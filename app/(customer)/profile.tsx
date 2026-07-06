@@ -66,7 +66,7 @@ export default function CustomerProfile() {
   };
 
   const handleSwitchToMerchant = async () => {
-    if (user?.role === 'merchant' && user?.merchant_id) {
+    if ((user?.role === 'merchant' || (user?.role as any) === 'both') && user?.merchant_id) {
       await switchRole('merchant');
       router.replace('/(merchant)');
     } else {

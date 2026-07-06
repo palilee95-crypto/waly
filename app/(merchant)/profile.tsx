@@ -606,6 +606,16 @@ export default function ProfileScreen() {
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
+          {merchant && merchant.owner === user?.id && (
+            <SettingItem
+              iconName="people-outline"
+              title="Manage Staff"
+              subtitle="Invite and remove store staff"
+              iconBgColor="#F1F5F9"
+              iconColor="#000000"
+              onPress={() => router.push('/(merchant)/staff' as any)}
+            />
+          )}
           <SettingItem
             iconName="notifications-outline"
             title="Notifications"

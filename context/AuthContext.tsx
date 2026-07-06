@@ -107,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let merchantId = record.merchant_id;
     let status: 'active' | 'suspended' | 'pending' = 'pending';
     
-    if (record.role === 'merchant') {
+    if (record.role === 'merchant' || record.role === 'both') {
       let merchantRecord = null;
       if (merchantId) {
         merchantRecord = await pb.collection('merchants').getOne(merchantId)
@@ -127,7 +127,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (pb.authStore.isValid && pb.authStore.record) {
         const refreshResult = await pb.collection('users').authRefresh().catch(() => null);
         const record = refreshResult?.record || pb.authStore.record;
-        const role = (storedRole as UserRole) || record.role || 'customer';
+        let role = (storedRole as UserRole) || record.role || 'customer';
+        if (role === 'both') {
+          role = 'customer';
+        }
         const merchantData = await ensureMerchantProfile(record);
         
         setUser({
@@ -186,7 +189,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Authenticate using the otpId and OTP code
     const authData = await pb.collection('users').authWithOTP(otpId, otp);
     const authRecord = authData.record;
-    const role: UserRole = authRecord.role || 'customer';
+    const rawRole = authRecord.role || 'customer';
+    const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
     await storage.setItem('waly_active_role', role || 'customer');
     const merchantData = await ensureMerchantProfile(authRecord);
     setUser({
@@ -210,7 +214,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Authenticate using the email and password
     const authData = await pb.collection('users').authWithPassword(email, password);
     const authRecord = authData.record;
-    const role: UserRole = authRecord.role || 'customer';
+    const rawRole = authRecord.role || 'customer';
+    const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
     await storage.setItem('waly_active_role', role || 'customer');
     const merchantData = await ensureMerchantProfile(authRecord);
     setUser({
@@ -299,7 +304,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!record) return;
 
       const storedRole = await storage.getItem('waly_active_role');
-      const role = (storedRole as UserRole) || record.role || 'customer';
+      let role = (storedRole as UserRole) || record.role || 'customer';
+      if (role === 'both') {
+        role = 'customer';
+      }
       const merchantData = await ensureMerchantProfile(record);
       
       setUser({

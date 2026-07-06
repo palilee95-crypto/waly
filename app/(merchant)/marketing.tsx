@@ -338,7 +338,7 @@ export default function MarketingScreen() {
       const res = await pb.send('/api/waly/merchant/whatsapp/status', {
         method: 'GET',
         headers: {
-          'Authorization': pb.authStore.token
+          'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
       setWhatsappStatus(res.status);
@@ -357,7 +357,7 @@ export default function MarketingScreen() {
       await pb.send('/api/waly/merchant/whatsapp/disconnect', {
         method: 'POST',
         headers: {
-          'Authorization': pb.authStore.token
+          'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
       setWhatsappStatus('disconnected');
@@ -413,7 +413,7 @@ export default function MarketingScreen() {
               const res = await pb.send('/api/waly/merchant/blast', {
                 method: 'POST',
                 headers: {
-                  'Authorization': pb.authStore.token
+                  'Authorization': 'Bearer ' + pb.authStore.token
                 },
                 body: {
                   title: bTitle.trim(),
@@ -450,7 +450,7 @@ export default function MarketingScreen() {
           const res = await pb.send('/api/waly/merchant/whatsapp/status?generateQr=true', {
             method: 'GET',
             headers: {
-              'Authorization': pb.authStore.token
+              'Authorization': 'Bearer ' + pb.authStore.token
             }
           });
           if (res.status === 'connected') {

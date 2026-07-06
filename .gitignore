@@ -54,4 +54,7 @@ scratch/
 # documentation
 docs/
 
+# PocketBase schemas
+pb_schema.json
+pb_schema_example.json
 

@@ -25,7 +25,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
 
         {/* Navigation Links */}
         <View style={styles.sidebarLinks}>
-          {state.routes.map((route: any, index: number) => {
+          {state.routes.filter((route: any) => route.name !== 'staff').map((route: any, index: number) => {
             const isFocused = state.index === index;
 
             const onPress = () => {
@@ -97,7 +97,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
   // Mobile Bottom Tab Bar view
   return (
     <View style={[styles.mobileTabBar, { paddingBottom: insets.bottom + 8 }]}>
-      {state.routes.map((route: any, index: number) => {
+      {state.routes.filter((route: any) => route.name !== 'staff').map((route: any, index: number) => {
         const isFocused = state.index === index;
         const onPress = () => {
           const event = navigation.emit({
@@ -763,6 +763,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="give" />
         <Tabs.Screen name="marketing" />
         <Tabs.Screen name="profile" />
+        <Tabs.Screen name="staff" options={{ href: null }} />
       </Tabs>
     </View>
   );
