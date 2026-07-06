@@ -1,0 +1,14 @@
+api.waly.app {
+  reverse_proxy localhost:8090
+
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy strict-origin-when-cross-origin
+  }
+}
+
+evolution.waly.app {
+  reverse_proxy localhost:8080
+}
+

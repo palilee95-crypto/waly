@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up | Waly</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Design System Tokens -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#f8f9ff",
+                    "on-tertiary-container": "#eff1f3",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container-high": "#dce9ff",
+                    "on-tertiary-fixed": "#191c1e",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "on-primary-container": "#eeefff",
+                    "on-background": "#0b1c30",
+                    "surface": "#f8f9ff",
+                    "on-error": "#ffffff",
+                    "error": "#ba1a1a",
+                    "inverse-primary": "#b4c5ff",
+                    "tertiary-container": "#6b6e70",
+                    "tertiary-fixed-dim": "#c4c7c9",
+                    "primary-fixed": "#dbe1ff",
+                    "primary-container": "#2563eb",
+                    "background": "#f8f9ff",
+                    "outline-variant": "#c3c6d7",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed-variant": "#3f465c",
+                    "on-surface": "#0b1c30",
+                    "on-surface-variant": "#434655",
+                    "surface-dim": "#cbdbf5",
+                    "inverse-surface": "#213145",
+                    "secondary": "#565e74",
+                    "on-primary-fixed": "#00174b",
+                    "inverse-on-surface": "#eaf1ff",
+                    "secondary-fixed": "#dae2fd",
+                    "tertiary": "#525657",
+                    "secondary-container": "#dae2fd",
+                    "on-secondary-fixed": "#131b2e",
+                    "on-tertiary-fixed-variant": "#444749",
+                    "on-secondary-container": "#5c647a",
+                    "surface-tint": "#0053db",
+                    "surface-container": "#e5eeff",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "tertiary-fixed": "#e0e3e5",
+                    "surface-container-low": "#eff4ff",
+                    "on-tertiary": "#ffffff",
+                    "secondary-fixed-dim": "#bec6e0",
+                    "primary": "#004ac6",
+                    "outline": "#737686"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "touch-target-min": "48px",
+                    "unit": "8px",
+                    "stack-lg": "24px",
+                    "container-margin": "20px",
+                    "stack-sm": "8px",
+                    "stack-md": "16px",
+                    "gutter": "16px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        /* Neo-Glassmorphism Effects */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .neo-blur-bg {
+            background: radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 90% 80%, rgba(0, 74, 198, 0.1) 0%, transparent 40%),
+                        radial-gradient(circle at 50% 50%, rgba(211, 228, 254, 0.5) 0%, #f8f9ff 100%);
+        }
+
+        .holographic-btn {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #004ac6 0%, #2563eb 50%, #004ac6 100%);
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        .holographic-btn::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 20%,
+                rgba(255, 255, 255, 0.2) 45%,
+                rgba(255, 255, 255, 0.5) 50%,
+                rgba(255, 255, 255, 0.2) 55%,
+                transparent 80%
+            );
+            transform: rotate(-45deg);
+            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .holographic-btn:hover::before {
+            left: 100%;
+            top: 100%;
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.3), 0 0 40px rgba(37, 99, 235, 0.1);
+        }
+
+        .floating {
+            animation: floating 6s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0% { transform: translate(0, 0px); }
+            50% { transform: translate(0, 15px); }
+            100% { transform: translate(0, -0px); }
+        }
+
+        .scan-line {
+            height: 2px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.5), transparent);
+            position: absolute;
+            top: 0;
+            animation: scan 4s linear infinite;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface neo-blur-bg min-h-screen flex flex-col font-body-md overflow-x-hidden">
+<!-- Top Navigation Anchor (Suppressed in standard Sign Up flow, but integrated per Brand Anchor "TopAppBar" logic with modifications for a focused task) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-container-margin h-touch-target-min transition-opacity duration-300">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-headline-md">verified_user</span>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight">Waly</h1>
+</div>
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity p-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<span class="font-label-sm text-label-sm">Support</span>
+</button>
+</header>
+<main class="flex-grow flex items-center justify-center p-container-margin py-24 relative">
+<!-- Background Atmospheric Element (SVG Animation placeholder would go here if defined) -->
+<div class="absolute inset-0 z-0 pointer-events-none opacity-40">
+<div class="absolute top-1/4 -left-20 w-64 h-64 bg-primary-container rounded-full blur-[100px] floating"></div>
+<div class="absolute bottom-1/4 -right-20 w-96 h-96 bg-surface-variant rounded-full blur-[120px] floating" style="animation-delay: -3s;"></div>
+</div>
+<!-- Multi-layered Neo-Glass Card -->
+<div class="relative w-full max-w-lg z-10">
+<!-- Decorative Back Layers -->
+<div class="absolute -top-4 -right-4 w-full h-full glass-panel rounded-[32px] rotate-2 opacity-30 pointer-events-none"></div>
+<div class="absolute -bottom-2 -left-2 w-full h-full glass-panel rounded-[32px] -rotate-1 opacity-20 pointer-events-none"></div>
+<!-- Main Content Card -->
+<div class="glass-panel rounded-[32px] p-stack-lg shadow-xl relative overflow-hidden">
+<div class="scan-line"></div>
+<!-- Header -->
+<div class="mb-stack-lg text-center">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-container mb-stack-md neon-glow">
+<span class="material-symbols-outlined text-on-primary text-[32px]">rocket_launch</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-2">Initialize Loyalty</h2>
+<p class="font-body-md text-on-surface-variant px-8">Join the next generation of premium merchant rewards.</p>
+</div>
+<!-- Form Fields -->
+<form class="space-y-stack-md" onsubmit="return false;">
+<div class="grid grid-cols-2 gap-gutter">
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant px-1">FIRST NAME</label>
+<input class="w-full h-touch-target-min px-stack-md bg-white/50 border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all font-body-md outline-none" placeholder="John" type="text"/>
+</div>
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant px-1">LAST NAME</label>
+<input class="w-full h-touch-target-min px-stack-md bg-white/50 border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all font-body-md outline-none" placeholder="Doe" type="text"/>
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant px-1">EMAIL ARCHITECTURE</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-[20px]">alternate_email</span>
+<input class="w-full h-touch-target-min pl-12 pr-stack-md bg-white/50 border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all font-body-md outline-none" placeholder="name@nexus.com" type="email"/>
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant px-1">SECURITY KEY</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock_open</span>
+<input class="w-full h-touch-target-min pl-12 pr-stack-md bg-white/50 border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all font-body-md outline-none" placeholder="••••••••••••" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant" type="button">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+</div>
+</div>
+<div class="flex items-start gap-3 py-2">
+<div class="relative flex items-center">
+<input class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary bg-white/50 cursor-pointer" id="terms" type="checkbox"/>
+</div>
+<label class="font-label-sm text-label-sm text-on-surface-variant cursor-pointer leading-tight" for="terms">
+                            I accept the <span class="text-primary font-bold">Protocols</span> and acknowledge the <span class="text-primary font-bold">Privacy Matrix</span> for data integrity.
+                        </label>
+</div>
+<!-- Primary Action Button with Holographic Effect -->
+<button class="holographic-btn w-full h-[56px] rounded-2xl text-on-primary font-label-md text-label-md uppercase tracking-widest shadow-lg active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+<span>Create Account</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</form>
+<!-- Alternative Social Entry -->
+<div class="mt-stack-lg pt-stack-lg border-t border-outline-variant/30 text-center">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-stack-md">AUTHENTICATE WITH ECOSYSTEM</p>
+<div class="flex justify-center gap-gutter">
+<button class="w-full h-touch-target-min flex items-center justify-center gap-3 bg-white/60 border border-outline-variant rounded-xl hover:bg-white transition-colors">
+<img alt="G" class="w-5 h-5 opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyiKUfr3fTMRvKK0DTfxu6Gycnt8aO1z0UMiIPY9RSRdnr5_wNWLDjcOPV0ImR0ITkdqTNswr6dcgan2-O733wsVs2hV34W10PD3Hnz7crXHc0vCRXc9gjYij9E5Wh0Q6Q9QQFckMeKJBioSnP_mH_osWmCO4XH7rhZEDUiD4OrzzlVkdDuaYwTzmqPYWrsGqSy5I-ZvjsnaA-gkaw5Eq1MiEKwTtojr47Wzyd1AJDv2ZPl5begbULDs69YTVnFWOVe452GrtOFCGd"/>
+<span class="font-label-md text-label-md">Google</span>
+</button>
+<button class="w-full h-touch-target-min flex items-center justify-center gap-3 bg-white/60 border border-outline-variant rounded-xl hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-[20px]">apps</span>
+<span class="font-label-md text-label-md">Apple</span>
+</button>
+</div>
+</div>
+<div class="mt-stack-lg text-center">
+<p class="font-body-md text-on-surface-variant">
+                        Already part of the network? 
+                        <a class="text-primary font-bold hover:underline" href="#">Secure Login</a>
+</p>
+</div>
+</div>
+<!-- Promotional Card Snippet (Bento Grid Style) -->
+<div class="mt-gutter grid grid-cols-2 gap-gutter">
+<div class="glass-panel p-stack-md rounded-2xl flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-[20px]" data-weight="fill">token</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Start Bonus</p>
+<p class="font-headline-md text-headline-md text-on-surface">500 <span class="text-label-sm font-normal">pts</span></p>
+</div>
+</div>
+<div class="glass-panel p-stack-md rounded-2xl flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-[20px]">encrypted</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Security</p>
+<p class="font-headline-md text-headline-md text-on-surface">Tier 1</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Logic from JSON (Suppressed as this is a focused transactional screen) -->
+<!-- We maintain the layout structure but skip the persistent BottomNavBar for Sign Up -->
+<footer class="mt-auto py-stack-md px-container-margin text-center">
+<p class="font-label-sm text-label-sm text-outline opacity-60">© 2024 WALY SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE</p>
+</footer>
+<script>
+        // Micro-interactions for form feedback
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('scale-[1.01]');
+                input.parentElement.style.transition = 'transform 0.2s ease';
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('scale-[1.01]');
+            });
+        });
+
+        // Holographic button tilt effect (simulated via mouse move)
+        const btn = document.querySelector('.holographic-btn');
+        if (btn) {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = (y - centerY) / 10;
+                const rotateY = (centerX - x) / 10;
+                
+                btn.style.transform = `perspective</script></body></html>

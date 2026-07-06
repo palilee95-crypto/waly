@@ -31,7 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +40,18 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local data storage, databases & binaries
+pb_data/
+pb_data_test/
+evolution_db_data/
+evolution_redis_data/
+pocketbase.exe
+
+# agent scratchpads
+scratch/
+
+# documentation
+docs/
+
+

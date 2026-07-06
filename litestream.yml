@@ -1,0 +1,9 @@
+dbs:
+  - path: /pb_data/data.db
+    replicas:
+      - type: s3
+        bucket: waly-pb-backup
+        path: backups/data.db
+        region: ap-southeast-1
+        sync-interval: 1s
+        retention: 7d
