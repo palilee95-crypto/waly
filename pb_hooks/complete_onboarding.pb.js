@@ -10,6 +10,7 @@ routerAdd("POST", "/api/waly/onboarding/complete", (e) => {
   const name = data.name || '';
   const email = data.email || '';
 
+
   const trimmedName = name.trim();
   const trimmedEmail = email.trim().toLowerCase();
 
@@ -46,7 +47,17 @@ routerAdd("POST", "/api/waly/onboarding/complete", (e) => {
 
     $app.save(authRecord);
 
-    const token = $tokens.newRecordAuthToken($app, authRecord);
+    const duration = authRecord.collection().authToken.duration || 604800;
+    const secret = authRecord.tokenKey() + authRecord.collection().authToken.secret;
+    const token = $security.createJWT(
+      {
+        id: authRecord.id,
+        type: "auth",
+        collectionId: authRecord.collection().id,
+      },
+      secret,
+      duration
+    );
 
     return e.json(200, {
       message: "Profile successfully completed.",

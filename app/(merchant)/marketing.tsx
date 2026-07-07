@@ -65,6 +65,11 @@ export default function MarketingScreen() {
   const [rewardDesc, setRewardDesc] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<string>('coffee');
   const [cardColor, setCardColor] = useState<string>('#000000');
+  const [customHexInput, setCustomHexInput] = useState<string>('#000000');
+  const [bgImage, setBgImage] = useState<string>('');
+  const [bgFile, setBgFile] = useState<any>(null);
+  const [removeBgImage, setRemoveBgImage] = useState<boolean>(false);
+  const colorPickerRef = React.useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessNotice, setShowSuccessNotice] = useState(false);
@@ -531,6 +536,10 @@ export default function MarketingScreen() {
         setRewardDesc(prog.reward_description || '');
         setSelectedIcon(prog.card_icon || 'coffee');
         setCardColor(prog.card_color || '#000000');
+        setCustomHexInput(prog.card_color || '#000000');
+        setBgImage(prog.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background}` : '');
+        setBgFile(null);
+        setRemoveBgImage(false);
       }
     } catch (err) {
       console.warn('Failed to load merchant marketing settings:', err);
@@ -553,7 +562,7 @@ export default function MarketingScreen() {
 
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         merchant: user.merchant_id,
         name: `${merchant?.name || 'Store'} Reward Card`,
         is_active: isActive,
@@ -565,13 +574,37 @@ export default function MarketingScreen() {
         expiry_days: days,
       };
 
-      if (programId) {
-        // Update existing program
-        await pb.collection('loyalty_programs').update(programId, payload);
+      if (bgFile) {
+        // Create FormData for multipart image upload
+        const formData = new FormData();
+        Object.keys(payload).forEach(key => {
+          formData.append(key, String(payload[key]));
+        });
+        formData.append('card_background', bgFile);
+
+        if (programId) {
+          const updated = await pb.collection('loyalty_programs').update(programId, formData);
+          setBgImage(updated.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${updated.id}/${updated.card_background}` : '');
+          setBgFile(null);
+          setRemoveBgImage(false);
+        } else {
+          const newProg = await pb.collection('loyalty_programs').create(formData);
+          setProgramId(newProg.id);
+          setBgImage(newProg.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${newProg.id}/${newProg.card_background}` : '');
+          setBgFile(null);
+          setRemoveBgImage(false);
+        }
       } else {
-        // Create new program
-        const newProg = await pb.collection('loyalty_programs').create(payload);
-        setProgramId(newProg.id);
+        if (removeBgImage) {
+          payload.card_background = null;
+        }
+
+        if (programId) {
+          await pb.collection('loyalty_programs').update(programId, payload);
+        } else {
+          const newProg = await pb.collection('loyalty_programs').create(payload);
+          setProgramId(newProg.id);
+        }
       }
 
       setShowSuccessNotice(true);
@@ -607,6 +640,10 @@ export default function MarketingScreen() {
             setRewardDesc('');
             setSelectedIcon('coffee');
             setCardColor('#000000');
+            setCustomHexInput('#000000');
+            setBgImage('');
+            setBgFile(null);
+            setRemoveBgImage(false);
             Alert.alert('Success', 'Campaign deleted successfully.');
           } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to delete campaign.');
@@ -759,6 +796,21 @@ export default function MarketingScreen() {
           </Text>
         </View>
 
+        {/* Hidden HTML input for visual color picking (Web only) */}
+        {Platform.OS === 'web' && (
+          <input
+            ref={colorPickerRef}
+            type="color"
+            style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
+            value={cardColor}
+            onChange={(e) => {
+              const val = e.target.value.toUpperCase();
+              setCardColor(val);
+              setCustomHexInput(val);
+            }}
+          />
+        )}
+
         {/* Form Card 2.5: Card Color Selector */}
         <View style={styles.configCard}>
           <Text style={styles.cardSectionTitle}>Select Card Background Color</Text>
@@ -773,7 +825,10 @@ export default function MarketingScreen() {
                     { backgroundColor: circleColor },
                     cardColor === opt.value && styles.colorCircleActive,
                   ]}
-                  onPress={() => setCardColor(opt.value)}
+                  onPress={() => {
+                    setCardColor(opt.value);
+                    setCustomHexInput(opt.value);
+                  }}
                   activeOpacity={0.8}
                 >
                   {cardColor === opt.value && (
@@ -782,6 +837,139 @@ export default function MarketingScreen() {
                 </TouchableOpacity>
               );
             })}
+            
+            {/* Visual Color Picker Circle */}
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                style={[
+                  styles.colorCircle,
+                  styles.colorWheelCircle,
+                  !colorOptions.some(opt => opt.value === cardColor) && styles.colorCircleActive,
+                ]}
+                onPress={() => colorPickerRef.current?.click()}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="color-filter-outline" size={16} color="#000000" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Hex input section */}
+          <View style={styles.hexInputContainer}>
+            <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+            <View style={styles.hexInputWrapper}>
+              <Text style={styles.hexHashSymbol}>#</Text>
+              <TextInput
+                style={styles.hexTextInput}
+                value={customHexInput.replace('#', '')}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                  setCustomHexInput('#' + cleaned);
+                  if (cleaned.length === 6) {
+                    setCardColor('#' + cleaned.toUpperCase());
+                  }
+                }}
+                placeholder="000000"
+                placeholderTextColor="#BEC6E0"
+                maxLength={6}
+                {...Platform.select({
+                  web: {
+                    outlineStyle: 'none',
+                  } as any,
+                })}
+              />
+              <View style={[styles.hexColorPreview, { backgroundColor: cardColor }]} />
+            </View>
+          </View>
+        </View>
+
+        {/* Form Card 2.7: Card Background Image */}
+        <View style={styles.configCard}>
+          <Text style={styles.cardSectionTitle}>Custom Card Background Image</Text>
+          <View style={styles.uploadBlock}>
+            {bgImage ? (
+              <View style={styles.previewImageContainer}>
+                <Image source={{ uri: bgImage }} style={styles.uploadPreview} resizeMode="cover" />
+                <TouchableOpacity
+                  style={styles.removeImageBtn}
+                  onPress={() => {
+                    setBgImage('');
+                    setBgFile(null);
+                    setRemoveBgImage(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.removeImageText}>Remove Image</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.uploadPlaceholder}
+                onPress={() => {
+                  if (Platform.OS === 'web') {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e: any) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event: any) => {
+                          const img = new window.Image();
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 600;
+                            const MAX_HEIGHT = 400;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                              if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                              }
+                            } else {
+                              if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                              }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+
+                            canvas.toBlob((blob) => {
+                              if (blob) {
+                                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                                  type: 'image/jpeg',
+                                  lastModified: Date.now()
+                                });
+                                setBgFile(compressedFile);
+                                setBgImage(URL.createObjectURL(compressedFile));
+                                setRemoveBgImage(false);
+                              }
+                            }, 'image/jpeg', 0.85);
+                          };
+                          img.src = event.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    };
+                    input.click();
+                  } else {
+                    Alert.alert('Not Supported', 'Image upload is currently web-only in this demo.');
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                <Text style={styles.uploadPlaceholderText}>Select Background Picture</Text>
+                <Text style={styles.uploadPlaceholderSub}>Supports JPG, PNG, WEBP up to 5MB</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -864,7 +1052,14 @@ export default function MarketingScreen() {
         <Text style={styles.previewSectionHeader}>STAMP CARD PREVIEW</Text>
 
         {/* Live Preview Loyalty Card representation */}
-        <View style={[styles.liveCardPreview, { backgroundColor: cardColor }]}>
+        <View style={[styles.liveCardPreview, { backgroundColor: cardColor, overflow: 'hidden' }]}>
+          {bgImage ? (
+            <Image
+              source={{ uri: bgImage }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+            />
+          ) : null}
           <View style={styles.cardPreviewHeader}>
             <View>
               <Text style={styles.previewSub}>LOYALTY PROGRAM</Text>
@@ -2700,5 +2895,115 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     marginTop: 2,
+  },
+  // Custom Color Picker & Background styles
+  colorWheelCircle: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hexInputContainer: {
+    marginTop: 16,
+  },
+  hexInputLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 1.0,
+    marginBottom: 8,
+  },
+  hexInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 48,
+    gap: 8,
+  },
+  hexHashSymbol: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
+  },
+  hexTextInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+    padding: 0,
+  },
+  hexColorPreview: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  uploadBlock: {
+    marginTop: 12,
+  },
+  previewImageContainer: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  uploadPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(220, 38, 38, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  removeImageText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  uploadPlaceholder: {
+    width: '100%',
+    height: 140,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+  },
+  uploadPlaceholderText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    marginTop: 4,
+  },
+  uploadPlaceholderSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
 });

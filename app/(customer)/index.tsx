@@ -33,6 +33,7 @@ type LoyaltyCardItem = {
   points: number;
   gradientColors: string[];
   cardIcon: string;
+  cardBackground?: string;
 };
 
 const stampIcons = [
@@ -178,6 +179,9 @@ export default function CustomerDashboard() {
           points: rec.stamps_collected || 0,
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
+          cardBackground: program?.card_background
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
+            : undefined,
         };
       });
       setLoyaltyCards(mapped);
@@ -564,6 +568,7 @@ export default function CustomerDashboard() {
                           { translateY: translateY as any },
                           { scale: scale as any },
                         ],
+                        overflow: 'hidden',
                       },
                     ]}
                   >
@@ -584,6 +589,9 @@ export default function CustomerDashboard() {
                       } : undefined}
                       activeOpacity={0.95}
                     >
+                      {item.cardBackground ? (
+                        <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                      ) : null}
                       <View style={styles.stackedCardContent}>
                         {/* Header info */}
                         <View style={styles.cardInfoRow}>
@@ -687,7 +695,10 @@ export default function CustomerDashboard() {
               </View>
 
               {/* Large credit-card style loyalty details card */}
-              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0] }]}>
+               <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
+                {selectedCard.cardBackground ? (
+                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                ) : null}
                 <View style={styles.largeCardHeader}>
                   <View>
                     <Text style={styles.largeCardMerchant}>{selectedCard.merchantName}</Text>

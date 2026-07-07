@@ -31,6 +31,7 @@ type LoyaltyCardItem = {
   points: number;
   gradientColors: string[];
   cardIcon: string;
+  cardBackground?: string;
 };
 
 export default function MyCardsScreen() {
@@ -67,6 +68,9 @@ export default function MyCardsScreen() {
           points: rec.stamps_collected || 0,
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
+          cardBackground: program?.card_background
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
+            : undefined,
         };
       });
       setLoyaltyCards(mapped);
@@ -201,10 +205,13 @@ export default function MyCardsScreen() {
               loyaltyCards.map((item) => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.loyaltyCard, { backgroundColor: item.gradientColors[0] }]}
+                  style={[styles.loyaltyCard, { backgroundColor: item.gradientColors[0], overflow: 'hidden' }]}
                   onPress={() => openCardDetails(item)}
                   activeOpacity={0.9}
                 >
+                  {item.cardBackground ? (
+                    <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  ) : null}
                   <View style={styles.cardHeader}>
                     <View style={styles.shopLogoBg}>
                       <Image source={{ uri: item.logo }} style={styles.shopLogo} />
@@ -272,7 +279,10 @@ export default function MyCardsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0] }]}>
+              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
+                {selectedCard.cardBackground ? (
+                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                ) : null}
                 <View style={styles.largeCardHeader}>
                   <View>
                     <Text style={styles.largeCardMerchant}>{selectedCard.merchantName}</Text>
