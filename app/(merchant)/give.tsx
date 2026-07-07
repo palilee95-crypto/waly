@@ -83,39 +83,11 @@ export default function GiveStampsScreen() {
     }
   };
 
-  const handleManualSubmit = async () => {
-    const rawInput = phoneNumber.trim();
-    if (!rawInput) {
-      Alert.alert('Error', 'Please enter a valid phone number or voucher code.');
-      return;
-    }
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Unauthorized merchant account.');
-      return;
-    }
-
-    // If input starts with WV- prefix, process as voucher redemption
-    if (rawInput.toUpperCase().startsWith('WV-')) {
-      await redeemVoucherCode(rawInput);
-      return;
-    }
-
-    const count = parseInt(stampsCount || '1', 10);
-    let customer;
-    try {
-      const normalizedPhone = normalizePhoneNumber(rawInput);
-      // Find the user by phone
-      customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-    } catch (err: any) {
-      console.warn(err);
-      Alert.alert('Error', 'Customer not found. Please verify that the phone number is registered with Waly.');
-      return;
-    }
-
+  const proceedWithIssuingStamps = async (customer: any, count: number, rawInput: string) => {
     let program;
     try {
       // Fetch merchant's active loyalty program
-      program = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user.merchant_id}" && is_active = true`);
+      program = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user!.merchant_id}" && is_active = true`);
     } catch (err: any) {
       console.warn(err);
       Alert.alert(
@@ -134,7 +106,7 @@ export default function GiveStampsScreen() {
         loyaltyCard = await pb.collection('loyalty_cards').create({
           customer: customer.id,
           program: program.id,
-          merchant: user.merchant_id,
+          merchant: user!.merchant_id,
           stamps_collected: 0,
           completions: 0,
           status: 'active',
@@ -152,7 +124,7 @@ export default function GiveStampsScreen() {
       // 2. Issue earn transaction log
       await pb.collection('transactions').create({
         customer: customer.id,
-        merchant: user.merchant_id,
+        merchant: user!.merchant_id,
         loyalty_card: loyaltyCard!.id,
         type: 'earn',
         points: count, // Hook will multiply points
@@ -172,6 +144,74 @@ export default function GiveStampsScreen() {
       console.warn(err);
       Alert.alert('Error', err.message || 'Failed to award stamps.');
     }
+  };
+
+  const handleManualSubmit = async () => {
+    const rawInput = phoneNumber.trim();
+    if (!rawInput) {
+      Alert.alert('Error', 'Please enter a valid phone number or voucher code.');
+      return;
+    }
+    if (!user || !user.merchant_id) {
+      Alert.alert('Error', 'Unauthorized merchant account.');
+      return;
+    }
+
+    // If input starts with WV- prefix, process as voucher redemption
+    if (rawInput.toUpperCase().startsWith('WV-')) {
+      await redeemVoucherCode(rawInput);
+      return;
+    }
+
+    const count = parseInt(stampsCount || '1', 10);
+    let customer;
+    const normalizedPhone = normalizePhoneNumber(rawInput);
+    try {
+      // Find the user by phone
+      customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+    } catch (err: any) {
+      console.warn(err);
+      // Prompt to create a new customer
+      Alert.alert(
+        'New Customer',
+        `Phone number ${rawInput} is not registered. Would you like to create a new customer profile and issue these stamps?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Create & Issue',
+            onPress: async () => {
+              try {
+                // Generate a random clean email
+                const cleanNum = normalizedPhone.replace(/[^\d]/g, '');
+                const emailVal = `user_${cleanNum}@waly.app`;
+                const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
+
+                // Create new customer
+                const newCustomer = await pb.collection('users').create({
+                  phone: normalizedPhone,
+                  email: emailVal,
+                  name: `User ${normalizedPhone.slice(-4)}`,
+                  role: 'customer',
+                  password: randomPassword,
+                  passwordConfirm: randomPassword,
+                  total_points: 0,
+                  tier: 'bronze',
+                });
+
+                // Continue the stamp issue process using the new customer!
+                await proceedWithIssuingStamps(newCustomer, count, rawInput);
+              } catch (createErr: any) {
+                console.error(createErr);
+                Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+              }
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    await proceedWithIssuingStamps(customer, count, rawInput);
   };
 
   const simulateVoucherScan = async () => {
