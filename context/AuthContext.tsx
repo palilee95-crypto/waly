@@ -113,7 +113,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         merchantRecord = await pb.collection('merchants').getOne(merchantId)
           .catch(() => null);
       }
-      if (merchantRecord) {
+      
+      // Self-healing: if role is merchant but merchant_id is missing, find or create one
+      if (!merchantRecord) {
+        try {
+          // Check if there is an orphaned merchant owned by this user
+          const existing = await pb.collection('merchants').getFullList({
+            filter: `owner = "${record.id}"`
+          });
+          if (existing.length > 0) {
+            merchantRecord = existing[0];
+          } else {
+            // Create a new pending merchant record
+            merchantRecord = await pb.collection('merchants').create({
+              name: `${record.name || 'New'}'s Shop`,
+              owner: record.id,
+              category: 'food',
+              status: 'pending',
+            });
+          }
+          
+          if (merchantRecord) {
+            merchantId = merchantRecord.id;
+            status = (merchantRecord.status as any) || 'pending';
+            // Link it to the user profile
+            await pb.collection('users').update(record.id, {
+              merchant_id: merchantRecord.id,
+            });
+          }
+        } catch (err) {
+          console.error("Self-healing merchant profile creation failed:", err);
+        }
+      } else {
         merchantId = merchantRecord.id;
         status = (merchantRecord.status as any) || 'pending';
       }

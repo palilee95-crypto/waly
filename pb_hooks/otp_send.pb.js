@@ -50,6 +50,25 @@ routerAdd("POST", "/api/waly/register", (e) => {
     user.set("role", role);
     user.setPassword(password);
     $app.save(user);
+
+    // If the role is merchant or both, auto-create a pending merchant record
+    if (role === 'merchant' || role === 'both') {
+      try {
+        const merchantCollection = $app.findCollectionByNameOrId("merchants");
+        const merchant = new Record(merchantCollection);
+        merchant.set("name", `${user.getString("name")}'s Shop`);
+        merchant.set("owner", user.id);
+        merchant.set("category", "food");
+        merchant.set("status", "pending");
+        $app.save(merchant);
+
+        // Update user with the merchant ID reference
+        user.set("merchant_id", merchant.id);
+        $app.save(user);
+      } catch (merchantErr) {
+        console.log("Failed to auto-provision merchant profile during registration:", merchantErr.message || merchantErr);
+      }
+    }
   } catch (createErr) {
     return e.json(500, { message: "Failed to create user record: " + createErr.message });
   }
@@ -128,6 +147,12 @@ onMailerRecordOTPSend((e) => {
 
   // Clean target to numbers only for WhatsApp delivery
   const cleanPhone = target.replace(/[^\d]/g, '');
+
+  // Log OTP to server console for local developer testing!
+  console.log("\n========================================");
+  console.log("🔑 [LOCAL TEST OTP] Sent to: " + cleanPhone);
+  console.log("👉 OTP Code: " + otp);
+  console.log("========================================\n");
 
   const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
   const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'waly_dev_api_key';

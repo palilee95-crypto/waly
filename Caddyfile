@@ -1,14 +1,17 @@
-api.waly.app {
-  reverse_proxy localhost:8090
+# API PocketBase Reverse Proxy
+{$DOMAIN_API} {
+    reverse_proxy pocketbase:8090
 
-  header {
-    X-Content-Type-Options nosniff
-    X-Frame-Options DENY
-    Referrer-Policy strict-origin-when-cross-origin
-  }
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
 }
 
-evolution.waly.app {
-  reverse_proxy localhost:8080
+# Evolution API Reverse Proxy
+{$DOMAIN_EVO} {
+    reverse_proxy evolution-api:8080
 }
+
 

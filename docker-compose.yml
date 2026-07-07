@@ -1,20 +1,81 @@
 version: '3.8'
 
 services:
+  # Caddy reverse proxy with automatic SSL
+  caddy:
+    image: caddy:latest
+    container_name: waly-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN_API=${DOMAIN_API}
+      - DOMAIN_EVO=${DOMAIN_EVO}
+    depends_on:
+      - pocketbase
+      - evolution-api
+    networks:
+      - waly-network
 
-  # Evolution API Database (Postgres)
+  # PocketBase Go Backend
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: waly-pocketbase
+    restart: unless-stopped
+    working_dir: /pb
+    command: serve --http=0.0.0.0:8090 --dir=/pb/pb_data --hooksDir=/pb/pb_hooks --migrationsDir=/pb/pb_migrations
+    volumes:
+      - ./pb_data:/pb/pb_data
+      - ./pb_hooks:/pb/pb_hooks
+      - ./pb_migrations:/pb/pb_migrations
+    environment:
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    networks:
+      - waly-network
+
+  # Litestream SQLite backup
+  litestream:
+    image: litestream/litestream:latest
+    container_name: waly-litestream
+    restart: unless-stopped
+    volumes:
+      - ./pb_data:/pb_data
+      - ./litestream.yml:/etc/litestream.yml
+    command: replicate
+    depends_on:
+      - pocketbase
+    environment:
+      - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_REGION=${S3_REGION}
+    networks:
+      - waly-network
+
+  # Evolution API DB (PostgreSQL)
   evolution-db:
     image: postgres:15-alpine
     container_name: waly-evolution-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${EVOLUTION_DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:-waly_postgres_pass}
-      POSTGRES_DB: ${EVOLUTION_DB_NAME:-evolution}
+      POSTGRES_USER: ${EVOLUTION_DB_USER}
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+      POSTGRES_DB: ${EVOLUTION_DB_NAME}
     volumes:
       - ./evolution_db_data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5433:5432"
+    networks:
+      - waly-network
 
   # Evolution API Cache (Redis)
   evolution-redis:
@@ -23,37 +84,31 @@ services:
     restart: unless-stopped
     volumes:
       - ./evolution_redis_data:/data
+    networks:
+      - waly-network
 
-  # Evolution API Service
+  # Evolution API Whatsapp Service
   evolution-api:
     image: evoapicloud/evolution-api:latest
     container_name: waly-evolution-api
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     depends_on:
       - evolution-db
       - evolution-redis
     environment:
       - SERVER_TYPE=http
       - SERVER_PORT=8080
-      - SERVER_URL=${EVOLUTION_API_URL:-http://localhost:8080}
+      - SERVER_URL=${EVOLUTION_API_URL}
       - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-waly_dev_api_key}
-      
-      # Database Configuration
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://${EVOLUTION_DB_USER:-postgres}:${EVOLUTION_DB_PASSWORD:-waly_postgres_pass}@evolution-db:5432/${EVOLUTION_DB_NAME:-evolution}?schema=public
+      - DATABASE_CONNECTION_URI=postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/${EVOLUTION_DB_NAME}?schema=public
       - DATABASE_CONNECTION_CLIENT_NAME=waly
-      
-      # Cache Configuration (Redis)
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://evolution-redis:6379/1
       - CACHE_REDIS_PREFIX_KEY=evolution
       - CACHE_LOCAL_ENABLED=false
-      
-      # Save Data Preferences (optimized to avoid bloated db)
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=false
       - DATABASE_SAVE_DATA_CONTACTS=false
@@ -61,4 +116,14 @@ services:
       - DATABASE_SAVE_DATA_HISTORIC=false
       - DATABASE_SAVE_MESSAGE_UPDATE=false
       - DATABASE_SAVE_DATA_LABELS=false
+    networks:
+      - waly-network
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  waly-network:
+    driver: bridge
 
