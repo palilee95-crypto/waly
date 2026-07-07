@@ -16,11 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [stampsCount, setStampsCount] = useState('1');
@@ -28,6 +30,7 @@ export default function GiveStampsScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
+  const [showNoCampaignModal, setShowNoCampaignModal] = useState(false);
   const [tempPhone, setTempPhone] = useState('');
   const [tempCount, setTempCount] = useState(1);
   const [successDetails, setSuccessDetails] = useState<{
@@ -92,11 +95,8 @@ export default function GiveStampsScreen() {
       // Fetch merchant's active loyalty program
       program = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user!.merchant_id}" && is_active = true`);
     } catch (err: any) {
-      console.warn(err);
-      Alert.alert(
-        'Loyalty Campaign Inactive',
-        'No active loyalty program found for your merchant account.\n\nPlease go to the "Marketing" tab, configure your card goals, and turn on the "Enable Campaign" toggle to save and activate it first.'
-      );
+      console.warn("Active loyalty campaign search failed:", err);
+      setShowNoCampaignModal(true);
       return;
     }
 
@@ -645,6 +645,80 @@ export default function GiveStampsScreen() {
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
                   Create & Issue
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Campaign Inactive Warning Modal */}
+      <Modal
+        visible={showNoCampaignModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNoCampaignModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Elegant Warning Icon */}
+            <View style={[styles.successIconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="megaphone-outline" size={40} color="#D97706" />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: '#D97706', marginBottom: 12, textAlign: 'center' }]}>
+              CAMPAIGN INACTIVE
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_600SemiBold',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 18,
+              marginBottom: 24,
+            }}>
+              No active loyalty program found for your store. Please go to the Marketing section to create a campaign and enable it first.
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                }}
+                onPress={() => setShowNoCampaignModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                  Close
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#000000',
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => {
+                  setShowNoCampaignModal(false);
+                  router.push('/(merchant)/marketing' as any);
+                }}
+                activeOpacity={0.9}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                  Go to Marketing
                 </Text>
               </TouchableOpacity>
             </View>
