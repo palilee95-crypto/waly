@@ -163,31 +163,33 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
   const initialName = user?.name && !user.name.startsWith('User ') ? user.name : '';
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
   const handleSubmit = async () => {
+    setError('');
     const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedName) {
-      Alert.alert('Error', 'Please enter your Full Name.');
+      setError('Please enter your Full Name.');
       return;
     }
     if (!trimmedEmail) {
-      Alert.alert('Error', 'Please enter your Email Address.');
+      setError('Please enter your Email Address.');
       return;
     }
     
     // Simple email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      Alert.alert('Error', 'Please enter a valid email address.');
+      setError('Please enter a valid email address.');
       return;
     }
     if (trimmedEmail.endsWith('@waly.app')) {
-      Alert.alert('Error', 'Please use your personal email address, not a temporary @waly.app domain.');
+      setError('Please use your personal email address, not a temporary @waly.app domain.');
       return;
     }
 
@@ -201,12 +203,10 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
 
       // 2. Refresh the local session to update state and unlock the portal
       await refreshSession();
-
-      Alert.alert('Profile Complete', 'Welcome to WALY! Your digital wallet is now ready.');
     } catch (err: any) {
       console.error(err);
       const errMsg = err.message || (err.data && JSON.stringify(err.data)) || 'Failed to complete profile registration.';
-      Alert.alert('Registration Error', errMsg);
+      setError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -257,6 +257,14 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
             </View>
             <Text style={styles.inputHint}>This email will be used for account recovery and rewards notification.</Text>
           </View>
+
+          {/* Validation Error Message Box */}
+          {error ? (
+            <View style={styles.errorBoxContainer}>
+              <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
+              <Text style={styles.errorBoxText}>{error}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={styles.submitBtn}
@@ -592,6 +600,22 @@ const styles = StyleSheet.create({
   logoutLinkText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#EF4444',
+  },
+  errorBoxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  errorBoxText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#EF4444',
   },
 });
