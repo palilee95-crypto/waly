@@ -33,6 +33,7 @@ export default function GiveStampsScreen() {
   const [showNoCampaignModal, setShowNoCampaignModal] = useState(false);
   const [tempPhone, setTempPhone] = useState('');
   const [tempCount, setTempCount] = useState(1);
+  const [newCustomerName, setNewCustomerName] = useState('');
   const [successDetails, setSuccessDetails] = useState<{
     customerName: string;
     customerPhone: string;
@@ -192,13 +193,15 @@ export default function GiveStampsScreen() {
       const newCustomer = await pb.collection('users').create({
         phone: tempPhone,
         email: emailVal,
-        name: `User ${tempPhone.slice(-4)}`,
+        name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
         role: 'customer',
         password: randomPassword,
         passwordConfirm: randomPassword,
         total_points: 0,
         tier: 'bronze',
       });
+
+      setNewCustomerName('');
 
       // Continue the stamp issue process using the new customer!
       await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
@@ -606,6 +609,47 @@ export default function GiveStampsScreen() {
             }}>
               Phone number <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{phoneNumber}</Text> is not registered with WALY. Create a new guest account to credit these stamps?
             </Text>
+
+            {/* Optional Customer Name Input */}
+            <View style={{ width: '100%', marginBottom: 20 }}>
+              <Text style={{
+                fontSize: 10,
+                fontFamily: 'PlusJakartaSans_700Bold',
+                color: '#94A3B8',
+                letterSpacing: 0.5,
+                marginBottom: 6,
+              }}>
+                CUSTOMER NAME (OPTIONAL)
+              </Text>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderWidth: 1.5,
+                borderColor: '#E2E8F0',
+                borderRadius: 12,
+                height: 44,
+                paddingHorizontal: 12,
+                backgroundColor: '#F8FAFC',
+              }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#000000',
+                    ...Platform.select({
+                      web: {
+                        outlineStyle: 'none',
+                      } as any,
+                    }),
+                  }}
+                  value={newCustomerName}
+                  onChangeText={setNewCustomerName}
+                  placeholder="Enter name (e.g. Adam)"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+            </View>
 
             {/* Action Buttons */}
             <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>

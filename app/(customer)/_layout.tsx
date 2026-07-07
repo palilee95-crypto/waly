@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { pb } from '@/lib/pocketbase';
 
 // Custom Bottom Tab Bar / Sidebar to match the clean minimalist black/white design
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -157,8 +158,133 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   );
 }
 
+function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; refreshSession: () => Promise<void>; logout: () => Promise<void> }) {
+  // Pre-fill the name if it is not the placeholder User XXXX format
+  const initialName = user?.name && !user.name.startsWith('User ') ? user.name : '';
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
+
+  const handleSubmit = async () => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName) {
+      Alert.alert('Error', 'Please enter your Full Name.');
+      return;
+    }
+    if (!trimmedEmail) {
+      Alert.alert('Error', 'Please enter your Email Address.');
+      return;
+    }
+    
+    // Simple email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      Alert.alert('Error', 'Please enter a valid email address.');
+      return;
+    }
+    if (trimmedEmail.endsWith('@waly.app')) {
+      Alert.alert('Error', 'Please use your personal email address, not a temporary @waly.app domain.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Update the user profile in PocketBase
+      await pb.collection('users').update(user.id, {
+        name: trimmedName,
+        email: trimmedEmail,
+      });
+
+      // 2. Refresh the local session to update state and unlock the portal
+      await refreshSession();
+
+      Alert.alert('Profile Complete', 'Welcome to WALY! Your digital wallet is now ready.');
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err.message || (err.data && JSON.stringify(err.data)) || 'Failed to complete profile registration.';
+      Alert.alert('Registration Error', errMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.onboardScroll} style={styles.onboardContainer}>
+      <View style={[styles.onboardCard, isDesktop && { maxWidth: 500, alignSelf: 'center', width: '100%' }]}>
+        <View style={styles.onboardHeader}>
+          <View style={styles.onboardIconBg}>
+            <Ionicons name="sparkles" size={28} color="#000000" style={{ transform: [{ rotate: '15deg' }] }} />
+          </View>
+          <Text style={styles.onboardTitle}>Welcome to WALY! 🎁</Text>
+          <Text style={styles.onboardSubtitle}>
+            Let's complete your profile so you can manage your loyalty cards and start claiming rewards.
+          </Text>
+        </View>
+
+        {/* Inputs */}
+        <View style={styles.onboardForm}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>FULL NAME</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="John Doe"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.textInput}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="your.email@example.com"
+                placeholderTextColor="#94A3B8"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            <Text style={styles.inputHint}>This email will be used for account recovery and rewards notification.</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+            activeOpacity={0.8}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.submitBtnText}>Continue to Wallet</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutLink} onPress={logout} activeOpacity={0.7}>
+            <Text style={styles.logoutLinkText}>Log Out Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
 export default function CustomerLayout() {
-  const { isAuthenticated, isLoading, activeRole } = useAuth();
+  const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -176,6 +302,11 @@ export default function CustomerLayout() {
 
   if (activeRole !== 'customer') {
     return <Redirect href="/(merchant)" />;
+  }
+
+  const isShadowUser = user?.email?.startsWith('user_') && user?.email?.endsWith('@waly.app');
+  if (isShadowUser) {
+    return <CustomerOnboardingGate user={user} refreshSession={refreshSession} logout={logout} />;
   }
 
   return (
@@ -344,6 +475,121 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#EF4444',
+  },
+  // Onboarding Blocker Styles
+  onboardContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  onboardScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  onboardCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  onboardHeader: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  onboardIconBg: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  onboardTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  onboardSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
+  onboardForm: {
+    gap: 20,
+  },
+  inputGroup: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    height: 48,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    gap: 8,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#000000',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
+  },
+  inputHint: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 2,
+    paddingHorizontal: 4,
+  },
+  submitBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  logoutLink: {
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  logoutLinkText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#EF4444',
