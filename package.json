@@ -35,7 +35,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "admin": "npm run dev --prefix admin-portal",
-    "build:web": "npx expo export --platform web",
+    "build:web": "npx expo export --platform web --clear",
     "build:staging": "cross-env EXPO_PUBLIC_APP_ENV=staging EXPO_PUBLIC_PB_URL=https://staging-api.waly.app npx expo export --platform web",
     "build:production": "cross-env EXPO_PUBLIC_APP_ENV=production EXPO_PUBLIC_PB_URL=https://api.waly.app npx expo export --platform web"
   },
