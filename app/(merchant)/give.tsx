@@ -27,6 +27,9 @@ export default function GiveStampsScreen() {
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
+  const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
+  const [tempPhone, setTempPhone] = useState('');
+  const [tempCount, setTempCount] = useState(1);
   const [successDetails, setSuccessDetails] = useState<{
     customerName: string;
     customerPhone: string;
@@ -169,49 +172,40 @@ export default function GiveStampsScreen() {
     try {
       // Find the user by phone
       customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+      await proceedWithIssuingStamps(customer, count, rawInput);
     } catch (err: any) {
-      console.warn(err);
-      // Prompt to create a new customer
-      Alert.alert(
-        'New Customer',
-        `Phone number ${rawInput} is not registered. Would you like to create a new customer profile and issue these stamps?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Create & Issue',
-            onPress: async () => {
-              try {
-                // Generate a random clean email
-                const cleanNum = normalizedPhone.replace(/[^\d]/g, '');
-                const emailVal = `user_${cleanNum}@waly.app`;
-                const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
-
-                // Create new customer
-                const newCustomer = await pb.collection('users').create({
-                  phone: normalizedPhone,
-                  email: emailVal,
-                  name: `User ${normalizedPhone.slice(-4)}`,
-                  role: 'customer',
-                  password: randomPassword,
-                  passwordConfirm: randomPassword,
-                  total_points: 0,
-                  tier: 'bronze',
-                });
-
-                // Continue the stamp issue process using the new customer!
-                await proceedWithIssuingStamps(newCustomer, count, rawInput);
-              } catch (createErr: any) {
-                console.error(createErr);
-                Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
-              }
-            }
-          }
-        ]
-      );
-      return;
+      console.warn("Phone lookup failed (customer doesn't exist yet):", err);
+      // Trigger the custom beautiful in-app modal instead of browser native Alerts!
+      setTempPhone(normalizedPhone);
+      setTempCount(count);
+      setShowCreateConfirmModal(true);
     }
+  };
 
-    await proceedWithIssuingStamps(customer, count, rawInput);
+  const handleCreateAndIssue = async () => {
+    try {
+      const cleanNum = tempPhone.replace(/[^\d]/g, '');
+      const emailVal = `user_${cleanNum}@waly.app`;
+      const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
+
+      // Create new customer
+      const newCustomer = await pb.collection('users').create({
+        phone: tempPhone,
+        email: emailVal,
+        name: `User ${tempPhone.slice(-4)}`,
+        role: 'customer',
+        password: randomPassword,
+        passwordConfirm: randomPassword,
+        total_points: 0,
+        tier: 'bronze',
+      });
+
+      // Continue the stamp issue process using the new customer!
+      await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
+    } catch (createErr: any) {
+      console.error("Auto customer creation failed:", createErr);
+      Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+    }
   };
 
   const simulateVoucherScan = async () => {
@@ -580,6 +574,80 @@ export default function GiveStampsScreen() {
             >
               <Text style={styles.modalCloseBtnText}>DONE</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* New Customer Auto-Provisioning Confirmation Modal */}
+      <Modal
+        visible={showCreateConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCreateConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Elegant Prompt Icon */}
+            <View style={[styles.successIconContainer, { backgroundColor: '#F1F5F9' }]}>
+              <Ionicons name="person-add-outline" size={40} color="#000000" />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: 12, textAlign: 'center' }]}>
+              NEW CUSTOMER PROFILE
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_600SemiBold',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 18,
+              marginBottom: 24,
+            }}>
+              Phone number <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{phoneNumber}</Text> is not registered with WALY. Create a new guest account to credit these stamps?
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                }}
+                onPress={() => setShowCreateConfirmModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#000000',
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={async () => {
+                  setShowCreateConfirmModal(false);
+                  await handleCreateAndIssue();
+                }}
+                activeOpacity={0.9}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                  Create & Issue
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
