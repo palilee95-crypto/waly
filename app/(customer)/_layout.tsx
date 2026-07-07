@@ -199,6 +199,7 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
       await pb.collection('users').update(user.id, {
         name: trimmedName,
         email: trimmedEmail,
+        emailConfirm: trimmedEmail,
       });
 
       // 2. Refresh the local session to update state and unlock the portal
