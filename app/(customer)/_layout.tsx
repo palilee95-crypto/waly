@@ -205,7 +205,17 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
       await refreshSession();
     } catch (err: any) {
       console.error(err);
-      const errMsg = err.message || (err.data && JSON.stringify(err.data)) || 'Failed to complete profile registration.';
+      let errMsg = '';
+      if (err.data && err.data.data) {
+        const details = [];
+        for (const key in err.data.data) {
+          details.push(`${key.toUpperCase()}: ${err.data.data[key].message}`);
+        }
+        errMsg = details.join(', ');
+      }
+      if (!errMsg) {
+        errMsg = err.message || 'Failed to complete profile registration.';
+      }
       setError(errMsg);
     } finally {
       setIsSubmitting(false);
