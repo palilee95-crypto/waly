@@ -66,6 +66,7 @@ interface AuthUser {
   id: string;
   phone: string;
   name: string;
+  email: string;
   avatar?: string;
   role: UserRole;
   activeRole: UserRole; // currently active mode
@@ -168,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: record.id,
           phone: record.phone || '',
           name: record.name || '',
+          email: record.email || '',
           avatar: record.avatar || undefined,
           role: record.role,
           activeRole: role,
@@ -228,6 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: authRecord.id,
       phone: authRecord.phone || '',
       name: authRecord.name || '',
+      email: authRecord.email || '',
       avatar: authRecord.avatar || undefined,
       role,
       activeRole: role,
@@ -253,6 +256,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: authRecord.id,
       phone: authRecord.phone || '',
       name: authRecord.name || '',
+      email: authRecord.email || '',
       avatar: authRecord.avatar || undefined,
       role,
       activeRole: role,
@@ -345,6 +349,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: record.id,
         phone: record.phone || '',
         name: record.name || '',
+        email: record.email || '',
         avatar: record.avatar || undefined,
         role: record.role,
         activeRole: role,
