@@ -46,7 +46,28 @@ routerAdd("POST", "/api/waly/onboarding/complete", (e) => {
 
     $app.save(authRecord);
 
-    return e.json(200, { message: "Profile successfully completed." });
+    const token = $tokens.newRecordAuthToken($app, authRecord);
+
+    return e.json(200, {
+      message: "Profile successfully completed.",
+      token: token,
+      record: {
+        id: authRecord.id,
+        collectionId: authRecord.collection().id,
+        collectionName: authRecord.collection().name,
+        name: authRecord.getString("name"),
+        email: authRecord.getString("email"),
+        emailVisibility: authRecord.getBool("emailVisibility"),
+        verified: authRecord.getBool("verified"),
+        phone: authRecord.getString("phone"),
+        role: authRecord.getString("role"),
+        tier: authRecord.getString("tier"),
+        total_points: authRecord.getInt("total_points"),
+        merchant_id: authRecord.getString("merchant_id"),
+        created: authRecord.getString("created"),
+        updated: authRecord.getString("updated"),
+      }
+    });
   } catch (err) {
     return e.json(500, { message: "Failed to update profile: " + err.message });
   }

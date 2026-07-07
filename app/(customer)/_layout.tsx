@@ -196,13 +196,18 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
     setIsSubmitting(true);
     try {
       // 1. Update the user profile via secure onboarding endpoint
-      await pb.send('/api/waly/onboarding/complete', {
+      const response = await pb.send<{ token: string; record: any }>('/api/waly/onboarding/complete', {
         method: 'POST',
         body: {
           name: trimmedName,
           email: trimmedEmail,
         },
       });
+
+      // Update the local authStore with the new valid token and record
+      if (response && response.token && response.record) {
+        pb.authStore.save(response.token, response.record);
+      }
 
       // 2. Refresh the local session to update state and unlock the portal
       await refreshSession();
