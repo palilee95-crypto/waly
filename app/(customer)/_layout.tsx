@@ -195,11 +195,13 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
 
     setIsSubmitting(true);
     try {
-      // 1. Update the user profile in PocketBase
-      await pb.collection('users').update(user.id, {
-        name: trimmedName,
-        email: trimmedEmail,
-        emailConfirm: trimmedEmail,
+      // 1. Update the user profile via secure onboarding endpoint
+      await pb.send('/api/waly/onboarding/complete', {
+        method: 'POST',
+        body: {
+          name: trimmedName,
+          email: trimmedEmail,
+        },
       });
 
       // 2. Refresh the local session to update state and unlock the portal
