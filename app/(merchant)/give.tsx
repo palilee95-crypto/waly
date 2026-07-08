@@ -476,26 +476,7 @@ export default function GiveStampsScreen() {
                 <View style={[styles.bracket, styles.topRightBracket]} />
                 <View style={[styles.bracket, styles.bottomLeftBracket]} />
                 <View style={[styles.bracket, styles.bottomRightBracket]} />
-
                 <View style={styles.scanIndicatorDot} />
-              </View>
-
-              {/* Sleek simulation button */}
-              <TouchableOpacity
-                style={styles.simulateBtn}
-                onPress={triggerMockScanSuccess}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="sparkles" size={16} color="#000000" />
-                <Text style={styles.simulateBtnText}>Simulate Camera Scan</Text>
-              </TouchableOpacity>
-
-              {/* Minimalist Info Tip Panel */}
-              <View style={styles.tipPanel}>
-                <Ionicons name="information-circle-outline" size={16} color="#64748B" />
-                <Text style={styles.tipText}>
-                  Hold QR code inside the viewfinder or use the simulate button to test.
-                </Text>
               </View>
             </View>
           </View>
