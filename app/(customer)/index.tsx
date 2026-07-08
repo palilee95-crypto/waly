@@ -33,6 +33,8 @@ type LoyaltyCardItem = {
   points: number;
   gradientColors: string[];
   cardIcon: string;
+  stampColor?: string;
+  fontColor?: string;
   cardBackground?: string;
 };
 
@@ -177,8 +179,10 @@ export default function CustomerDashboard() {
           rewardName: program?.reward_description || 'Free Gift',
           cardNumber: `•••• •••• •••• ${rec.id.substring(rec.id.length - 4).toUpperCase()}`,
           points: rec.stamps_collected || 0,
-          gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
+          stampColor: program?.stamp_color || '#3B82F6',
+          fontColor: program?.font_color || '#FFFFFF',
           cardBackground: program?.card_background
             ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
             : undefined,
@@ -303,14 +307,21 @@ export default function CustomerDashboard() {
     for (let i = 1; i <= card.totalStamps; i++) {
       if (i <= card.collectedStamps) {
         slots.push(
-          <AnimatedStampSlot key={i} index={i} style={styles.largeStampEarned}>
+          <AnimatedStampSlot 
+            key={i} 
+            index={i} 
+            style={[
+              styles.largeStampEarned,
+              card.stampColor && { backgroundColor: card.stampColor }
+            ]}
+          >
             {renderStampIcon(card.cardIcon, 16, '#FFFFFF')}
           </AnimatedStampSlot>
         );
       } else {
         slots.push(
           <AnimatedStampSlot key={i} index={i} style={styles.largeStampEmpty}>
-            {renderStampIcon(card.cardIcon, 14, 'rgba(255, 255, 255, 0.25)')}
+            {renderStampIcon(card.cardIcon, 14, card.fontColor ? `${card.fontColor}40` : 'rgba(255, 255, 255, 0.25)')}
           </AnimatedStampSlot>
         );
       }
@@ -599,14 +610,14 @@ export default function CustomerDashboard() {
                             <Image source={{ uri: item.logo }} style={styles.shopLogo} />
                           </View>
                           <View style={styles.shopTextColumn}>
-                            <Text style={styles.shopNameText}>{item.merchantName}</Text>
-                            <Text style={styles.shopCategoryText}>{item.category}</Text>
+                            <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]}>{item.merchantName}</Text>
+                            <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]}>{item.category}</Text>
                           </View>
                           <View style={styles.ptsColumn}>
-                            <Text style={styles.ptsValueText}>
+                            <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
                               {item.collectedStamps}/{item.totalStamps}
                             </Text>
-                            <Text style={styles.ptsLabelText}>Stamps</Text>
+                            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>Stamps</Text>
                           </View>
                         </View>
 
@@ -695,14 +706,14 @@ export default function CustomerDashboard() {
               </View>
 
               {/* Large credit-card style loyalty details card */}
-               <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
+              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
                 {selectedCard.cardBackground ? (
                   <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : null}
                 <View style={styles.largeCardHeader}>
                   <View>
-                    <Text style={styles.largeCardMerchant}>{selectedCard.merchantName}</Text>
-                    <Text style={styles.largeCardNumber}>{selectedCard.cardNumber}</Text>
+                    <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]}>{selectedCard.merchantName}</Text>
+                    <Text style={[styles.largeCardNumber, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>{selectedCard.cardNumber}</Text>
                   </View>
                   <View style={styles.goldBadge}>
                     <Text style={styles.goldBadgeText}>STANDART</Text>
@@ -716,7 +727,12 @@ export default function CustomerDashboard() {
                     <View style={styles.chipLineVert} />
                     <View style={styles.chipCenterPin} />
                   </View>
-                  <Ionicons name="wifi" size={16} color="rgba(255, 255, 255, 0.35)" style={styles.nfcIcon} />
+                  <Ionicons 
+                    name="wifi" 
+                    size={16} 
+                    color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                    style={[styles.nfcIcon, selectedCard.fontColor && { opacity: 0.35 }]} 
+                  />
                 </View>
 
                 {/* Stamps grid details */}
@@ -726,12 +742,12 @@ export default function CustomerDashboard() {
 
                 <View style={styles.largeCardFooter}>
                   <View style={styles.holderCol}>
-                    <Text style={styles.holderLabel}>CARD HOLDER</Text>
-                    <Text style={styles.holderValue}>{user?.name || 'Ahmad Fazli'}</Text>
+                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>CARD HOLDER</Text>
+                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>{user?.name || 'Ahmad Fazli'}</Text>
                   </View>
                   <View style={styles.brandBadge}>
-                    <Text style={styles.brandBadgeText}>Waly</Text>
-                    <Text style={styles.largeProgressPercentage}>
+                    <Text style={[styles.brandBadgeText, selectedCard.fontColor && { color: selectedCard.fontColor }]}>Waly</Text>
+                    <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
                       {selectedCard.collectedStamps}/{selectedCard.totalStamps} Stamps
                     </Text>
                   </View>

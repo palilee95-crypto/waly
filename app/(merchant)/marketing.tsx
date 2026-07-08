@@ -50,6 +50,24 @@ const colorOptions = [
   { label: 'Royal Blue', value: '#1E3A8A' },
 ];
 
+const stampColorOptions = [
+  { label: 'Blue', value: '#3B82F6' },
+  { label: 'Red', value: '#EF4444' },
+  { label: 'Green', value: '#10B981' },
+  { label: 'Amber', value: '#F59E0B' },
+  { label: 'Purple', value: '#8B5CF6' },
+  { label: 'Black', value: '#000000' },
+];
+
+const fontColorOptions = [
+  { label: 'White', value: '#FFFFFF' },
+  { label: 'Black', value: '#000000' },
+  { label: 'Light Gray', value: '#F3F4F6' },
+  { label: 'Slate', value: '#1E293B' },
+  { label: 'Gold', value: '#FFD700' },
+  { label: 'Rose', value: '#F43F5E' },
+];
+
 export default function MarketingScreen() {
   const { user } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
@@ -66,6 +84,10 @@ export default function MarketingScreen() {
   const [selectedIcon, setSelectedIcon] = useState<string>('coffee');
   const [cardColor, setCardColor] = useState<string>('#000000');
   const [customHexInput, setCustomHexInput] = useState<string>('#000000');
+  const [stampColor, setStampColor] = useState<string>('#3B82F6');
+  const [customStampHexInput, setCustomStampHexInput] = useState<string>('#3B82F6');
+  const [fontColor, setFontColor] = useState<string>('#FFFFFF');
+  const [customFontHexInput, setCustomFontHexInput] = useState<string>('#FFFFFF');
   const [bgImage, setBgImage] = useState<string>('');
   const [bgFile, setBgFile] = useState<any>(null);
   const [removeBgImage, setRemoveBgImage] = useState<boolean>(false);
@@ -536,6 +558,10 @@ export default function MarketingScreen() {
         setSelectedIcon(prog.card_icon || 'coffee');
         setCardColor(prog.card_color || '#000000');
         setCustomHexInput(prog.card_color || '#000000');
+        setStampColor(prog.stamp_color || '#3B82F6');
+        setCustomStampHexInput(prog.stamp_color || '#3B82F6');
+        setFontColor(prog.font_color || '#FFFFFF');
+        setCustomFontHexInput(prog.font_color || '#FFFFFF');
         setBgImage(prog.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background}` : '');
         setBgFile(null);
         setRemoveBgImage(false);
@@ -568,6 +594,8 @@ export default function MarketingScreen() {
         stamp_goal: requiredStamps,
         reward_description: rewardDesc.trim(),
         card_color: cardColor,
+        stamp_color: stampColor,
+        font_color: fontColor,
         card_icon: selectedIcon,
         points_per_stamp: 10,
         expiry_days: days,
@@ -658,16 +686,27 @@ export default function MarketingScreen() {
   const renderPreviewStamps = () => {
     const previewSlots = [];
     for (let i = 1; i <= requiredStamps; i++) {
+      const isEarned = i <= 3; // Preview 3 earned stamps with custom stamp color
       previewSlots.push(
-        <View key={i} style={styles.previewSlot}>
+        <View 
+          key={i} 
+          style={[
+            styles.previewSlot,
+            isEarned && {
+              backgroundColor: stampColor,
+              borderStyle: 'solid',
+              borderColor: 'rgba(255, 255, 255, 0.15)'
+            }
+          ]}
+        >
           {activeIconObj.family === 'Ionicons' && (
-            <Ionicons name={activeIconObj.name} size={18} color="rgba(255, 255, 255, 0.4)" />
+            <Ionicons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
           {activeIconObj.family === 'FontAwesome' && (
-            <FontAwesome name={activeIconObj.name} size={18} color="rgba(255, 255, 255, 0.4)" />
+            <FontAwesome name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
           {activeIconObj.family === 'MaterialIcons' && (
-            <MaterialIcons name={activeIconObj.name} size={18} color="rgba(255, 255, 255, 0.4)" />
+            <MaterialIcons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
         </View>
       );
@@ -888,6 +927,194 @@ export default function MarketingScreen() {
           </View>
         </View>
 
+        {/* Form Card 2.5a: Collected Stamp Color Selector */}
+        <View style={styles.configCard}>
+          <Text style={styles.cardSectionTitle}>Select Collected Stamp Color</Text>
+          <View style={styles.colorRow}>
+            {stampColorOptions.map((opt) => {
+              const circleColor = opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: circleColor },
+                    stampColor === opt.value && styles.colorCircleActive,
+                  ]}
+                  onPress={() => {
+                    setStampColor(opt.value);
+                    setCustomStampHexInput(opt.value);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {stampColor === opt.value && (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            
+            {/* Visual Color Picker Circle */}
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                style={[
+                  styles.colorCircle,
+                  styles.colorWheelCircle,
+                  !stampColorOptions.some(opt => opt.value === stampColor) && styles.colorCircleActive,
+                ]}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                <input
+                  type="color"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer',
+                    border: 'none',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                  value={stampColor}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setStampColor(val);
+                    setCustomStampHexInput(val);
+                  }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Hex input section */}
+          <View style={styles.hexInputContainer}>
+            <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+            <View style={styles.hexInputWrapper}>
+              <Text style={styles.hexHashSymbol}>#</Text>
+              <TextInput
+                style={styles.hexTextInput}
+                value={customStampHexInput.replace('#', '')}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                  setCustomStampHexInput('#' + cleaned);
+                  if (cleaned.length === 6) {
+                    setStampColor('#' + cleaned.toUpperCase());
+                  }
+                }}
+                placeholder="3B82F6"
+                placeholderTextColor="#BEC6E0"
+                maxLength={6}
+                {...Platform.select({
+                  web: {
+                    outlineStyle: 'none',
+                  } as any,
+                })}
+              />
+              <View style={[styles.hexColorPreview, { backgroundColor: stampColor }]} />
+            </View>
+          </View>
+        </View>
+
+        {/* Form Card 2.5b: Card Text/Font Color Selector */}
+        <View style={styles.configCard}>
+          <Text style={styles.cardSectionTitle}>Select Card Text Color</Text>
+          <View style={styles.colorRow}>
+            {fontColorOptions.map((opt) => {
+              const circleColor = opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: circleColor },
+                    fontColor === opt.value && styles.colorCircleActive,
+                  ]}
+                  onPress={() => {
+                    setFontColor(opt.value);
+                    setCustomFontHexInput(opt.value);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {fontColor === opt.value && (
+                    <Ionicons 
+                      name="checkmark" 
+                      size={14} 
+                      color={fontColor === '#FFFFFF' || fontColor === '#F3F4F6' ? '#000000' : '#FFFFFF'} 
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            
+            {/* Visual Color Picker Circle */}
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                style={[
+                  styles.colorCircle,
+                  styles.colorWheelCircle,
+                  !fontColorOptions.some(opt => opt.value === fontColor) && styles.colorCircleActive,
+                ]}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                <input
+                  type="color"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer',
+                    border: 'none',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                  value={fontColor}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setFontColor(val);
+                    setCustomFontHexInput(val);
+                  }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Hex input section */}
+          <View style={styles.hexInputContainer}>
+            <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+            <View style={styles.hexInputWrapper}>
+              <Text style={styles.hexHashSymbol}>#</Text>
+              <TextInput
+                style={styles.hexTextInput}
+                value={customFontHexInput.replace('#', '')}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                  setCustomFontHexInput('#' + cleaned);
+                  if (cleaned.length === 6) {
+                    setFontColor('#' + cleaned.toUpperCase());
+                  }
+                }}
+                placeholder="FFFFFF"
+                placeholderTextColor="#BEC6E0"
+                maxLength={6}
+                {...Platform.select({
+                  web: {
+                    outlineStyle: 'none',
+                  } as any,
+                })}
+              />
+              <View style={[styles.hexColorPreview, { backgroundColor: fontColor }]} />
+            </View>
+          </View>
+        </View>
+
         {/* Form Card 2.7: Card Background Image */}
         <View style={styles.configCard}>
           <Text style={styles.cardSectionTitle}>Custom Card Background Image</Text>
@@ -1028,8 +1255,8 @@ export default function MarketingScreen() {
           ) : null}
           <View style={styles.cardPreviewHeader}>
             <View>
-              <Text style={styles.previewSub}>LOYALTY PROGRAM</Text>
-              <Text style={styles.previewTitle}>{merchant?.name || 'Store'} Reward</Text>
+              <Text style={[styles.previewSub, { color: fontColor, opacity: 0.65 }]}>LOYALTY PROGRAM</Text>
+              <Text style={[styles.previewTitle, { color: fontColor }]}>{merchant?.name || 'Store'} Reward</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#DC2626' }]}>
               <Text style={styles.statusText}>{isActive ? 'ACTIVE' : 'PAUSED'}</Text>
@@ -1041,8 +1268,8 @@ export default function MarketingScreen() {
 
           {/* Subtitle */}
           <View style={styles.previewFooter}>
-            <Ionicons name="gift-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.previewRewardText} numberOfLines={1}>
+            <Ionicons name="gift-outline" size={16} color={fontColor} />
+            <Text style={[styles.previewRewardText, { color: fontColor }]} numberOfLines={1}>
               {rewardDesc.trim() || 'Please input reward description...'}
             </Text>
           </View>
