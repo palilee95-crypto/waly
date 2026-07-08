@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { width } = Dimensions.get('window');
@@ -25,6 +25,8 @@ const { width } = Dimensions.get('window');
 export default function GiveStampsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isFocused = !pathname.includes('customers') && !pathname.includes('marketing') && !pathname.includes('profile');
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -455,7 +457,7 @@ export default function GiveStampsScreen() {
                       <Text style={styles.permissionBtnText}>Enable Camera</Text>
                     </TouchableOpacity>
                   </View>
-                ) : !scanned ? (
+                ) : !scanned && isFocused ? (
                   <CameraView
                     style={StyleSheet.absoluteFill}
                     facing="back"
