@@ -1294,9 +1294,6 @@ export default function MarketingScreen() {
             />
           ) : null}
 
-          {/* Premium waves in config preview card */}
-          <View style={styles.cardBgWave} />
-          <View style={styles.cardBgWave2} />
 
           <View style={styles.cardPreviewHeader}>
             <View style={{ flex: 1, marginRight: 8 }}>

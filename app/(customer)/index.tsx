@@ -604,9 +604,6 @@ export default function CustomerDashboard() {
                         <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                       ) : null}
 
-                      {/* Premium credit card curved wave overlays */}
-                      <View style={styles.cardBgWave} />
-                      <View style={styles.cardBgWave2} />
 
                       <View style={styles.stackedCardContent}>
                         {/* Header: Shop Name & Logo */}
@@ -775,9 +772,6 @@ export default function CustomerDashboard() {
                   <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : null}
 
-                {/* Premium waves in modal card view */}
-                <View style={[styles.cardBgWave, { width: 350, height: 400, borderRadius: 175, right: -100, top: -80 }]} />
-                <View style={[styles.cardBgWave2, { width: 250, height: 290, borderRadius: 125, right: -50, top: 0 }]} />
 
                 <View style={styles.largeCardHeader}>
                   <View style={{ flex: 1, marginRight: 8 }}>
