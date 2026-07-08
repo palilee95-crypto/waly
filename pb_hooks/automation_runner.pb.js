@@ -88,7 +88,7 @@ cronAdd("run_loyalty_automations", "0 10 * * *", () => {
           .replace(/\{\{\s*name\s*\}\}/g, customerName)
           .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount));
 
-        const formattedWhatsAppMsg = `💌 *Automated Follow-up from ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n_Reply STOP to unsubscribe from notifications._`;
+        const formattedWhatsAppMsg = `💌 *Susulan Automatik daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Balas STOP untuk berhenti melanggan notifikasi._`;
 
         // A. Create In-App Notification
         createNotification(

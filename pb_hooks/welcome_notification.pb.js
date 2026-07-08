@@ -46,7 +46,7 @@ onRecordAfterCreateSuccess((e) => {
         },
         body: JSON.stringify({
           number: cleanPhone,
-          text: `🎁 *Welcome to WALY, ${customerName}!* 🎁\n\nAn account has been created for your phone number: *${phone}*\n\nYou just earned: *${stampsEarned}* Stamp(s) at *${merchantName}*! 🎉\n\nTo view your stamp card, redeem rewards, and verify your account, log in here:\n🔗 ${appUrl}\n\nThank you!`,
+          text: `🎁 *Selamat Datang ke WALY, ${customerName}!* 🎁\n\nAkaun telah dicipta untuk nombor telefon anda: *${phone}*\n\nAnda baru sahaja menerima: *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat kad cop anda, menuntut ganjaran, dan mengesahkan akaun anda, sila log masuk di sini:\n🔗 ${appUrl}\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih!`,
           options: {
             delay: 2000,
             presence: 'composing'

@@ -202,7 +202,7 @@ routerAdd("POST", "/api/waly/merchant/blast", (e) => {
         .replace(/\{\{\s*stamps\s*\}\}/g, String(customerStamps));
 
       // Format a beautiful, branded business message for WhatsApp
-      const formattedWhatsAppMsg = `💌 *Exclusive Broadcast from ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n_To manage notifications, update your Profile Settings on the WALY App._`;
+      const formattedWhatsAppMsg = `💌 *Hebahan Eksklusif daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
 
       // A. Create In-App Notification
       createNotification(

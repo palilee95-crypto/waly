@@ -167,7 +167,7 @@ onMailerRecordOTPSend((e) => {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        text: `🔑 *WALY Verification Code*\n\nYour secure verification code is: *${otp}*\n───────────────────\n⏳ This code is valid for *5 minutes*.\n⚠️ For security, *do not share* this code with anyone.\n\nThank you for using WALY!`,
+        text: `🔑 *Kod Pengesahan WALY*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan WALY!`,
         options: {
           delay: 2000,
           presence: 'composing'
