@@ -603,43 +603,116 @@ export default function CustomerDashboard() {
                       {item.cardBackground ? (
                         <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                       ) : null}
+
+                      {/* Premium credit card curved wave overlays */}
+                      <View style={styles.cardBgWave} />
+                      <View style={styles.cardBgWave2} />
+
                       <View style={styles.stackedCardContent}>
-                        {/* Header info */}
+                        {/* Header: Shop Name & Logo */}
                         <View style={styles.cardInfoRow}>
                           <View style={styles.shopLogoBg}>
                             <Image source={{ uri: item.logo }} style={styles.shopLogo} />
                           </View>
                           <View style={styles.shopTextColumn}>
-                            <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]}>{item.merchantName}</Text>
-                            <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]}>{item.category}</Text>
+                            <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
+                              {item.merchantName}
+                            </Text>
+                            <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]} numberOfLines={1}>
+                              {item.category.toUpperCase()}
+                            </Text>
                           </View>
+
+                          {/* Stamp progress display in header (instead of big block) */}
                           <View style={styles.ptsColumn}>
                             <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
                               {item.collectedStamps}/{item.totalStamps}
                             </Text>
-                            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>Stamps</Text>
+                            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>STAMPS</Text>
                           </View>
                         </View>
 
-                        {/* Front Card Specific Footer Accents */}
+                        {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
+                        <View style={styles.cardMidRow}>
+                          <View style={styles.cardChip}>
+                            <View style={styles.chipLineHoriz} />
+                            <View style={styles.chipLineVert} />
+                            <View style={styles.chipCenterPin} />
+                          </View>
+                          <Ionicons 
+                            name="wifi" 
+                            size={16} 
+                            color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                            style={{ opacity: 0.35 }} 
+                          />
+                        </View>
+
+                        {/* Card Number block */}
+                        <View style={styles.cardNumberContainer}>
+                          <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                            CARD NUMBER
+                          </Text>
+                          <Text style={[styles.cardNumberValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
+                            {item.cardNumber}
+                          </Text>
+                        </View>
+
+                        {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
+                        <View style={styles.cardBottomRow}>
+                          <View style={styles.holderBlock}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                              CARD HOLDER
+                            </Text>
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
+                              {(user?.name || 'Ahmad Fazli').toUpperCase()}
+                            </Text>
+                          </View>
+
+                          <View style={styles.validBlock}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                              VALID
+                            </Text>
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+                              12/30
+                            </Text>
+                          </View>
+
+                          <View style={styles.cvvBlock}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                              CVV
+                            </Text>
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+                              888
+                            </Text>
+                          </View>
+
+                          {/* Mastercard-style overlapping circles */}
+                          <View style={styles.mastercardBadge}>
+                            <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                            <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                          </View>
+                        </View>
+
+                        {/* Front Card Specific overlay buttons */}
                         {isFront && (
-                          <View style={styles.frontCardFooter}>
-                            <View style={styles.bottomWaveOverlay} />
-                            
+                          <View style={styles.frontCardPillsRow}>
                             <TouchableOpacity
                               style={styles.viewAllPill}
                               onPress={() => router.push('/(customer)/my-cards')}
+                              activeOpacity={0.8}
                             >
                               <Text style={styles.viewAllPillText}>View all</Text>
-                              <Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.7)" />
+                              <Ionicons name="chevron-forward" size={10} color="#FFFFFF" />
                             </TouchableOpacity>
 
                             {stackedLength > 1 && (
                               <TouchableOpacity
-                                style={styles.floatingChevronBtn}
+                                style={styles.cyclePill}
                                 onPress={cycleCard}
+                                activeOpacity={0.8}
                               >
-                                <Ionicons name="chevron-forward" size={20} color="#565e74" />
+                                <Ionicons name="swap-horizontal" size={12} color="#FFFFFF" />
+                                <Text style={styles.cyclePillText}>Next Card</Text>
                               </TouchableOpacity>
                             )}
                           </View>
@@ -710,18 +783,27 @@ export default function CustomerDashboard() {
                 {selectedCard.cardBackground ? (
                   <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : null}
+
+                {/* Premium waves in modal card view */}
+                <View style={[styles.cardBgWave, { width: 350, height: 400, borderRadius: 175, right: -100, top: -80 }]} />
+                <View style={[styles.cardBgWave2, { width: 250, height: 290, borderRadius: 125, right: -50, top: 0 }]} />
+
                 <View style={styles.largeCardHeader}>
-                  <View>
-                    <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]}>{selectedCard.merchantName}</Text>
-                    <Text style={[styles.largeCardNumber, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>{selectedCard.cardNumber}</Text>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                      {selectedCard.merchantName}
+                    </Text>
+                    <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
+                      {selectedCard.category.toUpperCase()}
+                    </Text>
                   </View>
                   <View style={styles.goldBadge}>
-                    <Text style={styles.goldBadgeText}>STANDART</Text>
+                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
                   </View>
                 </View>
 
                 {/* EMV Microchip */}
-                <View style={styles.cardChipRow}>
+                <View style={styles.cardMidRow}>
                   <View style={styles.cardChip}>
                     <View style={styles.chipLineHoriz} />
                     <View style={styles.chipLineVert} />
@@ -729,9 +811,9 @@ export default function CustomerDashboard() {
                   </View>
                   <Ionicons 
                     name="wifi" 
-                    size={16} 
+                    size={18} 
                     color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                    style={[styles.nfcIcon, selectedCard.fontColor && { opacity: 0.35 }]} 
+                    style={{ opacity: 0.35 }} 
                   />
                 </View>
 
@@ -742,13 +824,29 @@ export default function CustomerDashboard() {
 
                 <View style={styles.largeCardFooter}>
                   <View style={styles.holderCol}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>CARD HOLDER</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>{user?.name || 'Ahmad Fazli'}</Text>
+                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
+                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                      {(user?.name || 'Ahmad Fazli').toUpperCase()}
+                    </Text>
                   </View>
+
+                  <View style={{ width: 45 }}>
+                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
+                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
+                  </View>
+
+                  <View style={{ width: 35 }}>
+                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
+                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
+                  </View>
+
                   <View style={styles.brandBadge}>
-                    <Text style={[styles.brandBadgeText, selectedCard.fontColor && { color: selectedCard.fontColor }]}>Waly</Text>
+                    <View style={styles.mastercardBadge}>
+                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                    </View>
                     <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
-                      {selectedCard.collectedStamps}/{selectedCard.totalStamps} Stamps
+                      {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
                     </Text>
                   </View>
                 </View>
@@ -1580,5 +1678,102 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  cardBgWave: {
+    position: 'absolute',
+    right: -80,
+    top: -50,
+    width: 260,
+    height: 300,
+    borderRadius: 130,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  cardBgWave2: {
+    position: 'absolute',
+    right: -40,
+    top: 10,
+    width: 180,
+    height: 220,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  cardMidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginVertical: 4,
+  },
+  cardNumberContainer: {
+    paddingHorizontal: 4,
+    marginVertical: 4,
+  },
+  cardLabelText: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  cardNumberValueText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 1.5,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  holderBlock: {
+    flex: 1,
+    marginRight: 10,
+  },
+  holderValueText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  validBlock: {
+    width: 45,
+  },
+  cvvBlock: {
+    width: 35,
+  },
+  mastercardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+  },
+  badgeCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  frontCardPillsRow: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  cyclePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  cyclePillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
 });

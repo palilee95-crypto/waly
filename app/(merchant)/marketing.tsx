@@ -1293,24 +1293,90 @@ export default function MarketingScreen() {
               resizeMode="cover"
             />
           ) : null}
+
+          {/* Premium waves in config preview card */}
+          <View style={styles.cardBgWave} />
+          <View style={styles.cardBgWave2} />
+
           <View style={styles.cardPreviewHeader}>
-            <View>
-              <Text style={[styles.previewSub, { color: fontColor, opacity: 0.65 }]}>LOYALTY PROGRAM</Text>
-              <Text style={[styles.previewTitle, { color: fontColor }]}>{merchant?.name || 'Store'} Reward</Text>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={[styles.previewTitle, { color: fontColor }]} numberOfLines={1}>
+                {merchant?.name || 'Boutique Royal'}
+              </Text>
+              <Text style={[styles.shopCategoryText, { color: fontColor, opacity: 0.65 }]}>
+                {(merchant?.category || 'FOOD').toUpperCase()}
+              </Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#DC2626' }]}>
               <Text style={styles.statusText}>{isActive ? 'ACTIVE' : 'PAUSED'}</Text>
             </View>
           </View>
 
+          {/* Middle row: EMV Chip & Contactless logo */}
+          <View style={styles.cardMidRow}>
+            <View style={styles.cardChip}>
+              <View style={styles.chipLineHoriz} />
+              <View style={styles.chipLineVert} />
+              <View style={styles.chipCenterPin} />
+            </View>
+            <Ionicons 
+              name="wifi" 
+              size={18} 
+              color={fontColor ? fontColor : "rgba(255, 255, 255, 0.35)"} 
+              style={{ opacity: 0.35 }} 
+            />
+          </View>
+
           {/* Dynamic grid of slots based on inputs */}
           <View style={styles.previewGrid}>{renderPreviewStamps()}</View>
 
-          {/* Subtitle */}
-          <View style={styles.previewFooter}>
-            <Ionicons name="gift-outline" size={16} color={fontColor} />
-            <Text style={[styles.previewRewardText, { color: fontColor }]} numberOfLines={1}>
-              {rewardDesc.trim() || 'Please input reward description...'}
+          {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
+          <View style={styles.cardBottomRow}>
+            <View style={styles.holderBlock}>
+              <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
+                CARD HOLDER
+              </Text>
+              <Text style={[styles.holderValueText, { color: fontColor }]} numberOfLines={1}>
+                {(user?.name || 'Ahmad Fazli').toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={styles.validBlock}>
+              <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
+                VALID
+              </Text>
+              <Text style={[styles.holderValueText, { color: fontColor }]}>
+                12/30
+              </Text>
+            </View>
+
+            <View style={styles.cvvBlock}>
+              <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
+                CVV
+              </Text>
+              <Text style={[styles.holderValueText, { color: fontColor }]}>
+                888
+              </Text>
+            </View>
+
+            <View style={styles.mastercardBadge}>
+              <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+              <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+            </View>
+          </View>
+        </View>
+
+        {/* Reward description panel below card preview */}
+        <View style={styles.rewardDetailPanel}>
+          <View style={styles.rewardIconBg}>
+            <Ionicons name="gift" size={20} color="#FFFFFF" />
+          </View>
+          <View style={styles.rewardDetailInfo}>
+            <Text style={styles.rewardDetailTitle}>
+              {rewardDesc.trim() || 'Reward Description'}
+            </Text>
+            <Text style={styles.rewardDetailSub}>
+              Customers will earn this reward automatically once they complete all stamp slots.
             </Text>
           </View>
         </View>
@@ -3296,5 +3362,154 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  cardBgWave: {
+    position: 'absolute',
+    right: -80,
+    top: -50,
+    width: 260,
+    height: 300,
+    borderRadius: 130,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  cardBgWave2: {
+    position: 'absolute',
+    right: -40,
+    top: 10,
+    width: 180,
+    height: 220,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  cardMidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginVertical: 4,
+  },
+  cardChip: {
+    width: 38,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#EAB308',
+    borderWidth: 1.2,
+    borderColor: '#CA8A04',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  chipLineHoriz: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#CA8A04',
+  },
+  chipLineVert: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#CA8A04',
+  },
+  chipCenterPin: {
+    position: 'absolute',
+    top: 6,
+    left: 10,
+    width: 16,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#CA8A04',
+    backgroundColor: '#EAB308',
+  },
+  cardNumberContainer: {
+    paddingHorizontal: 4,
+    marginVertical: 4,
+  },
+  cardLabelText: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  cardNumberValueText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 1.5,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  holderBlock: {
+    flex: 1,
+    marginRight: 10,
+  },
+  holderValueText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  validBlock: {
+    width: 45,
+  },
+  cvvBlock: {
+    width: 35,
+  },
+  mastercardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+  },
+  badgeCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  shopCategoryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.65)',
+  },
+  rewardDetailPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    marginTop: 20,
+  },
+  rewardIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rewardDetailInfo: {
+    flex: 1,
+  },
+  rewardDetailTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  rewardDetailSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 15,
   },
 });
