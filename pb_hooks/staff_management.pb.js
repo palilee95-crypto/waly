@@ -1,6 +1,6 @@
 // pb_hooks/staff_management.pb.js
 
-routerAdd("GET", "/api/waly/merchant/staff", (e) => {
+routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
     return e.json(401, { message: "Unauthorized. Please log in first." });
@@ -54,7 +54,7 @@ routerAdd("GET", "/api/waly/merchant/staff", (e) => {
   return e.json(200, result);
 }, $apis.requireAuth("users"));
 
-routerAdd("POST", "/api/waly/merchant/staff", (e) => {
+routerAdd("POST", "/api/risev/merchant/staff", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
     return e.json(401, { message: "Unauthorized." });
@@ -169,7 +169,7 @@ routerAdd("POST", "/api/waly/merchant/staff", (e) => {
   });
 }, $apis.requireAuth("users"));
 
-routerAdd("DELETE", "/api/waly/merchant/staff", (e) => {
+routerAdd("DELETE", "/api/risev/merchant/staff", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
     return e.json(401, { message: "Unauthorized." });

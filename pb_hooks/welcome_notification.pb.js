@@ -33,12 +33,12 @@ onRecordAfterCreateSuccess((e) => {
 
       // Load environment settings
       const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
-      const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'waly_dev_api_key';
-      const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app';
+      const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'risev_dev_api_key';
+      const appUrl = $os.getenv('APP_URL') || 'https://risev-five.vercel.app';
 
       // 3. Dispatch welcome message via Evolution API
       $http.send({
-        url: `${evolutionUrl}/message/sendText/waly-instance`,
+        url: `${evolutionUrl}/message/sendText/risev-instance`,
         method: 'POST',
         headers: {
           'apikey': evolutionKey,
@@ -46,7 +46,7 @@ onRecordAfterCreateSuccess((e) => {
         },
         body: JSON.stringify({
           number: cleanPhone,
-          text: `🎁 *Selamat Datang ke WALY, ${customerName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam untuk mengelakkan gangguan pada akaun ganjaran anda.`,
+          text: `🎁 *Selamat Datang ke RISEV, ${customerName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam untuk mengelakkan gangguan pada akaun ganjaran anda.`,
           options: {
             delay: 2000,
             presence: 'composing'

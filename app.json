@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Waly",
-    "slug": "waly-mobile",
+    "name": "RISEV",
+    "slug": "risev-mobile",
     "version": "1.0.0",
-    "scheme": "waly",
+    "scheme": "risev",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.waly.mobile"
+      "bundleIdentifier": "com.risev.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1C1340"
       },
-      "package": "com.waly.mobile"
+      "package": "com.risev.mobile"
     },
     "web": {
       "bundler": "metro",

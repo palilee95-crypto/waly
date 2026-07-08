@@ -100,7 +100,7 @@ export default function StampHistoryScreen() {
             <View style={styles.introCard}>
               <Text style={styles.introTitle}>Activity Logs</Text>
               <Text style={styles.introSub}>
-                Track your stamp collections, rewards redemptions, and loyalty points earned at Waly partner merchants.
+                Track your stamp collections, rewards redemptions, and loyalty points earned at RISEV partner merchants.
               </Text>
             </View>
 

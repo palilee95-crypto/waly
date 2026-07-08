@@ -1,6 +1,6 @@
 // pb_hooks/complete_onboarding.pb.js
 
-routerAdd("POST", "/api/waly/onboarding/complete", (e) => {
+routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
     return e.json(401, { message: "Unauthorized. Please log in first." });
@@ -26,8 +26,8 @@ routerAdd("POST", "/api/waly/onboarding/complete", (e) => {
   if (!emailRegex.test(trimmedEmail)) {
     return e.json(400, { message: "Please enter a valid email address." });
   }
-  if (trimmedEmail.endsWith('@waly.app')) {
-    return e.json(400, { message: "Please use your personal email address, not a temporary @waly.app domain." });
+  if (trimmedEmail.endsWith('@risev.app')) {
+    return e.json(400, { message: "Please use your personal email address, not a temporary @risev.app domain." });
   }
 
   // Check if the email is already registered by another user

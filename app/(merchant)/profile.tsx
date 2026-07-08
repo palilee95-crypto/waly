@@ -499,7 +499,7 @@ export default function ProfileScreen() {
           <View style={styles.logoBadge}>
             <Ionicons name="cafe" size={16} color="#000000" />
           </View>
-          <Text style={styles.headerLogoText}>Waly Merchant Portal</Text>
+          <Text style={styles.headerLogoText}>RISEV Merchant Portal</Text>
         </View>
         <TouchableOpacity style={styles.notifyBtn}>
           <Ionicons name="notifications-outline" size={22} color="#0b1c30" />
@@ -684,7 +684,7 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.modalTitle}>Log Out Account</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to log out of your Waly account? You will need to verify your mobile number again to sign back in.
+              Are you sure you want to log out of your RISEV account? You will need to verify your mobile number again to sign back in.
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity

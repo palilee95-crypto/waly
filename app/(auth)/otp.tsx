@@ -157,7 +157,7 @@ export default function OTPScreen() {
               <View style={styles.brandIconWrap}>
                 <Ionicons name="shield-checkmark" size={14} color="#000000" />
               </View>
-              <Text style={styles.brandText}>Waly</Text>
+              <Text style={styles.brandText}>RISEV</Text>
             </View>
           </View>
 
@@ -261,7 +261,7 @@ export default function OTPScreen() {
               <View style={styles.infoBox}>
                 <Ionicons name="warning-outline" size={16} color="#92400E" style={{ marginTop: 1 }} />
                 <Text style={styles.infoText}>
-                  Do not share this code with anyone. Waly will never ask for your OTP code.
+                  Do not share this code with anyone. RISEV will never ask for your OTP code.
                 </Text>
               </View>
             </View>
@@ -270,7 +270,7 @@ export default function OTPScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              © 2026 WALY SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
+               © 2026 RISEV SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
             </Text>
           </View>
         </ScrollView>

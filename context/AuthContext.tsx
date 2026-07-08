@@ -155,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const initAuth = async () => {
     try {
-      const storedRole = await storage.getItem('waly_active_role');
+      const storedRole = await storage.getItem('risev_active_role');
       if (pb.authStore.isValid && pb.authStore.record) {
         const refreshResult = await pb.collection('users').authRefresh().catch(() => null);
         const record = refreshResult?.record || pb.authStore.record;
@@ -190,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   const requestOTP = async (phone: string): Promise<string> => {
     // Call the custom PocketBase endpoint we registered
-    const res = await pb.send<{ otpId: string }>("/api/waly/request-otp", {
+    const res = await pb.send<{ otpId: string }>("/api/risev/request-otp", {
       method: "POST",
       body: { phone }
     });
@@ -199,7 +199,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string }> => {
     try {
-      const res = await pb.send<{ exists: boolean; email?: string }>('/api/waly/check-phone', {
+      const res = await pb.send<{ exists: boolean; email?: string }>('/api/risev/check-phone', {
         method: 'GET',
         params: { phone }
       });
@@ -211,7 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const register = async (phone: string, email: string, name: string, password: string, role: UserRole): Promise<string> => {
-    const res = await pb.send<{ otpId: string }>('/api/waly/register', {
+    const res = await pb.send<{ otpId: string }>('/api/risev/register', {
       method: 'POST',
       body: { phone, email, name, password, role }
     });
@@ -224,7 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const authRecord = authData.record;
     const rawRole = authRecord.role || 'customer';
     const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
-    await storage.setItem('waly_active_role', role || 'customer');
+    await storage.setItem('risev_active_role', role || 'customer');
     const merchantData = await ensureMerchantProfile(authRecord);
     setUser({
       id: authRecord.id,
@@ -250,7 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const authRecord = authData.record;
     const rawRole = authRecord.role || 'customer';
     const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
-    await storage.setItem('waly_active_role', role || 'customer');
+    await storage.setItem('risev_active_role', role || 'customer');
     const merchantData = await ensureMerchantProfile(authRecord);
     setUser({
       id: authRecord.id,
@@ -272,14 +272,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     pb.authStore.clear();
-    await storage.deleteItem('waly_active_role');
+    await storage.deleteItem('risev_active_role');
     setUser(null);
     setActiveRole(null);
   };
 
   const switchRole = async (role: UserRole) => {
     if (!user) return;
-    await storage.setItem('waly_active_role', role || 'customer');
+    await storage.setItem('risev_active_role', role || 'customer');
     setActiveRole(role);
     setUser(prev => prev ? { ...prev, activeRole: role } : null);
   };
@@ -288,7 +288,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     // Update role in PocketBase
     await pb.collection('users').update(user.id, { role });
-    await storage.setItem('waly_active_role', role || 'customer');
+    await storage.setItem('risev_active_role', role || 'customer');
     
     let merchantData: { id?: string; status?: 'active' | 'suspended' | 'pending' } = { 
       id: user.merchant_id, 
@@ -338,7 +338,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const record = refreshResult?.record || pb.authStore.record;
       if (!record) return;
 
-      const storedRole = await storage.getItem('waly_active_role');
+      const storedRole = await storage.getItem('risev_active_role');
       let role = (storedRole as UserRole) || record.role || 'customer';
       if (role === 'both') {
         role = 'customer';

@@ -1,7 +1,7 @@
 // pb_hooks/blast_message.pb.js
 
 // 1. GET WhatsApp Connection Status & Pairing QR Code
-routerAdd("GET", "/api/waly/merchant/whatsapp/status", (e) => {
+routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
   const { callEvo } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
@@ -79,7 +79,7 @@ routerAdd("GET", "/api/waly/merchant/whatsapp/status", (e) => {
 }, $apis.requireAuth("users"));
 
 // 2. POST Disconnect & Delete WhatsApp Instance
-routerAdd("POST", "/api/waly/merchant/whatsapp/disconnect", (e) => {
+routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
   const { callEvo } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
@@ -109,7 +109,7 @@ routerAdd("POST", "/api/waly/merchant/whatsapp/disconnect", (e) => {
 }, $apis.requireAuth("users"));
 
 // 3. POST Blast Message to Customers
-routerAdd("POST", "/api/waly/merchant/blast", (e) => {
+routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   const { evolutionUrl, evolutionKey } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
@@ -202,7 +202,7 @@ routerAdd("POST", "/api/waly/merchant/blast", (e) => {
         .replace(/\{\{\s*stamps\s*\}\}/g, String(customerStamps));
 
       // Format a beautiful, branded business message for WhatsApp
-      const formattedWhatsAppMsg = `💌 *Hebahan Eksklusif daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
+      const formattedWhatsAppMsg = `💌 *Hebahan Eksklusif daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV._`;
 
       // A. Create In-App Notification
       createNotification(
@@ -279,7 +279,7 @@ routerAdd("POST", "/api/waly/merchant/blast", (e) => {
 }, $apis.requireAuth("users"));
 
 // 4. POST WhatsApp Webhook Listener (captures STOP opt-outs)
-routerAdd("POST", "/api/waly/whatsapp-webhook", (e) => {
+routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
   try {
     const body = e.requestInfo().body;
     const event = body.event;

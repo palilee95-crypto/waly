@@ -347,7 +347,7 @@ export default function CustomerDashboard() {
           />
           
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>Waly</Text>
+            <Text style={styles.logoText}>RISEV</Text>
             <Text style={styles.logoSubtext}>Loyalty Reward</Text>
           </View>
 
@@ -418,7 +418,7 @@ export default function CustomerDashboard() {
             </View>
           </View>
 
-          {/* Waly Campaign Promo Banner */}
+          {/* RISEV Campaign Promo Banner */}
           <View style={styles.promoCard}>
             <View style={styles.promoHeaderRow}>
               <Text style={styles.promoTitle}>2x Stamps Weekend</Text>
@@ -426,7 +426,7 @@ export default function CustomerDashboard() {
                 <Text style={styles.promoBadgeText}>LIMITED</Text>
               </View>
             </View>
-            <Text style={styles.promoDesc}>Visit any Waly partner shop this weekend and earn double stamps!</Text>
+            <Text style={styles.promoDesc}>Visit any RISEV partner shop this weekend and earn double stamps!</Text>
             <TouchableOpacity
               style={styles.viewPromoBtn}
               onPress={() => router.push('/(customer)/explore')}
@@ -732,9 +732,9 @@ export default function CustomerDashboard() {
             </View>
 
             <View style={styles.qrWrapper}>
-              <Image
+               <Image
                 source={{
-                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${user?.phone || 'waly-loyalty-customer'}`,
+                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${user?.phone || 'risev-loyalty-customer'}`,
                 }}
                 style={styles.qrCodeImage}
               />

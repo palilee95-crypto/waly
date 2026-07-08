@@ -375,7 +375,7 @@ export default function MarketingScreen() {
   const fetchWhatsappStatus = async () => {
     if (!user || !user.merchant_id) return;
     try {
-      const res = await pb.send('/api/waly/merchant/whatsapp/status', {
+      const res = await pb.send('/api/risev/merchant/whatsapp/status', {
         method: 'GET',
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
@@ -394,7 +394,7 @@ export default function MarketingScreen() {
   const handleDisconnectWhatsapp = async () => {
     try {
       setWhatsappStatus('checking');
-      await pb.send('/api/waly/merchant/whatsapp/disconnect', {
+      await pb.send('/api/risev/merchant/whatsapp/disconnect', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
@@ -450,7 +450,7 @@ export default function MarketingScreen() {
           onPress: async () => {
             setIsSendingBlast(true);
             try {
-              const res = await pb.send('/api/waly/merchant/blast', {
+              const res = await pb.send('/api/risev/merchant/blast', {
                 method: 'POST',
                 headers: {
                   'Authorization': 'Bearer ' + pb.authStore.token
@@ -487,7 +487,7 @@ export default function MarketingScreen() {
     if (showQrModal && user && user.merchant_id) {
       const poll = async () => {
         try {
-          const res = await pb.send('/api/waly/merchant/whatsapp/status?generateQr=true', {
+          const res = await pb.send('/api/risev/merchant/whatsapp/status?generateQr=true', {
             method: 'GET',
             headers: {
               'Authorization': 'Bearer ' + pb.authStore.token

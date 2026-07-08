@@ -4,7 +4,7 @@ services:
   # Caddy reverse proxy with automatic SSL
   caddy:
     image: caddy:latest
-    container_name: waly-caddy
+    container_name: risev-caddy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -21,12 +21,12 @@ services:
       - pocketbase
       - evolution-api
     networks:
-      - waly-network
+      - risev-network
 
   # PocketBase Go Backend
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
-    container_name: waly-pocketbase
+    container_name: risev-pocketbase
     restart: unless-stopped
     working_dir: /pb
     command: serve --http=0.0.0.0:8090 --dir=/pb/pb_data --hooksDir=/pb/pb_hooks --migrationsDir=/pb/pb_migrations
@@ -42,12 +42,12 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
     networks:
-      - waly-network
+      - risev-network
 
   # Litestream SQLite backup
   litestream:
     image: litestream/litestream:latest
-    container_name: waly-litestream
+    container_name: risev-litestream
     restart: unless-stopped
     volumes:
       - ./pb_data:/pb_data
@@ -61,12 +61,12 @@ services:
       - S3_BUCKET=${S3_BUCKET}
       - S3_REGION=${S3_REGION}
     networks:
-      - waly-network
+      - risev-network
 
   # Evolution API DB (PostgreSQL)
   evolution-db:
     image: postgres:15-alpine
-    container_name: waly-evolution-db
+    container_name: risev-evolution-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${EVOLUTION_DB_USER}
@@ -75,22 +75,22 @@ services:
     volumes:
       - ./evolution_db_data:/var/lib/postgresql/data
     networks:
-      - waly-network
+      - risev-network
 
   # Evolution API Cache (Redis)
   evolution-redis:
     image: redis:alpine
-    container_name: waly-evolution-redis
+    container_name: risev-evolution-redis
     restart: unless-stopped
     volumes:
       - ./evolution_redis_data:/data
     networks:
-      - waly-network
+      - risev-network
 
   # Evolution API Whatsapp Service
   evolution-api:
     image: evoapicloud/evolution-api:latest
-    container_name: waly-evolution-api
+    container_name: risev-evolution-api
     restart: unless-stopped
     depends_on:
       - evolution-db
@@ -104,7 +104,7 @@ services:
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/${EVOLUTION_DB_NAME}?schema=public
-      - DATABASE_CONNECTION_CLIENT_NAME=waly
+      - DATABASE_CONNECTION_CLIENT_NAME=risev
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://evolution-redis:6379/1
       - CACHE_REDIS_PREFIX_KEY=evolution
@@ -117,13 +117,13 @@ services:
       - DATABASE_SAVE_MESSAGE_UPDATE=false
       - DATABASE_SAVE_DATA_LABELS=false
     networks:
-      - waly-network
+      - risev-network
 
 volumes:
   caddy_data:
   caddy_config:
 
 networks:
-  waly-network:
+  risev-network:
     driver: bridge
 

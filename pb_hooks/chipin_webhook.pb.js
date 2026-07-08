@@ -1,6 +1,6 @@
 // pb_hooks/chipin_webhook.pb.js
 
-routerAdd("POST", "/api/waly/chipin-webhook", (c) => {
+routerAdd("POST", "/api/risev/chipin-webhook", (c) => {
   try {
     const data = c.requestInfo().body;
     const paymentId = data.id || data.payment_id;

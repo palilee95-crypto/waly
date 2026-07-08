@@ -30,7 +30,7 @@ onRecordCreate((e) => {
   const user = $app.findRecordById('users', customerId);
   const metadata = user.get('metadata') || {};
   if (metadata.frozen) {
-    throw new ForbiddenError('Account is temporarily frozen for review. Contact support@waly.app.');
+    throw new ForbiddenError('Account is temporarily frozen for review. Contact support@risev.app.');
   }
 
   // 1. Self-issuance check (V05)

@@ -87,7 +87,7 @@ export default function RoleSelectScreen() {
           <Text style={styles.greeting}>
             Selamat Datang{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
           </Text>
-          <Text style={styles.title}>Kamu Guna Waly Sebagai?</Text>
+          <Text style={styles.title}>Kamu Guna RISEV Sebagai?</Text>
           <Text style={styles.subtitle}>
             Pilih peranan utama kamu. Kamu boleh menukar peranan pada bila-bila masa.
           </Text>

@@ -141,7 +141,7 @@ export default function LoginScreen() {
               <View style={styles.brandIconWrap}>
                 <Ionicons name="shield-checkmark" size={18} color="#000000" />
               </View>
-              <Text style={styles.brandText}>Waly</Text>
+              <Text style={styles.brandText}>RISEV</Text>
             </View>
             <TouchableOpacity style={styles.supportBtn}>
               <Ionicons name="help-circle-outline" size={18} color="#000000" />
@@ -488,7 +488,7 @@ export default function LoginScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              © 2026 WALY SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
+              © 2026 RISEV SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
             </Text>
           </View>
         </ScrollView>

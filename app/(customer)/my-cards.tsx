@@ -170,7 +170,7 @@ export default function MyCardsScreen() {
           </TouchableOpacity>
           
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>Waly</Text>
+            <Text style={styles.logoText}>RISEV</Text>
             <Text style={styles.logoSubtext}>Loyalty Reward</Text>
           </View>
 

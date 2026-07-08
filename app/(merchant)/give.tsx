@@ -201,7 +201,7 @@ export default function GiveStampsScreen() {
   const handleCreateAndIssue = async () => {
     try {
       const cleanNum = tempPhone.replace(/[^\d]/g, '');
-      const emailVal = `user_${cleanNum}@waly.app`;
+      const emailVal = `user_${cleanNum}@risev.app`;
       const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
 
       // Create new customer
@@ -350,7 +350,7 @@ export default function GiveStampsScreen() {
               console.warn(err);
               let errorMsg = 'Failed to award scan stamp.';
               if (err.status === 404) {
-                errorMsg = 'Customer not found. Please verify that the phone number is registered with Waly.';
+                errorMsg = 'Customer not found. Please verify that the phone number is registered with RISEV.';
               } else if (err.message) {
                 errorMsg = err.message;
               }
@@ -416,7 +416,7 @@ export default function GiveStampsScreen() {
           <View style={styles.logoBadge}>
             <Ionicons name="cafe" size={15} color="#000000" />
           </View>
-          <Text style={styles.headerLogoText}>Waly Merchant Portal</Text>
+          <Text style={styles.headerLogoText}>RISEV Merchant Portal</Text>
         </View>
         <TouchableOpacity style={styles.notifyBtn}>
           <Ionicons name="notifications-outline" size={22} color="#0b1c30" />
@@ -663,7 +663,7 @@ export default function GiveStampsScreen() {
               lineHeight: 18,
               marginBottom: 24,
             }}>
-              Phone number <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{phoneNumber}</Text> is not registered with WALY. Create a new guest account to credit these stamps?
+              Phone number <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{phoneNumber}</Text> is not registered with RISEV. Create a new guest account to credit these stamps?
             </Text>
 
             {/* Optional Customer Name Input */}

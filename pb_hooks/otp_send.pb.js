@@ -1,4 +1,4 @@
-routerAdd("GET", "/api/waly/check-phone", (e) => {
+routerAdd("GET", "/api/risev/check-phone", (e) => {
   const query = e.requestInfo().query;
   const phone = query.phone || '';
   if (!phone) {
@@ -12,7 +12,7 @@ routerAdd("GET", "/api/waly/check-phone", (e) => {
   }
 });
 
-routerAdd("POST", "/api/waly/register", (e) => {
+routerAdd("POST", "/api/risev/register", (e) => {
   const body = e.requestInfo().body;
   const phone = body.phone || '';
   const email = body.email || '';
@@ -97,7 +97,7 @@ routerAdd("POST", "/api/waly/register", (e) => {
   }
 });
 
-routerAdd("POST", "/api/waly/request-otp", (e) => {
+routerAdd("POST", "/api/risev/request-otp", (e) => {
   const body = e.requestInfo().body;
   const phone = body.phone || '';
   if (!phone) {
@@ -155,11 +155,11 @@ onMailerRecordOTPSend((e) => {
   console.log("========================================\n");
 
   const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
-  const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'waly_dev_api_key';
+  const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'risev_dev_api_key';
 
   try {
     $http.send({
-      url: `${evolutionUrl}/message/sendText/waly-instance`,
+      url: `${evolutionUrl}/message/sendText/risev-instance`,
       method: 'POST',
       headers: {
         'apikey': evolutionKey,
@@ -167,7 +167,7 @@ onMailerRecordOTPSend((e) => {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        text: `🔑 *Kod Pengesahan WALY*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan WALY!`,
+        text: `🔑 *Kod Pengesahan RISEV*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan RISEV!`,
         options: {
           delay: 2000,
           presence: 'composing'

@@ -19,7 +19,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
       <View style={styles.desktopSidebar}>
         {/* Branding */}
         <View style={styles.sidebarBrand}>
-          <Text style={styles.brandTitle}>Waly</Text>
+          <Text style={styles.brandTitle}>RISEV</Text>
           <Text style={styles.brandSubtitle}>Merchant Console</Text>
         </View>
 
@@ -445,7 +445,7 @@ export default function MerchantLayout() {
       }
 
       setIsOnboardingRequired(false);
-      Alert.alert('Success', 'Store profile successfully set up! Welcome to Waly.');
+      Alert.alert('Success', 'Store profile successfully set up! Welcome to RISEV.');
     } catch (err: any) {
       Alert.alert('Setup Error', err.message || 'Failed to complete store setup.');
     } finally {
@@ -474,7 +474,7 @@ export default function MerchantLayout() {
     try {
       // Simulate webhook call to Chip-in payment gateway
       const paymentId = 'chipin_' + Math.random().toString(36).substring(2, 10);
-      const res = await fetch(`${pb.baseUrl}/api/waly/chipin-webhook`, {
+      const res = await fetch(`${pb.baseUrl}/api/risev/chipin-webhook`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -482,7 +482,7 @@ export default function MerchantLayout() {
         body: JSON.stringify({
           id: paymentId,
           status: 'success',
-          email: (user?.phone || 'merchant') + '@waly.app',
+          email: (user?.phone || 'merchant') + '@risev.app',
           reference: merchantId,
         }),
       });
@@ -577,7 +577,7 @@ export default function MerchantLayout() {
             <View style={styles.onboardingIconBg}>
               <Ionicons name="rocket-outline" size={28} color="#FFFFFF" />
             </View>
-            <Text style={styles.onboardingTitle}>Welcome to Waly Merchant Pro! 🚀</Text>
+            <Text style={styles.onboardingTitle}>Welcome to RISEV Merchant Pro! 🚀</Text>
             <Text style={styles.onboardingSubtitle}>
               Let's set up your store profile so customers can start collecting your stamps.
             </Text>

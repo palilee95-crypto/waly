@@ -18,7 +18,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       <View style={styles.desktopSidebar}>
         {/* Branding */}
         <View style={styles.sidebarBrand}>
-          <Text style={styles.brandTitle}>Waly</Text>
+          <Text style={styles.brandTitle}>RISEV</Text>
           <Text style={styles.brandSubtitle}>Loyalty Wallet</Text>
         </View>
 
@@ -188,15 +188,15 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
       setError('Please enter a valid email address.');
       return;
     }
-    if (trimmedEmail.endsWith('@waly.app')) {
-      setError('Please use your personal email address, not a temporary @waly.app domain.');
+    if (trimmedEmail.endsWith('@risev.app')) {
+      setError('Please use your personal email address, not a temporary @risev.app domain.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       // 1. Update the user profile via secure onboarding endpoint
-      const response = await pb.send<{ token: string; record: any }>('/api/waly/onboarding/complete', {
+      const response = await pb.send<{ token: string; record: any }>('/api/risev/onboarding/complete', {
         method: 'POST',
         body: {
           name: trimmedName,
@@ -237,7 +237,7 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
           <View style={styles.onboardIconBg}>
             <Ionicons name="sparkles" size={28} color="#000000" style={{ transform: [{ rotate: '15deg' }] }} />
           </View>
-          <Text style={styles.onboardTitle}>Welcome to WALY! 🎁</Text>
+          <Text style={styles.onboardTitle}>Welcome to RISEV! 🎁</Text>
           <Text style={styles.onboardSubtitle}>
             Let's complete your profile so you can manage your loyalty cards and start claiming rewards.
           </Text>
@@ -330,7 +330,7 @@ export default function CustomerLayout() {
     return <Redirect href="/(merchant)" />;
   }
 
-  const isShadowUser = user?.email?.startsWith('user_') && user?.email?.endsWith('@waly.app');
+  const isShadowUser = user?.email?.startsWith('user_') && user?.email?.endsWith('@risev.app');
   if (isShadowUser) {
     return <CustomerOnboardingGate user={user} refreshSession={refreshSession} logout={logout} />;
   }

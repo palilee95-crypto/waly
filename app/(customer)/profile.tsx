@@ -105,7 +105,7 @@ export default function CustomerProfile() {
         status: 'active',
         plan: 'pro',
         chipin_payment_id: paymentId,
-        chipin_customer_email: (user.phone || 'merchant') + '@waly.app',
+        chipin_customer_email: (user.phone || 'merchant') + '@risev.app',
         current_period_end: periodEndStr,
         cancel_at_period_end: false,
       });
@@ -116,7 +116,7 @@ export default function CustomerProfile() {
       // 6. Switch role locally
       await switchRole('merchant');
       
-      Alert.alert('Subscription Active', 'Welcome to Waly Merchant Pro! Your shop console is now active.');
+      Alert.alert('Subscription Active', 'Welcome to RISEV Merchant Pro! Your shop console is now active.');
       setSubscribeModalVisible(false);
       router.replace('/(merchant)');
     } catch (err: any) {
@@ -239,7 +239,7 @@ export default function CustomerProfile() {
       setIsSendingSupport(false);
       setSupportMessage('');
       setSupportModalVisible(false);
-      Alert.alert('Support Request Sent', 'Thank you! Waly support team has received your message and will respond shortly.');
+      Alert.alert('Support Request Sent', 'Thank you! RISEV support team has received your message and will respond shortly.');
     }, 1200);
   };
 
@@ -267,7 +267,7 @@ export default function CustomerProfile() {
           />
           
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>Waly</Text>
+            <Text style={styles.logoText}>RISEV</Text>
             <Text style={styles.logoSubtext}>Loyalty Reward</Text>
           </View>
 
@@ -421,7 +421,7 @@ export default function CustomerProfile() {
             </View>
             <Text style={styles.modalTitle}>Log Out Account</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to log out of your Waly account? You will need to verify your mobile number again to sign back in.
+              Are you sure you want to log out of your RISEV account? You will need to verify your mobile number again to sign back in.
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
@@ -562,7 +562,7 @@ export default function CustomerProfile() {
             <ScrollView style={styles.privacyScroll} showsVerticalScrollIndicator={false}>
               <Text style={styles.privacyHeading}>1. Terms of Service</Text>
               <Text style={styles.privacyText}>
-                Welcome to Waly. By using our loyalty and rewards application, you agree to comply with our stamp validation protocols. Any attempt to exploit points, forge transactions, or bypass security rules will result in the immediate termination of your active cards.
+                Welcome to RISEV. By using our loyalty and rewards application, you agree to comply with our stamp validation protocols. Any attempt to exploit points, forge transactions, or bypass security rules will result in the immediate termination of your active cards.
               </Text>
               
               <Text style={styles.privacyHeading}>2. Data Privacy</Text>
@@ -572,7 +572,7 @@ export default function CustomerProfile() {
               
               <Text style={styles.privacyHeading}>3. WhatsApp Protocols</Text>
               <Text style={styles.privacyText}>
-                Waly uses an automated messaging relay to dispatch OTP authentication codes and stamp completion logs to your WhatsApp instance. By registering, you opt in to receive transactional messages.
+                RISEV uses an automated messaging relay to dispatch OTP authentication codes and stamp completion logs to your WhatsApp instance. By registering, you opt in to receive transactional messages.
               </Text>
             </ScrollView>
 
