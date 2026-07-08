@@ -62,7 +62,7 @@ const stampColorOptions = [
 const fontColorOptions = [
   { label: 'White', value: '#FFFFFF' },
   { label: 'Black', value: '#000000' },
-  { label: 'Light Gray', value: '#F3F4F6' },
+  { label: 'Silver', value: '#D1D5DB' },
   { label: 'Slate', value: '#1E293B' },
   { label: 'Gold', value: '#FFD700' },
   { label: 'Rose', value: '#F43F5E' },
@@ -1043,7 +1043,7 @@ export default function MarketingScreen() {
                     <Ionicons 
                       name="checkmark" 
                       size={14} 
-                      color={fontColor === '#FFFFFF' || fontColor === '#F3F4F6' ? '#000000' : '#FFFFFF'} 
+                      color={fontColor === '#FFFFFF' || fontColor === '#D1D5DB' ? '#000000' : '#FFFFFF'} 
                     />
                   )}
                 </TouchableOpacity>
