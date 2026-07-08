@@ -919,48 +919,9 @@ export default function MarketingScreen() {
                     input.onchange = (e: any) => {
                       const file = e.target.files[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event: any) => {
-                          const img = new window.Image();
-                          img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 600;
-                            const MAX_HEIGHT = 400;
-                            let width = img.width;
-                            let height = img.height;
-
-                            if (width > height) {
-                              if (width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                              }
-                            } else {
-                              if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                              }
-                            }
-
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            ctx?.drawImage(img, 0, 0, width, height);
-
-                            canvas.toBlob((blob) => {
-                              if (blob) {
-                                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
-                                  type: 'image/jpeg',
-                                  lastModified: Date.now()
-                                });
-                                setBgFile(compressedFile);
-                                setBgImage(URL.createObjectURL(compressedFile));
-                                setRemoveBgImage(false);
-                              }
-                            }, 'image/jpeg', 0.85);
-                          };
-                          img.src = event.target.result;
-                        };
-                        reader.readAsDataURL(file);
+                        setBgFile(file);
+                        setBgImage(URL.createObjectURL(file));
+                        setRemoveBgImage(false);
                       }
                     };
                     input.click();
