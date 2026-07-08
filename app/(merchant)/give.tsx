@@ -11,12 +11,14 @@ import {
   Platform,
   Modal,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter } from 'expo-router';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +26,8 @@ export default function GiveStampsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [stampsCount, setStampsCount] = useState('1');
   const [phoneFocused, setPhoneFocused] = useState(false);
@@ -208,7 +212,14 @@ export default function GiveStampsScreen() {
     } catch (createErr: any) {
       console.error("Auto customer creation failed:", createErr);
       Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+      setScanned(false);
     }
+  };
+
+  const handleCreateAndIssueSubmit = async () => {
+    setNewCustomerName('');
+    setShowCreateConfirmModal(false);
+    await handleCreateAndIssue();
   };
 
   const simulateVoucherScan = async () => {
@@ -352,6 +363,37 @@ export default function GiveStampsScreen() {
     setShowSimulateModal(true);
   };
 
+  const handleBarcodeScanned = async (data: string) => {
+    const rawInput = data.trim();
+    if (!rawInput || scanned) return;
+
+    if (!user || !user.merchant_id) {
+      Alert.alert('Error', 'Unauthorized merchant account.');
+      return;
+    }
+
+    setScanned(true);
+
+    if (rawInput.toUpperCase().startsWith('WV-')) {
+      // It's a voucher redemption scan!
+      await redeemVoucherCode(rawInput);
+    } else {
+      // It's a loyalty card stamp issue scan!
+      const count = parseInt(stampsCount || '1', 10);
+      const normalizedPhone = normalizePhoneNumber(rawInput);
+      try {
+        const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+        await proceedWithIssuingStamps(customer, count, rawInput);
+      } catch (err: any) {
+        console.warn("QR Phone lookup failed:", err);
+        // If the customer doesn't exist, trigger the customer creation modal
+        setTempPhone(normalizedPhone);
+        setTempCount(count);
+        setShowCreateConfirmModal(true);
+      }
+    }
+  };
+
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
@@ -401,23 +443,42 @@ export default function GiveStampsScreen() {
                 Align the customer's QR code within the viewfinder frame to credit stamp points automatically.
               </Text>
 
-              {/* Light Minimalist Viewfinder Target Area */}
-              <TouchableOpacity
-                style={styles.viewfinderFrame}
-                onPress={triggerMockScanSuccess}
-                activeOpacity={0.9}
-              >
+              {/* Live Camera / Fallback permission target Area */}
+              <View style={[styles.viewfinderFrame, { overflow: 'hidden' }]}>
+                {permission === null ? (
+                  <ActivityIndicator color="#000000" size="large" />
+                ) : !permission.granted ? (
+                  <View style={styles.permissionContainer}>
+                    <Ionicons name="camera-reverse-outline" size={40} color="#64748B" />
+                    <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
+                    <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.8}>
+                      <Text style={styles.permissionBtnText}>Enable Camera</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : !scanned ? (
+                  <CameraView
+                    style={StyleSheet.absoluteFill}
+                    facing="back"
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr'],
+                    }}
+                    onBarcodeScanned={({ data }) => handleBarcodeScanned(data)}
+                  />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, styles.scannedPlaceholder]}>
+                    <ActivityIndicator color="#000000" size="large" />
+                    <Text style={styles.processingText}>Processing...</Text>
+                  </View>
+                )}
+
                 {/* Thin elegant black brackets */}
                 <View style={[styles.bracket, styles.topLeftBracket]} />
                 <View style={[styles.bracket, styles.topRightBracket]} />
                 <View style={[styles.bracket, styles.bottomLeftBracket]} />
                 <View style={[styles.bracket, styles.bottomRightBracket]} />
 
-                {/* Center scan help icon */}
-                <Ionicons name="qr-code-outline" size={80} color="#E2E8F0" style={styles.qrBgIcon} />
-                
                 <View style={styles.scanIndicatorDot} />
-              </TouchableOpacity>
+              </View>
 
               {/* Sleek simulation button */}
               <TouchableOpacity
@@ -433,7 +494,7 @@ export default function GiveStampsScreen() {
               <View style={styles.tipPanel}>
                 <Ionicons name="information-circle-outline" size={16} color="#64748B" />
                 <Text style={styles.tipText}>
-                  Tap the viewfinder or simulate button to test a successful scan event.
+                  Hold QR code inside the viewfinder or use the simulate button to test.
                 </Text>
               </View>
             </View>
@@ -572,7 +633,10 @@ export default function GiveStampsScreen() {
 
             <TouchableOpacity
               style={styles.modalCloseBtn}
-              onPress={() => setShowSuccessModal(false)}
+              onPress={() => {
+                setShowSuccessModal(false);
+                setScanned(false);
+              }}
               activeOpacity={0.9}
             >
               <Text style={styles.modalCloseBtnText}>DONE</Text>
@@ -664,7 +728,10 @@ export default function GiveStampsScreen() {
                   borderColor: '#E2E8F0',
                   backgroundColor: '#FFFFFF',
                 }}
-                onPress={() => setShowCreateConfirmModal(false)}
+                onPress={() => {
+                  setShowCreateConfirmModal(false);
+                  setScanned(false);
+                }}
                 activeOpacity={0.7}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
@@ -1218,5 +1285,44 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
     letterSpacing: 1,
+  },
+  permissionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+  },
+  permissionText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+    lineHeight: 16,
+  },
+  permissionBtn: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  permissionBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  scannedPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+  },
+  processingText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    marginTop: 10,
   },
 });
