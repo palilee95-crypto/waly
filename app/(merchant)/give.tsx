@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,15 @@ export default function GiveStampsScreen() {
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+
+  // Automatically request camera permission when screen is focused and permission is not yet granted
+  useEffect(() => {
+    if (isFocused && permission && !permission.granted) {
+      requestPermission().catch((err) => {
+        console.warn("Auto-request camera permission failed:", err);
+      });
+    }
+  }, [isFocused, permission?.granted]);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [stampsCount, setStampsCount] = useState('1');
   const [phoneFocused, setPhoneFocused] = useState(false);
