@@ -26,7 +26,7 @@ export default function GiveStampsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const isFocused = !pathname.includes('customers') && !pathname.includes('marketing') && !pathname.includes('profile');
+  const isFocused = pathname.includes('give');
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
