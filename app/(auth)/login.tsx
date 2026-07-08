@@ -135,19 +135,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Navigation Header */}
-          <View style={styles.navBar}>
-            <View style={styles.brandRow}>
-              <View style={styles.brandIconWrap}>
-                <Ionicons name="shield-checkmark" size={18} color="#000000" />
-              </View>
-              <Text style={styles.brandText}>RISEV</Text>
-            </View>
-            <TouchableOpacity style={styles.supportBtn}>
-              <Ionicons name="help-circle-outline" size={18} color="#000000" />
-              <Text style={styles.supportText}>Support</Text>
-            </TouchableOpacity>
-          </View>
+
 
           {/* Main Card Container with decorative overlapping layers behind it */}
           <View style={styles.cardWrapper}>
@@ -446,25 +434,7 @@ export default function LoginScreen() {
                 )}
               </View>
 
-              {/* Social Login Divider */}
-              <View style={styles.socialDivider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>AUTHENTICATE WITH ECOSYSTEM</Text>
-                <View style={styles.dividerLine} />
-              </View>
 
-              {/* Social Logins */}
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialCardBtn} activeOpacity={0.8}>
-                  <AntDesign name="google" size={16} color="#EA4335" />
-                  <Text style={styles.socialBtnText}>Google</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.socialCardBtn} activeOpacity={0.8}>
-                  <FontAwesome name="apple" size={16} color="#000000" />
-                  <Text style={styles.socialBtnText}>Apple</Text>
-                </TouchableOpacity>
-              </View>
 
               {/* Secure Login Link */}
               {step === 'phone' && (
