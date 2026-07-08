@@ -647,15 +647,6 @@ export default function CustomerDashboard() {
                           />
                         </View>
 
-                        {/* Card Number block */}
-                        <View style={styles.cardNumberContainer}>
-                          <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                            CARD NUMBER
-                          </Text>
-                          <Text style={[styles.cardNumberValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
-                            {item.cardNumber}
-                          </Text>
-                        </View>
 
                         {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
                         <View style={styles.cardBottomRow}>
