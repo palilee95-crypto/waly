@@ -613,8 +613,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoImage: {
-    width: 140,
-    height: 48,
+    width: 200,
+    height: 64,
     marginBottom: 6,
     alignSelf: 'center',
   },
