@@ -135,9 +135,8 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-
-
-          {/* Main Card Container with decorative overlapping layers behind it */}
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            {/* Main Card Container with decorative overlapping layers behind it */}
           <View style={styles.cardWrapper}>
             {/* Back Layer 2 (Rotated slightly) */}
             <View style={[styles.backLayer, styles.backLayer2]} />
@@ -452,9 +451,7 @@ export default function LoginScreen() {
               )}
             </View>
           </View>
-
-
-
+          </View>
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
