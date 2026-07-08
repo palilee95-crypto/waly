@@ -590,7 +590,7 @@ export default function CustomerDashboard() {
                       activeOpacity={0.95}
                     >
                       {item.cardBackground ? (
-                        <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                        <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                       ) : null}
                       <View style={styles.stackedCardContent}>
                         {/* Header info */}
@@ -697,7 +697,7 @@ export default function CustomerDashboard() {
               {/* Large credit-card style loyalty details card */}
                <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
                 {selectedCard.cardBackground ? (
-                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : null}
                 <View style={styles.largeCardHeader}>
                   <View>

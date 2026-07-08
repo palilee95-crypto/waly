@@ -210,7 +210,7 @@ export default function MyCardsScreen() {
                   activeOpacity={0.9}
                 >
                   {item.cardBackground ? (
-                    <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                    <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : null}
                   <View style={styles.cardHeader}>
                     <View style={styles.shopLogoBg}>
@@ -281,7 +281,7 @@ export default function MyCardsScreen() {
 
               <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
                 {selectedCard.cardBackground ? (
-                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : null}
                 <View style={styles.largeCardHeader}>
                   <View>

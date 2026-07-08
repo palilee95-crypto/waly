@@ -69,7 +69,6 @@ export default function MarketingScreen() {
   const [bgImage, setBgImage] = useState<string>('');
   const [bgFile, setBgFile] = useState<any>(null);
   const [removeBgImage, setRemoveBgImage] = useState<boolean>(false);
-  const colorPickerRef = React.useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessNotice, setShowSuccessNotice] = useState(false);
@@ -796,20 +795,6 @@ export default function MarketingScreen() {
           </Text>
         </View>
 
-        {/* Hidden HTML input for visual color picking (Web only) */}
-        {Platform.OS === 'web' && (
-          <input
-            ref={colorPickerRef}
-            type="color"
-            style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
-            value={cardColor}
-            onChange={(e) => {
-              const val = e.target.value.toUpperCase();
-              setCardColor(val);
-              setCustomHexInput(val);
-            }}
-          />
-        )}
 
         {/* Form Card 2.5: Card Color Selector */}
         <View style={styles.configCard}>
@@ -846,10 +831,30 @@ export default function MarketingScreen() {
                   styles.colorWheelCircle,
                   !colorOptions.some(opt => opt.value === cardColor) && styles.colorCircleActive,
                 ]}
-                onPress={() => colorPickerRef.current?.click()}
                 activeOpacity={0.8}
               >
                 <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                <input
+                  type="color"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer',
+                    border: 'none',
+                    padding: 0,
+                    margin: 0,
+                  }}
+                  value={cardColor}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setCardColor(val);
+                    setCustomHexInput(val);
+                  }}
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -1056,7 +1061,7 @@ export default function MarketingScreen() {
           {bgImage ? (
             <Image
               source={{ uri: bgImage }}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
           ) : null}
