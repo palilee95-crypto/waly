@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 
 
 
@@ -38,6 +38,16 @@ const stampIcons: StampIconOption[] = [
   { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
   { id: 'cake', family: 'MaterialIcons', name: 'cake' },
   { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
+  { id: 'tag', family: 'Ionicons', name: 'pricetag' },
+  { id: 'gift', family: 'Ionicons', name: 'gift' },
+  { id: 'beer', family: 'Ionicons', name: 'beer' },
+  { id: 'pizza', family: 'Ionicons', name: 'pizza' },
+  { id: 'card', family: 'Ionicons', name: 'card' },
+  { id: 'store', family: 'Ionicons', name: 'storefront' },
+  { id: 'car', family: 'Ionicons', name: 'car-sport' },
+  { id: 'icecream', family: 'Ionicons', name: 'ice-cream' },
+  { id: 'barbell', family: 'Ionicons', name: 'barbell' },
+  { id: 'scissors', family: 'Ionicons', name: 'scissors' },
   { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
   { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
 ];
@@ -72,6 +82,8 @@ const fontColorOptions = [
 export default function MarketingScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isFocused = pathname.includes('marketing');
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   
@@ -733,7 +745,7 @@ export default function MarketingScreen() {
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
-        visible={merchant !== null && merchant.owner !== user?.id}
+        visible={isFocused && merchant !== null && merchant.owner !== user?.id}
         transparent={true}
         animationType="fade"
       >
