@@ -2284,7 +2284,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: '#E2E8F0',
   },
   colorCircleActive: {
     borderColor: '#000000',
