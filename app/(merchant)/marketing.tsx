@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
+import { useRouter } from 'expo-router';
 
 
 
@@ -70,6 +71,7 @@ const fontColorOptions = [
 
 export default function MarketingScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   
@@ -729,6 +731,32 @@ export default function MarketingScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+      {/* Restrict to Owner Modal Overlay */}
+      <Modal
+        visible={merchant !== null && merchant.owner !== user?.id}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.restrictionOverlay}>
+          <View style={styles.restrictionContent}>
+            <View style={styles.lockIconBg}>
+              <Ionicons name="lock-closed" size={44} color="#EF4444" />
+            </View>
+            <Text style={styles.restrictionTitle}>Store Owner Only</Text>
+            <Text style={styles.restrictionSubtitle}>
+              This configuration panel is restricted to the merchant store owner. Please contact your administrator to make design updates.
+            </Text>
+            <TouchableOpacity
+              style={styles.restrictionBtn}
+              onPress={() => router.replace('/(merchant)/give' as any)}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.restrictionBtnText}>Go Back Home</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
@@ -3198,5 +3226,63 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+  restrictionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  restrictionContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  lockIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  restrictionTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  restrictionSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 32,
+  },
+  restrictionBtn: {
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    height: 50,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restrictionBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });
