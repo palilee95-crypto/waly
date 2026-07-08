@@ -46,7 +46,7 @@ onRecordAfterCreateSuccess((e) => {
         },
         body: JSON.stringify({
           number: cleanPhone,
-          text: `🎁 *Selamat Datang ke WALY, ${customerName}!* 🎁\n\nAkaun telah dicipta untuk nombor telefon anda: *${phone}*\n\nAnda baru sahaja menerima: *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat kad cop anda, menuntut ganjaran, dan mengesahkan akaun anda, sila log masuk di sini:\n🔗 ${appUrl}\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih!`,
+          text: `🎁 *Selamat Datang ke WALY, ${customerName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam untuk mengelakkan gangguan pada akaun ganjaran anda.`,
           options: {
             delay: 2000,
             presence: 'composing'
