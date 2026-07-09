@@ -866,89 +866,140 @@ export default function CustomerDashboard() {
                 </TouchableOpacity>
               </View>
 
-              {/* Large credit-card style loyalty details card */}
-              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
-                {selectedCard.cardBackground ? (
-                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : null}
+              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+                {/* Large credit-card style loyalty details card */}
+                <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
+                  {selectedCard.cardBackground ? (
+                    <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : null}
 
-
-                <View style={styles.largeCardHeader}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                      {selectedCard.merchantName}
-                    </Text>
-                    <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
-                      {selectedCard.category.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.goldBadge}>
-                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
-                  </View>
-                </View>
-
-                {/* EMV Microchip */}
-                <View style={styles.cardMidRow}>
-                  <View style={styles.cardChip}>
-                    <View style={styles.chipLineHoriz} />
-                    <View style={styles.chipLineVert} />
-                    <View style={styles.chipCenterPin} />
-                  </View>
-                  <Ionicons 
-                    name="wifi" 
-                    size={18} 
-                    color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                    style={{ opacity: 0.35 }} 
-                  />
-                </View>
-
-                {/* Stamps grid details */}
-                <View style={styles.largeStampsGrid}>
-                  {renderDetailStampSlots(selectedCard)}
-                </View>
-
-                <View style={styles.largeCardFooter}>
-                  <View style={styles.holderCol}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                      {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                    </Text>
-                  </View>
-
-                  <View style={{ width: 45 }}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
-                  </View>
-
-                  <View style={{ width: 35 }}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
-                  </View>
-
-                  <View style={styles.brandBadge}>
-                    <View style={styles.mastercardBadge}>
-                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                  <View style={styles.largeCardHeader}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                        {selectedCard.merchantName}
+                      </Text>
+                      <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
+                        {selectedCard.category.toUpperCase()}
+                      </Text>
                     </View>
-                    <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
-                      {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
+                    <View style={styles.goldBadge}>
+                      <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
+                    </View>
+                  </View>
+
+                  {/* EMV Microchip */}
+                  <View style={styles.cardMidRow}>
+                    <View style={styles.cardChip}>
+                      <View style={styles.chipLineHoriz} />
+                      <View style={styles.chipLineVert} />
+                      <View style={styles.chipCenterPin} />
+                    </View>
+                    <Ionicons 
+                      name="wifi" 
+                      size={18} 
+                      color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                      style={{ opacity: 0.35 }} 
+                    />
+                  </View>
+
+                  {/* Stamps grid details */}
+                  <View style={styles.largeStampsGrid}>
+                    {renderDetailStampSlots(selectedCard)}
+                  </View>
+
+                  <View style={styles.largeCardFooter}>
+                    <View style={styles.holderCol}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                        {(user?.name || 'Ahmad Fazli').toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View style={{ width: 45 }}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
+                    </View>
+
+                    <View style={{ width: 35 }}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
+                    </View>
+
+                    <View style={styles.brandBadge}>
+                      <View style={styles.mastercardBadge}>
+                        <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                        <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                      </View>
+                      <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
+                        {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Points & Tier Info Section */}
+                <View style={styles.pointsTierCard}>
+                  <View style={styles.pointsTierInfo}>
+                    <Text style={styles.pointsTierTitle}>Points Balance</Text>
+                    <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
+                  </View>
+                  <View style={[styles.tierBadge, { backgroundColor: getTierColor(selectedCard.tier) }]}>
+                    <Ionicons name="ribbon" size={14} color="#FFFFFF" />
+                    <Text style={styles.tierBadgeText}>{(selectedCard.tier || 'bronze').toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                {/* Reward description card */}
+                <View style={styles.rewardDetailPanel}>
+                  <View style={styles.rewardIconBg}>
+                    <Ionicons name="gift" size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.rewardDetailInfo}>
+                    <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
+                    <Text style={styles.rewardDetailSub}>
+                      Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
                     </Text>
                   </View>
                 </View>
-              </View>
 
-              {/* Reward description card */}
-              <View style={styles.rewardDetailPanel}>
-                <View style={styles.rewardIconBg}>
-                  <Ionicons name="gift" size={22} color="#FFFFFF" />
+                {/* Points Catalog Section */}
+                <View style={styles.catalogSection}>
+                  <Text style={styles.catalogTitle}>Points Catalog</Text>
+                  <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
+                  
+                  {loadingRewards ? (
+                    <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
+                  ) : merchantRewards.length === 0 ? (
+                    <View style={styles.emptyCatalogCard}>
+                      <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.catalogList}>
+                      {merchantRewards.map((reward: any) => (
+                        <View key={reward.id} style={styles.catalogItem}>
+                          <View style={{ flex: 1, marginRight: 12 }}>
+                            <Text style={styles.catalogItemName}>{reward.name}</Text>
+                            <Text style={styles.catalogItemCost}>{reward.points_cost} Points</Text>
+                            {reward.description ? (
+                              <Text style={styles.catalogItemDesc}>{reward.description}</Text>
+                            ) : null}
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.redeemBtn,
+                              selectedCard.points < reward.points_cost && styles.redeemBtnDisabled
+                            ]}
+                            disabled={selectedCard.points < reward.points_cost}
+                            onPress={() => handleRedeemReward(reward)}
+                          >
+                            <Text style={styles.redeemBtnText}>Redeem</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
-                <View style={styles.rewardDetailInfo}>
-                  <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
-                  <Text style={styles.rewardDetailSub}>
-                    Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
-                  </Text>
-                </View>
-              </View>
+              </ScrollView>
 
               {/* Scan Trigger Button */}
               <TouchableOpacity

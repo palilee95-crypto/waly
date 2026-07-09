@@ -436,29 +436,45 @@ export default function MyCardsScreen() {
                         {selectedCard.category.toUpperCase()}
                       </Text>
                     </View>
-                    <View style={styles.largeCardIconWrapper}>
-                      <Ionicons name={selectedCard.cardIcon as any} size={28} color={selectedCard.fontColor || '#FFFFFF'} />
+                    <View style={styles.goldBadge}>
+                      <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
                     </View>
                   </View>
 
-                  {/* Stamp Slots Grid */}
-                  <View style={styles.slotsContainer}>
+                  {/* EMV Microchip */}
+                  <View style={styles.cardMidRow}>
+                    <View style={styles.cardChip}>
+                      <View style={styles.chipLineHoriz} />
+                      <View style={styles.chipLineVert} />
+                      <View style={styles.chipCenterPin} />
+                    </View>
+                    <Ionicons 
+                      name="wifi" 
+                      size={18} 
+                      color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                      style={{ opacity: 0.35 }} 
+                    />
+                  </View>
+
+                  {/* Stamps grid details */}
+                  <View style={styles.largeStampsGrid}>
                     {renderDetailStampSlots(selectedCard)}
                   </View>
 
-                  {/* Card Number & Brand indicator */}
                   <View style={styles.largeCardFooter}>
-                    <View style={styles.holderBlock}>
+                    <View style={styles.holderCol}>
                       <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
                       <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                        {user?.name || 'Ahmad Fazli'}
+                        {(user?.name || 'Ahmad Fazli').toUpperCase()}
                       </Text>
                     </View>
-                    <View style={styles.validBlock}>
+
+                    <View style={{ width: 45 }}>
                       <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
                       <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
                     </View>
-                    <View style={styles.cvvBlock}>
+
+                    <View style={{ width: 35 }}>
                       <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
                       <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
                     </View>
