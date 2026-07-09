@@ -159,9 +159,23 @@ export default function MyCardsScreen() {
     try {
       setRedeemingInProgress(true);
       setRedemptionError(null);
+
+      // Generate a random voucher code in format: RV-XXXX-XXXX
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const seg = (n: number) => {
+        let result = '';
+        for (let i = 0; i < n; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+      const redemptionCode = `RV-${seg(4)}-${seg(4)}`;
+
       await pb.collection('redemptions').create({
         customer: user!.id,
         reward: selectedRewardToRedeem.id,
+        code: redemptionCode,
+        status: 'pending',
       });
       setRedemptionSuccessVisible(true);
     } catch (err: any) {
