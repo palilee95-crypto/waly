@@ -77,6 +77,11 @@ export default function GiveStampsScreen() {
     return cleaned;
   };
 
+  const isVoucherCode = (input: string) => {
+    const upper = input.trim().toUpperCase();
+    return upper.startsWith('WV-') || upper.startsWith('RV-');
+  };
+
   const redeemVoucherCode = async (code: string) => {
     try {
       const voucher = await pb.collection('vouchers').getFirstListItem(
@@ -185,8 +190,8 @@ export default function GiveStampsScreen() {
       return;
     }
 
-    // If input starts with WV- prefix, process as voucher redemption
-    if (rawInput.toUpperCase().startsWith('WV-')) {
+    // If input starts with WV- or RV- prefix, process as voucher redemption
+    if (isVoucherCode(rawInput)) {
       await redeemVoucherCode(rawInput);
       return;
     }
@@ -400,7 +405,7 @@ export default function GiveStampsScreen() {
 
     setScanned(true);
 
-    if (rawInput.toUpperCase().startsWith('WV-')) {
+    if (isVoucherCode(rawInput)) {
       // It's a voucher redemption scan!
       await redeemVoucherCode(rawInput);
     } else {
@@ -511,7 +516,7 @@ export default function GiveStampsScreen() {
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Manual Stamp or Voucher</Text>
             <Text style={styles.formSubtitle}>
-              Enter customer's phone number to credit stamps, or enter a voucher code (starts with WV-) to redeem.
+              Enter customer's phone number to credit stamps, or enter a voucher code (starts with WV- or RV-) to redeem.
             </Text>
 
             {/* Input field */}
@@ -523,7 +528,7 @@ export default function GiveStampsScreen() {
                   style={styles.textInput}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
-                  placeholder="+60123456789 or WV-XXXX-XXXX"
+                  placeholder="+60123456789 or WV-XXXX/RV-XXXX"
                   placeholderTextColor="#94A3B8"
                   autoCapitalize="characters"
                   onFocus={() => setPhoneFocused(true)}
@@ -533,7 +538,7 @@ export default function GiveStampsScreen() {
             </View>
 
             {/* Bill Subtotal field */}
-            {!phoneNumber.toUpperCase().startsWith('WV-') && (
+            {!isVoucherCode(phoneNumber) && (
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>BILL SUBTOTAL (RM)</Text>
                 <View style={[styles.inputWrapper, subtotalFocused && styles.inputWrapperFocused]}>
@@ -553,7 +558,7 @@ export default function GiveStampsScreen() {
             )}
 
             {/* Count Selector field */}
-            {!phoneNumber.toUpperCase().startsWith('WV-') && (
+            {!isVoucherCode(phoneNumber) && (
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>NUMBER OF STAMPS TO ISSUE</Text>
                 <View style={styles.stampControls}>
@@ -588,7 +593,7 @@ export default function GiveStampsScreen() {
               activeOpacity={0.9}
             >
               <Text style={styles.submitBtnText}>
-                {phoneNumber.toUpperCase().startsWith('WV-') ? 'Redeem Voucher' : 'Issue Stamp Points'}
+                {isVoucherCode(phoneNumber) ? 'Redeem Voucher' : 'Issue Stamp Points'}
               </Text>
             </TouchableOpacity>
           </View>
