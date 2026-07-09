@@ -23,7 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 
 interface Reward {
   id: string;
-  title: string;
+  name: string;
   description: string;
   points_cost: number;
   stock: number;
@@ -96,7 +96,7 @@ export default function RewardsManagementScreen() {
 
   const handleOpenEdit = (reward: Reward) => {
     setEditingReward(reward);
-    setFormTitle(reward.title);
+    setFormTitle(reward.name);
     setFormDesc(reward.description || '');
     setFormPointsCost(String(reward.points_cost || 0));
     setFormStock(String(reward.stock || 0));
@@ -149,7 +149,7 @@ export default function RewardsManagementScreen() {
     try {
       const formData = new FormData();
       formData.append('merchant', user!.merchant_id);
-      formData.append('title', formTitle.trim());
+      formData.append('name', formTitle.trim());
       formData.append('description', formDesc.trim());
       formData.append('points_cost', String(pointsCostVal));
       formData.append('stock', String(parseInt(formStock, 10) || 0));
@@ -274,7 +274,7 @@ export default function RewardsManagementScreen() {
                       </View>
                     </View>
 
-                    <Text style={styles.rewardTitle} numberOfLines={1}>{reward.title}</Text>
+                    <Text style={styles.rewardTitle} numberOfLines={1}>{reward.name}</Text>
                     <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || 'No description provided.'}</Text>
                     
                     <View style={styles.rewardFooterRow}>
@@ -377,7 +377,7 @@ export default function RewardsManagementScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Reward Type</Text>
                 <View style={styles.typeSelectionGrid}>
-                  {['free_item', 'discount', 'experience', 'cash_credit'].map((t: any) => (
+                  {['free_item', 'discount'].map((t: any) => (
                     <TouchableOpacity
                       key={t}
                       style={[styles.typeSelectBtn, formType === t && styles.typeSelectBtnActive]}
@@ -447,7 +447,7 @@ export default function RewardsManagementScreen() {
             </View>
             <Text style={styles.modalTitle}>Delete Reward</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to delete "{selectedDeleteReward?.title}" from your catalogue? This action cannot be undone.
+              Are you sure you want to delete "{selectedDeleteReward?.name}" from your catalogue? This action cannot be undone.
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
