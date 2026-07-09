@@ -5,9 +5,25 @@ onRecordCreate((e) => {
   const merchantId = e.record.get('merchant');
   const now = new Date().toISOString();
   
-  // 1. Fetch user's current tier
-  const user = $app.findRecordById('users', customerId);
-  const tier = user.get('tier') || 'bronze';
+  // 1. Fetch user's loyalty card for this merchant
+  let card;
+  const cardId = e.record.get('loyalty_card');
+  try {
+    if (cardId) {
+      card = $app.findRecordById('loyalty_cards', cardId);
+    } else {
+      card = $app.findFirstRecordByFilter('loyalty_cards', 
+        'customer = {:cid} && merchant = {:mid}', 
+        { cid: customerId, mid: merchantId }
+      );
+    }
+  } catch (err) {
+    console.log("[MULTIPLIER HOOK] Loyalty card lookup failed:", err.message || err);
+    return e.next();
+  }
+
+  // 2. Fetch tier from card
+  const tier = card.get('tier') || 'bronze';
 
   const TIER_MULTIPLIERS = {
     bronze: 1.0,
@@ -17,7 +33,7 @@ onRecordCreate((e) => {
   };
   const tierMult = TIER_MULTIPLIERS[tier] || 1.0;
 
-  // 2. Fetch active double_points campaign
+  // 3. Fetch active double_points campaign
   let campaignMult = 1.0;
   try {
     const campaigns = $app.findRecordsByFilter('campaigns',
@@ -31,7 +47,21 @@ onRecordCreate((e) => {
     // Ignore error
   }
 
-  // 3. Fetch user's active streak multiplier
+  // 4. Fetch active flat_bonus campaign
+  let flatBonus = 0;
+  try {
+    const flatCampaigns = $app.findRecordsByFilter('campaigns',
+      `merchant = {:mid} && is_active = true && start_date <= {:now} && end_date >= {:now} && type = 'flat_bonus'`,
+      '-created', 1, 0, { mid: merchantId, now }
+    );
+    if (flatCampaigns.length > 0) {
+      flatBonus = flatCampaigns[0].get('bonus_value') || 0;
+    }
+  } catch (err) {
+    // Ignore
+  }
+
+  // 5. Fetch active streak multiplier
   let streakMult = 1.0;
   try {
     const streak = $app.findFirstRecordByFilter('streaks', `user = {:uid}`, { uid: customerId });
@@ -47,10 +77,42 @@ onRecordCreate((e) => {
     // No streak record yet, ignore
   }
 
-  // 4. Calculate final points
-  const basePoints = e.record.get('points') || 0;
-  const finalPoints = Math.floor(basePoints * tierMult * campaignMult * streakMult);
+  // 6. Calculate final points
+  const basePoints = e.record.get('points') || 0; // represent the bill amount
+  const finalPoints = Math.floor(basePoints * tierMult * campaignMult * streakMult) + flatBonus;
   e.record.set('points', finalPoints);
+
+  // 7. Fetch active bonus_stamps campaign
+  let bonusStamps = 0;
+  try {
+    const stampCampaigns = $app.findRecordsByFilter('campaigns',
+      `merchant = {:mid} && is_active = true && start_date <= {:now} && end_date >= {:now} && type = 'bonus_stamps'`,
+      '-created', 1, 0, { mid: merchantId, now }
+    );
+    if (stampCampaigns.length > 0) {
+      bonusStamps = stampCampaigns[0].get('bonus_value') || 0;
+    }
+  } catch (err) {
+    // Ignore
+  }
+
+  if (bonusStamps > 0) {
+    const baseStamps = e.record.get('stamps') || 0;
+    e.record.set('stamps', baseStamps + bonusStamps);
+    
+    const currentStamps = card.get('stamps_collected') || 0;
+    card.set('stamps_collected', currentStamps + bonusStamps);
+  }
+
+  // 8. Update points balance on card
+  const newBalance = (card.get('points_balance') || 0) + finalPoints;
+  card.set('points_balance', newBalance);
+
+  try {
+    $app.save(card); // Saves card and triggers stamp_complete.pb.js checks
+  } catch (saveErr) {
+    console.log("[MULTIPLIER HOOK] Card save failed:", saveErr.message || saveErr);
+  }
 
   // Log calculation details in metadata JSON
   const existingMetadata = e.record.get('metadata') || {};
@@ -58,6 +120,8 @@ onRecordCreate((e) => {
     base_points: basePoints,
     tier_multiplier: tierMult,
     campaign_multiplier: campaignMult,
+    flat_bonus: flatBonus,
+    bonus_stamps: bonusStamps,
     streak_multiplier: streakMult,
     calculated_at: now
   }));
