@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
@@ -143,60 +144,81 @@ export default function MyCardsScreen() {
     if (!selectedCard) return;
     
     if (selectedCard.points < reward.points_cost) {
-      Alert.alert("Insufficient Points", "You don't have enough points at this shop to redeem this reward.");
+      if (Platform.OS === 'web') {
+        window.alert("You don't have enough points at this shop to redeem this reward.");
+      } else {
+        Alert.alert("Insufficient Points", "You don't have enough points at this shop to redeem this reward.");
+      }
       return;
     }
 
-    Alert.alert(
-      "Confirm Redemption",
-      `Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Redeem",
-          onPress: async () => {
-            try {
-              await pb.collection('redemptions').create({
-                customer: user!.id,
-                reward: reward.id,
-              });
+    const redeemAction = async () => {
+      try {
+        await pb.collection('redemptions').create({
+          customer: user!.id,
+          reward: reward.id,
+        });
 
-              Alert.alert(
-                "Redeemed!",
-                "Voucher generated successfully. You can find your new voucher in the Vouchers tab!",
-                [
-                  {
-                    text: "View Vouchers",
-                    onPress: () => {
-                      setDetailModalVisible(false);
-                      router.push('/(customer)/vouchers');
-                    }
-                  },
-                  {
-                    text: "Done",
-                    onPress: () => {
-                      fetchLoyaltyCards();
-                      if (selectedCard) {
-                        setSelectedCard(prev => {
-                          if (!prev) return null;
-                          return {
-                            ...prev,
-                            points: prev.points - reward.points_cost
-                          };
-                        });
-                      }
-                    }
-                  }
-                ]
-              );
-            } catch (err: any) {
-              console.warn("Redemption failed:", err);
-              Alert.alert("Error", err.message || "Failed to redeem reward.");
-            }
+        const viewVouchers = () => {
+          setDetailModalVisible(false);
+          router.push('/(customer)/vouchers');
+        };
+
+        const done = () => {
+          fetchLoyaltyCards();
+          if (selectedCard) {
+            setSelectedCard(prev => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                points: prev.points - reward.points_cost
+              };
+            });
           }
+        };
+
+        if (Platform.OS === 'web') {
+          const viewNow = window.confirm("Redeemed! Voucher generated successfully. Do you want to view your vouchers now?");
+          if (viewNow) {
+            viewVouchers();
+          } else {
+            done();
+          }
+        } else {
+          Alert.alert(
+            "Redeemed!",
+            "Voucher generated successfully. You can find your new voucher in the Vouchers tab!",
+            [
+              { text: "View Vouchers", onPress: viewVouchers },
+              { text: "Done", onPress: done }
+            ]
+          );
         }
-      ]
-    );
+      } catch (err: any) {
+        console.warn("Redemption failed:", err);
+        if (Platform.OS === 'web') {
+          window.alert(err.message || "Failed to redeem reward.");
+        } else {
+          Alert.alert("Error", err.message || "Failed to redeem reward.");
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`);
+      if (confirmed) {
+        await redeemAction();
+      }
+    } else {
+      Alert.alert(
+        "Confirm Redemption",
+        `Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Redeem", onPress: redeemAction }
+        ]
+      );
+    }
   };
 
   const getTierColor = (tier: string = 'bronze') => {
