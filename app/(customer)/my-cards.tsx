@@ -140,85 +140,60 @@ export default function MyCardsScreen() {
     }
   };
 
-  const handleRedeemReward = async (reward: any) => {
-    if (!selectedCard) return;
-    
-    if (selectedCard.points < reward.points_cost) {
-      if (Platform.OS === 'web') {
-        window.alert("You don't have enough points at this shop to redeem this reward.");
-      } else {
-        Alert.alert("Insufficient Points", "You don't have enough points at this shop to redeem this reward.");
-      }
-      return;
+  // Custom Redemption States
+  const [redemptionConfirmVisible, setRedemptionConfirmVisible] = useState(false);
+  const [selectedRewardToRedeem, setSelectedRewardToRedeem] = useState<any>(null);
+  const [redeemingInProgress, setRedeemingInProgress] = useState(false);
+  const [redemptionSuccessVisible, setRedemptionSuccessVisible] = useState(false);
+  const [redemptionError, setRedemptionError] = useState<string | null>(null);
+
+  const handleRedeemReward = (reward: any) => {
+    setSelectedRewardToRedeem(reward);
+    setRedemptionConfirmVisible(true);
+    setRedemptionSuccessVisible(false);
+    setRedemptionError(null);
+  };
+
+  const executeRedemption = async () => {
+    if (!selectedRewardToRedeem || !selectedCard) return;
+    try {
+      setRedeemingInProgress(true);
+      setRedemptionError(null);
+      await pb.collection('redemptions').create({
+        customer: user!.id,
+        reward: selectedRewardToRedeem.id,
+      });
+      setRedemptionSuccessVisible(true);
+    } catch (err: any) {
+      console.warn("Redemption failed:", err);
+      setRedemptionError(err.message || "Failed to redeem reward. Please try again.");
+    } finally {
+      setRedeemingInProgress(false);
     }
+  };
 
-    const redeemAction = async () => {
-      try {
-        await pb.collection('redemptions').create({
-          customer: user!.id,
-          reward: reward.id,
-        });
-
-        const viewVouchers = () => {
-          setDetailModalVisible(false);
-          router.push('/(customer)/vouchers');
+  const handleRedemptionSuccessDone = () => {
+    fetchLoyaltyCards();
+    if (selectedCard && selectedRewardToRedeem) {
+      setSelectedCard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          points: prev.points - selectedRewardToRedeem.points_cost
         };
-
-        const done = () => {
-          fetchLoyaltyCards();
-          if (selectedCard) {
-            setSelectedCard(prev => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                points: prev.points - reward.points_cost
-              };
-            });
-          }
-        };
-
-        if (Platform.OS === 'web') {
-          const viewNow = window.confirm("Redeemed! Voucher generated successfully. Do you want to view your vouchers now?");
-          if (viewNow) {
-            viewVouchers();
-          } else {
-            done();
-          }
-        } else {
-          Alert.alert(
-            "Redeemed!",
-            "Voucher generated successfully. You can find your new voucher in the Vouchers tab!",
-            [
-              { text: "View Vouchers", onPress: viewVouchers },
-              { text: "Done", onPress: done }
-            ]
-          );
-        }
-      } catch (err: any) {
-        console.warn("Redemption failed:", err);
-        if (Platform.OS === 'web') {
-          window.alert(err.message || "Failed to redeem reward.");
-        } else {
-          Alert.alert("Error", err.message || "Failed to redeem reward.");
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`);
-      if (confirmed) {
-        await redeemAction();
-      }
-    } else {
-      Alert.alert(
-        "Confirm Redemption",
-        `Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Redeem", onPress: redeemAction }
-        ]
-      );
+      });
     }
+    setRedemptionConfirmVisible(false);
+    setRedemptionSuccessVisible(false);
+    setSelectedRewardToRedeem(null);
+  };
+
+  const handleRedemptionSuccessViewVouchers = () => {
+    setRedemptionConfirmVisible(false);
+    setRedemptionSuccessVisible(false);
+    setSelectedRewardToRedeem(null);
+    setDetailModalVisible(false);
+    router.push('/(customer)/vouchers');
   };
 
   const getTierColor = (tier: string = 'bronze') => {
@@ -595,6 +570,99 @@ export default function MyCardsScreen() {
               </TouchableOpacity>
             </View>
           )}
+        </View>
+      </Modal>
+
+      {/* Custom Redemption Confirm & Success Modal */}
+      <Modal
+        visible={redemptionConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!redeemingInProgress) setRedemptionConfirmVisible(false);
+        }}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContent}>
+            {redemptionError ? (
+              // Error State
+              <View style={{ alignItems: 'center', width: '100%' }}>
+                <View style={[styles.confirmIconBg, { backgroundColor: '#EF4444' }]}>
+                  <Ionicons name="warning" size={32} color="#FFFFFF" />
+                </View>
+                <Text style={styles.confirmTitle}>Redemption Failed</Text>
+                <Text style={styles.confirmText}>{redemptionError}</Text>
+                
+                <TouchableOpacity
+                  style={styles.errorCloseBtn}
+                  onPress={() => {
+                    setRedemptionError(null);
+                    setRedemptionConfirmVisible(false);
+                  }}
+                >
+                  <Text style={styles.errorCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            ) : !redemptionSuccessVisible ? (
+              // Confirmation State
+              <View style={{ alignItems: 'center', width: '100%' }}>
+                <View style={styles.confirmIconBg}>
+                  <Ionicons name="gift" size={32} color="#FFFFFF" />
+                </View>
+                <Text style={styles.confirmTitle}>Confirm Redemption</Text>
+                <Text style={styles.confirmText}>
+                  Are you sure you want to redeem "{selectedRewardToRedeem?.name}" for {selectedRewardToRedeem?.points_cost} points?
+                </Text>
+                
+                <View style={styles.confirmActions}>
+                  <TouchableOpacity
+                    style={styles.cancelActionBtn}
+                    disabled={redeemingInProgress}
+                    onPress={() => setRedemptionConfirmVisible(false)}
+                  >
+                    <Text style={styles.cancelActionText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmActionBtn}
+                    disabled={redeemingInProgress}
+                    onPress={executeRedemption}
+                  >
+                    {redeemingInProgress ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.confirmActionText}>Redeem</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              // Success State
+              <View style={{ alignItems: 'center', width: '100%' }}>
+                <View style={[styles.confirmIconBg, { backgroundColor: '#10B981' }]}>
+                  <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
+                </View>
+                <Text style={styles.confirmTitle}>Redemption Successful!</Text>
+                <Text style={styles.confirmText}>
+                  Your voucher has been generated successfully. You can find it under the Vouchers tab!
+                </Text>
+                
+                <View style={styles.successActions}>
+                  <TouchableOpacity
+                    style={styles.successDoneBtn}
+                    onPress={handleRedemptionSuccessDone}
+                  >
+                    <Text style={styles.successDoneText}>Done</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.successViewVouchersBtn}
+                    onPress={handleRedemptionSuccessViewVouchers}
+                  >
+                    <Text style={styles.successViewVouchersText}>View Vouchers</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       </Modal>
 
@@ -1328,6 +1396,125 @@ const styles = StyleSheet.create({
   },
   redeemBtnText: {
     fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmModalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  confirmIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 24,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  cancelActionBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelActionText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  confirmActionBtn: {
+    flex: 1,
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmActionText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  successActions: {
+    flexDirection: 'row-reverse',
+    gap: 12,
+    width: '100%',
+  },
+  successDoneBtn: {
+    flex: 1,
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successDoneText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  successViewVouchersBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successViewVouchersText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  errorCloseBtn: {
+    width: '100%',
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorCloseText: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
