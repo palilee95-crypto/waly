@@ -929,7 +929,6 @@ export default function UnifiedRewardsScreen() {
                   placeholderTextColor="#94A3B8"
                   onFocus={() => setExpiryFocused(true)}
                   onBlur={() => setExpiryFocused(false)}
-                  {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
                 <Text style={styles.inputSuffix}>Days</Text>
               </View>
@@ -945,7 +944,6 @@ export default function UnifiedRewardsScreen() {
                   multiline
                   onFocus={() => setRewardFocused(true)}
                   onBlur={() => setRewardFocused(false)}
-                  {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
               </View>
             </View>
@@ -1187,7 +1185,6 @@ export default function UnifiedRewardsScreen() {
                   onChangeText={setFormTitle}
                   placeholder="e.g. Free Hot Americano"
                   placeholderTextColor="#94A3B8"
-                  {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
               </View>
 
@@ -1201,7 +1198,6 @@ export default function UnifiedRewardsScreen() {
                   placeholder="e.g. 200"
                   placeholderTextColor="#94A3B8"
                   keyboardType="number-pad"
-                  {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
               </View>
 
@@ -1215,7 +1211,6 @@ export default function UnifiedRewardsScreen() {
                   placeholder="e.g. 100"
                   placeholderTextColor="#94A3B8"
                   keyboardType="number-pad"
-                  {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
               </View>
 
@@ -1768,7 +1763,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   inputWrapperFocused: {
-    borderColor: '#000000',
+    borderColor: '#0F172A',
+    borderWidth: 1.5,
   },
   inputSuffix: {
     fontSize: 13,
@@ -2284,6 +2280,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#0F172A',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }) as any,
   },
   nestedTextInput: {
     flex: 1,
@@ -2295,6 +2296,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 0,
     height: '100%',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }) as any,
   },
   nestedTextInputMultiline: {
     flex: 1,
@@ -2307,6 +2313,11 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     textAlignVertical: 'top',
     height: '100%',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }) as any,
   },
   settingsLabel: {
     fontSize: 12,
