@@ -918,10 +918,10 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <Text style={styles.cardSectionTitle}>Card Settings</Text>
 
-              <Text style={[styles.cardSectionDesc, { marginBottom: 6 }]}>Card expiration (days)</Text>
+              <Text style={styles.settingsLabel}>Card expiration (days)</Text>
               <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused]}>
                 <TextInput
-                  style={styles.textInput}
+                  style={styles.nestedTextInput}
                   value={expiryDays}
                   onChangeText={setExpiryDays}
                   keyboardType="number-pad"
@@ -934,10 +934,10 @@ export default function UnifiedRewardsScreen() {
                 <Text style={styles.inputSuffix}>Days</Text>
               </View>
 
-              <Text style={[styles.cardSectionDesc, { marginTop: 16, marginBottom: 6 }]}>Stamp completion reward description</Text>
-              <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 72, alignItems: 'flex-start', paddingTop: 10 }]}>
+              <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Stamp completion reward description</Text>
+              <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }]}>
                 <TextInput
-                  style={[styles.textInput, { height: 52, flex: 1 }]}
+                  style={styles.nestedTextInputMultiline}
                   value={rewardDesc}
                   onChangeText={setRewardDesc}
                   placeholder="e.g. One Free Double Cheeseburger"
@@ -1766,7 +1766,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 44,
     paddingHorizontal: 12,
-    marginTop: 10,
   },
   inputWrapperFocused: {
     borderColor: '#000000',
@@ -2285,6 +2284,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#0F172A',
+  },
+  nestedTextInput: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    height: '100%',
+  },
+  nestedTextInputMultiline: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    textAlignVertical: 'top',
+    height: '100%',
+  },
+  settingsLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+    marginBottom: 6,
+    marginTop: 12,
   },
   helpText: {
     fontSize: 11,
