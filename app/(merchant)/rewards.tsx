@@ -965,7 +965,7 @@ export default function UnifiedRewardsScreen() {
                     {(merchant?.category || 'FOOD').toUpperCase()}
                   </Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#DC2626' }]}>
+                <View style={[styles.cardStatusBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#DC2626' }]}>
                   <Text style={styles.statusText}>{isActive ? 'ACTIVE' : 'PAUSED'}</Text>
                 </View>
               </View>
@@ -1642,7 +1642,7 @@ const styles = StyleSheet.create({
     border: 'none',
     padding: 0,
     margin: 0,
-  },
+  } as any,
   hexInputContainer: {
     marginTop: 16,
     borderTopWidth: 1,
@@ -1807,7 +1807,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginTop: 2,
   },
-  statusBadge: {
+  cardStatusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -2140,6 +2140,24 @@ const styles = StyleSheet.create({
     color: '#475569',
     marginBottom: 6,
     letterSpacing: 0.5,
+  },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    height: 44,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  helpText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 16,
+    marginTop: 4,
   },
   typeSelectionGrid: {
     flexDirection: 'row',

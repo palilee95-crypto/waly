@@ -122,6 +122,7 @@ export default function MarketingScreen() {
   const [broadcastsList, setBroadcastsList] = useState<any[]>([]);
   const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [whatsappQr, setWhatsappQr] = useState<string>('');
   const [bCampaignId, setBCampaignId] = useState('');
   const [bTitle, setBTitle] = useState('Exclusive Promotion! 🎁');
   const [bMessage, setBMessage] = useState('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
@@ -754,7 +755,7 @@ export default function MarketingScreen() {
               Broadcast
             </Text>
           </TouchableOpacity>
-
+        </View>
 
         {subTab === 'campaigns' && (
           <View style={styles.campaignsContent}>
