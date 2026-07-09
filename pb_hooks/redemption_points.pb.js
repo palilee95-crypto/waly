@@ -39,5 +39,17 @@ onRecordCreate((e) => {
   tx.set('metadata', { reward_redemption: e.record.id || '' });
   $app.save(tx);
 
+  // Issue the corresponding active voucher
+  const voucherCol = $app.findCollectionByNameOrId('vouchers');
+  const voucher = new Record(voucherCol);
+  voucher.set('customer', customerId);
+  voucher.set('reward', rewardId);
+  voucher.set('code', e.record.get('code'));
+  voucher.set('status', 'active');
+  // Default voucher validity of 30 days
+  const expiry = new Date(Date.now() + 30 * 86400000).toISOString();
+  voucher.set('expires_at', expiry);
+  $app.save(voucher);
+
   return e.next();
 }, 'redemptions');
