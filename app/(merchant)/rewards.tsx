@@ -1078,29 +1078,28 @@ export default function UnifiedRewardsScreen() {
               </Text>
 
               <View style={styles.tiersContainer}>
-
                 {/* Bronze */}
                 <View style={styles.tierListItem}>
-                  <View style={styles.tierBadgeHeader}>
-                    <View style={[styles.tierCircle, { backgroundColor: '#B45309' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.tierName}>🥉 Bronze</Text>
-                      <Text style={styles.tierThreshold}>New customers · Total spend below RM 100</Text>
-                    </View>
+                  <View style={[styles.tierCircle, { backgroundColor: '#FFEDD5' }]}>
+                    <Text style={styles.tierEmoji}>🥉</Text>
                   </View>
-                  <View style={styles.multiplierBox}>
-                    <Text style={styles.multiplierText}>1x Points</Text>
+                  <View style={styles.tierInfoCol}>
+                    <Text style={styles.tierName}>Bronze</Text>
+                    <Text style={styles.tierThreshold}>New customers · Total spend below RM 100</Text>
+                  </View>
+                  <View style={[styles.multiplierBox, { backgroundColor: '#FFEDD5' }]}>
+                    <Text style={[styles.multiplierText, { color: '#C2410C' }]}>1x Points</Text>
                   </View>
                 </View>
 
                 {/* Silver */}
                 <View style={styles.tierListItem}>
-                  <View style={styles.tierBadgeHeader}>
-                    <View style={[styles.tierCircle, { backgroundColor: '#94A3B8' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.tierName}>🥈 Silver</Text>
-                      <Text style={styles.tierThreshold}>Regular customers · RM 100 – RM 299 spent</Text>
-                    </View>
+                  <View style={[styles.tierCircle, { backgroundColor: '#E2E8F0' }]}>
+                    <Text style={styles.tierEmoji}>🥈</Text>
+                  </View>
+                  <View style={styles.tierInfoCol}>
+                    <Text style={styles.tierName}>Silver</Text>
+                    <Text style={styles.tierThreshold}>Regular customers · RM 100 – RM 299 spent</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#F1F5F9' }]}>
                     <Text style={[styles.multiplierText, { color: '#475569' }]}>1.25x Points</Text>
@@ -1109,12 +1108,12 @@ export default function UnifiedRewardsScreen() {
 
                 {/* Gold */}
                 <View style={styles.tierListItem}>
-                  <View style={styles.tierBadgeHeader}>
-                    <View style={[styles.tierCircle, { backgroundColor: '#D97706' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.tierName}>🥇 Gold</Text>
-                      <Text style={styles.tierThreshold}>Loyal customers · RM 300 – RM 499 spent</Text>
-                    </View>
+                  <View style={[styles.tierCircle, { backgroundColor: '#FEF3C7' }]}>
+                    <Text style={styles.tierEmoji}>🥇</Text>
+                  </View>
+                  <View style={styles.tierInfoCol}>
+                    <Text style={styles.tierName}>Gold</Text>
+                    <Text style={styles.tierThreshold}>Loyal customers · RM 300 – RM 499 spent</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#FEF3C7' }]}>
                     <Text style={[styles.multiplierText, { color: '#B45309' }]}>1.5x Points</Text>
@@ -1123,15 +1122,15 @@ export default function UnifiedRewardsScreen() {
 
                 {/* Platinum */}
                 <View style={styles.tierListItem}>
-                  <View style={styles.tierBadgeHeader}>
-                    <View style={[styles.tierCircle, { backgroundColor: '#1E1B4B' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.tierName}>💎 Platinum</Text>
-                      <Text style={styles.tierThreshold}>VIP customers · RM 500+ spent</Text>
-                    </View>
+                  <View style={[styles.tierCircle, { backgroundColor: '#E0E7FF' }]}>
+                    <Text style={styles.tierEmoji}>💎</Text>
+                  </View>
+                  <View style={styles.tierInfoCol}>
+                    <Text style={styles.tierName}>Platinum</Text>
+                    <Text style={styles.tierThreshold}>VIP customers · RM 500+ spent</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={[styles.multiplierText, { color: '#312E81' }]}>2x Points</Text>
+                    <Text style={[styles.multiplierText, { color: '#3730A3' }]}>2x Points</Text>
                   </View>
                 </View>
               </View>
@@ -2103,16 +2102,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tierCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tierEmoji: {
+    fontSize: 18,
+  },
+  tierInfoCol: {
+    flex: 1,
+    gap: 2,
+    marginRight: 6,
   },
   tierName: {
     fontSize: 13,
@@ -2123,18 +2125,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
-    marginTop: 1,
+    lineHeight: 14,
   },
   multiplierBox: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   multiplierText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#D97706',
   },
   // Modal Overlays Restriction
   restrictionOverlay: {
