@@ -282,21 +282,15 @@ export default function MyCardsScreen() {
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
         {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
           <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={18} color="#000000" />
           </TouchableOpacity>
           
           <Image
             source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 90, height: 32, resizeMode: 'contain' }}
+            style={{ width: 110, height: 38, resizeMode: 'contain' }}
           />
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.roundHeaderBtn}>
-              <Ionicons name="notifications-outline" size={18} color="#000000" />
-            </TouchableOpacity>
-          </View>
         </View>
 
         <ScrollView

@@ -287,16 +287,10 @@ export default function CustomersScreen() {
           />
           <Text style={styles.headerTitle}>Transaction History</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 80, height: 28, resizeMode: 'contain' }}
-          />
-          <TouchableOpacity style={styles.notifyBtn}>
-            <Ionicons name="notifications-outline" size={22} color="#0b1c30" />
-            <View style={styles.notifyDot} />
-          </TouchableOpacity>
-        </View>
+        <Image
+          source={require('../../theme/rise_officiallogo.png')}
+          style={{ width: 110, height: 38, resizeMode: 'contain' }}
+        />
       </View>
 
       <ScrollView

@@ -588,17 +588,17 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Top Header Row */}
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+      <View style={[styles.headerRow, isDesktop && { paddingLeft: 260 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
         <View style={styles.headerLeft}>
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 90, height: 32, resizeMode: 'contain' }}
-          />
+          <View style={styles.logoBadge}>
+            <Ionicons name="cafe" size={16} color="#000000" />
+          </View>
+          <Text style={styles.headerLogoText}>Merchant Portal</Text>
         </View>
-        <TouchableOpacity style={styles.notifyBtn}>
-          <Ionicons name="notifications-outline" size={22} color="#0b1c30" />
-        </TouchableOpacity>
+        <Image
+          source={require('../../theme/rise_officiallogo.png')}
+          style={{ width: 110, height: 38, resizeMode: 'contain' }}
+        />
       </View>
 
       <ScrollView

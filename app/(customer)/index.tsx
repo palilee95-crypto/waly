@@ -457,7 +457,7 @@ export default function CustomerDashboard() {
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
         {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
           <Image
             source={{ uri: avatarUrl }}
             style={styles.avatar}
@@ -465,18 +465,8 @@ export default function CustomerDashboard() {
           
           <Image
             source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 90, height: 32, resizeMode: 'contain' }}
+            style={{ width: 110, height: 38, resizeMode: 'contain' }}
           />
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => router.push('/(customer)/explore')}>
-              <Ionicons name="compass-outline" size={18} color="#004ac6" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => setShowNotificationsModal(true)}>
-              <Ionicons name="notifications-outline" size={18} color="#565e74" />
-              {unreadCount > 0 && <View style={styles.badgeDot} />}
-            </TouchableOpacity>
-          </View>
         </View>
 
         <ScrollView

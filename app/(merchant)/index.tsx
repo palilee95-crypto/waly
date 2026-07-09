@@ -158,7 +158,7 @@ export default function MerchantDashboard() {
           </View>
           <Image
             source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 80, height: 28, resizeMode: 'contain' }}
+            style={{ width: 110, height: 38, resizeMode: 'contain' }}
           />
         </View>
 
