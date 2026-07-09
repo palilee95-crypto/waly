@@ -1065,43 +1065,56 @@ export default function UnifiedRewardsScreen() {
         {/* TAB 3: Points & Tiers Rules Dashboard */}
         {activeTab === 'points_tiers' && (
           <View style={{ marginTop: 12, gap: 16 }}>
-            {/* Calculation Rules Info Block */}
+
+            {/* How Points Work — Simple Explainer */}
             <View style={styles.configCard}>
               <View style={styles.pointsRuleHeader}>
-                <Ionicons name="calculator-outline" size={24} color="#10B981" />
-                <Text style={styles.ruleSectionTitle}>Earning Calculation Rules</Text>
+                <Ionicons name="star-outline" size={24} color="#10B981" />
+                <Text style={styles.ruleSectionTitle}>How Your Customers Earn Points</Text>
               </View>
               <Text style={styles.pointsRuleText}>
-                Your shop uses <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Option B-2: Shop-Specific spend loyalty points</Text>. 
-                Points earning is directly proportional to bill spending subtotal:
+                Every time a customer pays at your shop, they earn loyalty points based on how much they spend.
               </Text>
+
+              {/* Visual formula */}
               <View style={styles.formulaBox}>
-                <Text style={styles.formulaText}>RM 1.00 spent = 1.0 Base Point</Text>
+                <Text style={styles.formulaText}>RM 1 spent = 1 Point</Text>
               </View>
+
+              {/* Worked Example */}
+              <View style={styles.exampleBox}>
+                <Text style={styles.exampleTitle}>📋 Example</Text>
+                <Text style={styles.exampleText}>
+                  A customer pays <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>RM 45.50</Text> for their order.
+                  {'\n'}They receive <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>45 points</Text> added to their loyalty card — automatically!
+                </Text>
+              </View>
+
               <Text style={styles.helpText}>
-                When manual stamps are credited to a customer's visit, the bill subtotal amount entered is automatically debited to their loyalty card point balance as base points.
+                Points are added whenever your staff keys in a customer visit. No extra step needed from the customer.
               </Text>
             </View>
 
-            {/* Tiers configurations breakdown list */}
+            {/* Membership Tiers */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Membership Tiers & Multipliers</Text>
+              <Text style={styles.cardSectionTitle}>Customer Membership Tiers</Text>
               <Text style={styles.cardSectionDesc}>
-                Customers automatically advance to premium tiers based on points earned at your store in the last 12 rolling months.
+                Customers move up tiers based on their total spending at <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>your shop</Text> over the past 12 months. Higher tiers earn more points per ringgit — rewarding your most loyal customers automatically.
               </Text>
 
               <View style={styles.tiersContainer}>
+
                 {/* Bronze */}
                 <View style={styles.tierListItem}>
                   <View style={styles.tierBadgeHeader}>
                     <View style={[styles.tierCircle, { backgroundColor: '#B45309' }]} />
-                    <View>
-                      <Text style={styles.tierName}>Bronze Tier</Text>
-                      <Text style={styles.tierThreshold}>Spend: RM 0 - RM 99</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tierName}>🥉 Bronze</Text>
+                      <Text style={styles.tierThreshold}>New customers · Total spend below RM 100</Text>
                     </View>
                   </View>
                   <View style={styles.multiplierBox}>
-                    <Text style={styles.multiplierText}>1.0x Pts</Text>
+                    <Text style={styles.multiplierText}>1x Points</Text>
                   </View>
                 </View>
 
@@ -1109,13 +1122,13 @@ export default function UnifiedRewardsScreen() {
                 <View style={styles.tierListItem}>
                   <View style={styles.tierBadgeHeader}>
                     <View style={[styles.tierCircle, { backgroundColor: '#94A3B8' }]} />
-                    <View>
-                      <Text style={styles.tierName}>Silver Tier</Text>
-                      <Text style={styles.tierThreshold}>Spend: RM 100 - RM 299</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tierName}>🥈 Silver</Text>
+                      <Text style={styles.tierThreshold}>Regular customers · RM 100 – RM 299 spent</Text>
                     </View>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#F1F5F9' }]}>
-                    <Text style={[styles.multiplierText, { color: '#475569' }]}>1.25x Pts</Text>
+                    <Text style={[styles.multiplierText, { color: '#475569' }]}>1.25x Points</Text>
                   </View>
                 </View>
 
@@ -1123,13 +1136,13 @@ export default function UnifiedRewardsScreen() {
                 <View style={styles.tierListItem}>
                   <View style={styles.tierBadgeHeader}>
                     <View style={[styles.tierCircle, { backgroundColor: '#D97706' }]} />
-                    <View>
-                      <Text style={styles.tierName}>Gold Tier</Text>
-                      <Text style={styles.tierThreshold}>Spend: RM 300 - RM 499</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tierName}>🥇 Gold</Text>
+                      <Text style={styles.tierThreshold}>Loyal customers · RM 300 – RM 499 spent</Text>
                     </View>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#FEF3C7' }]}>
-                    <Text style={[styles.multiplierText, { color: '#B45309' }]}>1.5x Pts</Text>
+                    <Text style={[styles.multiplierText, { color: '#B45309' }]}>1.5x Points</Text>
                   </View>
                 </View>
 
@@ -1137,17 +1150,29 @@ export default function UnifiedRewardsScreen() {
                 <View style={styles.tierListItem}>
                   <View style={styles.tierBadgeHeader}>
                     <View style={[styles.tierCircle, { backgroundColor: '#1E1B4B' }]} />
-                    <View>
-                      <Text style={styles.tierName}>Platinum Tier</Text>
-                      <Text style={styles.tierThreshold}>Spend: RM 500+</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tierName}>💎 Platinum</Text>
+                      <Text style={styles.tierThreshold}>VIP customers · RM 500+ spent</Text>
                     </View>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={[styles.multiplierText, { color: '#312E81' }]}>2.0x Pts</Text>
+                    <Text style={[styles.multiplierText, { color: '#312E81' }]}>2x Points</Text>
                   </View>
                 </View>
               </View>
             </View>
+
+            {/* Tip Card */}
+            <View style={styles.tipCard}>
+              <View style={styles.tipCardHeader}>
+                <Ionicons name="bulb-outline" size={20} color="#D97706" />
+                <Text style={styles.tipCardTitle}>Why tiers matter for your business</Text>
+              </View>
+              <Text style={styles.tipCardText}>
+                Platinum customers earn <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#D97706' }}>2x points</Text> per ringgit, which motivates your best spenders to keep coming back. Tiers are tracked and updated automatically — you don't need to do anything.
+              </Text>
+            </View>
+
           </View>
         )}
       </ScrollView>
@@ -2001,6 +2026,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#065F46',
+  },
+  exampleBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  exampleTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+    marginBottom: 6,
+    letterSpacing: 0.3,
+  },
+  exampleText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#334155',
+    lineHeight: 20,
+  },
+  tipCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 16,
+    gap: 8,
+  },
+  tipCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tipCardTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+  },
+  tipCardText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#78350F',
+    lineHeight: 19,
   },
   tiersContainer: {
     marginTop: 16,
