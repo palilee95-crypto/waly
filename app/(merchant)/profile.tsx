@@ -60,6 +60,11 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
+  // WhatsApp connection states
+  const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [whatsappQr, setWhatsappQr] = useState<string>('');
+  const [showQrModal, setShowQrModal] = useState(false);
+
   // Edit store profile states
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editStoreName, setEditStoreName] = useState('');
@@ -96,12 +101,71 @@ export default function ProfileScreen() {
     ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
     : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200';
 
+  const fetchWhatsappStatus = async (generateQr = false) => {
+    if (!user || !user.merchant_id) return;
+    try {
+      const url = `/api/risev/merchant/whatsapp/status${generateQr ? '?generateQr=true' : ''}`;
+      const res = await pb.send(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      setWhatsappStatus(res.status);
+      if (res.qrcode) {
+        setWhatsappQr(res.qrcode);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch WhatsApp status:', err);
+      setWhatsappStatus('disconnected');
+    }
+  };
+
+  const handleDisconnectWhatsapp = async () => {
+    try {
+      setWhatsappStatus('checking');
+      await pb.send('/api/risev/merchant/whatsapp/disconnect', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      setWhatsappStatus('disconnected');
+      setWhatsappQr('');
+      Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
+      setWhatsappStatus('connected');
+    }
+  };
+
+  const handleWhatsappPress = () => {
+    if (whatsappStatus === 'connected') {
+      Alert.alert(
+        'WhatsApp Settings',
+        'Your store WhatsApp account is currently connected. Do you want to disconnect it?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Disconnect', style: 'destructive', onPress: handleDisconnectWhatsapp }
+        ]
+      );
+    } else {
+      setShowQrModal(true);
+      fetchWhatsappStatus(true);
+    }
+  };
+
   useEffect(() => {
     const fetchMerchant = async () => {
       if (!user || !user.merchant_id) return;
       try {
         const mRec = await pb.collection('merchants').getOne(user.merchant_id);
         setMerchant(mRec);
+
+        // Fetch WhatsApp status only if user is owner
+        if (mRec.owner === user.id) {
+          fetchWhatsappStatus();
+        }
 
         const locs = await pb.collection('store_locations').getFullList({
           filter: `merchant = "${user.merchant_id}"`,
@@ -118,6 +182,37 @@ export default function ProfileScreen() {
     };
     fetchMerchant();
   }, [user]);
+
+  useEffect(() => {
+    let intervalId: any;
+    if (showQrModal && user && user.merchant_id) {
+      const poll = async () => {
+        try {
+          const res = await pb.send('/api/risev/merchant/whatsapp/status?generateQr=true', {
+            method: 'GET',
+            headers: {
+              'Authorization': 'Bearer ' + pb.authStore.token
+            }
+          });
+          if (res.status === 'connected') {
+            setWhatsappStatus('connected');
+            setShowQrModal(false);
+            Alert.alert('Success', 'WhatsApp connected successfully!');
+            if (intervalId) clearInterval(intervalId);
+          } else if (res.qrcode) {
+            setWhatsappQr(res.qrcode);
+          }
+        } catch (err) {
+          console.warn('Polling WhatsApp status failed:', err);
+        }
+      };
+      poll();
+      intervalId = setInterval(poll, 3000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [showQrModal]);
 
   // Leaflet Map Injection and Management (Web Only)
   useEffect(() => {
@@ -607,14 +702,24 @@ export default function ProfileScreen() {
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
           {merchant && merchant.owner === user?.id && (
-            <SettingItem
-              iconName="people-outline"
-              title="Manage Staff"
-              subtitle="Invite and remove store staff"
-              iconBgColor="#F1F5F9"
-              iconColor="#000000"
-              onPress={() => router.push('/(merchant)/staff' as any)}
-            />
+            <>
+              <SettingItem
+                iconName="people-outline"
+                title="Manage Staff"
+                subtitle="Invite and remove store staff"
+                iconBgColor="#F1F5F9"
+                iconColor="#000000"
+                onPress={() => router.push('/(merchant)/staff' as any)}
+              />
+              <SettingItem
+                iconName="logo-whatsapp"
+                title="Link WhatsApp"
+                subtitle={whatsappStatus === 'connected' ? 'Connected (Tap to manage)' : whatsappStatus === 'checking' ? 'Checking status...' : 'Link store WhatsApp account'}
+                iconBgColor="#E8F5E9"
+                iconColor="#25D366"
+                onPress={handleWhatsappPress}
+              />
+            </>
           )}
           <SettingItem
             iconName="notifications-outline"
@@ -701,6 +806,45 @@ export default function ProfileScreen() {
               >
                 <Text style={styles.modalConfirmText}>Log Out</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* WhatsApp QR Pairing Modal */}
+      <Modal
+        visible={showQrModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQrModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { minHeight: 380, justifyContent: 'center', alignItems: 'center', gap: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
+              <Text style={[styles.modalTitle, { textAlign: 'left' }]}>Link WhatsApp</Text>
+              <TouchableOpacity onPress={() => setShowQrModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={[styles.modalSubtitle, { textAlign: 'center', paddingHorizontal: 10, marginTop: 4 }]}>
+              Open WhatsApp on your phone, navigate to **Settings {'>'} Linked Devices**, and scan the QR code below.
+            </Text>
+
+            {whatsappQr ? (
+              <Image source={{ uri: whatsappQr }} style={{ width: 180, height: 180, borderRadius: 12 }} />
+            ) : (
+              <View style={{ width: 180, height: 180, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 }}>
+                <ActivityIndicator size="large" color="#000000" />
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>Generating QR...</Text>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <ActivityIndicator size="small" color="#10B981" />
+              <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                Waiting for device scan...
+              </Text>
             </View>
           </View>
         </View>

@@ -122,8 +122,6 @@ export default function MarketingScreen() {
   const [broadcastsList, setBroadcastsList] = useState<any[]>([]);
   const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-  const [whatsappQr, setWhatsappQr] = useState<string>('');
-  const [showQrModal, setShowQrModal] = useState(false);
   const [bCampaignId, setBCampaignId] = useState('');
   const [bTitle, setBTitle] = useState('Exclusive Promotion! 🎁');
   const [bMessage, setBMessage] = useState('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
@@ -391,24 +389,6 @@ export default function MarketingScreen() {
     }
   };
 
-  const handleDisconnectWhatsapp = async () => {
-    try {
-      setWhatsappStatus('checking');
-      await pb.send('/api/risev/merchant/whatsapp/disconnect', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + pb.authStore.token
-        }
-      });
-      setWhatsappStatus('disconnected');
-      setWhatsappQr('');
-      Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
-      setWhatsappStatus('connected');
-    }
-  };
-
   const fetchAudienceEstimate = async () => {
     if (!user || !user.merchant_id) return;
     try {
@@ -481,37 +461,6 @@ export default function MarketingScreen() {
       ]
     );
   };
-
-  useEffect(() => {
-    let intervalId: any;
-    if (showQrModal && user && user.merchant_id) {
-      const poll = async () => {
-        try {
-          const res = await pb.send('/api/risev/merchant/whatsapp/status?generateQr=true', {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer ' + pb.authStore.token
-            }
-          });
-          if (res.status === 'connected') {
-            setWhatsappStatus('connected');
-            setShowQrModal(false);
-            Alert.alert('Success', 'WhatsApp connected successfully!');
-            if (intervalId) clearInterval(intervalId);
-          } else if (res.qrcode) {
-            setWhatsappQr(res.qrcode);
-          }
-        } catch (err) {
-          console.warn('Polling WhatsApp status failed:', err);
-        }
-      };
-      poll();
-      intervalId = setInterval(poll, 3000);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [showQrModal]);
 
   useEffect(() => {
     loadCampaignData();
@@ -1536,38 +1485,30 @@ export default function MarketingScreen() {
 
         {subTab === 'broadcast' && (
           <View style={styles.broadcastContent}>
-            {/* WhatsApp Status Indicator */}
-            <View style={styles.whatsappStatusCard}>
-              <View style={styles.statusRow}>
-                <View style={[styles.whatsappStatusDot, { backgroundColor: whatsappStatus === 'connected' ? '#10B981' : whatsappStatus === 'checking' ? '#F59E0B' : '#EF4444' }]} />
-                <View style={styles.statusTextWrap}>
-                  <Text style={styles.cardSectionTitle}>
-                    {whatsappStatus === 'connected' ? 'WhatsApp Connected' : whatsappStatus === 'checking' ? 'Checking connection...' : 'WhatsApp Disconnected'}
+            {/* WhatsApp Status Alert (GUIDES TO PROFILE) */}
+            {whatsappStatus !== 'connected' && (
+              <View style={{
+                flexDirection: 'row',
+                backgroundColor: '#FFFBEB',
+                borderColor: '#FDE68A',
+                borderWidth: 1,
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 20,
+                alignItems: 'center',
+                gap: 12
+              }}>
+                <Ionicons name="warning" size={20} color="#D97706" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                    WhatsApp Disconnected
                   </Text>
-                  <Text style={styles.cardSectionDesc}>
-                    {whatsappStatus === 'connected' 
-                      ? 'Messages will send directly from your personal number.' 
-                      : 'Link your WhatsApp account to enable promotional chats.'}
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#D97706', marginTop: 2 }}>
+                    Please link your store WhatsApp in your <Text style={{ textDecorationLine: 'underline', fontFamily: 'PlusJakartaSans_700Bold' }} onPress={() => router.push('/(merchant)/profile' as any)}>Profile Settings</Text> to send promotions.
                   </Text>
                 </View>
-                {whatsappStatus === 'connected' ? (
-                  <TouchableOpacity style={styles.disconnectLinkBtn} onPress={handleDisconnectWhatsapp}>
-                    <Text style={styles.disconnectLinkBtnText}>Disconnect</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.connectLinkBtn} 
-                    onPress={async () => {
-                      setShowQrModal(true);
-                      await fetchWhatsappStatus();
-                    }}
-                    disabled={whatsappStatus === 'checking'}
-                  >
-                    <Text style={styles.connectLinkBtnText}>Link WhatsApp</Text>
-                  </TouchableOpacity>
-                )}
               </View>
-            </View>
+            )}
 
             {/* Mode Switch Segment */}
             <View style={styles.modeSegmentContainer}>
@@ -1966,44 +1907,6 @@ export default function MarketingScreen() {
           </View>
         )}
       </ScrollView>
-
-      <Modal
-        visible={showQrModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowQrModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 420, justifyContent: 'center', alignItems: 'center', gap: 16 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Link WhatsApp Account</Text>
-              <TouchableOpacity onPress={() => setShowQrModal(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={[styles.cardSectionDesc, { textAlign: 'center', paddingHorizontal: 10 }]}>
-              Open WhatsApp on your phone, navigate to **Settings {'>'} Linked Devices**, and scan the QR code below.
-            </Text>
-
-            {whatsappQr ? (
-              <Image source={{ uri: whatsappQr }} style={{ width: 180, height: 180, borderRadius: 12 }} />
-            ) : (
-              <View style={{ width: 180, height: 180, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 }}>
-                <ActivityIndicator size="large" color="#000000" />
-                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>Generating QR...</Text>
-              </View>
-            )}
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <ActivityIndicator size="small" color="#10B981" />
-              <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_600SemiBold' }}>
-                Waiting for device scan...
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Create Campaign Modal */}
       <Modal
