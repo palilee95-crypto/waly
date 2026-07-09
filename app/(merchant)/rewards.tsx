@@ -83,6 +83,8 @@ const fontColorOptions = [
   { label: 'Black', value: '#000000' },
   { label: 'Slate', value: '#1E293B' },
   { label: 'Gold', value: '#FFD700' },
+  { label: 'Silver', value: '#94A3B8' },
+  { label: 'Orange', value: '#F59E0B' },
 ];
 
 export default function UnifiedRewardsScreen() {
@@ -124,6 +126,7 @@ export default function UnifiedRewardsScreen() {
 
   // Tab 2: Stamp Card Customizer States
   const [programId, setProgramId] = useState<string | null>(null);
+  const [linkedRewardId, setLinkedRewardId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [requiredStamps, setRequiredStamps] = useState<5 | 10 | 15>(10);
   const [expiryDays, setExpiryDays] = useState('30');
@@ -160,6 +163,7 @@ export default function UnifiedRewardsScreen() {
 
       if (prog) {
         setProgramId(prog.id);
+        setLinkedRewardId(prog.linked_reward || null);
         setIsActive(prog.is_active);
         setRequiredStamps(prog.stamp_goal as any || 10);
         setExpiryDays(String(prog.expiry_days || '30'));
@@ -566,17 +570,18 @@ export default function UnifiedRewardsScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
-              Points & Tiers
+        Points & Tiers
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* TAB 1: Rewards Catalogue */}
         {activeTab === 'catalogue' && (
-          <View style={{ marginTop: 12 }}>
+          <View style={{ flex: 1 }}>
+            {/* Catalogue header title & button is in parent screen header */}
             {loadingRewards ? (
               <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
-            ) : rewards.length === 0 ? (
+            ) : rewards.filter(r => r.id !== linkedRewardId).length === 0 ? (
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyIconBg}>
                   <Ionicons name="gift-outline" size={48} color="#94A3B8" />
@@ -591,50 +596,52 @@ export default function UnifiedRewardsScreen() {
               </View>
             ) : (
               <View style={styles.rewardsList}>
-                {rewards.map((reward) => {
-                  const itemImgUrl = reward.image
-                    ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
-                    : 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=150';
+                {rewards
+                  .filter(r => r.id !== linkedRewardId)
+                  .map((reward) => {
+                    const itemImgUrl = reward.image
+                      ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
+                      : 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=150';
 
-                  return (
-                    <View key={reward.id} style={styles.rewardCard}>
-                      <Image source={{ uri: itemImgUrl }} style={styles.rewardImage} />
-                      
-                      <View style={styles.rewardInfo}>
-                        <View style={styles.rewardHeaderRow}>
-                          <View style={styles.typeBadge}>
-                            <Text style={styles.typeBadgeText}>{getRewardTypeLabel(reward.type)}</Text>
-                          </View>
-                          <View style={[styles.statusBadge, { backgroundColor: reward.is_active ? '#E8F5E9' : '#F1F5F9' }]}>
-                            <Text style={[styles.statusBadgeText, { color: reward.is_active ? '#10B981' : '#64748B' }]}>
-                              {reward.is_active ? 'Active' : 'Draft'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <Text style={styles.rewardTitle} numberOfLines={1}>{reward.name}</Text>
-                        <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || 'No description provided.'}</Text>
+                    return (
+                      <View key={reward.id} style={styles.rewardCard}>
+                        <Image source={{ uri: itemImgUrl }} style={styles.rewardImage} />
                         
-                        <View style={styles.rewardFooterRow}>
-                          <View style={styles.pointsCostContainer}>
-                            <Ionicons name="gift" size={14} color="#10B981" />
-                            <Text style={styles.pointsCostText}>{reward.points_cost} Pts</Text>
+                        <View style={styles.rewardInfo}>
+                          <View style={styles.rewardHeaderRow}>
+                            <View style={styles.typeBadge}>
+                              <Text style={styles.typeBadgeText}>{getRewardTypeLabel(reward.type)}</Text>
+                            </View>
+                            <View style={[styles.statusBadge, { backgroundColor: reward.is_active ? '#E8F5E9' : '#F1F5F9' }]}>
+                              <Text style={[styles.statusBadgeText, { color: reward.is_active ? '#10B981' : '#64748B' }]}>
+                                {reward.is_active ? 'Active' : 'Draft'}
+                              </Text>
+                            </View>
                           </View>
-                          <Text style={styles.stockText}>Stock: {reward.stock || '0'}</Text>
+
+                          <Text style={styles.rewardTitle} numberOfLines={1}>{reward.name}</Text>
+                          <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || 'No description provided.'}</Text>
+                          
+                          <View style={styles.rewardFooterRow}>
+                            <View style={styles.pointsCostContainer}>
+                              <Ionicons name="gift" size={14} color="#10B981" />
+                              <Text style={styles.pointsCostText}>{reward.points_cost} Pts</Text>
+                            </View>
+                            <Text style={styles.stockText}>Stock: {reward.stock || '0'}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenEdit(reward)}>
+                            <Ionicons name="create-outline" size={18} color="#475569" />
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenDelete(reward)}>
+                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                          </TouchableOpacity>
                         </View>
                       </View>
-
-                      <View style={styles.cardActions}>
-                        <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenEdit(reward)}>
-                          <Ionicons name="create-outline" size={18} color="#475569" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenDelete(reward)}>
-                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })}
+                    );
+                  })}
               </View>
             )}
           </View>
