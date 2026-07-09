@@ -439,13 +439,13 @@ export default function UnifiedRewardsScreen() {
           ]}
         >
           {activeIconObj.family === 'Ionicons' && (
-            <Ionicons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
+            <Ionicons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
           {activeIconObj.family === 'FontAwesome' && (
-            <FontAwesome name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
+            <FontAwesome name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
           {activeIconObj.family === 'MaterialIcons' && (
-            <MaterialIcons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
+            <MaterialIcons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
           )}
         </View>
       );
@@ -468,28 +468,28 @@ export default function UnifiedRewardsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Hidden native color inputs — rendered at top so dialog appears centred in viewport */}
+      {/* Hidden native color inputs — positioned mid-viewport so picker dialog is centred */}
       {Platform.OS === 'web' && (
         <>
           <input
             ref={cardColorInputRef}
             type="color"
             value={cardColor}
-            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            style={{ position: 'fixed', top: '50%', left: '50%', width: 0, height: 0, opacity: 0, border: 'none', pointerEvents: 'none' } as any}
             onChange={(e: any) => { const v = e.target.value.toUpperCase(); setCardColor(v); setCustomHexInput(v); }}
           />
           <input
             ref={stampColorInputRef}
             type="color"
             value={stampColor}
-            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            style={{ position: 'fixed', top: '50%', left: '50%', width: 0, height: 0, opacity: 0, border: 'none', pointerEvents: 'none' } as any}
             onChange={(e: any) => { const v = e.target.value.toUpperCase(); setStampColor(v); setCustomStampHexInput(v); }}
           />
           <input
             ref={fontColorInputRef}
             type="color"
             value={fontColor}
-            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            style={{ position: 'fixed', top: '50%', left: '50%', width: 0, height: 0, opacity: 0, border: 'none', pointerEvents: 'none' } as any}
             onChange={(e: any) => { const v = e.target.value.toUpperCase(); setFontColor(v); setCustomFontHexInput(v); }}
           />
         </>
@@ -921,9 +921,11 @@ export default function UnifiedRewardsScreen() {
               </View>
             </View>
 
-            {/* Expiry and Milestone reward configs */}
+            {/* Expiry & Milestone Reward in one card */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Card Expiration Days</Text>
+              <Text style={styles.cardSectionTitle}>Card Settings</Text>
+
+              <Text style={[styles.cardSectionDesc, { marginBottom: 6 }]}>Card expiration (days)</Text>
               <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused]}>
                 <TextInput
                   style={styles.textInput}
@@ -938,16 +940,14 @@ export default function UnifiedRewardsScreen() {
                 />
                 <Text style={styles.inputSuffix}>Days</Text>
               </View>
-            </View>
 
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Stamp Completion Milestone Reward Description</Text>
-              <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 80, alignItems: 'flex-start', paddingTop: 10 }]}>
+              <Text style={[styles.cardSectionDesc, { marginTop: 16, marginBottom: 6 }]}>Stamp completion reward description</Text>
+              <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 72, alignItems: 'flex-start', paddingTop: 10 }]}>
                 <TextInput
-                  style={[styles.textInput, { height: 60, flex: 1 }]}
+                  style={[styles.textInput, { height: 52, flex: 1 }]}
                   value={rewardDesc}
                   onChangeText={setRewardDesc}
-                  placeholder="e.g. Completing card awards one Free Double Cheeseburger"
+                  placeholder="e.g. One Free Double Cheeseburger"
                   placeholderTextColor="#94A3B8"
                   multiline
                   onFocus={() => setRewardFocused(true)}
@@ -1944,14 +1944,14 @@ const styles = StyleSheet.create({
   previewGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginVertical: 12,
+    gap: 5,
+    marginVertical: 8,
     zIndex: 2,
   },
   previewSlot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderWidth: 1,
     borderStyle: 'dashed',
