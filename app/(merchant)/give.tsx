@@ -42,6 +42,8 @@ export default function GiveStampsScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [stampsCount, setStampsCount] = useState('1');
   const [phoneFocused, setPhoneFocused] = useState(false);
+  const [billSubtotal, setBillSubtotal] = useState('');
+  const [subtotalFocused, setSubtotalFocused] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
@@ -54,6 +56,7 @@ export default function GiveStampsScreen() {
     customerPhone: string;
     awardedCount: number;
     totalStamps: number;
+    billAmount?: number;
   } | null>(null);
   const [successType, setSuccessType] = useState<'stamps' | 'voucher'>('stamps');
   const [voucherDetails, setVoucherDetails] = useState<{
@@ -141,13 +144,17 @@ export default function GiveStampsScreen() {
       });
 
       // 2. Issue earn transaction log
+      const amountPaid = parseFloat(billSubtotal) || 0;
       await pb.collection('transactions').create({
         customer: customer.id,
         merchant: user!.merchant_id,
         loyalty_card: loyaltyCard!.id,
         type: 'earn',
-        points: count, // Hook will multiply points
+        points: amountPaid, // Hook will multiply points
         stamps: count,
+        metadata: {
+          bill_amount: amountPaid
+        }
       });
 
       setSuccessType('stamps');
@@ -156,9 +163,11 @@ export default function GiveStampsScreen() {
         customerPhone: customer.phone,
         awardedCount: count,
         totalStamps: newStamps,
+        billAmount: amountPaid,
       });
       setShowSuccessModal(true);
       setPhoneNumber('');
+      setBillSubtotal('');
     } catch (err: any) {
       console.warn(err);
       Alert.alert('Error', err.message || 'Failed to award stamps.');
@@ -329,13 +338,17 @@ export default function GiveStampsScreen() {
                 stamps_collected: newStamps,
               });
 
+              const amountPaid = parseFloat(billSubtotal) || 10.0;
               await pb.collection('transactions').create({
                 customer: customer.id,
                 merchant: user.merchant_id,
                 loyalty_card: loyaltyCard!.id,
                 type: 'earn',
-                points: 1,
+                points: amountPaid,
                 stamps: 1,
+                metadata: {
+                  bill_amount: amountPaid
+                }
               });
 
               setSuccessType('stamps');
@@ -344,7 +357,9 @@ export default function GiveStampsScreen() {
                 customerPhone: customer.phone,
                 awardedCount: 1,
                 totalStamps: newStamps,
+                billAmount: amountPaid,
               });
+              setBillSubtotal('');
               setShowSuccessModal(true);
             } catch (err: any) {
               console.warn(err);
@@ -517,6 +532,26 @@ export default function GiveStampsScreen() {
               </View>
             </View>
 
+            {/* Bill Subtotal field */}
+            {!phoneNumber.toUpperCase().startsWith('WV-') && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>BILL SUBTOTAL (RM)</Text>
+                <View style={[styles.inputWrapper, subtotalFocused && styles.inputWrapperFocused]}>
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginRight: 4 }}>RM</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={billSubtotal}
+                    onChangeText={setBillSubtotal}
+                    placeholder="0.00"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="decimal-pad"
+                    onFocus={() => setSubtotalFocused(true)}
+                    onBlur={() => setSubtotalFocused(false)}
+                  />
+                </View>
+              </View>
+            )}
+
             {/* Count Selector field */}
             {!phoneNumber.toUpperCase().startsWith('WV-') && (
               <View style={styles.inputGroup}>
@@ -592,6 +627,13 @@ export default function GiveStampsScreen() {
                     +{successDetails.awardedCount} Stamp{successDetails.awardedCount > 1 ? 's' : ''}
                   </Text>
                 </View>
+
+                {successDetails.billAmount !== undefined && successDetails.billAmount > 0 && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Bill Amount</Text>
+                    <Text style={styles.detailValue}>RM {successDetails.billAmount.toFixed(2)}</Text>
+                  </View>
+                )}
                 
                 <View style={styles.divider} />
                 

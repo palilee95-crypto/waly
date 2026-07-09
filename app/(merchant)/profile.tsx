@@ -719,6 +719,14 @@ export default function ProfileScreen() {
                 iconColor="#25D366"
                 onPress={handleWhatsappPress}
               />
+              <SettingItem
+                iconName="gift-outline"
+                title="Manage Rewards"
+                subtitle="Setup and manage rewards catalog"
+                iconBgColor="#FFF3E0"
+                iconColor="#FF9800"
+                onPress={() => router.push('/(merchant)/rewards' as any)}
+              />
             </>
           )}
           <SettingItem
