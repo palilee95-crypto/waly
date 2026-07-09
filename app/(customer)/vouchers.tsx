@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   },
   // Dotted Ticket-Style Voucher Cards
   vouchersList: {
-    gap: 16,
+    gap: 20,
   },
   ticketCard: {
     flexDirection: 'row',
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    height: 130,
+    height: 148,
     overflow: 'hidden',
   },
   ticketLeft: {
