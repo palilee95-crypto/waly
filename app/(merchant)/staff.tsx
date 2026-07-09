@@ -51,7 +51,7 @@ export default function StaffManagementScreen() {
   const fetchStaff = async () => {
     try {
       setLoading(true);
-      const data = await pb.send('/api/waly/merchant/staff', {
+      const data = await pb.send('/api/risev/merchant/staff', {
         method: 'GET',
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
@@ -81,7 +81,7 @@ export default function StaffManagementScreen() {
 
     setIsAdding(true);
     try {
-      await pb.send('/api/waly/merchant/staff', {
+      await pb.send('/api/risev/merchant/staff', {
         method: 'POST',
         body: { phone: cleanPhone },
         headers: {
@@ -110,7 +110,7 @@ export default function StaffManagementScreen() {
     if (!selectedStaff) return;
     setIsRemoving(true);
     try {
-      await pb.send('/api/waly/merchant/staff', {
+      await pb.send('/api/risev/merchant/staff', {
         method: 'DELETE',
         body: { userId: selectedStaff.id },
         headers: {
