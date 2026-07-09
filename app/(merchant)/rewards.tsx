@@ -423,41 +423,27 @@ export default function UnifiedRewardsScreen() {
   };
 
   const renderPreviewStamps = () => {
-    const rows: React.ReactNode[] = [];
-    const totalRows = Math.ceil(requiredStamps / 5);
-    for (let row = 0; row < totalRows; row++) {
-      const rowSlots: React.ReactNode[] = [];
-      for (let col = 0; col < 5; col++) {
-        const i = row * 5 + col + 1;
-        if (i > requiredStamps) break;
-        const isEarned = i <= 3;
-        rowSlots.push(
-          <View
-            key={i}
-            style={[
-              styles.previewSlot,
-              isEarned && { backgroundColor: stampColor, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.15)' }
-            ]}
-          >
-            {activeIconObj.family === 'Ionicons' && (
-              <Ionicons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
-            )}
-            {activeIconObj.family === 'FontAwesome' && (
-              <FontAwesome name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
-            )}
-            {activeIconObj.family === 'MaterialIcons' && (
-              <MaterialIcons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
-            )}
-          </View>
-        );
-      }
-      rows.push(
-        <View key={row} style={{ flexDirection: 'row', gap: 5 }}>
-          {rowSlots}
+    const slots: React.ReactNode[] = [];
+    for (let i = 1; i <= requiredStamps; i++) {
+      const isEarned = i <= 3;
+      const slotStyle = isEarned
+        ? [styles.prevLargeStampEarned, { backgroundColor: stampColor }]
+        : styles.prevLargeStampEmpty;
+      slots.push(
+        <View key={i} style={slotStyle}>
+          {activeIconObj.family === 'Ionicons' && (
+            <Ionicons name={activeIconObj.name} size={16} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.25)'} />
+          )}
+          {activeIconObj.family === 'FontAwesome' && (
+            <FontAwesome name={activeIconObj.name} size={16} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.25)'} />
+          )}
+          {activeIconObj.family === 'MaterialIcons' && (
+            <MaterialIcons name={activeIconObj.name} size={16} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.25)'} />
+          )}
         </View>
       );
     }
-    return rows;
+    return slots;
   };
 
   const merchantLogo = merchant?.logo
@@ -967,88 +953,65 @@ export default function UnifiedRewardsScreen() {
             {/* Live Visual Preview Header */}
             <Text style={styles.previewSectionHeader}>LIVE PREVIEW CARD</Text>
 
-            {/* Premium EMV Preview Card Layout - matches customer view */}
+            {/* Card preview — mirrors customer Stamp Card Details modal exactly */}
             <View style={[styles.liveCardPreview, { backgroundColor: cardColor }]}>
               {bgImage ? (
-                <Image 
-                  source={{ uri: bgImage }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
+                <Image source={{ uri: bgImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               ) : null}
 
-              {/* Header: logo + name/category + stamp counter (same as customer) */}
+              {/* Header: merchant name + category + LOYALTY CARD badge */}
               <View style={styles.cardPreviewHeader}>
-                <View style={styles.previewShopLogoBg}>
-                  <Image 
-                    source={{ uri: merchantLogo }}
-                    style={styles.previewShopLogo}
-                  />
-                </View>
-                <View style={styles.previewShopTextCol}>
-                  <Text style={[styles.previewShopName, { color: fontColor }]} numberOfLines={1}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.prevLargeCardMerchant, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
                     {merchant?.name || 'Your Shop'}
                   </Text>
-                  <Text style={[styles.previewShopCategory, { color: fontColor, opacity: 0.65 }]} numberOfLines={1}>
+                  <Text style={[styles.prevLargeCardCategory, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
                     {(merchant?.category || 'FOOD').toUpperCase()}
                   </Text>
                 </View>
-                <View style={styles.previewPtsCol}>
-                  <Text style={[styles.previewPtsValue, { color: fontColor }]}>3/{requiredStamps}</Text>
-                  <Text style={[styles.previewPtsLabel, { color: fontColor, opacity: 0.8 }]}>STAMPS</Text>
+                <View style={styles.prevGoldBadge}>
+                  <Text style={[styles.prevGoldBadgeText, { color: fontColor || '#FFFFFF' }]}>LOYALTY CARD</Text>
                 </View>
               </View>
 
-              {/* EMV Chip + Wifi contactless row */}
+              {/* EMV Chip + Wifi */}
               <View style={styles.cardMidRow}>
                 <View style={styles.cardChip}>
                   <View style={styles.chipLineHoriz} />
                   <View style={styles.chipLineVert} />
                   <View style={styles.chipCenterPin} />
                 </View>
-                <Ionicons 
-                  name="wifi" 
-                  size={18} 
-                  color={fontColor ? fontColor : "rgba(255, 255, 255, 0.35)"} 
-                  style={{ opacity: 0.35 }} 
-                />
+                <Ionicons name="wifi" size={18} color={fontColor || 'rgba(255,255,255,0.35)'} style={{ opacity: 0.35 }} />
               </View>
 
-              {/* Stamp slots grid */}
+              {/* Stamp slots — 17% width each, space-between = 5 per row */}
               <View style={styles.previewGrid}>{renderPreviewStamps()}</View>
 
-              {/* Footer: Holder | Valid | CVV | Mastercard circles */}
+              {/* Footer: CARD HOLDER | VALID | CVV | brand badge */}
               <View style={styles.cardBottomRow}>
                 <View style={styles.holderBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
-                    CARD HOLDER
-                  </Text>
-                  <Text style={[styles.holderValueText, { color: fontColor }]} numberOfLines={1}>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>CARD HOLDER</Text>
+                  <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
                     {(user?.name || 'MERCHANT').toUpperCase()}
                   </Text>
                 </View>
-
                 <View style={styles.validBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
-                    VALID
-                  </Text>
-                  <Text style={[styles.holderValueText, { color: fontColor }]}>
-                    12/30
-                  </Text>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>VALID</Text>
+                  <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>12/30</Text>
                 </View>
-
                 <View style={styles.cvvBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
-                    CVV
-                  </Text>
-                  <Text style={[styles.holderValueText, { color: fontColor }]}>
-                    888
-                  </Text>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>CVV</Text>
+                  <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>888</Text>
                 </View>
-
-                <View style={styles.mastercardBadge}>
-                  <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                  <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                {/* Brand badge: mastercard circles + stamp count */}
+                <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                  <View style={styles.mastercardBadge}>
+                    <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                    <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                  </View>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.9, fontSize: 9 }]}>
+                    3/{requiredStamps} STAMPS
+                  </Text>
                 </View>
               </View>
             </View>
@@ -1825,9 +1788,10 @@ const styles = StyleSheet.create({
   // Live visual preview card EMV
   liveCardPreview: {
     borderRadius: 24,
-    padding: 20,
-    height: 200,
-    justifyContent: 'space-between',
+    padding: 24,
+    gap: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
@@ -1838,8 +1802,35 @@ const styles = StyleSheet.create({
   },
   cardPreviewHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     zIndex: 2,
+  },
+  prevLargeCardMerchant: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
+  },
+  prevLargeCardCategory: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.55)',
+    marginTop: 3,
+    letterSpacing: 0.5,
+  },
+  prevGoldBadge: {
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  prevGoldBadgeText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   previewShopLogoBg: {
     width: 36,
@@ -1949,19 +1940,30 @@ const styles = StyleSheet.create({
     borderColor: '#B45309',
   },
   previewGrid: {
-    flexDirection: 'column',
-    gap: 5,
-    marginVertical: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 14,
+    width: '100%',
     zIndex: 2,
   },
-  previewSlot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  prevLargeStampEarned: {
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 99,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  prevLargeStampEmpty: {
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
