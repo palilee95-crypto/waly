@@ -11,6 +11,7 @@ import {
   Animated,
   ActivityIndicator,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, FontAwesome, MaterialIcons } from '@expo/vector-icons';
@@ -36,6 +37,8 @@ type LoyaltyCardItem = {
   stampColor?: string;
   fontColor?: string;
   cardBackground?: string;
+  tier?: string;
+  merchantId?: string;
 };
 
 const stampIcons = [
@@ -178,8 +181,10 @@ export default function CustomerDashboard() {
           totalStamps: program?.stamp_goal || 10,
           rewardName: program?.reward_description || 'Free Gift',
           cardNumber: `•••• •••• •••• ${rec.id.substring(rec.id.length - 4).toUpperCase()}`,
-          points: rec.stamps_collected || 0,
-           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+          points: rec.points_balance || 0,
+          tier: rec.tier || 'bronze',
+          merchantId: merchant?.id,
+          gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
           fontColor: program?.font_color || '#FFFFFF',
@@ -234,10 +239,105 @@ export default function CustomerDashboard() {
     };
   }, [user]);
 
+  const [merchantRewards, setMerchantRewards] = useState<any[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(false);
+
+  useEffect(() => {
+    if (selectedCard && selectedCard.merchantId) {
+      loadMerchantRewards(selectedCard.merchantId);
+    } else {
+      setMerchantRewards([]);
+    }
+  }, [selectedCard]);
+
+  const loadMerchantRewards = async (merchantId: string) => {
+    try {
+      setLoadingRewards(true);
+      const res = await pb.collection('rewards').getFullList({
+        filter: `merchant = "${merchantId}" && is_active = true`,
+        sort: '-created',
+        requestKey: null,
+      });
+      setMerchantRewards(res);
+    } catch (err) {
+      console.warn("Failed to load rewards:", err);
+    } finally {
+      setLoadingRewards(false);
+    }
+  };
+
+  const handleRedeemReward = async (reward: any) => {
+    if (!selectedCard) return;
+    
+    if (selectedCard.points < reward.points_cost) {
+      Alert.alert("Insufficient Points", "You don't have enough points at this shop to redeem this reward.");
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Redemption",
+      `Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Redeem",
+          onPress: async () => {
+            try {
+              await pb.collection('redemptions').create({
+                customer: user!.id,
+                reward: reward.id,
+              });
+
+              Alert.alert(
+                "Redeemed!",
+                "Voucher generated successfully. You can find your new voucher in the Vouchers tab!",
+                [
+                  {
+                    text: "View Vouchers",
+                    onPress: () => {
+                      setDetailModalVisible(false);
+                      router.push('/(customer)/vouchers');
+                    }
+                  },
+                  {
+                    text: "Done",
+                    onPress: () => {
+                      fetchLoyaltyCards();
+                      if (selectedCard) {
+                        setSelectedCard(prev => {
+                          if (!prev) return null;
+                          return {
+                            ...prev,
+                            points: prev.points - reward.points_cost
+                          };
+                        });
+                      }
+                    }
+                  }
+                ]
+              );
+            } catch (err: any) {
+              console.warn("Redemption failed:", err);
+              Alert.alert("Error", err.message || "Failed to redeem reward.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const getTierColor = (tier: string = 'bronze') => {
+    switch (tier) {
+      case 'silver': return '#64748B';
+      case 'gold': return '#D97706';
+      case 'platinum': return '#0284C7';
+      default: return '#B45309';
+    }
+  };
+
   const openCardDetails = (card: LoyaltyCardItem) => {
     setSelectedCard(card);
     setDetailModalVisible(true);
-    // Mark notifications as read or clear badge if needed, but a simple indicator is fine for now
   };
 
   const getStackedCards = () => {
@@ -1758,6 +1858,119 @@ const styles = StyleSheet.create({
   },
   cyclePillText: {
     fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  pointsTierCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pointsTierInfo: {
+    flexDirection: 'column',
+  },
+  pointsTierTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  pointsTierValue: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 99,
+  },
+  tierBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  catalogSection: {
+    marginTop: 8,
+  },
+  catalogTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  catalogSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  emptyCatalogCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  emptyCatalogText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  catalogList: {
+    gap: 8,
+  },
+  catalogItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  catalogItemName: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  catalogItemCost: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#10B981',
+    marginTop: 2,
+  },
+  catalogItemDesc: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 14,
+  },
+  redeemBtn: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  redeemBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  redeemBtnText: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },

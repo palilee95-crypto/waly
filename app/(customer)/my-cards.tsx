@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
@@ -34,6 +35,8 @@ type LoyaltyCardItem = {
   stampColor?: string;
   fontColor?: string;
   cardBackground?: string;
+  tier?: string;
+  merchantId?: string;
 };
 
 export default function MyCardsScreen() {
@@ -67,7 +70,9 @@ export default function MyCardsScreen() {
           totalStamps: program?.stamp_goal || 10,
           rewardName: program?.reward_description || 'Free Gift',
           cardNumber: `•••• •••• •••• ${rec.id.substring(rec.id.length - 4).toUpperCase()}`,
-          points: rec.stamps_collected || 0,
+          points: rec.points_balance || 0,
+          tier: rec.tier || 'bronze',
+          merchantId: merchant?.id,
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
@@ -100,6 +105,102 @@ export default function MyCardsScreen() {
       pb.collection('loyalty_cards').unsubscribe('*');
     };
   }, [user]);
+
+  const [merchantRewards, setMerchantRewards] = useState<any[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(false);
+
+  useEffect(() => {
+    if (selectedCard && selectedCard.merchantId) {
+      loadMerchantRewards(selectedCard.merchantId);
+    } else {
+      setMerchantRewards([]);
+    }
+  }, [selectedCard]);
+
+  const loadMerchantRewards = async (merchantId: string) => {
+    try {
+      setLoadingRewards(true);
+      const res = await pb.collection('rewards').getFullList({
+        filter: `merchant = "${merchantId}" && is_active = true`,
+        sort: '-created',
+        requestKey: null,
+      });
+      setMerchantRewards(res);
+    } catch (err) {
+      console.warn("Failed to load rewards:", err);
+    } finally {
+      setLoadingRewards(false);
+    }
+  };
+
+  const handleRedeemReward = async (reward: any) => {
+    if (!selectedCard) return;
+    
+    if (selectedCard.points < reward.points_cost) {
+      Alert.alert("Insufficient Points", "You don't have enough points at this shop to redeem this reward.");
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Redemption",
+      `Are you sure you want to redeem "${reward.name}" for ${reward.points_cost} points?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Redeem",
+          onPress: async () => {
+            try {
+              await pb.collection('redemptions').create({
+                customer: user!.id,
+                reward: reward.id,
+              });
+
+              Alert.alert(
+                "Redeemed!",
+                "Voucher generated successfully. You can find your new voucher in the Vouchers tab!",
+                [
+                  {
+                    text: "View Vouchers",
+                    onPress: () => {
+                      setDetailModalVisible(false);
+                      router.push('/(customer)/vouchers');
+                    }
+                  },
+                  {
+                    text: "Done",
+                    onPress: () => {
+                      fetchLoyaltyCards();
+                      if (selectedCard) {
+                        setSelectedCard(prev => {
+                          if (!prev) return null;
+                          return {
+                            ...prev,
+                            points: prev.points - reward.points_cost
+                          };
+                        });
+                      }
+                    }
+                  }
+                ]
+              );
+            } catch (err: any) {
+              console.warn("Redemption failed:", err);
+              Alert.alert("Error", err.message || "Failed to redeem reward.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const getTierColor = (tier: string = 'bronze') => {
+    switch (tier) {
+      case 'silver': return '#64748B';
+      case 'gold': return '#D97706';
+      case 'platinum': return '#0284C7';
+      default: return '#B45309';
+    }
+  };
 
   const openCardDetails = (card: LoyaltyCardItem) => {
     setSelectedCard(card);
@@ -319,88 +420,124 @@ export default function MyCardsScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Large credit-card style loyalty details card */}
-              <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
-                {selectedCard.cardBackground ? (
-                  <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : null}
+              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+                {/* Large credit-card style loyalty details card */}
+                <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
+                  {selectedCard.cardBackground ? (
+                    <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : null}
 
-
-                <View style={styles.largeCardHeader}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                      {selectedCard.merchantName}
-                    </Text>
-                    <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
-                      {selectedCard.category.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.goldBadge}>
-                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
-                  </View>
-                </View>
-
-                {/* EMV Microchip */}
-                <View style={styles.cardMidRow}>
-                  <View style={styles.cardChip}>
-                    <View style={styles.chipLineHoriz} />
-                    <View style={styles.chipLineVert} />
-                    <View style={styles.chipCenterPin} />
-                  </View>
-                  <Ionicons 
-                    name="wifi" 
-                    size={18} 
-                    color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                    style={{ opacity: 0.35 }} 
-                  />
-                </View>
-
-                {/* Stamps grid details */}
-                <View style={styles.largeStampsGrid}>
-                  {renderDetailStampSlots(selectedCard)}
-                </View>
-
-                <View style={styles.largeCardFooter}>
-                  <View style={styles.holderCol}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                      {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                    </Text>
-                  </View>
-
-                  <View style={{ width: 45 }}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
-                  </View>
-
-                  <View style={{ width: 35 }}>
-                    <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
-                    <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
-                  </View>
-
-                  <View style={styles.brandBadge}>
-                    <View style={styles.mastercardBadge}>
-                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                  <View style={styles.largeCardHeader}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                        {selectedCard.merchantName}
+                      </Text>
+                      <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
+                        {selectedCard.category.toUpperCase()}
+                      </Text>
                     </View>
-                    <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
-                      {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
+                    <View style={styles.largeCardIconWrapper}>
+                      <Ionicons name={selectedCard.cardIcon as any} size={28} color={selectedCard.fontColor || '#FFFFFF'} />
+                    </View>
+                  </View>
+
+                  {/* Stamp Slots Grid */}
+                  <View style={styles.slotsContainer}>
+                    {renderDetailStampSlots(selectedCard)}
+                  </View>
+
+                  {/* Card Number & Brand indicator */}
+                  <View style={styles.largeCardFooter}>
+                    <View style={styles.holderBlock}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
+                        {user?.name || 'Ahmad Fazli'}
+                      </Text>
+                    </View>
+                    <View style={styles.validBlock}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
+                    </View>
+                    <View style={styles.cvvBlock}>
+                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
+                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
+                    </View>
+
+                    <View style={styles.brandBadge}>
+                      <View style={styles.mastercardBadge}>
+                        <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                        <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                      </View>
+                      <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
+                        {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Points & Tier Info Section */}
+                <View style={styles.pointsTierCard}>
+                  <View style={styles.pointsTierInfo}>
+                    <Text style={styles.pointsTierTitle}>Points Balance</Text>
+                    <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
+                  </View>
+                  <View style={[styles.tierBadge, { backgroundColor: getTierColor(selectedCard.tier) }]}>
+                    <Ionicons name="ribbon" size={14} color="#FFFFFF" />
+                    <Text style={styles.tierBadgeText}>{(selectedCard.tier || 'bronze').toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                {/* Stamp Completion Reward panel */}
+                <View style={styles.rewardDetailPanel}>
+                  <View style={styles.rewardIconBg}>
+                    <Ionicons name="gift" size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.rewardDetailInfo}>
+                    <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
+                    <Text style={styles.rewardDetailSub}>
+                      Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
                     </Text>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.rewardDetailPanel}>
-                <View style={styles.rewardIconBg}>
-                  <Ionicons name="gift" size={22} color="#FFFFFF" />
+                {/* Points Catalog Section */}
+                <View style={styles.catalogSection}>
+                  <Text style={styles.catalogTitle}>Points Catalog</Text>
+                  <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
+                  
+                  {loadingRewards ? (
+                    <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
+                  ) : merchantRewards.length === 0 ? (
+                    <View style={styles.emptyCatalogCard}>
+                      <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.catalogList}>
+                      {merchantRewards.map((reward: any) => (
+                        <View key={reward.id} style={styles.catalogItem}>
+                          <View style={{ flex: 1, marginRight: 12 }}>
+                            <Text style={styles.catalogItemName}>{reward.name}</Text>
+                            <Text style={styles.catalogItemCost}>{reward.points_cost} Points</Text>
+                            {reward.description ? (
+                              <Text style={styles.catalogItemDesc}>{reward.description}</Text>
+                            ) : null}
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.redeemBtn,
+                              selectedCard.points < reward.points_cost && styles.redeemBtnDisabled
+                            ]}
+                            disabled={selectedCard.points < reward.points_cost}
+                            onPress={() => handleRedeemReward(reward)}
+                          >
+                            <Text style={styles.redeemBtnText}>Redeem</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
-                <View style={styles.rewardDetailInfo}>
-                  <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
-                  <Text style={styles.rewardDetailSub}>
-                    Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
-                  </Text>
-                </View>
-              </View>
+              </ScrollView>
 
               <TouchableOpacity
                 style={styles.modalScanBtn}
@@ -1036,5 +1173,118 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
+  },
+  pointsTierCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pointsTierInfo: {
+    flexDirection: 'column',
+  },
+  pointsTierTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  pointsTierValue: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 99,
+  },
+  tierBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  catalogSection: {
+    marginTop: 8,
+  },
+  catalogTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  catalogSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  emptyCatalogCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  emptyCatalogText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  catalogList: {
+    gap: 8,
+  },
+  catalogItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  catalogItemName: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  catalogItemCost: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#10B981',
+    marginTop: 2,
+  },
+  catalogItemDesc: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 14,
+  },
+  redeemBtn: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  redeemBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  redeemBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
 });
