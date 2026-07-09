@@ -423,34 +423,41 @@ export default function UnifiedRewardsScreen() {
   };
 
   const renderPreviewStamps = () => {
-    const previewSlots = [];
-    for (let i = 1; i <= requiredStamps; i++) {
-      const isEarned = i <= 3; // Mock 3 completed stamps for display
-      previewSlots.push(
-        <View 
-          key={i} 
-          style={[
-            styles.previewSlot,
-            isEarned && {
-              backgroundColor: stampColor,
-              borderStyle: 'solid',
-              borderColor: 'rgba(255, 255, 255, 0.15)'
-            }
-          ]}
-        >
-          {activeIconObj.family === 'Ionicons' && (
-            <Ionicons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
-          )}
-          {activeIconObj.family === 'FontAwesome' && (
-            <FontAwesome name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
-          )}
-          {activeIconObj.family === 'MaterialIcons' && (
-            <MaterialIcons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
-          )}
+    const rows: React.ReactNode[] = [];
+    const totalRows = Math.ceil(requiredStamps / 5);
+    for (let row = 0; row < totalRows; row++) {
+      const rowSlots: React.ReactNode[] = [];
+      for (let col = 0; col < 5; col++) {
+        const i = row * 5 + col + 1;
+        if (i > requiredStamps) break;
+        const isEarned = i <= 3;
+        rowSlots.push(
+          <View
+            key={i}
+            style={[
+              styles.previewSlot,
+              isEarned && { backgroundColor: stampColor, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.15)' }
+            ]}
+          >
+            {activeIconObj.family === 'Ionicons' && (
+              <Ionicons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
+            )}
+            {activeIconObj.family === 'FontAwesome' && (
+              <FontAwesome name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
+            )}
+            {activeIconObj.family === 'MaterialIcons' && (
+              <MaterialIcons name={activeIconObj.name} size={12} color={isEarned ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
+            )}
+          </View>
+        );
+      }
+      rows.push(
+        <View key={row} style={{ flexDirection: 'row', gap: 5 }}>
+          {rowSlots}
         </View>
       );
     }
-    return previewSlots;
+    return rows;
   };
 
   const merchantLogo = merchant?.logo
@@ -1942,8 +1949,7 @@ const styles = StyleSheet.create({
     borderColor: '#B45309',
   },
   previewGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 5,
     marginVertical: 8,
     zIndex: 2,
