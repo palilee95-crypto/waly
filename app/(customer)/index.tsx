@@ -39,6 +39,7 @@ type LoyaltyCardItem = {
   cardBackground?: string;
   tier?: string;
   merchantId?: string;
+  linkedRewardId?: string;
 };
 
 const stampIcons = [
@@ -184,6 +185,7 @@ export default function CustomerDashboard() {
           points: rec.points_balance || 0,
           tier: rec.tier || 'bronze',
           merchantId: merchant?.id,
+          linkedRewardId: program?.linked_reward,
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
@@ -244,17 +246,21 @@ export default function CustomerDashboard() {
 
   useEffect(() => {
     if (selectedCard && selectedCard.merchantId) {
-      loadMerchantRewards(selectedCard.merchantId);
+      loadMerchantRewards(selectedCard.merchantId, selectedCard.linkedRewardId);
     } else {
       setMerchantRewards([]);
     }
   }, [selectedCard]);
 
-  const loadMerchantRewards = async (merchantId: string) => {
+  const loadMerchantRewards = async (merchantId: string, linkedRewardId?: string) => {
     try {
       setLoadingRewards(true);
+      let filterQuery = `merchant = "${merchantId}" && is_active = true`;
+      if (linkedRewardId) {
+        filterQuery += ` && id != "${linkedRewardId}"`;
+      }
       const res = await pb.collection('rewards').getFullList({
-        filter: `merchant = "${merchantId}" && is_active = true`,
+        filter: filterQuery,
         sort: '-created',
         requestKey: null,
       });
