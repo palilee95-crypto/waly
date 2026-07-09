@@ -91,6 +91,11 @@ export default function UnifiedRewardsScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
+  // Color picker refs (web only) — render inputs at top level so picker dialog is centered
+  const cardColorInputRef = React.useRef<any>(null);
+  const stampColorInputRef = React.useRef<any>(null);
+  const fontColorInputRef = React.useRef<any>(null);
+
   // Sub-tabs Selection
   const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'points_tiers'>('catalogue');
 
@@ -463,6 +468,32 @@ export default function UnifiedRewardsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+      {/* Hidden native color inputs — rendered at top so dialog appears centred in viewport */}
+      {Platform.OS === 'web' && (
+        <>
+          <input
+            ref={cardColorInputRef}
+            type="color"
+            value={cardColor}
+            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            onChange={(e: any) => { const v = e.target.value.toUpperCase(); setCardColor(v); setCustomHexInput(v); }}
+          />
+          <input
+            ref={stampColorInputRef}
+            type="color"
+            value={stampColor}
+            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            onChange={(e: any) => { const v = e.target.value.toUpperCase(); setStampColor(v); setCustomStampHexInput(v); }}
+          />
+          <input
+            ref={fontColorInputRef}
+            type="color"
+            value={fontColor}
+            style={{ position: 'fixed', top: '-200px', left: '-200px', width: 0, height: 0, opacity: 0, border: 'none' } as any}
+            onChange={(e: any) => { const v = e.target.value.toUpperCase(); setFontColor(v); setCustomFontHexInput(v); }}
+          />
+        </>
+      )}
       {/* Restrict to Owner Modal Overlay */}
       <Modal
         visible={merchant !== null && merchant.owner !== user?.id}
@@ -671,47 +702,30 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <Text style={styles.cardSectionTitle}>Card Background Color</Text>
               <View style={styles.colorRow}>
-                {colorOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.colorCircle,
-                      { backgroundColor: opt.value },
-                      cardColor === opt.value && styles.colorCircleActive,
-                    ]}
-                    onPress={() => {
-                      setCardColor(opt.value);
-                      setCustomHexInput(opt.value);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {cardColor === opt.value && (
-                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                
+                {colorOptions.map((opt) => {
+                  const isSelected = cardColor === opt.value;
+                  return (
+                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
+                      <TouchableOpacity
+                        style={[styles.colorCircle, { backgroundColor: opt.value }]}
+                        onPress={() => { setCardColor(opt.value); setCustomHexInput(opt.value); }}
+                        activeOpacity={0.8}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
                 {Platform.OS === 'web' && (
-                  <TouchableOpacity
-                    style={[
-                      styles.colorCircle,
-                      styles.colorWheelCircle,
-                      !colorOptions.some(opt => opt.value === cardColor) && styles.colorCircleActive,
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="color-filter-outline" size={16} color="#000000" />
-                    <input
-                      type="color"
-                      style={styles.webColorPickerInput}
-                      value={cardColor}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        setCardColor(val);
-                        setCustomHexInput(val);
-                      }}
-                    />
-                  </TouchableOpacity>
+                  <View style={!colorOptions.some(o => o.value === cardColor) ? styles.colorCircleSelectedRing : undefined}>
+                    <TouchableOpacity
+                      style={[styles.colorCircle, styles.colorWheelCircle]}
+                      onPress={() => cardColorInputRef.current?.click()}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
 
@@ -725,16 +739,13 @@ export default function UnifiedRewardsScreen() {
                     onChangeText={(val) => {
                       const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
                       setCustomHexInput('#' + cleaned);
-                      if (cleaned.length === 6) {
-                        setCardColor('#' + cleaned.toUpperCase());
-                      }
+                      if (cleaned.length === 6) { setCardColor('#' + cleaned.toUpperCase()); }
                     }}
                     placeholder="000000"
                     placeholderTextColor="#BEC6E0"
                     maxLength={6}
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
-                  <View style={[styles.hexColorPreview, { backgroundColor: cardColor }]} />
                 </View>
               </View>
             </View>
@@ -743,47 +754,30 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <Text style={styles.cardSectionTitle}>Collected Stamp Slots Color</Text>
               <View style={styles.colorRow}>
-                {stampColorOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.colorCircle,
-                      { backgroundColor: opt.value },
-                      stampColor === opt.value && styles.stampColorCircleActive,
-                    ]}
-                    onPress={() => {
-                      setStampColor(opt.value);
-                      setCustomStampHexInput(opt.value);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {stampColor === opt.value && (
-                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                
+                {stampColorOptions.map((opt) => {
+                  const isSelected = stampColor === opt.value;
+                  return (
+                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
+                      <TouchableOpacity
+                        style={[styles.colorCircle, { backgroundColor: opt.value }]}
+                        onPress={() => { setStampColor(opt.value); setCustomStampHexInput(opt.value); }}
+                        activeOpacity={0.8}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
                 {Platform.OS === 'web' && (
-                  <TouchableOpacity
-                    style={[
-                      styles.colorCircle,
-                      styles.colorWheelCircle,
-                      !stampColorOptions.some(opt => opt.value === stampColor) && styles.stampColorCircleActive,
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="color-filter-outline" size={16} color="#000000" />
-                    <input
-                      type="color"
-                      style={styles.webColorPickerInput}
-                      value={stampColor}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        setStampColor(val);
-                        setCustomStampHexInput(val);
-                      }}
-                    />
-                  </TouchableOpacity>
+                  <View style={!stampColorOptions.some(o => o.value === stampColor) ? styles.colorCircleSelectedRing : undefined}>
+                    <TouchableOpacity
+                      style={[styles.colorCircle, styles.colorWheelCircle]}
+                      onPress={() => stampColorInputRef.current?.click()}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
 
@@ -797,16 +791,13 @@ export default function UnifiedRewardsScreen() {
                     onChangeText={(val) => {
                       const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
                       setCustomStampHexInput('#' + cleaned);
-                      if (cleaned.length === 6) {
-                        setStampColor('#' + cleaned.toUpperCase());
-                      }
+                      if (cleaned.length === 6) { setStampColor('#' + cleaned.toUpperCase()); }
                     }}
                     placeholder="3B82F6"
                     placeholderTextColor="#BEC6E0"
                     maxLength={6}
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
-                  <View style={[styles.hexColorPreview, { backgroundColor: stampColor }]} />
                 </View>
               </View>
             </View>
@@ -815,29 +806,52 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <Text style={styles.cardSectionTitle}>Select Card Text Color</Text>
               <View style={styles.colorRow}>
-                {fontColorOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.colorCircle,
-                      { backgroundColor: opt.value, borderWidth: 1, borderColor: '#E2E8F0' },
-                      fontColor === opt.value && styles.colorCircleActive,
-                    ]}
-                    onPress={() => {
-                      setFontColor(opt.value);
-                      setCustomFontHexInput(opt.value);
+                {fontColorOptions.map((opt) => {
+                  const isSelected = fontColor === opt.value;
+                  const checkColor = opt.value === '#FFFFFF' ? '#000000' : '#FFFFFF';
+                  return (
+                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
+                      <TouchableOpacity
+                        style={[styles.colorCircle, { backgroundColor: opt.value, borderWidth: 1, borderColor: '#E2E8F0' }]}
+                        onPress={() => { setFontColor(opt.value); setCustomFontHexInput(opt.value); }}
+                        activeOpacity={0.8}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={14} color={checkColor} />}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+                {Platform.OS === 'web' && (
+                  <View style={!fontColorOptions.some(o => o.value === fontColor) ? styles.colorCircleSelectedRing : undefined}>
+                    <TouchableOpacity
+                      style={[styles.colorCircle, styles.colorWheelCircle]}
+                      onPress={() => fontColorInputRef.current?.click()}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="color-filter-outline" size={16} color="#000000" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.hexInputContainer}>
+                <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+                <View style={styles.hexInputWrapper}>
+                  <Text style={styles.hexHashSymbol}>#</Text>
+                  <TextInput
+                    style={styles.hexTextInput}
+                    value={customFontHexInput.replace('#', '')}
+                    onChangeText={(val) => {
+                      const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                      setCustomFontHexInput('#' + cleaned);
+                      if (cleaned.length === 6) { setFontColor('#' + cleaned.toUpperCase()); }
                     }}
-                    activeOpacity={0.8}
-                  >
-                    {fontColor === opt.value && (
-                      <Ionicons 
-                        name="checkmark" 
-                        size={14} 
-                        color={fontColor === '#FFFFFF' ? '#000000' : '#FFFFFF'} 
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                    placeholder="FFFFFF"
+                    placeholderTextColor="#BEC6E0"
+                    maxLength={6}
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                </View>
               </View>
             </View>
 
@@ -946,7 +960,7 @@ export default function UnifiedRewardsScreen() {
             {/* Live Visual Preview Header */}
             <Text style={styles.previewSectionHeader}>LIVE PREVIEW CARD</Text>
 
-            {/* Premium EMV Preview Card Layout */}
+            {/* Premium EMV Preview Card Layout - matches customer view */}
             <View style={[styles.liveCardPreview, { backgroundColor: cardColor }]}>
               {bgImage ? (
                 <Image 
@@ -956,20 +970,29 @@ export default function UnifiedRewardsScreen() {
                 />
               ) : null}
 
+              {/* Header: logo + name/category + stamp counter (same as customer) */}
               <View style={styles.cardPreviewHeader}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.previewTitle, { color: fontColor }]} numberOfLines={1}>
+                <View style={styles.previewShopLogoBg}>
+                  <Image 
+                    source={{ uri: merchantLogo }}
+                    style={styles.previewShopLogo}
+                  />
+                </View>
+                <View style={styles.previewShopTextCol}>
+                  <Text style={[styles.previewShopName, { color: fontColor }]} numberOfLines={1}>
                     {merchant?.name || 'Your Shop'}
                   </Text>
-                  <Text style={[styles.shopCategoryText, { color: fontColor, opacity: 0.65 }]}>
+                  <Text style={[styles.previewShopCategory, { color: fontColor, opacity: 0.65 }]} numberOfLines={1}>
                     {(merchant?.category || 'FOOD').toUpperCase()}
                   </Text>
                 </View>
-                <View style={[styles.cardStatusBadge, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#DC2626' }]}>
-                  <Text style={styles.statusText}>{isActive ? 'ACTIVE' : 'PAUSED'}</Text>
+                <View style={styles.previewPtsCol}>
+                  <Text style={[styles.previewPtsValue, { color: fontColor }]}>3/{requiredStamps}</Text>
+                  <Text style={[styles.previewPtsLabel, { color: fontColor, opacity: 0.8 }]}>STAMPS</Text>
                 </View>
               </View>
 
+              {/* EMV Chip + Wifi contactless row */}
               <View style={styles.cardMidRow}>
                 <View style={styles.cardChip}>
                   <View style={styles.chipLineHoriz} />
@@ -984,15 +1007,17 @@ export default function UnifiedRewardsScreen() {
                 />
               </View>
 
+              {/* Stamp slots grid */}
               <View style={styles.previewGrid}>{renderPreviewStamps()}</View>
 
+              {/* Footer: Holder | Valid | CVV | Mastercard circles */}
               <View style={styles.cardBottomRow}>
                 <View style={styles.holderBlock}>
                   <Text style={[styles.cardLabelText, { color: fontColor, opacity: 0.5 }]}>
                     CARD HOLDER
                   </Text>
                   <Text style={[styles.holderValueText, { color: fontColor }]} numberOfLines={1}>
-                    {(user?.name || 'Ahmad Fazli').toUpperCase()}
+                    {(user?.name || 'MERCHANT').toUpperCase()}
                   </Text>
                 </View>
 
@@ -1010,13 +1035,13 @@ export default function UnifiedRewardsScreen() {
                     CVV
                   </Text>
                   <Text style={[styles.holderValueText, { color: fontColor }]}>
-                    ***
+                    888
                   </Text>
                 </View>
 
                 <View style={styles.mastercardBadge}>
-                  <View style={[styles.badgeCircle, { backgroundColor: 'rgba(255,255,255,0.4)', marginRight: -8 }]} />
-                  <View style={[styles.badgeCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                  <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                  <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
                 </View>
               </View>
             </View>
@@ -1606,23 +1631,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  colorCircleActive: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  stampColorCircleActive: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+  // Active selection ring: wraps the circle to add a visible ring on any background
+  colorCircleSelectedRing: {
+    borderRadius: 20,
+    borderWidth: 2.5,
+    borderColor: '#0F172A',
+    padding: 2,
   },
   colorWheelCircle: {
     backgroundColor: '#FFFFFF',
@@ -1792,9 +1806,50 @@ const styles = StyleSheet.create({
   },
   cardPreviewHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     zIndex: 2,
+  },
+  previewShopLogoBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  previewShopLogo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
+  previewShopTextCol: {
+    flex: 1,
+    marginLeft: 10,
+    gap: 1,
+  },
+  previewShopName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  previewShopCategory: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.65)',
+  },
+  previewPtsCol: {
+    alignItems: 'flex-end',
+  },
+  previewPtsValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  previewPtsLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.75)',
   },
   previewTitle: {
     fontSize: 18,
