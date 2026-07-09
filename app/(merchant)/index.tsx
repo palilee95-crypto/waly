@@ -142,18 +142,24 @@ export default function MerchantDashboard() {
       >
         {/* Welcome Merchant Profile Header */}
         <View style={styles.profileHeader}>
-          <Image
-            source={{ 
-              uri: merchant?.logo 
-                ? pb.files.getURL(merchant, merchant.logo)
-                : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' 
-            }}
-            style={styles.merchantAvatar}
-          />
-          <View style={styles.profileTextWrap}>
-            <Text style={styles.welcomeSub}>Welcome back</Text>
-            <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Image
+              source={{ 
+                uri: merchant?.logo 
+                  ? pb.files.getURL(merchant, merchant.logo)
+                  : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' 
+              }}
+              style={styles.merchantAvatar}
+            />
+            <View style={styles.profileTextWrap}>
+              <Text style={styles.welcomeSub}>Welcome back</Text>
+              <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+            </View>
           </View>
+          <Image
+            source={require('../../theme/rise_officiallogo.png')}
+            style={{ width: 80, height: 28, resizeMode: 'contain' }}
+          />
         </View>
 
         {/* Total Stamp Issued Metric Card */}
@@ -290,7 +296,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
     marginVertical: 4,
   },
   merchantAvatar: {

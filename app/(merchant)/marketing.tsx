@@ -725,14 +725,20 @@ export default function MarketingScreen() {
       >
         {/* Welcome Merchant Profile Header */}
         <View style={styles.profileHeader}>
-          <Image
-            source={{ uri: merchantLogo }}
-            style={styles.merchantAvatar}
-          />
-          <View style={styles.profileTextWrap}>
-            <Text style={styles.welcomeSub}>Welcome back</Text>
-            <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Image
+              source={{ uri: merchantLogo }}
+              style={styles.merchantAvatar}
+            />
+            <View style={styles.profileTextWrap}>
+              <Text style={styles.welcomeSub}>Welcome back</Text>
+              <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+            </View>
           </View>
+          <Image
+            source={require('../../theme/rise_officiallogo.png')}
+            style={{ width: 80, height: 28, resizeMode: 'contain' }}
+          />
         </View>
 
         {/* Sub-tab Selection Row */}
@@ -1580,7 +1586,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
     marginVertical: 4,
   },
   merchantAvatar: {

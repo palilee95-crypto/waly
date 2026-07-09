@@ -433,10 +433,10 @@ export default function GiveStampsScreen() {
       {/* Top Header - White minimalist luxury style */}
       <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="cafe" size={15} color="#000000" />
-          </View>
-          <Text style={styles.headerLogoText}>RISEV Merchant Portal</Text>
+          <Image
+            source={require('../../theme/rise_officiallogo.png')}
+            style={{ width: 90, height: 32, resizeMode: 'contain' }}
+          />
         </View>
         <TouchableOpacity style={styles.notifyBtn}>
           <Ionicons name="notifications-outline" size={22} color="#0b1c30" />

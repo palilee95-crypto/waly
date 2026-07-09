@@ -287,10 +287,10 @@ export default function MyCardsScreen() {
             <Ionicons name="arrow-back" size={18} color="#000000" />
           </TouchableOpacity>
           
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>RISEV</Text>
-            <Text style={styles.logoSubtext}>Loyalty Reward</Text>
-          </View>
+          <Image
+            source={require('../../theme/rise_officiallogo.png')}
+            style={{ width: 90, height: 32, resizeMode: 'contain' }}
+          />
 
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.roundHeaderBtn}>
