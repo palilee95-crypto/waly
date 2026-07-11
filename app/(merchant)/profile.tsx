@@ -70,6 +70,7 @@ export default function ProfileScreen() {
   const [editStoreName, setEditStoreName] = useState('');
   const [editBusinessEmail, setEditBusinessEmail] = useState('');
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editMonthlySalesGoal, setEditMonthlySalesGoal] = useState('10000');
   const [editAddress, setEditAddress] = useState('');
   const [editCategory, setEditCategory] = useState<'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other'>('food');
   const [editLat, setEditLat] = useState('6.2443');
@@ -299,6 +300,7 @@ export default function ProfileScreen() {
     setEditStoreName(merchant?.name || user?.name || 'The Coffee House');
     setEditBusinessEmail(merchant?.metadata?.email || merchant?.website || (user as any)?.email || 'hello@thecoffeehouse.my');
     setEditPhoneNumber(merchant?.metadata?.phone || user?.phone || '+60 3-1234 5678');
+    setEditMonthlySalesGoal(String(merchant?.metadata?.monthly_sales_goal || '10000'));
     setEditAddress(merchant?.description || 'Lot G-12, Premium Galleries, Persiaran KLCC, 50088 Kuala Lumpur');
     setEditCategory(merchant?.category || 'food');
     setEditLat(String(locationRecord?.lat || '6.2443'));
@@ -383,6 +385,7 @@ export default function ProfileScreen() {
         ...(merchant?.metadata || {}),
         phone: editPhoneNumber.trim(),
         email: editBusinessEmail.trim(),
+        monthly_sales_goal: parseFloat(editMonthlySalesGoal) || 10000,
       };
       formData.append('metadata', JSON.stringify(updatedMetadata));
 
@@ -927,6 +930,22 @@ export default function ProfileScreen() {
                   placeholder="Enter phone number"
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
+                  {...Platform.select({
+                    web: { outlineStyle: 'none' } as any,
+                  })}
+                />
+              </View>
+
+              {/* Monthly Sales Goal Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Monthly Sales Goal (RM)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editMonthlySalesGoal}
+                  onChangeText={setEditMonthlySalesGoal}
+                  placeholder="e.g. 10000"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
                   {...Platform.select({
                     web: { outlineStyle: 'none' } as any,
                   })}

@@ -102,21 +102,26 @@ export default function MerchantDashboard() {
 
   const filteredTransactions = getFilteredTransactions();
 
-  // Stamps progress for the month (goal: 5000 stamps)
-  const monthlyGoal = 5000;
-  const stampsThisMonth = transactions
+  // Sales progress for the month (configurable goal stored in merchant metadata, defaults to 10000)
+  const monthlySalesGoal = Number(merchant?.metadata?.monthly_sales_goal) || 10000;
+  const salesThisMonth = transactions
     .filter(tx => {
+      if (tx.type !== 'earn') return false;
       const txDate = new Date(tx.created);
       const now = new Date();
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     })
-    .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
+    .reduce((acc, tx) => {
+      const amt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+      return acc + Number(amt);
+    }, 0);
 
-  const progressPercentage = Math.min((stampsThisMonth / monthlyGoal) * 100, 100);
-  const remainingStamps = Math.max(monthlyGoal - stampsThisMonth, 0);
+  const salesProgressPercentage = Math.min((salesThisMonth / monthlySalesGoal) * 100, 100);
+  const remainingSales = Math.max(monthlySalesGoal - salesThisMonth, 0);
 
   const mappedActivities: ActivityItem[] = filteredTransactions.map((tx: any) => {
     const cust = tx.expand?.customer;
+    const billAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
     return {
       id: tx.id,
       name: cust?.name || 'Walk-in Customer',
@@ -124,7 +129,7 @@ export default function MerchantDashboard() {
         ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
       date: new Date(tx.created).toLocaleDateString(),
-      amount: tx.metadata?.amount ? `$${tx.metadata.amount.toFixed(2)}` : '$0.00',
+      amount: billAmt > 0 ? `RM ${Number(billAmt).toFixed(2)}` : 'RM 0.00',
       stamps: tx.stamps || 0,
       status: tx.type === 'adjust' ? 'Pending' : 'Success'
     };
@@ -190,21 +195,28 @@ export default function MerchantDashboard() {
         {/* Goal Progress Card (Matches the goal/rewards limit progress card) */}
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>This Month's Goal</Text>
+            <Text style={styles.progressTitle}>This Month's Sales</Text>
             <Ionicons name="trending-up" size={18} color="#000000" />
           </View>
 
           <Text style={styles.progressStats}>
-            {loading ? '...' : stampsThisMonth.toLocaleString()} <Text style={styles.progressStatsMax}>/ {monthlyGoal.toLocaleString()} stamps</Text>
+            {loading ? (
+              '...'
+            ) : (
+              `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            )}{' '}
+            <Text style={styles.progressStatsMax}>/ RM {monthlySalesGoal.toLocaleString()} goal</Text>
           </Text>
 
           {/* Sleek Progress Fill Bar */}
           <View style={styles.barContainer}>
-            <View style={[styles.barFill, { width: `${progressPercentage}%` }]} />
+            <View style={[styles.barFill, { width: `${salesProgressPercentage}%` }]} />
           </View>
 
           <Text style={styles.remainingText}>
-            {loading ? '...' : `${remainingStamps.toLocaleString()} stamps to go!`}
+            {loading
+              ? '...'
+              : `RM ${remainingSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to go!`}
           </Text>
         </View>
 
