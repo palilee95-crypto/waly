@@ -220,11 +220,10 @@ export default function CustomersScreen() {
         sort: '-created'
       });
 
-      const headers = ["Customer ID", "Name", "Phone", "Email", "Tier", "Stamps Collected", "Points Balance", "Enrolled Date"];
+      const headers = ["Name", "Phone", "Email", "Tier", "Stamps Collected", "Points Balance", "Enrolled Date"];
       const rows = cards.map((card: any) => {
         const cust = card.expand?.customer;
         return [
-          cust?.id || '',
           cust?.name || 'Walk-in Customer',
           cust?.phone || 'No Phone',
           cust?.email || 'No Email',
@@ -275,7 +274,7 @@ export default function CustomersScreen() {
         });
       }
 
-      const headers = ["Transaction ID", "Date", "Time", "Customer ID", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
+      const headers = ["Transaction ID", "Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
       const rows = recordsToExport.map((tx: any) => {
         const txDate = new Date(tx.created);
         const saleAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
@@ -283,7 +282,6 @@ export default function CustomersScreen() {
           tx.id,
           txDate.toLocaleDateString(),
           txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          tx.customerId,
           tx.name,
           tx.customerPhone,
           tx.type,
