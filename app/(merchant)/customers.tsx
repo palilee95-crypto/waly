@@ -364,9 +364,9 @@ export default function CustomersScreen() {
 
   const filteredTransactions = getFilteredAndSortedTransactions();
 
-  const totalPointsDistributed = transactions
+  const totalStampsDistributed = transactions
     .filter((tx) => tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT')
-    .reduce((acc, tx) => acc + (tx.points || tx.stamps * 10), 0);
+    .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
   const totalPointsRedeemed = transactions
     .filter((tx) => tx.type === 'REDEMPTION')
@@ -392,22 +392,22 @@ export default function CustomersScreen() {
     ).values()
   );
 
-  // Points distributed this month (last 30 days) vs previous month (30-60 days ago)
+  // Stamps distributed this month (last 30 days) vs previous month (30-60 days ago)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000);
 
-  const currentPeriodPoints = transactions
+  const currentPeriodStamps = transactions
     .filter((tx) => (tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT') && new Date(tx.created) >= thirtyDaysAgo)
-    .reduce((acc, tx) => acc + (tx.points || tx.stamps * 10), 0);
+    .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
-  const previousPeriodPoints = transactions
+  const previousPeriodStamps = transactions
     .filter((tx) => (tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT') && new Date(tx.created) >= sixtyDaysAgo && new Date(tx.created) < thirtyDaysAgo)
-    .reduce((acc, tx) => acc + (tx.points || tx.stamps * 10), 0);
+    .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
   let percentChange = 0;
-  if (previousPeriodPoints > 0) {
-    percentChange = Math.round(((currentPeriodPoints - previousPeriodPoints) / previousPeriodPoints) * 100);
-  } else if (currentPeriodPoints > 0) {
+  if (previousPeriodStamps > 0) {
+    percentChange = Math.round(((currentPeriodStamps - previousPeriodStamps) / previousPeriodStamps) * 100);
+  } else if (currentPeriodStamps > 0) {
     percentChange = 100;
   }
 
@@ -445,9 +445,9 @@ export default function CustomersScreen() {
         {/* Metric Cards Section */}
         {/* Card 1: Blue Points Collected Card */}
         <View style={[styles.metricCard, styles.blueCard]}>
-          <Text style={styles.metricLabelBlue}>TOTAL POINTS DISTRIBUTED</Text>
+          <Text style={styles.metricLabelBlue}>TOTAL STAMPS DISTRIBUTED</Text>
           <Text style={styles.metricValueBlue}>
-            {loading ? '...' : totalPointsDistributed.toLocaleString()}
+            {loading ? '...' : totalStampsDistributed.toLocaleString()}
           </Text>
           <View style={styles.trendRow}>
             <Feather name={trendIcon} size={14} color="#FFFFFF" />
@@ -459,7 +459,7 @@ export default function CustomersScreen() {
         <View style={[styles.metricCard, styles.greyCard]}>
           <Text style={styles.metricLabelGrey}>POINTS REDEEMED</Text>
           <Text style={styles.metricValueGrey}>
-            {loading ? '...' : totalPointsRedeemed.toLocaleString()}
+            {loading ? '...' : Math.abs(totalPointsRedeemed).toLocaleString()}
           </Text>
           <Text style={styles.subtextGrey}>
             {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} rewards claimed by customers`}
