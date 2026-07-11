@@ -274,12 +274,11 @@ export default function CustomersScreen() {
         });
       }
 
-      const headers = ["Transaction ID", "Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
+      const headers = ["Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
       const rows = recordsToExport.map((tx: any) => {
         const txDate = new Date(tx.created);
         const saleAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
         return [
-          tx.id,
           txDate.toLocaleDateString(),
           txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           tx.name,
