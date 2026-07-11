@@ -12,12 +12,15 @@ import {
   Modal,
   Platform,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 
@@ -121,6 +124,8 @@ export default function CustomersScreen() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const openCustomerDetails = async (tx: TransactionItem) => {
     if (!tx.customerId) return;
@@ -153,6 +158,149 @@ export default function CustomersScreen() {
       console.warn('Failed to fetch customer details:', err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleDownloadCSV = async (csvContent: string, fileName: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const isSharingAvailable = await Sharing.isAvailableAsync();
+        if (!isSharingAvailable) {
+          Alert.alert("Sharing Unavailable", "Sharing is not supported on this device.");
+          return;
+        }
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Export CSV Data',
+          UTI: 'public.comma-separated-values-text',
+        });
+      }
+    } catch (err: any) {
+      console.warn("CSV download/share failed:", err);
+      Alert.alert("Export Error", err.message || "Failed to download CSV");
+    }
+  };
+
+  const escapeCSVField = (val: any) => {
+    if (val === null || val === undefined) return '';
+    let str = String(val).replace(/"/g, '""');
+    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+      str = `"${str}"`;
+    }
+    return str;
+  };
+
+  const compileToCSV = (headers: string[], rows: any[][]): string => {
+    const headerLine = headers.map(escapeCSVField).join(',');
+    const rowLines = rows.map(row => row.map(escapeCSVField).join(','));
+    return [headerLine, ...rowLines].join('\n');
+  };
+
+  const exportCustomersCSV = async () => {
+    if (!user?.merchant_id) return;
+    setIsExporting(true);
+    try {
+      // Fetch all loyalty cards for this merchant
+      const cards = await pb.collection('loyalty_cards').getFullList({
+        filter: `merchant = '${user.merchant_id}'`,
+        expand: 'customer',
+        sort: '-created'
+      });
+
+      const headers = ["Customer ID", "Name", "Phone", "Email", "Tier", "Stamps Collected", "Points Balance", "Enrolled Date"];
+      const rows = cards.map((card: any) => {
+        const cust = card.expand?.customer;
+        return [
+          cust?.id || '',
+          cust?.name || 'Walk-in Customer',
+          cust?.phone || 'No Phone',
+          cust?.email || 'No Email',
+          (card.tier || 'bronze').toUpperCase(),
+          card.stamps_collected || 0,
+          card.points_balance || 0,
+          new Date(card.created).toLocaleDateString()
+        ];
+      });
+
+      const csv = compileToCSV(headers, rows);
+      await handleDownloadCSV(csv, 'customers_list.csv');
+      setExportModalVisible(false);
+    } catch (err: any) {
+      Alert.alert("Export Failed", err.message || "Could not export customer list.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportTransactionsCSV = async (mode: 'filtered' | 'alltime') => {
+    if (!user?.merchant_id) return;
+    setIsExporting(true);
+    try {
+      let recordsToExport: any[] = [];
+      if (mode === 'filtered') {
+        recordsToExport = getFilteredAndSortedTransactions();
+      } else {
+        const rawTxs = await pb.collection('transactions').getFullList({
+          filter: `merchant = '${user.merchant_id}'`,
+          expand: 'customer',
+          sort: '-created'
+        });
+        recordsToExport = rawTxs.map((rec: any) => {
+          const cust = rec.expand?.customer;
+          const metadata = typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : (rec.metadata || {});
+          return {
+            id: rec.id,
+            name: cust?.name || 'Walk-in Customer',
+            type: rec.type === 'earn' ? 'PURCHASE' : rec.type === 'redeem' ? 'REDEMPTION' : 'ADJUSTMENT',
+            stamps: rec.stamps || 0,
+            points: rec.points || 0,
+            customerId: cust?.id || '',
+            customerPhone: cust?.phone || 'No Phone',
+            created: rec.created,
+            metadata
+          };
+        });
+      }
+
+      const headers = ["Transaction ID", "Date", "Time", "Customer ID", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
+      const rows = recordsToExport.map((tx: any) => {
+        const txDate = new Date(tx.created);
+        const saleAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+        return [
+          tx.id,
+          txDate.toLocaleDateString(),
+          txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          tx.customerId,
+          tx.name,
+          tx.customerPhone,
+          tx.type,
+          tx.stamps,
+          tx.points,
+          saleAmt > 0 ? Number(saleAmt).toFixed(2) : '0.00'
+        ];
+      });
+
+      const csv = compileToCSV(headers, rows);
+      const filename = mode === 'filtered' ? 'transactions_filtered.csv' : 'transactions_all_time.csv';
+      await handleDownloadCSV(csv, filename);
+      setExportModalVisible(false);
+    } catch (err: any) {
+      Alert.alert("Export Failed", err.message || "Could not export transaction logs.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -404,6 +552,13 @@ export default function CustomersScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="options-outline" size={20} color={sortBy !== 'newest' ? '#FFFFFF' : '#0b1c30'} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.filterBtn} 
+              onPress={() => setExportModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="download-outline" size={20} color="#0b1c30" />
             </TouchableOpacity>
           </View>
         </View>
@@ -771,6 +926,83 @@ export default function CustomersScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Export Options Modal */}
+      <Modal
+        visible={exportModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => !isExporting && setExportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 32 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Export Data to CSV</Text>
+              {!isExporting && (
+                <TouchableOpacity onPress={() => setExportModalVisible(false)} style={styles.closeBtn}>
+                  <Feather name="x" size={20} color="#000000" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isExporting ? (
+              <View style={{ alignItems: 'center', marginVertical: 32, gap: 12 }}>
+                <ActivityIndicator size="large" color="#004ac6" />
+                <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', fontSize: 14 }}>
+                  Compiling CSV export file...
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 16, marginTop: 12 }}>
+                {/* Customers export button */}
+                <TouchableOpacity 
+                  style={styles.exportOptionCard} 
+                  onPress={exportCustomersCSV}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.exportIconBg}>
+                    <Ionicons name="people-outline" size={20} color="#0b1c30" />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.exportCardTitle}>Customer Database</Text>
+                    <Text style={styles.exportCardSub}>Includes names, phone numbers, tiers, and points balance.</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Filtered Transactions export button */}
+                <TouchableOpacity 
+                  style={styles.exportOptionCard} 
+                  onPress={() => exportTransactionsCSV('filtered')}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.exportIconBg, { backgroundColor: '#F0FDF4' }]}>
+                    <Ionicons name="funnel-outline" size={20} color="#15803d" />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.exportCardTitle}>Filtered Transactions</Text>
+                    <Text style={styles.exportCardSub}>Exports only records matching current filter settings.</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* All time Transactions export button */}
+                <TouchableOpacity 
+                  style={styles.exportOptionCard} 
+                  onPress={() => exportTransactionsCSV('alltime')}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.exportIconBg, { backgroundColor: '#FFFBEB' }]}>
+                    <Ionicons name="receipt-outline" size={20} color="#b45309" />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.exportCardTitle}>All-Time Transactions</Text>
+                    <Text style={styles.exportCardSub}>Full transaction history logs including subtotal sale amounts.</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1475,5 +1707,33 @@ const styles = StyleSheet.create({
   receiptCodeText: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#4F46E5',
+  },
+  exportOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  exportIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportCardTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0b1c30',
+  },
+  exportCardSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#9CA3AF',
   },
 });
