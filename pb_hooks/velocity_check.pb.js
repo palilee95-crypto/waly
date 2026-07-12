@@ -5,8 +5,12 @@ onRecordCreate((e) => {
   const merchantId = e.record.get('merchant');
   
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
+  // Get date/time components in GMT+8 (Malaysia Time)
+  const msOffset = 8 * 60 * 60 * 1000;
+  const localTime = new Date(now.getTime() + msOffset);
+  const localStart = new Date(localTime);
+  localStart.setUTCHours(0, 0, 0, 0);
+  const todayStart = new Date(localStart.getTime() - msOffset);
   const minuteAgo = new Date(now.getTime() - 60000);
 
   // Helper function to create fraud flag (inlined to avoid Goja context garbage collection issues)
@@ -35,7 +39,8 @@ onRecordCreate((e) => {
 
   // 1. Self-issuance check (V05)
   const merchant = $app.findRecordById('merchants', merchantId);
-  if (merchant.get('owner') === customerId) {
+  const authRecord = e.httpContext ? e.httpContext.get('authRecord') : null;
+  if ((merchant.get('owner') === customerId) || (authRecord && authRecord.id === customerId)) {
     // Create fraud flag
     createFlag(customerId, null, 'V05', 'Self-issuance attempt blocked', 'critical');
     throw new ForbiddenError('Self-issuance is not permitted');

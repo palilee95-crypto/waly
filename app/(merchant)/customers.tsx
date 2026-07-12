@@ -274,7 +274,7 @@ export default function CustomersScreen() {
         });
       }
 
-      const headers = ["Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)"];
+      const headers = ["Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)", "Issued By"];
       const rows = recordsToExport.map((tx: any) => {
         const txDate = new Date(tx.created);
         const saleAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
@@ -286,7 +286,8 @@ export default function CustomersScreen() {
           tx.type,
           tx.stamps,
           tx.points,
-          saleAmt > 0 ? Number(saleAmt).toFixed(2) : '0.00'
+          saleAmt > 0 ? Number(saleAmt).toFixed(2) : '0.00',
+          tx.metadata?.issued_by_name || 'Owner/System'
         ];
       });
 

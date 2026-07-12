@@ -159,7 +159,9 @@ export default function GiveStampsScreen() {
         points: amountPaid, // Hook will multiply points
         stamps: count,
         metadata: {
-          bill_amount: amountPaid
+          bill_amount: amountPaid,
+          issued_by: user!.id,
+          issued_by_name: user!.name || 'Staff'
         }
       });
 
@@ -353,7 +355,9 @@ export default function GiveStampsScreen() {
                 points: amountPaid,
                 stamps: 1,
                 metadata: {
-                  bill_amount: amountPaid
+                  bill_amount: amountPaid,
+                  issued_by: user.id,
+                  issued_by_name: user.name || 'Staff'
                 }
               });
 
