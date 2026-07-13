@@ -44,7 +44,12 @@ function runAutomations() {
     const programFilter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ")";
     const filter = `${programFilter} && updated >= "${startStr}" && updated <= "${endStr}" && (opt_in_marketing != false || opt_in_marketing = null)`;
     
+    console.log(`[Automation Debug] Rule: "${rule.get("name")}" (triggerDays: ${triggerDays})`);
+    console.log(`[Automation Debug] Target UTC Range: ${startStr} to ${endStr}`);
+    console.log(`[Automation Debug] Filter: ${filter}`);
+
     const cards = $app.findRecordsByFilter("loyalty_cards", filter, "-created", 1000, 0);
+    console.log(`[Automation Debug] Found ${cards.length} card(s) matching filter.`);
     if (cards.length === 0) continue;
 
     let sentCount = 0;
@@ -54,6 +59,8 @@ function runAutomations() {
       const card = cards[i];
       const customerId = card.get("customer");
       const stampsCount = card.get("stamps_collected") || 0;
+
+      console.log(`[Automation Debug] Processing card: ${card.id} for customer: ${customerId} (stamps: ${stampsCount}, updated: ${card.get("updated")})`);
 
       // Anti-spam validation: Check if customer already received an automated message from this merchant in the last 7 days
       const sevenDaysAgo = new Date();
@@ -69,7 +76,7 @@ function runAutomations() {
       );
 
       if (recentNotifs.length > 0) {
-        // Already received a campaign notification recently - skip to avoid spam!
+        console.log(`[Automation Debug] Skipped customer ${customerId} (Anti-Spam active: already received campaign in the last 7 days)`);
         continue;
       }
 
@@ -78,11 +85,13 @@ function runAutomations() {
       try {
         customer = $app.findRecordById("users", customerId);
       } catch (_) {
+        console.log(`[Automation Debug] Customer record ${customerId} not found in database.`);
         continue;
       }
 
       const phone = customer.get("phone") || "";
       const customerName = customer.getString("name") || "Valued Customer";
+      console.log(`[Automation Debug] Customer ${customerId} passed all checks. Preparing WhatsApp for phone: ${phone}`);
 
       // Personalize message
       let personalizedMsg = messageTemplate
