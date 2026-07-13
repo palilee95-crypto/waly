@@ -143,31 +143,41 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const programIds = programs.map(p => p.id);
 
     const customerIds = new Set();
+    const optedOutIds = new Set();
     const customerRecords = [];
 
     if (programIds.length > 0) {
-      const filter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ") && (opt_in_marketing != false || opt_in_marketing = null)";
-      const cards = $app.findRecordsByFilter("loyalty_cards", filter, "-created", 1000, 0);
+      // 1. Fetch all cards for the merchant's programs to distinguish opted-in and opted-out customers
+      const programFilter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ")";
+      const cards = $app.findRecordsByFilter("loyalty_cards", programFilter, "-created", 1000, 0);
       for (let i = 0; i < cards.length; i++) {
         const customerId = cards[i].get("customer");
-        if (customerId && !customerIds.has(customerId)) {
-          customerIds.add(customerId);
-          try {
-            const cust = $app.findRecordById("users", customerId);
-            customerRecords.push({
-              record: cust,
-              stamps: cards[i].get("stamps_collected") || 0
-            });
-          } catch (_) {}
+        if (!customerId) continue;
+
+        const optIn = cards[i].get("opt_in_marketing");
+        if (optIn === false) {
+          optedOutIds.add(customerId);
+        } else {
+          if (!customerIds.has(customerId)) {
+            customerIds.add(customerId);
+            try {
+              const cust = $app.findRecordById("users", customerId);
+              customerRecords.push({
+                record: cust,
+                stamps: cards[i].get("stamps_collected") || 0
+              });
+            } catch (_) {}
+          }
         }
       }
     }
 
-    // Also scan transactions to include customers who transacted but might not have active cards (defaulting stamps to 0)
+    // 2. Also scan transactions to include customers who transacted but might not have active cards (defaulting stamps to 0),
+    // making sure we respect the explicit opt-out of customers who have cards where opt_in_marketing is false
     const txs = $app.findRecordsByFilter("transactions", `merchant = "${merchantId}"`, "-created", 1000, 0);
     for (let i = 0; i < txs.length; i++) {
       const customerId = txs[i].get("customer");
-      if (customerId && !customerIds.has(customerId)) {
+      if (customerId && !customerIds.has(customerId) && !optedOutIds.has(customerId)) {
         customerIds.add(customerId);
         try {
           const cust = $app.findRecordById("users", customerId);
@@ -228,8 +238,8 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
         const cleanPhone = phone.replace(/[^\d]/g, '');
         if (cleanPhone) {
           try {
-            // Calculate a randomized delay to simulate human typing in the queue
-            const randomDelay = Math.floor(Math.random() * 4000) + 5000; // 5s to 9s
+            // Spaced out queue delay: delay increments by 4 seconds for each recipient, plus 5-9 seconds typing delay
+            const queueDelay = (i * 4000) + Math.floor(Math.random() * 4000) + 5000;
 
             $http.send({
               url: `${evolutionUrl}/message/sendText/${instanceName}`,
@@ -242,7 +252,7 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
                 number: cleanPhone,
                 text: formattedWhatsAppMsg,
                 options: {
-                  delay: randomDelay,
+                  delay: queueDelay,
                   presence: 'composing'
                 }
               }),
