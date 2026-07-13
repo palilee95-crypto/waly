@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -26,6 +27,7 @@ const { width } = Dimensions.get('window');
 export default function GiveStampsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
   const pathname = usePathname();
   const isFocused = pathname.includes('give');
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
@@ -440,7 +442,7 @@ export default function GiveStampsScreen() {
           <View style={styles.logoBadge}>
             <Ionicons name="cafe" size={15} color="#000000" />
           </View>
-          <Text style={styles.headerLogoText}>Merchant Portal</Text>
+          <Text style={styles.headerLogoText}>{t('merchant_portal')}</Text>
         </View>
         <Image
           source={require('../../theme/rise_officiallogo.png')}
@@ -458,7 +460,7 @@ export default function GiveStampsScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="camera-outline" size={16} color={scanMode === 'camera' ? '#FFFFFF' : '#64748B'} />
-            <Text style={[styles.segmentText, scanMode === 'camera' && styles.segmentTextActive]}>Scan QR Code</Text>
+            <Text style={[styles.segmentText, scanMode === 'camera' && styles.segmentTextActive]}>{t('scan_qr_code')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.segmentBtn, scanMode === 'manual' && styles.segmentBtnActive]}
@@ -466,7 +468,7 @@ export default function GiveStampsScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="create-outline" size={16} color={scanMode === 'manual' ? '#FFFFFF' : '#64748B'} />
-            <Text style={[styles.segmentText, scanMode === 'manual' && styles.segmentTextActive]}>Manual Input</Text>
+            <Text style={[styles.segmentText, scanMode === 'manual' && styles.segmentTextActive]}>{t('manual_input')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -474,9 +476,9 @@ export default function GiveStampsScreen() {
           // MINIMALIST LIGHT QR CODE SCAN VIEWFINDER
           <View style={styles.scanWrapper}>
             <View style={styles.viewfinderCard}>
-              <Text style={styles.scanTitle}>Scan Customer QR</Text>
+              <Text style={styles.scanTitle}>{t('scan_customer_qr')}</Text>
               <Text style={styles.scanSubtitle}>
-                Align the customer's QR code within the viewfinder frame to credit stamp points automatically.
+                {t('scan_subtitle')}
               </Text>
 
               {/* Live Camera / Fallback permission target Area */}
@@ -486,9 +488,9 @@ export default function GiveStampsScreen() {
                 ) : !permission.granted ? (
                   <View style={styles.permissionContainer}>
                     <Ionicons name="camera-reverse-outline" size={40} color="#64748B" />
-                    <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
+                    <Text style={styles.permissionText}>{t('camera_permission_required')}</Text>
                     <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.8}>
-                      <Text style={styles.permissionBtnText}>Enable Camera</Text>
+                      <Text style={styles.permissionBtnText}>{t('enable_camera')}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : !scanned && isFocused ? (
@@ -503,7 +505,7 @@ export default function GiveStampsScreen() {
                 ) : (
                   <View style={[StyleSheet.absoluteFill, styles.scannedPlaceholder]}>
                     <ActivityIndicator color="#000000" size="large" />
-                    <Text style={styles.processingText}>Processing...</Text>
+                    <Text style={styles.processingText}>{t('submitting')}</Text>
                   </View>
                 )}
 
@@ -519,21 +521,21 @@ export default function GiveStampsScreen() {
         ) : (
           // MANUAL ENTRY FORM MODE
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Manual Stamp or Voucher</Text>
+            <Text style={styles.formTitle}>{t('manual_stamp_or_voucher')}</Text>
             <Text style={styles.formSubtitle}>
-              Enter customer's phone number to credit stamps, or enter a voucher code (starts with WV- or RV-) to redeem.
+              {t('manual_subtitle')}
             </Text>
 
             {/* Input field */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>PHONE NUMBER OR VOUCHER CODE</Text>
+              <Text style={styles.inputLabel}>{t('phone_number_or_voucher')}</Text>
               <View style={[styles.inputWrapper, phoneFocused && styles.inputWrapperFocused]}>
                 <Ionicons name="phone-portrait-outline" size={18} color={phoneFocused ? '#000000' : '#94A3B8'} />
                 <TextInput
                   style={styles.textInput}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
-                  placeholder="+60123456789 or WV-XXXX/RV-XXXX"
+                  placeholder={t('phone_or_voucher_placeholder')}
                   placeholderTextColor="#94A3B8"
                   autoCapitalize="characters"
                   onFocus={() => setPhoneFocused(true)}
@@ -545,7 +547,7 @@ export default function GiveStampsScreen() {
             {/* Bill Subtotal field */}
             {!isVoucherCode(phoneNumber) && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>BILL SUBTOTAL (RM)</Text>
+                <Text style={styles.inputLabel}>{t('bill_subtotal')}</Text>
                 <View style={[styles.inputWrapper, subtotalFocused && styles.inputWrapperFocused]}>
                   <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginRight: 4 }}>RM</Text>
                   <TextInput
@@ -565,7 +567,7 @@ export default function GiveStampsScreen() {
             {/* Count Selector field */}
             {!isVoucherCode(phoneNumber) && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NUMBER OF STAMPS TO ISSUE</Text>
+                <Text style={styles.inputLabel}>{t('stamps_to_issue')}</Text>
                 <View style={styles.stampControls}>
                   <TouchableOpacity
                     style={styles.controlBtn}
@@ -598,7 +600,7 @@ export default function GiveStampsScreen() {
               activeOpacity={0.9}
             >
               <Text style={styles.submitBtnText}>
-                {isVoucherCode(phoneNumber) ? 'Redeem Voucher' : 'Issue Stamp Points'}
+                {isVoucherCode(phoneNumber) ? t('redeem_voucher') : t('issue_stamps_btn')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -618,29 +620,31 @@ export default function GiveStampsScreen() {
             </View>
 
             <Text style={styles.modalTitle}>
-              {successType === 'voucher' ? 'VOUCHER REDEEMED!' : 'STAMPS AWARDED!'}
+              {successType === 'voucher' ? t('voucher_redeemed_upper') : t('stamps_awarded_upper')}
             </Text>
             
             {successType === 'stamps' && successDetails && (
               <View style={styles.detailsContainer}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Customer</Text>
+                  <Text style={styles.detailLabel}>{t('customer')}</Text>
                   <Text style={styles.detailValue}>{successDetails.customerName}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Phone</Text>
+                  <Text style={styles.detailLabel}>{t('phone')}</Text>
                   <Text style={styles.detailValue}>{successDetails.customerPhone}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Awarded</Text>
+                  <Text style={styles.detailLabel}>{t('awarded')}</Text>
                   <Text style={[styles.detailValue, { color: '#10B981', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                    +{successDetails.awardedCount} Stamp{successDetails.awardedCount > 1 ? 's' : ''}
+                    {locale === 'en'
+                      ? `+${successDetails.awardedCount} Stamp${successDetails.awardedCount > 1 ? 's' : ''}`
+                      : `+${successDetails.awardedCount} Setem`}
                   </Text>
                 </View>
 
                 {successDetails.billAmount !== undefined && successDetails.billAmount > 0 && (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Bill Amount</Text>
+                    <Text style={styles.detailLabel}>{t('bill_amount')}</Text>
                     <Text style={styles.detailValue}>RM {successDetails.billAmount.toFixed(2)}</Text>
                   </View>
                 )}
@@ -648,9 +652,13 @@ export default function GiveStampsScreen() {
                 <View style={styles.divider} />
                 
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Current Balance</Text>
+                  <Text style={styles.totalLabel}>{t('current_balance')}</Text>
                   <View style={styles.stampBadge}>
-                    <Text style={styles.stampBadgeText}>{successDetails.totalStamps} Stamp{successDetails.totalStamps !== 1 ? 's' : ''}</Text>
+                    <Text style={styles.stampBadgeText}>
+                      {locale === 'en'
+                        ? `${successDetails.totalStamps} Stamp${successDetails.totalStamps !== 1 ? 's' : ''}`
+                        : `${successDetails.totalStamps} Setem`}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -659,15 +667,15 @@ export default function GiveStampsScreen() {
             {successType === 'voucher' && voucherDetails && (
               <View style={styles.detailsContainer}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Customer</Text>
+                  <Text style={styles.detailLabel}>{t('customer')}</Text>
                   <Text style={styles.detailValue}>{voucherDetails.customerName}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Voucher Code</Text>
+                  <Text style={styles.detailLabel}>{t('voucher_code')}</Text>
                   <Text style={styles.detailValue}>{voucherDetails.code}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Reward</Text>
+                  <Text style={styles.detailLabel}>{t('reward')}</Text>
                   <Text style={[styles.detailValue, { color: '#10B981', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                     {voucherDetails.rewardName}
                   </Text>
@@ -683,7 +691,7 @@ export default function GiveStampsScreen() {
               }}
               activeOpacity={0.9}
             >
-              <Text style={styles.modalCloseBtnText}>DONE</Text>
+              <Text style={styles.modalCloseBtnText}>{t('done')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -704,7 +712,7 @@ export default function GiveStampsScreen() {
             </View>
 
             <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: 12, textAlign: 'center' }]}>
-              NEW CUSTOMER PROFILE
+              {t('new_customer_profile')}
             </Text>
 
             <Text style={{
@@ -715,7 +723,9 @@ export default function GiveStampsScreen() {
               lineHeight: 18,
               marginBottom: 24,
             }}>
-              Phone number <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{phoneNumber}</Text> is not registered with RISEV. Create a new guest account to credit these stamps?
+              {locale === 'en'
+                ? `Phone number ${phoneNumber} is not registered with RISEV. Create a new guest account to credit these stamps?`
+                : `Nombor telefon ${phoneNumber} tidak didaftarkan dengan RISEV. Cipta akaun tetamu baru untuk mengkreditkan setem ini?`}
             </Text>
 
             {/* Optional Customer Name Input */}
@@ -727,7 +737,7 @@ export default function GiveStampsScreen() {
                 letterSpacing: 0.5,
                 marginBottom: 6,
               }}>
-                CUSTOMER NAME (OPTIONAL)
+                {t('customer_name_optional')}
               </Text>
               <View style={{
                 flexDirection: 'row',
@@ -753,7 +763,7 @@ export default function GiveStampsScreen() {
                   }}
                   value={newCustomerName}
                   onChangeText={setNewCustomerName}
-                  placeholder="Enter name (e.g. Adam)"
+                  placeholder={t('customer_name_placeholder')}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
@@ -779,7 +789,7 @@ export default function GiveStampsScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                  Cancel
+                  {t('cancel')}
                 </Text>
               </TouchableOpacity>
 
@@ -799,7 +809,7 @@ export default function GiveStampsScreen() {
                 activeOpacity={0.9}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  Create & Issue
+                  {t('create_issue')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -822,7 +832,7 @@ export default function GiveStampsScreen() {
             </View>
 
             <Text style={[styles.modalTitle, { color: '#D97706', marginBottom: 12, textAlign: 'center' }]}>
-              CAMPAIGN INACTIVE
+              {t('campaign_inactive')}
             </Text>
 
             <Text style={{
@@ -833,7 +843,7 @@ export default function GiveStampsScreen() {
               lineHeight: 18,
               marginBottom: 24,
             }}>
-              No active loyalty program found for your store. Please go to the Marketing section to create a campaign and enable it first.
+              {t('campaign_inactive_desc')}
             </Text>
 
             {/* Action Buttons */}
@@ -853,7 +863,7 @@ export default function GiveStampsScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                  Close
+                  {t('close')}
                 </Text>
               </TouchableOpacity>
 
@@ -873,7 +883,7 @@ export default function GiveStampsScreen() {
                 activeOpacity={0.9}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  Go to Marketing
+                  {t('go_to_marketing')}
                 </Text>
               </TouchableOpacity>
             </View>

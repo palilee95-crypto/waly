@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -52,6 +53,7 @@ const getInitials = (name: string) => {
 
 export default function CustomersScreen() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Purchase' | 'Redemption' | 'Adjustment'>('All');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -431,7 +433,7 @@ export default function CustomersScreen() {
             }}
             style={styles.merchantAvatar}
           />
-          <Text style={styles.headerTitle}>Transaction History</Text>
+          <Text style={styles.headerTitle}>{t('transaction_history')}</Text>
         </View>
         <Image
           source={require('../../theme/rise_officiallogo.png')}
@@ -446,30 +448,30 @@ export default function CustomersScreen() {
         {/* Metric Cards Section */}
         {/* Card 1: Blue Points Collected Card */}
         <View style={[styles.metricCard, styles.blueCard]}>
-          <Text style={styles.metricLabelBlue}>TOTAL STAMPS DISTRIBUTED</Text>
+          <Text style={styles.metricLabelBlue}>{t('total_stamps_distributed')}</Text>
           <Text style={styles.metricValueBlue}>
             {loading ? '...' : totalStampsDistributed.toLocaleString()}
           </Text>
           <View style={styles.trendRow}>
             <Feather name={trendIcon} size={14} color="#FFFFFF" />
-            <Text style={styles.trendText}>{percentText} from last month</Text>
+            <Text style={styles.trendText}>{percentText} {t('from_last_month')}</Text>
           </View>
         </View>
 
         {/* Card 2: Grey Points Redeemed Card */}
         <View style={[styles.metricCard, styles.greyCard]}>
-          <Text style={styles.metricLabelGrey}>POINTS REDEEMED</Text>
+          <Text style={styles.metricLabelGrey}>{t('points_redeemed')}</Text>
           <Text style={styles.metricValueGrey}>
             {loading ? '...' : Math.abs(totalPointsRedeemed).toLocaleString()}
           </Text>
           <Text style={styles.subtextGrey}>
-            {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} rewards claimed by customers`}
+            {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} ${t('rewards_claimed')}`}
           </Text>
         </View>
 
         {/* Card 3: Light Active Customers Card */}
         <View style={[styles.metricCard, styles.lightCard]}>
-          <Text style={styles.metricLabelLight}>ACTIVE MEMBERS</Text>
+          <Text style={styles.metricLabelLight}>{t('active_members')}</Text>
           <Text style={styles.metricValueLight}>
             {loading ? '...' : activeMembersCount.toLocaleString()}
           </Text>
@@ -497,7 +499,7 @@ export default function CustomersScreen() {
             ) : (
               <View style={styles.emptyStack}>
                 <Ionicons name="people-outline" size={14} color="#64748B" />
-                <Text style={styles.emptyStackText}>No active members</Text>
+                <Text style={styles.emptyStackText}>{t('no_active_members')}</Text>
               </View>
             )}
             {activeMembersCount > 3 && (
@@ -519,7 +521,7 @@ export default function CustomersScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  {tab}
+                  {t(tab.toLowerCase())}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -533,7 +535,7 @@ export default function CustomersScreen() {
                 style={styles.searchInput}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search Customer..."
+                placeholder={t('search_customer')}
                 placeholderTextColor="#BEC6E0"
               />
             </View>
@@ -565,9 +567,9 @@ export default function CustomersScreen() {
         <View style={styles.gridContainer}>
           {/* Table Header Row */}
           <View style={styles.tableHeader}>
-            <Text style={[styles.headerCol, styles.colDate]}>DATE & TIME</Text>
-            <Text style={[styles.headerCol, styles.colCustomer]}>CUSTOMER</Text>
-            <Text style={[styles.headerCol, styles.colType]}>TYPE</Text>
+            <Text style={[styles.headerCol, styles.colDate]}>{t('date_time')}</Text>
+            <Text style={[styles.headerCol, styles.colCustomer]}>{t('customer')}</Text>
+            <Text style={[styles.headerCol, styles.colType]}>{t('type')}</Text>
           </View>
 
           {/* Table List Rows */}
@@ -576,9 +578,9 @@ export default function CustomersScreen() {
           ) : filteredTransactions.length === 0 ? (
             <View style={styles.emptyStateCard}>
               <Ionicons name="receipt-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
-              <Text style={styles.emptyStateTitle}>No Transactions</Text>
+              <Text style={styles.emptyStateTitle}>{t('no_transactions')}</Text>
               <Text style={styles.emptyStateSubtitle}>
-                No customer transactions matched your filters.
+                {t('no_transactions_desc')}
               </Text>
             </View>
           ) : (
@@ -623,7 +625,7 @@ export default function CustomersScreen() {
                         tx.type === 'ADJUSTMENT' && styles.textAdjust,
                       ]}
                     >
-                      {tx.type}
+                      {t(tx.type.toLowerCase())}
                     </Text>
                   </View>
                 </View>
@@ -634,7 +636,9 @@ export default function CustomersScreen() {
           {/* Pagination Footer */}
           <View style={styles.tableFooter}>
             <Text style={styles.paginationText}>
-              Showing 1-{filteredTransactions.length} of {transactions.length} transactions
+              {locale === 'en'
+                ? `Showing 1-${filteredTransactions.length} of ${transactions.length} transactions`
+                : `Menunjukkan 1-${filteredTransactions.length} daripada ${transactions.length} transaksi`}
             </Text>
             <View style={styles.paginationArrows}>
               <TouchableOpacity style={styles.arrowBtn}>
@@ -659,7 +663,7 @@ export default function CustomersScreen() {
           <View style={styles.modalContent}>
             {/* Header info */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Customer Profile</Text>
+              <Text style={styles.modalTitle}>{t('customer_profile')}</Text>
               <TouchableOpacity onPress={() => setCustomerModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#000000" />
               </TouchableOpacity>
@@ -690,36 +694,36 @@ export default function CustomersScreen() {
                       <View style={styles.receiptCard}>
                         <View style={styles.receiptHeader}>
                           <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                          <Text style={styles.receiptHeaderTitle}>Redemption Details</Text>
+                          <Text style={styles.receiptHeaderTitle}>{t('redemption_details')}</Text>
                         </View>
                         <View style={styles.receiptDivider} />
                         <View style={styles.receiptRow}>
-                          <Text style={styles.receiptLabel}>Reward Item</Text>
+                          <Text style={styles.receiptLabel}>{t('reward_item')}</Text>
                           <Text style={styles.receiptValue}>
                             {customerVouchers.find(v => v.id === selectedCustomer.metadata?.voucher_id)?.expand?.reward?.name || 'Voucher Reward'}
                           </Text>
                         </View>
                         <View style={styles.receiptRow}>
-                          <Text style={styles.receiptLabel}>Voucher Code</Text>
+                          <Text style={styles.receiptLabel}>{t('voucher_code')}</Text>
                           <Text style={[styles.receiptValue, styles.receiptCodeText]}>
                             {customerVouchers.find(v => v.id === selectedCustomer.metadata?.voucher_id)?.code || 'WV-XXXX-XXXX'}
                           </Text>
                         </View>
                         <View style={styles.receiptRow}>
-                          <Text style={styles.receiptLabel}>Redeemed At</Text>
+                          <Text style={styles.receiptLabel}>{t('redeemed_at')}</Text>
                           <Text style={styles.receiptValue}>
-                            {selectedCustomer.dateTime.replace('\n', ' at ')}
+                            {selectedCustomer.dateTime.replace('\n', locale === 'en' ? ' at ' : ' pada ')}
                           </Text>
                         </View>
                       </View>
                     )}
 
                     {/* Loyalty Card Info */}
-                    <Text style={styles.sectionTitle}>STAMP CARD PROGRESS</Text>
+                    <Text style={styles.sectionTitle}>{t('stamp_card_progress')}</Text>
                     {customerCard ? (
                       <View style={styles.progCard}>
                         <View style={styles.progHeader}>
-                          <Text style={styles.progLabel}>Current Stamps</Text>
+                          <Text style={styles.progLabel}>{t('current_stamps')}</Text>
                           <Text style={styles.progValue}>
                             {customerCard.stamps_collected || 0} / 10
                           </Text>
@@ -734,22 +738,22 @@ export default function CustomersScreen() {
                           />
                         </View>
                         <View style={styles.progFooter}>
-                          <Text style={styles.completionsLabel}>Total Completions</Text>
+                          <Text style={styles.completionsLabel}>{t('total_completions')}</Text>
                           <View style={styles.completionsBadge}>
                             <Text style={styles.completionsBadgeText}>
-                              {customerCard.completions || 0} Completed
+                              {customerCard.completions || 0} {t('completed')}
                             </Text>
                           </View>
                         </View>
                       </View>
                     ) : (
                       <View style={styles.noCardBox}>
-                        <Text style={styles.noCardText}>No active stamp card started yet.</Text>
+                        <Text style={styles.noCardText}>{t('no_active_card_desc')}</Text>
                       </View>
                     )}
 
                     {/* Vouchers Section */}
-                    <Text style={styles.sectionTitle}>REWARDS & VOUCHERS</Text>
+                    <Text style={styles.sectionTitle}>{t('rewards_vouchers')}</Text>
                     {customerVouchers.length > 0 ? (
                       <View style={styles.vouchersWrap}>
                         {customerVouchers.map((v) => (
@@ -785,33 +789,33 @@ export default function CustomersScreen() {
                       </View>
                     ) : (
                       <View style={styles.noCardBox}>
-                        <Text style={styles.noCardText}>No vouchers issued for this customer.</Text>
+                        <Text style={styles.noCardText}>{t('no_vouchers_desc')}</Text>
                       </View>
                     )}
 
                     {/* Transaction History Section */}
-                    <Text style={styles.sectionTitle}>VISIT HISTORY</Text>
+                    <Text style={styles.sectionTitle}>{t('visit_history')}</Text>
                     {customerTransactions.length > 0 ? (
                       <View style={styles.txList}>
                         {customerTransactions.map((tx) => (
                           <View key={tx.id} style={styles.txRow}>
                             <View>
                               <Text style={styles.txTypeTitle}>
-                                {tx.type === 'earn' ? 'Earned Stamp' : tx.type === 'redeem' ? 'Redeemed Reward' : 'Adjustment'}
+                                {tx.type === 'earn' ? t('earned_stamp') : tx.type === 'redeem' ? t('redeemed_reward') : t('adjustment')}
                               </Text>
                               <Text style={styles.txDateText}>
-                                {new Date(tx.created).toLocaleDateString()} at {new Date(tx.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(tx.created).toLocaleDateString()} {locale === 'en' ? 'at' : 'pada'} {new Date(tx.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </Text>
                             </View>
                             <Text style={[styles.txStampsCount, tx.type === 'earn' ? { color: '#10B981' } : { color: '#EF4444' }]}>
-                              {tx.type === 'earn' ? `+${tx.stamps || 0}` : `-${tx.stamps || 0}`} Stamp{tx.stamps !== 1 ? 's' : ''}
+                              {tx.type === 'earn' ? `+${tx.stamps || 0}` : `-${tx.stamps || 0}`} {t('stamps_label')}
                             </Text>
                           </View>
                         ))}
                       </View>
                     ) : (
                       <View style={styles.noCardBox}>
-                        <Text style={styles.noCardText}>No visits logged.</Text>
+                        <Text style={styles.noCardText}>{t('no_visits_desc')}</Text>
                       </View>
                     )}
                   </View>
@@ -832,7 +836,7 @@ export default function CustomersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 32 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter by Date</Text>
+              <Text style={styles.modalTitle}>{t('filter_by_date')}</Text>
               <TouchableOpacity onPress={() => setDateModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#000000" />
               </TouchableOpacity>
@@ -840,11 +844,11 @@ export default function CustomersScreen() {
 
             <View style={styles.filterOptionsList}>
               {([
-                { label: 'All Time', value: 'All' },
-                { label: 'Today', value: 'Today' },
-                { label: 'Yesterday', value: 'Yesterday' },
-                { label: 'Last 7 Days', value: '7Days' },
-                { label: 'Last 30 Days', value: '30Days' },
+                { label: t('all_time'), value: 'All' },
+                { label: t('today'), value: 'Today' },
+                { label: t('yesterday'), value: 'Yesterday' },
+                { label: t('last_7_days'), value: '7Days' },
+                { label: t('last_30_days'), value: '30Days' },
               ] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -886,17 +890,17 @@ export default function CustomersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 32 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Sort Preferences</Text>
+              <Text style={styles.modalTitle}>{t('sort_preferences')}</Text>
               <TouchableOpacity onPress={() => setOptionsModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#000000" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.filterOptionsList}>
-              <Text style={styles.sectionTitle}>SORT BY DATE</Text>
+              <Text style={styles.sectionTitle}>{t('sort_by_date')}</Text>
               {([
-                { label: 'Newest First', value: 'newest' },
-                { label: 'Oldest First', value: 'oldest' },
+                { label: t('newest'), value: 'newest' },
+                { label: t('oldest'), value: 'oldest' },
               ] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -938,7 +942,7 @@ export default function CustomersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 32 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Export Data to CSV</Text>
+              <Text style={styles.modalTitle}>{t('export_data_csv')}</Text>
               {!isExporting && (
                 <TouchableOpacity onPress={() => setExportModalVisible(false)} style={styles.closeBtn}>
                   <Feather name="x" size={20} color="#000000" />
@@ -950,7 +954,7 @@ export default function CustomersScreen() {
               <View style={{ alignItems: 'center', marginVertical: 32, gap: 12 }}>
                 <ActivityIndicator size="large" color="#004ac6" />
                 <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', fontSize: 14 }}>
-                  Compiling CSV export file...
+                  {t('compiling_csv')}
                 </Text>
               </View>
             ) : (
@@ -965,8 +969,8 @@ export default function CustomersScreen() {
                     <Ionicons name="people-outline" size={20} color="#0b1c30" />
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.exportCardTitle}>Customer Database</Text>
-                    <Text style={styles.exportCardSub}>Includes names, phone numbers, tiers, and points balance.</Text>
+                    <Text style={styles.exportCardTitle}>{t('customer_database')}</Text>
+                    <Text style={styles.exportCardSub}>{t('customer_database_sub')}</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -980,8 +984,8 @@ export default function CustomersScreen() {
                     <Ionicons name="funnel-outline" size={20} color="#15803d" />
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.exportCardTitle}>Filtered Transactions</Text>
-                    <Text style={styles.exportCardSub}>Exports only records matching current filter settings.</Text>
+                    <Text style={styles.exportCardTitle}>{t('filtered_transactions')}</Text>
+                    <Text style={styles.exportCardSub}>{t('filtered_transactions_sub')}</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -995,8 +999,8 @@ export default function CustomersScreen() {
                     <Ionicons name="receipt-outline" size={20} color="#b45309" />
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.exportCardTitle}>All-Time Transactions</Text>
-                    <Text style={styles.exportCardSub}>Full transaction history logs including subtotal sale amounts.</Text>
+                    <Text style={styles.exportCardTitle}>{t('all_time_transactions')}</Text>
+                    <Text style={styles.exportCardSub}>{t('all_time_transactions_sub')}</Text>
                   </View>
                 </TouchableOpacity>
               </View>

@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
 
@@ -82,6 +83,7 @@ const fontColorOptions = [
 export default function MarketingScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
   const pathname = usePathname();
   const isFocused = pathname.includes('marketing');
   const { width: windowWidth } = useWindowDimensions();
@@ -704,16 +706,16 @@ export default function MarketingScreen() {
             <View style={styles.lockIconBg}>
               <Ionicons name="lock-closed" size={44} color="#EF4444" />
             </View>
-            <Text style={styles.restrictionTitle}>Store Owner Only</Text>
+            <Text style={styles.restrictionTitle}>{t('store_owner_only')}</Text>
             <Text style={styles.restrictionSubtitle}>
-              This configuration panel is restricted to the merchant store owner. Please contact your administrator to make design updates.
+              {t('store_owner_only_desc')}
             </Text>
             <TouchableOpacity
               style={styles.restrictionBtn}
               onPress={() => router.replace('/(merchant)/give' as any)}
               activeOpacity={0.9}
             >
-              <Text style={styles.restrictionBtnText}>Go Back Home</Text>
+              <Text style={styles.restrictionBtnText}>{t('go_back_home')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -731,7 +733,7 @@ export default function MarketingScreen() {
               style={styles.merchantAvatar}
             />
             <View style={styles.profileTextWrap}>
-              <Text style={styles.welcomeSub}>Welcome back</Text>
+              <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
               <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
             </View>
           </View>
@@ -749,7 +751,7 @@ export default function MarketingScreen() {
             activeOpacity={0.8}
           >
             <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]}>
-              Promotions
+              {t('promotions')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -758,7 +760,7 @@ export default function MarketingScreen() {
             activeOpacity={0.8}
           >
             <Text style={[styles.subTabText, subTab === 'broadcast' && styles.subTabTextActive]}>
-              Broadcast
+              {t('broadcast')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -768,8 +770,8 @@ export default function MarketingScreen() {
             {/* Header row with a Create Button */}
             <View style={styles.campHeaderRow}>
               <View>
-                <Text style={styles.campTitle}>Marketing Campaigns</Text>
-                <Text style={styles.campSubtitle}>Drive shop sales with multipliers and points promotions.</Text>
+                <Text style={styles.campTitle}>{t('marketing_campaigns')}</Text>
+                <Text style={styles.campSubtitle}>{t('marketing_subtitle')}</Text>
               </View>
               <TouchableOpacity 
                 style={styles.createCampBtn}
@@ -777,7 +779,7 @@ export default function MarketingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="add" size={20} color="#FFFFFF" />
-                <Text style={styles.createCampBtnText}>New</Text>
+                <Text style={styles.createCampBtnText}>{t('new_btn')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -787,15 +789,15 @@ export default function MarketingScreen() {
             ) : campaignsList.length === 0 ? (
               <View style={styles.campEmptyState}>
                 <Ionicons name="megaphone-outline" size={48} color="#94A3B8" />
-                <Text style={styles.campEmptyTitle}>No active promotions yet</Text>
+                <Text style={styles.campEmptyTitle}>{t('no_active_promotions')}</Text>
                 <Text style={styles.campEmptySub}>
-                  Launch a double points or flat bonus campaign to attract customers to your store.
+                  {t('no_promotions_desc')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.campEmptyBtn}
                   onPress={() => setCreateModalVisible(true)}
                 >
-                  <Text style={styles.campEmptyBtnText}>Create Campaign</Text>
+                  <Text style={styles.campEmptyBtnText}>{t('create_campaign')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -811,7 +813,7 @@ export default function MarketingScreen() {
                           {/* Type Badge */}
                           <View style={styles.campTypeBadge}>
                             <Text style={styles.campTypeBadgeText}>
-                              {camp.type === 'double_points' ? 'Double Points' : camp.type === 'bonus_stamps' ? 'Bonus Stamps' : camp.type === 'flat_bonus' ? 'Flat Bonus' : 'Promotion'}
+                              {t(camp.type)}
                             </Text>
                           </View>
                         </View>
@@ -823,24 +825,24 @@ export default function MarketingScreen() {
                         />
                       </View>
 
-                      <Text style={styles.campCardDesc}>{camp.description || 'No description provided.'}</Text>
+                      <Text style={styles.campCardDesc}>{camp.description || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>
 
                       {/* Details row */}
                       <View style={styles.campCardMetaRow}>
                         <View style={styles.campCardMetaCol}>
-                          <Text style={styles.campMetaLabel}>PROMOTION TYPE</Text>
+                          <Text style={styles.campMetaLabel}>{t('promotion_type')}</Text>
                           <Text style={styles.campMetaValue}>
                             {camp.type === 'double_points' 
-                              ? `${camp.multiplier || 2}x Multiplier` 
+                              ? `${camp.multiplier || 2}x ${locale === 'en' ? 'Multiplier' : 'Pengganda'}` 
                               : camp.type === 'bonus_stamps'
-                              ? `+${camp.bonus_value || 1} Stamps`
+                              ? `+${camp.bonus_value || 1} ${locale === 'en' ? 'Stamps' : 'Setem'}`
                               : camp.type === 'flat_bonus'
-                              ? `+${camp.bonus_value || 50} Points`
-                              : 'Special reward'}
+                              ? `+${camp.bonus_value || 50} ${locale === 'en' ? 'Points' : 'Mata'}`
+                              : (locale === 'en' ? 'Special reward' : 'Ganjaran khas')}
                           </Text>
                         </View>
                         <View style={styles.campCardMetaCol}>
-                          <Text style={styles.campMetaLabel}>CAMPAIGN PERIOD</Text>
+                          <Text style={styles.campMetaLabel}>{t('campaign_period')}</Text>
                           <Text style={styles.campMetaValue}>
                             {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}
                           </Text>
@@ -873,13 +875,17 @@ export default function MarketingScreen() {
                               status === 'ended' && { color: '#475569' }
                             ]}
                           >
-                            {status.toUpperCase()}
+                            {status === 'active' 
+                              ? (locale === 'en' ? 'ACTIVE' : 'AKTIF')
+                              : status === 'upcoming'
+                              ? (locale === 'en' ? 'UPCOMING' : 'AKAN DATANG')
+                              : (locale === 'en' ? 'ENDED' : 'TAMAT')}
                           </Text>
                         </View>
                         
                         {camp.max_redemptions > 0 && (
                           <Text style={styles.redemptionsCounterText}>
-                            Redemptions: {camp.current_redemptions || 0}/{camp.max_redemptions}
+                            {t('redemptions')}: {camp.current_redemptions || 0}/{camp.max_redemptions}
                           </Text>
                         )}
                       </View>
@@ -909,10 +915,14 @@ export default function MarketingScreen() {
                 <Ionicons name="warning" size={20} color="#D97706" />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                    WhatsApp Disconnected
+                    {t('whatsapp_disconnected')}
                   </Text>
                   <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#D97706', marginTop: 2 }}>
-                    Please link your store WhatsApp in your <Text style={{ textDecorationLine: 'underline', fontFamily: 'PlusJakartaSans_700Bold' }} onPress={() => router.push('/(merchant)/profile' as any)}>Profile Settings</Text> to send promotions.
+                    {locale === 'en' ? 'Please link your store WhatsApp in your ' : 'Sila pautkan WhatsApp kedai anda di '}
+                    <Text style={{ textDecorationLine: 'underline', fontFamily: 'PlusJakartaSans_700Bold' }} onPress={() => router.push('/(merchant)/profile' as any)}>
+                      {t('profile_settings')}
+                    </Text>
+                    {locale === 'en' ? ' to send promotions.' : ' untuk menghantar promosi.'}
                   </Text>
                 </View>
               </View>
@@ -926,7 +936,7 @@ export default function MarketingScreen() {
               >
                 <Ionicons name="send-outline" size={15} color={broadcastMode === 'manual' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
                 <Text style={[styles.modeSegmentBtnText, broadcastMode === 'manual' && styles.modeSegmentBtnTextActive]}>
-                  Instant Blast
+                  {t('instant_blast')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -935,7 +945,7 @@ export default function MarketingScreen() {
               >
                 <Ionicons name="time-outline" size={15} color={broadcastMode === 'automated' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
                 <Text style={[styles.modeSegmentBtnText, broadcastMode === 'automated' && styles.modeSegmentBtnTextActive]}>
-                  Auto Follow-Up
+                  {t('auto_follow_up')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -947,7 +957,7 @@ export default function MarketingScreen() {
                   {activeFollowUpParent ? (
                     <View style={styles.followUpBanner}>
                       <Text style={styles.followUpBannerText}>
-                        Replying to: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{activeFollowUpParent.title}</Text>
+                        {locale === 'en' ? 'Replying to: ' : 'Membalas kepada: '}<Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{activeFollowUpParent.title}</Text>
                       </Text>
                       <TouchableOpacity onPress={() => {
                         setActiveFollowUpParent(null);
@@ -957,18 +967,18 @@ export default function MarketingScreen() {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <Text style={styles.cardSectionTitle}>Compose Broadcast Blast</Text>
+                    <Text style={styles.cardSectionTitle}>{t('compose_broadcast')}</Text>
                   )}
                   <Text style={styles.cardSectionDesc}>
                     {activeFollowUpParent 
-                      ? 'Compose a threaded follow-up reply that will target the same customer list.'
-                      : 'Customize a promotion template or type a custom update.'}
+                      ? (locale === 'en' ? 'Compose a threaded follow-up reply that will target the same customer list.' : 'Gubal jawapan susulan berulir yang akan menyasarkan senarai pelanggan yang sama.')
+                      : t('compose_subtitle')}
                   </Text>
 
                   {/* Campaign Picker Horizontal Tags (disabled in follow-up mode) */}
                   {!activeFollowUpParent && (
                     <>
-                      <Text style={styles.inputLabelSmall}>LINK CAMPAIGN (OPTIONAL)</Text>
+                      <Text style={styles.inputLabelSmall}>{t('link_campaign')}</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagScrollGap}>
                         <TouchableOpacity
                           style={[styles.tagButton, !bCampaignId && styles.tagButtonActive]}
@@ -979,7 +989,7 @@ export default function MarketingScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <Text style={[styles.tagText, !bCampaignId && styles.tagTextActive]}>No Campaign Link</Text>
+                          <Text style={[styles.tagText, !bCampaignId && styles.tagTextActive]}>{t('no_campaign_link')}</Text>
                         </TouchableOpacity>
                         {campaignsList.map((camp) => (
                           <TouchableOpacity
@@ -999,7 +1009,7 @@ export default function MarketingScreen() {
                     </>
                   )}
 
-                  <Text style={styles.inputLabelSmall}>BROADCAST TITLE</Text>
+                  <Text style={styles.inputLabelSmall}>{t('broadcast_title')}</Text>
                   <TextInput
                     style={styles.modalTextInput}
                     value={bTitle}
@@ -1008,7 +1018,7 @@ export default function MarketingScreen() {
                     placeholderTextColor="#BEC6E0"
                   />
 
-                  <Text style={styles.inputLabelSmall}>MESSAGE BODY (TEMPLATED)</Text>
+                  <Text style={styles.inputLabelSmall}>{t('message_body')}</Text>
                   <TextInput
                     style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
                     multiline
@@ -1019,14 +1029,14 @@ export default function MarketingScreen() {
                     placeholderTextColor="#BEC6E0"
                   />
                   <Text style={styles.helperText}>
-                    Use <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{"{{name}}"}</Text> for customer name and <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{"{{stamps}}"}</Text> for stamp count.
+                    {t('template_helper_desc')}
                   </Text>
 
                   {/* Toggle WhatsApp Blast */}
                   <View style={styles.switchRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.switchLabel}>Send WhatsApp Message</Text>
-                      <Text style={styles.switchDesc}>Delivers high-engagement chats in addition to app push alerts.</Text>
+                      <Text style={styles.switchLabel}>{t('send_whatsapp_message')}</Text>
+                      <Text style={styles.switchDesc}>{t('whatsapp_blast_desc')}</Text>
                     </View>
                     <Switch
                       value={bSendWhatsApp}
@@ -1046,22 +1056,24 @@ export default function MarketingScreen() {
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <Text style={styles.saveBtnText}>
-                        {activeFollowUpParent ? 'Send Thread Follow-Up' : 'Send Broadcast Blast'}
+                        {activeFollowUpParent 
+                          ? (locale === 'en' ? 'Send Thread Follow-Up' : 'Hantar Susulan Utas')
+                          : t('send_broadcast_btn')}
                       </Text>
                     )}
                   </TouchableOpacity>
                 </View>
 
                 {/* Broadcast History Title */}
-                <Text style={styles.previewSectionHeader}>BROADCAST HISTORY</Text>
+                <Text style={styles.previewSectionHeader}>{t('broadcast_history')}</Text>
 
                 {loadingBroadcasts ? (
                   <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
                 ) : broadcastsList.length === 0 ? (
                   <View style={styles.campEmptyState}>
                     <Ionicons name="megaphone-outline" size={40} color="#94A3B8" />
-                    <Text style={styles.campEmptyTitle}>No broadcasts sent yet</Text>
-                    <Text style={styles.campEmptySub}>Link your WhatsApp and send your first promotional blast!</Text>
+                    <Text style={styles.campEmptyTitle}>{t('no_broadcasts_sent')}</Text>
+                    <Text style={styles.campEmptySub}>{t('no_broadcasts_desc')}</Text>
                   </View>
                 ) : (
                   <View style={styles.campList}>
@@ -1075,19 +1087,21 @@ export default function MarketingScreen() {
                               <View style={{ gap: 4, flex: 1 }}>
                                 <Text style={styles.campCardName}>{bc.title}</Text>
                                 <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                                  Sent on {new Date(bc.created).toLocaleString()}
+                                  {locale === 'en' ? 'Sent on ' : 'Dihantar pada '}{new Date(bc.created).toLocaleString()}
                                 </Text>
                               </View>
                               <View style={[styles.statusDotBadge, { backgroundColor: '#ECFDF5' }]}>
                                 <Text style={[styles.statusDotText, { color: '#047857' }]}>
-                                  {bc.recipients_count || 0} RECIPIENTS
+                                  {bc.recipients_count || 0} {t('recipients')}
                                 </Text>
                               </View>
                             </View>
                             <Text style={styles.campCardDesc}>{bc.message}</Text>
                             {bc.expand?.campaign && (
                               <View style={[styles.campTypeBadge, { marginTop: 4 }]}>
-                                <Text style={styles.campTypeBadgeText}>Linked Promo: {bc.expand.campaign.name}</Text>
+                                <Text style={styles.campTypeBadgeText}>
+                                  {locale === 'en' ? 'Linked Promo: ' : 'Promosi Dipautkan: '}{bc.expand.campaign.name}
+                                </Text>
                               </View>
                             )}
 
@@ -1101,7 +1115,7 @@ export default function MarketingScreen() {
                               activeOpacity={0.8}
                             >
                               <Ionicons name={"reply-outline" as any} size={14} color="#000000" style={{ marginRight: 4 }} />
-                              <Text style={styles.followUpBtnText}>Follow Up</Text>
+                              <Text style={styles.followUpBtnText}>{t('follow_up')}</Text>
                             </TouchableOpacity>
                           </View>
 
@@ -1114,12 +1128,12 @@ export default function MarketingScreen() {
                                   <View style={{ gap: 2, flex: 1 }}>
                                     <Text style={styles.replyCardName}>{reply.title}</Text>
                                     <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                                      Follow-up on {new Date(reply.created).toLocaleString()}
+                                      {t('follow_up_on')} {new Date(reply.created).toLocaleString()}
                                     </Text>
                                   </View>
                                   <View style={[styles.statusDotBadge, { backgroundColor: '#F1F5F9' }]}>
                                     <Text style={[styles.statusDotText, { color: '#475569', fontSize: 9 }]}>
-                                      {reply.recipients_count || 0} RECIPIENTS
+                                      {reply.recipients_count || 0} {t('recipients')}
                                     </Text>
                                   </View>
                                 </View>
@@ -1140,14 +1154,14 @@ export default function MarketingScreen() {
                 {/* Compose Automation Rule */}
                 <View style={styles.configCard}>
                   <Text style={styles.cardSectionTitle}>
-                    {selectedAutomation ? 'Edit Retention Follow-Up Rule' : 'Automated Win-Back Follow-Up'}
+                    {selectedAutomation ? t('edit_automation_rule') : t('automated_winback')}
                   </Text>
                   <Text style={styles.cardSectionDesc}>
-                    Automatically alert customers after they are inactive for a set number of days since their last visit/stamp.
+                    {t('automation_desc')}
                   </Text>
 
                   {/* Trigger Days Selection */}
-                  <Text style={styles.inputLabelSmall}>TRIGGER DELAY INACTIVITY</Text>
+                  <Text style={styles.inputLabelSmall}>{t('trigger_delay')}</Text>
                   <View style={styles.triggerDaysRow}>
                     {['3', '7', '14', '30'].map((day) => (
                       <TouchableOpacity
@@ -1163,13 +1177,13 @@ export default function MarketingScreen() {
                           styles.triggerDayBtnText,
                           arTriggerDays === day && styles.triggerDayBtnTextActive
                         ]}>
-                          {day} Days
+                          {day} {t('days')}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
 
-                  <Text style={styles.inputLabelSmall}>RULE NAME</Text>
+                  <Text style={styles.inputLabelSmall}>{t('rule_name')}</Text>
                   <TextInput
                     style={styles.modalTextInput}
                     value={arName}
@@ -1178,7 +1192,7 @@ export default function MarketingScreen() {
                     placeholderTextColor="#BEC6E0"
                   />
 
-                  <Text style={styles.inputLabelSmall}>MESSAGE TITLE</Text>
+                  <Text style={styles.inputLabelSmall}>{t('message_title')}</Text>
                   <TextInput
                     style={styles.modalTextInput}
                     value={arTitle}
@@ -1187,25 +1201,25 @@ export default function MarketingScreen() {
                     placeholderTextColor="#BEC6E0"
                   />
 
-                  <Text style={styles.inputLabelSmall}>MESSAGE BODY (TEMPLATED)</Text>
+                  <Text style={styles.inputLabelSmall}>{t('message_body')}</Text>
                   <TextInput
                     style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
                     multiline
                     numberOfLines={4}
                     value={arMessage}
                     onChangeText={setArMessage}
-                    placeholder="Use {{name}} and {{stamps}} tags..."
+                    placeholder={locale === 'en' ? "Use {{name}} and {{stamps}} tags..." : "Gunakan tag {{name}} dan {{stamps}}..."}
                     placeholderTextColor="#BEC6E0"
                   />
                   <Text style={styles.helperText}>
-                    Use <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{"{{name}}"}</Text> for customer name and <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{"{{stamps}}"}</Text> for collected stamps count.
+                    {t('template_helper_desc')}
                   </Text>
 
                   {/* Toggle WhatsApp Blast */}
                   <View style={styles.switchRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.switchLabel}>Send via WhatsApp</Text>
-                      <Text style={styles.switchDesc}>Delivers notification directly to client WhatsApp when triggered.</Text>
+                      <Text style={styles.switchLabel}>{t('send_via_whatsapp')}</Text>
+                      <Text style={styles.switchDesc}>{t('whatsapp_automation_desc')}</Text>
                     </View>
                     <Switch
                       value={arSendWhatsApp}
@@ -1225,7 +1239,7 @@ export default function MarketingScreen() {
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <Text style={styles.saveBtnText}>
-                        {selectedAutomation ? 'Update Rule' : 'Activate Automation Rule'}
+                        {selectedAutomation ? t('update_rule') : t('activate_rule')}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -1242,22 +1256,22 @@ export default function MarketingScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 13, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>
-                        Cancel Edit
+                        {t('cancel_edit')}
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
 
                 {/* Automation Rules List */}
-                <Text style={styles.previewSectionHeader}>ACTIVE AUTOMATION RULES</Text>
+                <Text style={styles.previewSectionHeader}>{t('active_automation_rules')}</Text>
 
                 {loadingRules ? (
                   <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
                 ) : automationRules.length === 0 ? (
                   <View style={styles.campEmptyState}>
                     <Ionicons name="time-outline" size={40} color="#94A3B8" />
-                    <Text style={styles.campEmptyTitle}>No automation rules yet</Text>
-                    <Text style={styles.campEmptySub}>Define your first rule above to automatically follow up on inactive customers.</Text>
+                    <Text style={styles.campEmptyTitle}>{t('no_automation_rules')}</Text>
+                    <Text style={styles.campEmptySub}>{t('no_automation_desc')}</Text>
                   </View>
                 ) : (
                   <View style={styles.campList}>
@@ -1267,7 +1281,7 @@ export default function MarketingScreen() {
                           <View style={{ gap: 4, flex: 1 }}>
                             <Text style={styles.campCardName}>{rule.name}</Text>
                             <Text style={{ fontSize: 11, color: '#475569', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                              Trigger: {rule.trigger_days} Days Inactive
+                              {t('trigger_label')}: {rule.trigger_days} {t('days_inactive')}
                             </Text>
                           </View>
                           <Switch
@@ -1278,7 +1292,7 @@ export default function MarketingScreen() {
                           />
                         </View>
                         <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginTop: 4 }}>
-                          Subject: {rule.title}
+                          {t('subject')}: {rule.title}
                         </Text>
                         <Text style={styles.campCardDesc}>{rule.message}</Text>
                         
@@ -1295,7 +1309,7 @@ export default function MarketingScreen() {
                             }}
                           >
                             <Feather name="edit-2" size={13} color="#475569" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Edit</Text>
+                            <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('edit')}</Text>
                           </TouchableOpacity>
 
                           <TouchableOpacity
@@ -1303,7 +1317,7 @@ export default function MarketingScreen() {
                             onPress={() => handleDeleteAutomationRule(rule.id)}
                           >
                             <Feather name="trash-2" size={13} color="#EF4444" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Delete</Text>
+                            <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('delete')}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1326,7 +1340,7 @@ export default function MarketingScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: '85%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Launch Campaign</Text>
+              <Text style={styles.modalTitle}>{t('launch_campaign')}</Text>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#000000" />
               </TouchableOpacity>
@@ -1335,12 +1349,12 @@ export default function MarketingScreen() {
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
               <View style={styles.modalFormBody}>
                 {/* Form fields */}
-                <Text style={styles.modalInputLabel}>CAMPAIGN NAME</Text>
+                <Text style={styles.modalInputLabel}>{t('campaign_name')}</Text>
                 <TextInput
                   style={styles.modalTextInput}
                   value={cName}
                   onChangeText={setCName}
-                  placeholder="e.g. Double Points Weekend, Autumn Festival"
+                  placeholder={locale === 'en' ? "e.g. Double Points Weekend, Autumn Festival" : "cth. Hujung Minggu Mata Berganda, Pesta Musim Luruh"}
                   placeholderTextColor="#BEC6E0"
                   {...Platform.select({
                     web: {
@@ -1349,13 +1363,13 @@ export default function MarketingScreen() {
                   })}
                 />
 
-                <Text style={styles.modalInputLabel}>DESCRIPTION</Text>
+                <Text style={styles.modalInputLabel}>{t('description')}</Text>
                 <TextInput
                   style={[styles.modalTextInput, { height: 72, textAlignVertical: 'top' }]}
                   multiline
                   value={cDesc}
                   onChangeText={setCDesc}
-                  placeholder="Describe the campaign terms to your customers..."
+                  placeholder={locale === 'en' ? "Describe the campaign terms to your customers..." : "Terangkan syarat-syarat kempen kepada pelanggan anda..."}
                   placeholderTextColor="#BEC6E0"
                   {...Platform.select({
                     web: {
@@ -1364,12 +1378,12 @@ export default function MarketingScreen() {
                   })}
                 />
 
-                <Text style={styles.modalInputLabel}>PROMOTION TYPE</Text>
+                <Text style={styles.modalInputLabel}>{t('promotion_type')}</Text>
                 <View style={styles.segmentRow}>
                   {([
-                    { label: 'Double Points', value: 'double_points' },
-                    { label: 'Flat Bonus', value: 'flat_bonus' },
-                    { label: 'Bonus Stamps', value: 'bonus_stamps' },
+                    { label: t('double_points'), value: 'double_points' },
+                    { label: t('flat_bonus'), value: 'flat_bonus' },
+                    { label: t('bonus_stamps'), value: 'bonus_stamps' },
                   ] as const).map((opt) => (
                     <TouchableOpacity
                       key={opt.value}
@@ -1397,12 +1411,12 @@ export default function MarketingScreen() {
                 {/* Conditional Fields */}
                 {cType === 'double_points' && (
                   <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>POINT MULTIPLIER</Text>
+                    <Text style={styles.modalInputLabel}>{t('point_multiplier')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
                       value={cCMultiplier}
                       onChangeText={setCMultiplier}
-                      placeholder="e.g. 2 for 2x points"
+                      placeholder={locale === 'en' ? "e.g. 2 for 2x points" : "cth. 2 untuk 2x mata"}
                       placeholderTextColor="#BEC6E0"
                       keyboardType="numeric"
                       {...Platform.select({
@@ -1416,12 +1430,12 @@ export default function MarketingScreen() {
 
                 {cType === 'flat_bonus' && (
                   <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>FLAT POINTS VALUE</Text>
+                    <Text style={styles.modalInputLabel}>{t('flat_points_value')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
                       value={cBonusValue}
                       onChangeText={setCBonusValue}
-                      placeholder="e.g. 50 bonus points"
+                      placeholder={locale === 'en' ? "e.g. 50 bonus points" : "cth. 50 mata bonus"}
                       placeholderTextColor="#BEC6E0"
                       keyboardType="number-pad"
                       {...Platform.select({
@@ -1435,12 +1449,12 @@ export default function MarketingScreen() {
 
                 {cType === 'bonus_stamps' && (
                   <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>BONUS STAMPS AWARDED</Text>
+                    <Text style={styles.modalInputLabel}>{t('bonus_stamps_awarded')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
                       value={cBonusValue}
                       onChangeText={setCBonusValue}
-                      placeholder="e.g. 1 bonus stamp"
+                      placeholder={locale === 'en' ? "e.g. 1 bonus stamp" : "cth. 1 setem bonus"}
                       placeholderTextColor="#BEC6E0"
                       keyboardType="number-pad"
                       {...Platform.select({
@@ -1455,7 +1469,7 @@ export default function MarketingScreen() {
                 {/* Dates selection */}
                 <View style={styles.datesRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalInputLabel}>START DATE</Text>
+                    <Text style={styles.modalInputLabel}>{t('start_date')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
                       value={cStartDate}
@@ -1470,7 +1484,7 @@ export default function MarketingScreen() {
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalInputLabel}>END DATE</Text>
+                    <Text style={styles.modalInputLabel}>{t('end_date')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
                       value={cEndDate}
@@ -1486,12 +1500,12 @@ export default function MarketingScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.modalInputLabel}>MAX REDEMPTIONS (OPTIONAL)</Text>
+                <Text style={styles.modalInputLabel}>{t('max_redemptions')}</Text>
                 <TextInput
                   style={styles.modalTextInput}
                   value={cMaxRedemptions}
                   onChangeText={setCMaxRedemptions}
-                  placeholder="Unlimited if left empty"
+                  placeholder={t('unlimited_placeholder')}
                   placeholderTextColor="#BEC6E0"
                   keyboardType="number-pad"
                   {...Platform.select({
@@ -1510,7 +1524,7 @@ export default function MarketingScreen() {
                   {isCreatingCampaign ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.saveBtnText}>Launch Promotion</Text>
+                    <Text style={styles.saveBtnText}>{t('launch_promotion_btn')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

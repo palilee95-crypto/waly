@@ -19,6 +19,7 @@ import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface StaffMember {
   id: string;
@@ -32,6 +33,7 @@ interface StaffMember {
 export default function StaffManagementScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -60,8 +62,8 @@ export default function StaffManagementScreen() {
       setStaff(data as StaffMember[]);
     } catch (err: any) {
       console.warn("Failed to fetch staff:", err.message || err);
-      setWarningTitle("Failed to Load Staff");
-      setWarningMessage(err.response?.message || err.data?.message || err.message || "Failed to load staff list.");
+      setWarningTitle(locale === 'en' ? "Failed to Load Staff" : "Gagal Memuatkan Kakitangan");
+      setWarningMessage(err.response?.message || err.data?.message || err.message || (locale === 'en' ? "Failed to load staff list." : "Gagal memuatkan senarai kakitangan."));
       setWarningModalVisible(true);
     } finally {
       setLoading(false);
@@ -75,7 +77,10 @@ export default function StaffManagementScreen() {
   const handleAddStaff = async () => {
     const cleanPhone = phoneInput.trim();
     if (!cleanPhone) {
-      Alert.alert("Validation Error", "Please enter a phone number.");
+      Alert.alert(
+        locale === 'en' ? "Validation Error" : "Ralat Pengesahan", 
+        locale === 'en' ? "Please enter a phone number." : "Sila masukkan nombor telefon."
+      );
       return;
     }
 
@@ -89,12 +94,15 @@ export default function StaffManagementScreen() {
         }
       });
       setPhoneInput('');
-      Alert.alert("Success", "Staff member added successfully!");
+      Alert.alert(
+        locale === 'en' ? "Success" : "Berjaya", 
+        locale === 'en' ? "Staff member added successfully!" : "Kakitangan berjaya ditambah!"
+      );
       fetchStaff();
     } catch (err: any) {
       console.warn("Failed to add staff member:", err.response || err);
-      setWarningTitle("Operation Blocked");
-      setWarningMessage(err.response?.message || err.data?.message || err.message || "Failed to add staff member.");
+      setWarningTitle(locale === 'en' ? "Operation Blocked" : "Operasi Disekat");
+      setWarningMessage(err.response?.message || err.data?.message || err.message || (locale === 'en' ? "Failed to add staff member." : "Gagal menambah kakitangan."));
       setWarningModalVisible(true);
     } finally {
       setIsAdding(false);
@@ -119,12 +127,15 @@ export default function StaffManagementScreen() {
       });
       setRemoveModalVisible(false);
       setSelectedStaff(null);
-      Alert.alert("Success", "Staff member removed successfully.");
+      Alert.alert(
+        locale === 'en' ? "Success" : "Berjaya", 
+        locale === 'en' ? "Staff member removed successfully." : "Kakitangan berjaya dialih keluar."
+      );
       fetchStaff();
     } catch (err: any) {
       console.warn("Failed to remove staff member:", err.response || err);
-      setWarningTitle("Failed to Remove Staff");
-      setWarningMessage(err.response?.message || err.data?.message || err.message || "Failed to remove staff member.");
+      setWarningTitle(locale === 'en' ? "Failed to Remove Staff" : "Gagal Mengalih Keluar Kakitangan");
+      setWarningMessage(err.response?.message || err.data?.message || err.message || (locale === 'en' ? "Failed to remove staff member." : "Gagal mengalih keluar kakitangan."));
       setWarningModalVisible(true);
     } finally {
       setIsRemoving(false);
@@ -145,7 +156,7 @@ export default function StaffManagementScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Staff</Text>
+        <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -154,14 +165,14 @@ export default function StaffManagementScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.sectionSubtitle}>
-          Authorize staff members to manage your store, issue stamps, and process reward redemptions.
+          {t('manage_staff_desc')}
         </Text>
 
         {/* Add Staff Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Add Staff Member</Text>
+          <Text style={styles.cardTitle}>{t('invite_staff')}</Text>
           <Text style={styles.cardSubtitle}>
-            Enter the customer's phone number to invite them as staff. They must already have an account on the Customer App.
+            {t('add_staff_desc')}
           </Text>
           <View style={styles.formRow}>
             <TextInput
@@ -187,7 +198,7 @@ export default function StaffManagementScreen() {
               ) : (
                 <>
                   <Ionicons name="add" size={20} color="#FFFFFF" />
-                  <Text style={styles.addBtnText}>Add</Text>
+                  <Text style={styles.addBtnText}>{t('add_btn_label')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -195,7 +206,7 @@ export default function StaffManagementScreen() {
         </View>
 
         {/* Active Staff List */}
-        <Text style={styles.sectionHeader}>Active Staff ({staff.length})</Text>
+        <Text style={styles.sectionHeader}>{t('active_staff')} ({staff.length})</Text>
 
         {loading ? (
           <View style={styles.loaderContainer}>
@@ -206,9 +217,9 @@ export default function StaffManagementScreen() {
             <View style={styles.emptyIconBg}>
               <Ionicons name="people-outline" size={32} color="#64748B" />
             </View>
-            <Text style={styles.emptyTitle}>No Staff Added Yet</Text>
+            <Text style={styles.emptyTitle}>{t('no_staff')}</Text>
             <Text style={styles.emptySubtitle}>
-              You currently manage this store alone. Use the form above to add your cashiers or branch managers.
+              {t('no_staff_desc')}
             </Text>
           </View>
         ) : (
@@ -246,9 +257,11 @@ export default function StaffManagementScreen() {
             <View style={styles.modalIconBg}>
               <Ionicons name="warning-outline" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Remove Staff Member</Text>
+            <Text style={styles.modalTitle}>{t('remove_staff')}</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to remove {selectedStaff?.name} from your store staff? They will immediately lose access to the merchant console.
+              {locale === 'en'
+                ? `Are you sure you want to remove ${selectedStaff?.name} from your store staff? They will immediately lose access to the merchant console.`
+                : `Adakah anda pasti mahu mengalih keluar ${selectedStaff?.name} daripada kakitangan kedai anda? Mereka akan kehilangan akses ke konsol peniaga dengan serta-merta.`}
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
@@ -257,7 +270,7 @@ export default function StaffManagementScreen() {
                 disabled={isRemoving}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
@@ -268,7 +281,7 @@ export default function StaffManagementScreen() {
                 {isRemoving ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Remove</Text>
+                  <Text style={styles.modalConfirmText}>{locale === 'en' ? 'Remove' : 'Alih Keluar'}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -296,7 +309,7 @@ export default function StaffManagementScreen() {
                 onPress={() => setWarningModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.dismissBtnText}>Dismiss</Text>
+                <Text style={styles.dismissBtnText}>{locale === 'en' ? 'Dismiss' : 'Tolak'}</Text>
               </TouchableOpacity>
             </View>
           </View>

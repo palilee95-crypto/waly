@@ -19,6 +19,7 @@ import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icon
 import { pb } from '@/lib/pocketbase';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 // Existing Catalogue Reward Interface
 interface Reward {
@@ -90,6 +91,7 @@ const fontColorOptions = [
 export default function UnifiedRewardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -329,11 +331,11 @@ export default function UnifiedRewardsScreen() {
 
   const getRewardTypeLabel = (type: string) => {
     switch (type) {
-      case 'free_item': return 'Free Item';
-      case 'discount': return 'Discount';
-      case 'experience': return 'Experience';
-      case 'cash_credit': return 'Cash Credit';
-      default: return 'Reward';
+      case 'free_item': return t('free_item');
+      case 'discount': return t('discount');
+      case 'experience': return t('experience');
+      case 'cash_credit': return t('cash_credit');
+      default: return t('reward');
     }
   };
 
@@ -502,16 +504,16 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.lockIconBg}>
               <Ionicons name="lock-closed" size={44} color="#EF4444" />
             </View>
-            <Text style={styles.restrictionTitle}>Store Owner Only</Text>
+            <Text style={styles.restrictionTitle}>{t('store_owner_only')}</Text>
             <Text style={styles.restrictionSubtitle}>
-              This configuration panel is restricted to the merchant store owner. Please contact your administrator to make design updates.
+              {t('store_owner_only_desc')}
             </Text>
             <TouchableOpacity
               style={styles.restrictionBtn}
               onPress={() => router.replace('/(merchant)/give' as any)}
               activeOpacity={0.9}
             >
-              <Text style={styles.restrictionBtnText}>Go Back Home</Text>
+              <Text style={styles.restrictionBtnText}>{t('go_back_home')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -522,7 +524,7 @@ export default function UnifiedRewardsScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color="#000000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Loyalty Settings</Text>
+        <Text style={styles.headerTitle}>{t('loyalty_settings')}</Text>
         {activeTab === 'catalogue' ? (
           <TouchableOpacity style={styles.addBtn} onPress={handleOpenCreate} activeOpacity={0.8}>
             <Ionicons name="add" size={22} color="#FFFFFF" />
@@ -538,9 +540,9 @@ export default function UnifiedRewardsScreen() {
       >
         {/* Intro */}
         <View style={styles.introSection}>
-          <Text style={styles.screenTitle}>Rewards & Loyalty Setup</Text>
+          <Text style={styles.screenTitle}>{t('rewards_loyalty_setup')}</Text>
           <Text style={styles.screenSubtitle}>
-            Configure your customer loyalty experience, visual card details, point rules, and catalog items.
+            {t('rewards_loyalty_setup_desc')}
           </Text>
         </View>
 
@@ -552,7 +554,7 @@ export default function UnifiedRewardsScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.tabBtnText, activeTab === 'catalogue' && styles.tabBtnTextActive]}>
-              Catalogue
+              {t('catalogue_tab')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -561,7 +563,7 @@ export default function UnifiedRewardsScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.tabBtnText, activeTab === 'card_design' && styles.tabBtnTextActive]}>
-              Card Design
+              {t('card_design_tab')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -570,7 +572,7 @@ export default function UnifiedRewardsScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
-        Points & Tiers
+              {t('points_tiers_tab')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -586,12 +588,12 @@ export default function UnifiedRewardsScreen() {
                 <View style={styles.emptyIconBg}>
                   <Ionicons name="gift-outline" size={48} color="#94A3B8" />
                 </View>
-                <Text style={styles.emptyTitle}>Catalogue is Empty</Text>
+                <Text style={styles.emptyTitle}>{t('catalogue_empty')}</Text>
                 <Text style={styles.emptySubtitle}>
-                  You haven't added any rewards for your customers to redeem yet. Click the "+" button in the top right to create your first reward!
+                  {t('catalogue_empty_desc')}
                 </Text>
                 <TouchableOpacity style={styles.createFirstBtn} onPress={handleOpenCreate} activeOpacity={0.8}>
-                  <Text style={styles.createFirstText}>Add First Reward</Text>
+                  <Text style={styles.createFirstText}>{t('add_first_reward')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -614,20 +616,20 @@ export default function UnifiedRewardsScreen() {
                             </View>
                             <View style={[styles.statusBadge, { backgroundColor: reward.is_active ? '#E8F5E9' : '#F1F5F9' }]}>
                               <Text style={[styles.statusBadgeText, { color: reward.is_active ? '#10B981' : '#64748B' }]}>
-                                {reward.is_active ? 'Active' : 'Draft'}
+                                {reward.is_active ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Draft' : 'Deraf')}
                               </Text>
                             </View>
                           </View>
 
                           <Text style={styles.rewardTitle} numberOfLines={1}>{reward.name}</Text>
-                          <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || 'No description provided.'}</Text>
+                          <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>
                           
                           <View style={styles.rewardFooterRow}>
                             <View style={styles.pointsCostContainer}>
                               <Ionicons name="gift" size={14} color="#10B981" />
-                              <Text style={styles.pointsCostText}>{reward.points_cost} Pts</Text>
+                              <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
                             </View>
-                            <Text style={styles.stockText}>Stock: {reward.stock || '0'}</Text>
+                            <Text style={styles.stockText}>{locale === 'en' ? 'Stock' : 'Stok'}: {reward.stock || '0'}</Text>
                           </View>
                         </View>
 
@@ -654,9 +656,9 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.cardSectionTitle}>Enable Loyalty Program</Text>
+                  <Text style={styles.cardSectionTitle}>{t('enable_loyalty_program')}</Text>
                   <Text style={styles.cardSectionDesc}>
-                    Instantly activate or pause this loyalty stamp program for your shop.
+                    {t('enable_loyalty_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -670,9 +672,9 @@ export default function UnifiedRewardsScreen() {
 
             {/* Stamps Goal selector */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Total Stamps Required</Text>
+              <Text style={styles.cardSectionTitle}>{t('total_stamps_required')}</Text>
               <Text style={styles.cardSectionDesc}>
-                Set the number of stamp collections milestones for voucher completion.
+                {t('total_stamps_desc')}
               </Text>
               <View style={styles.segmentRow}>
                 {[5, 10, 15].map((num) => (
@@ -691,7 +693,7 @@ export default function UnifiedRewardsScreen() {
                         requiredStamps === num && styles.segmentTextActive,
                       ]}
                     >
-                      {num} Stamps
+                      {num} {locale === 'en' ? 'Stamps' : 'Setem'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -700,7 +702,7 @@ export default function UnifiedRewardsScreen() {
 
             {/* Card Background Color Selector */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Card Background Color</Text>
+              <Text style={styles.cardSectionTitle}>{t('card_bg_color')}</Text>
               <View style={styles.colorRow}>
                 {colorOptions.map((opt) => {
                   const isSelected = cardColor === opt.value;
@@ -730,7 +732,7 @@ export default function UnifiedRewardsScreen() {
               </View>
 
               <View style={styles.hexInputContainer}>
-                <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+                <Text style={styles.hexInputLabel}>{t('custom_hex_code')}</Text>
                 <View style={styles.hexInputWrapper}>
                   <Text style={styles.hexHashSymbol}>#</Text>
                   <TextInput
@@ -752,7 +754,7 @@ export default function UnifiedRewardsScreen() {
 
             {/* Collected Stamp Slots Color Selector */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Collected Stamp Slots Color</Text>
+              <Text style={styles.cardSectionTitle}>{t('collected_slots_color')}</Text>
               <View style={styles.colorRow}>
                 {stampColorOptions.map((opt) => {
                   const isSelected = stampColor === opt.value;
@@ -782,7 +784,7 @@ export default function UnifiedRewardsScreen() {
               </View>
 
               <View style={styles.hexInputContainer}>
-                <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+                <Text style={styles.hexInputLabel}>{t('custom_hex_code')}</Text>
                 <View style={styles.hexInputWrapper}>
                   <Text style={styles.hexHashSymbol}>#</Text>
                   <TextInput
@@ -804,7 +806,7 @@ export default function UnifiedRewardsScreen() {
 
             {/* Stamp Card Font Color Selector */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Select Card Text Color</Text>
+              <Text style={styles.cardSectionTitle}>{t('select_card_text_color')}</Text>
               <View style={styles.colorRow}>
                 {fontColorOptions.map((opt) => {
                   const isSelected = fontColor === opt.value;
@@ -835,7 +837,7 @@ export default function UnifiedRewardsScreen() {
               </View>
 
               <View style={styles.hexInputContainer}>
-                <Text style={styles.hexInputLabel}>Custom Hex Code</Text>
+                <Text style={styles.hexInputLabel}>{t('custom_hex_code')}</Text>
                 <View style={styles.hexInputWrapper}>
                   <Text style={styles.hexHashSymbol}>#</Text>
                   <TextInput
@@ -857,9 +859,9 @@ export default function UnifiedRewardsScreen() {
 
             {/* Custom Stamp Icons Picker */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Stamp Check Icon</Text>
+              <Text style={styles.cardSectionTitle}>{t('stamp_check_icon')}</Text>
               <Text style={styles.cardSectionDesc}>
-                Choose the visual checkmark symbol displayed inside earned stamp slots.
+                {t('stamp_check_desc')}
               </Text>
               <View style={styles.iconsGrid}>
                 {stampIcons.map((icon) => (
@@ -888,9 +890,9 @@ export default function UnifiedRewardsScreen() {
 
             {/* Custom Background Image Uploader */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Custom Background Image</Text>
+              <Text style={styles.cardSectionTitle}>{t('custom_bg_image')}</Text>
               <Text style={styles.cardSectionDesc}>
-                Upload a landscape brand image overlay for your card back. Recommended: 800x450, max 2MB.
+                {t('custom_bg_desc')}
               </Text>
               <View style={styles.bgUploadRow}>
                 {bgImage ? (
@@ -915,7 +917,7 @@ export default function UnifiedRewardsScreen() {
                     activeOpacity={0.8}
                   >
                     <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                    <Text style={styles.bgUploadBtnText}>Upload Card Image</Text>
+                    <Text style={styles.bgUploadBtnText}>{t('upload_card_image')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -923,30 +925,30 @@ export default function UnifiedRewardsScreen() {
 
             {/* Expiry & Milestone Reward in one card */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Card Settings</Text>
+              <Text style={styles.cardSectionTitle}>{t('card_settings')}</Text>
 
-              <Text style={styles.settingsLabel}>Card expiration (days)</Text>
+              <Text style={styles.settingsLabel}>{t('card_expiration_days')}</Text>
               <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused]}>
                 <TextInput
                   style={styles.nestedTextInput}
                   value={expiryDays}
                   onChangeText={setExpiryDays}
                   keyboardType="number-pad"
-                  placeholder="e.g. 30"
+                  placeholder={locale === 'en' ? "e.g. 30" : "cth. 30"}
                   placeholderTextColor="#94A3B8"
                   onFocus={() => setExpiryFocused(true)}
                   onBlur={() => setExpiryFocused(false)}
                 />
-                <Text style={styles.inputSuffix}>Days</Text>
+                <Text style={styles.inputSuffix}>{t('days')}</Text>
               </View>
 
-              <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Stamp completion reward description</Text>
+              <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('stamp_completion_desc')}</Text>
               <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }]}>
                 <TextInput
                   style={styles.nestedTextInputMultiline}
                   value={rewardDesc}
                   onChangeText={setRewardDesc}
-                  placeholder="e.g. One Free Double Cheeseburger"
+                  placeholder={locale === 'en' ? "e.g. One Free Double Cheeseburger" : "cth. Satu Burger Keju Ganda Percuma"}
                   placeholderTextColor="#94A3B8"
                   multiline
                   onFocus={() => setRewardFocused(true)}
@@ -956,7 +958,7 @@ export default function UnifiedRewardsScreen() {
             </View>
 
             {/* Live Visual Preview Header */}
-            <Text style={styles.previewSectionHeader}>LIVE PREVIEW CARD</Text>
+            <Text style={styles.previewSectionHeader}>{t('live_preview_card')}</Text>
 
             {/* Card preview — mirrors customer Stamp Card Details modal exactly */}
             <View style={[styles.liveCardPreview, { backgroundColor: cardColor }]}>
@@ -968,14 +970,14 @@ export default function UnifiedRewardsScreen() {
               <View style={styles.cardPreviewHeader}>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={[styles.prevLargeCardMerchant, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                    {merchant?.name || 'Your Shop'}
+                    {merchant?.name || (locale === 'en' ? 'Your Shop' : 'Kedai Anda')}
                   </Text>
                   <Text style={[styles.prevLargeCardCategory, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                    {(merchant?.category || 'FOOD').toUpperCase()}
+                    {(merchant?.category || (locale === 'en' ? 'FOOD' : 'MAKANAN')).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.prevGoldBadge}>
-                  <Text style={[styles.prevGoldBadgeText, { color: fontColor || '#FFFFFF' }]}>LOYALTY CARD</Text>
+                  <Text style={[styles.prevGoldBadgeText, { color: fontColor || '#FFFFFF' }]}>{t('loyalty_card_upper')}</Text>
                 </View>
               </View>
 
@@ -995,17 +997,17 @@ export default function UnifiedRewardsScreen() {
               {/* Footer: CARD HOLDER | VALID | CVV | brand badge */}
               <View style={styles.cardBottomRow}>
                 <View style={styles.holderBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>CARD HOLDER</Text>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('card_holder')}</Text>
                   <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                    {(user?.name || 'MERCHANT').toUpperCase()}
+                    {(user?.name || (locale === 'en' ? 'MERCHANT' : 'PENIAGA')).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.validBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>VALID</Text>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('valid')}</Text>
                   <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>12/30</Text>
                 </View>
                 <View style={styles.cvvBlock}>
-                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>CVV</Text>
+                  <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('cvv')}</Text>
                   <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>888</Text>
                 </View>
                 {/* Brand badge: mastercard circles + stamp count */}
@@ -1015,7 +1017,7 @@ export default function UnifiedRewardsScreen() {
                     <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
                   </View>
                   <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.9, fontSize: 9 }]}>
-                    3/{requiredStamps} STAMPS
+                    3/{requiredStamps} {locale === 'en' ? 'STAMPS' : 'SETEM'}
                   </Text>
                 </View>
               </View>
@@ -1031,7 +1033,7 @@ export default function UnifiedRewardsScreen() {
               {isSavingCard ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.saveSubmitBtnText}>Save Card Configuration</Text>
+                <Text style={styles.saveSubmitBtnText}>{t('save_card_config')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1045,36 +1047,35 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.configCard}>
               <View style={styles.pointsRuleHeader}>
                 <Ionicons name="star-outline" size={24} color="#10B981" />
-                <Text style={styles.ruleSectionTitle}>How Your Customers Earn Points</Text>
+                <Text style={styles.ruleSectionTitle}>{t('how_points_work')}</Text>
               </View>
               <Text style={styles.pointsRuleText}>
-                Every time a customer pays at your shop, they earn loyalty points based on how much they spend.
+                {t('how_points_work_desc')}
               </Text>
 
               {/* Visual formula */}
               <View style={styles.formulaBox}>
-                <Text style={styles.formulaText}>RM 1 spent = 1 Point</Text>
+                <Text style={styles.formulaText}>{t('formula_label')}</Text>
               </View>
 
               {/* Worked Example */}
               <View style={styles.exampleBox}>
-                <Text style={styles.exampleTitle}>📋 Example</Text>
+                <Text style={styles.exampleTitle}>{t('example_label')}</Text>
                 <Text style={styles.exampleText}>
-                  A customer pays <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>RM 45.50</Text> for their order.
-                  {'\n'}They receive <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>45 points</Text> added to their loyalty card — automatically!
+                  {t('example_desc')}
                 </Text>
               </View>
 
               <Text style={styles.helpText}>
-                Points are added whenever your staff keys in a customer visit. No extra step needed from the customer.
+                {t('points_added_info')}
               </Text>
             </View>
 
             {/* Membership Tiers */}
             <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>Customer Membership Tiers</Text>
+              <Text style={styles.cardSectionTitle}>{t('membership_tiers')}</Text>
               <Text style={styles.cardSectionDesc}>
-                Customers move up tiers based on their total spending at <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>your shop</Text> over the past 12 months. Higher tiers earn more points per ringgit — rewarding your most loyal customers automatically.
+                {t('membership_tiers_desc')}
               </Text>
 
               <View style={styles.tiersContainer}>
@@ -1085,10 +1086,10 @@ export default function UnifiedRewardsScreen() {
                   </View>
                   <View style={styles.tierInfoCol}>
                     <Text style={styles.tierName}>Bronze</Text>
-                    <Text style={styles.tierThreshold}>New customers · Total spend below RM 100</Text>
+                    <Text style={styles.tierThreshold}>{t('bronze_desc')}</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#FFEDD5' }]}>
-                    <Text style={[styles.multiplierText, { color: '#C2410C' }]}>1x Points</Text>
+                    <Text style={[styles.multiplierText, { color: '#C2410C' }]}>{t('points_multiplier_label')}</Text>
                   </View>
                 </View>
 
@@ -1099,10 +1100,10 @@ export default function UnifiedRewardsScreen() {
                   </View>
                   <View style={styles.tierInfoCol}>
                     <Text style={styles.tierName}>Silver</Text>
-                    <Text style={styles.tierThreshold}>Regular customers · RM 100 – RM 299 spent</Text>
+                    <Text style={styles.tierThreshold}>{t('silver_desc')}</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#F1F5F9' }]}>
-                    <Text style={[styles.multiplierText, { color: '#475569' }]}>1.25x Points</Text>
+                    <Text style={[styles.multiplierText, { color: '#475569' }]}>{t('points_multiplier_silver')}</Text>
                   </View>
                 </View>
 
@@ -1113,10 +1114,10 @@ export default function UnifiedRewardsScreen() {
                   </View>
                   <View style={styles.tierInfoCol}>
                     <Text style={styles.tierName}>Gold</Text>
-                    <Text style={styles.tierThreshold}>Loyal customers · RM 300 – RM 499 spent</Text>
+                    <Text style={styles.tierThreshold}>{t('gold_desc')}</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#FEF3C7' }]}>
-                    <Text style={[styles.multiplierText, { color: '#B45309' }]}>1.5x Points</Text>
+                    <Text style={[styles.multiplierText, { color: '#B45309' }]}>{t('points_multiplier_gold')}</Text>
                   </View>
                 </View>
 
@@ -1127,10 +1128,10 @@ export default function UnifiedRewardsScreen() {
                   </View>
                   <View style={styles.tierInfoCol}>
                     <Text style={styles.tierName}>Platinum</Text>
-                    <Text style={styles.tierThreshold}>VIP customers · RM 500+ spent</Text>
+                    <Text style={styles.tierThreshold}>{t('platinum_desc')}</Text>
                   </View>
                   <View style={[styles.multiplierBox, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={[styles.multiplierText, { color: '#3730A3' }]}>2x Points</Text>
+                    <Text style={[styles.multiplierText, { color: '#3730A3' }]}>{t('points_multiplier_platinum')}</Text>
                   </View>
                 </View>
               </View>
@@ -1140,10 +1141,10 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.tipCard}>
               <View style={styles.tipCardHeader}>
                 <Ionicons name="bulb-outline" size={20} color="#D97706" />
-                <Text style={styles.tipCardTitle}>Why tiers matter for your business</Text>
+                <Text style={styles.tipCardTitle}>{t('why_tiers_matter')}</Text>
               </View>
               <Text style={styles.tipCardText}>
-                Platinum customers earn <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#D97706' }}>2x points</Text> per ringgit, which motivates your best spenders to keep coming back. Tiers are tracked and updated automatically — you don't need to do anything.
+                {t('why_tiers_matter_desc')}
               </Text>
             </View>
 
@@ -1161,7 +1162,7 @@ export default function UnifiedRewardsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingReward ? 'Edit Reward' : 'Add New Reward'}</Text>
+              <Text style={styles.modalTitle}>{editingReward ? t('edit_reward') : t('add_new_reward')}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#000000" />
               </TouchableOpacity>
@@ -1176,7 +1177,7 @@ export default function UnifiedRewardsScreen() {
                   ) : (
                     <View style={styles.pickerPlaceholder}>
                       <Ionicons name="image-outline" size={32} color="#94A3B8" />
-                      <Text style={styles.pickerText}>Upload Image</Text>
+                      <Text style={styles.pickerText}>{t('upload_image')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1184,19 +1185,19 @@ export default function UnifiedRewardsScreen() {
 
               {/* Title Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Reward Title</Text>
+                <Text style={styles.inputLabel}>{t('reward_title')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formTitle}
                   onChangeText={setFormTitle}
-                  placeholder="e.g. Free Hot Americano"
+                  placeholder={locale === 'en' ? "e.g. Free Hot Americano" : "cth. Americano Panas Percuma"}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
 
               {/* Points Cost */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Points Cost</Text>
+                <Text style={styles.inputLabel}>{t('points_cost')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formPointsCost}
@@ -1209,7 +1210,7 @@ export default function UnifiedRewardsScreen() {
 
               {/* Stock */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Stock Availability</Text>
+                <Text style={styles.inputLabel}>{t('stock_availability')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formStock}
@@ -1222,7 +1223,7 @@ export default function UnifiedRewardsScreen() {
 
               {/* Type Selection */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Reward Type</Text>
+                <Text style={styles.inputLabel}>{t('reward_type')}</Text>
                 <View style={styles.typeSelectionGrid}>
                   {['free_item', 'discount'].map((t: any) => (
                     <TouchableOpacity
@@ -1240,14 +1241,14 @@ export default function UnifiedRewardsScreen() {
 
               {/* Description */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Description / Terms</Text>
+                <Text style={styles.inputLabel}>{t('description_terms')}</Text>
                 <TextInput
                   style={[styles.textInput, { height: 80, textAlignVertical: 'top', paddingVertical: 10 }]}
                   multiline
                   numberOfLines={3}
                   value={formDesc}
                   onChangeText={setFormDesc}
-                  placeholder="Describe the reward and redemption terms..."
+                  placeholder={t('describe_terms_placeholder')}
                   placeholderTextColor="#94A3B8"
                   {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
@@ -1256,8 +1257,8 @@ export default function UnifiedRewardsScreen() {
               {/* Is Active Toggle */}
               <View style={styles.switchRow}>
                 <View>
-                  <Text style={styles.switchLabel}>Publish Reward</Text>
-                  <Text style={styles.switchDesc}>Make this reward immediately visible to customers.</Text>
+                  <Text style={styles.switchLabel}>{t('publish_reward')}</Text>
+                  <Text style={styles.switchDesc}>{t('publish_reward_desc')}</Text>
                 </View>
                 <Switch
                   value={formIsActive}
@@ -1272,7 +1273,7 @@ export default function UnifiedRewardsScreen() {
                 {isSavingReward ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.saveSubmitBtnText}>{editingReward ? 'Save Changes' : 'Create Reward'}</Text>
+                  <Text style={styles.saveSubmitBtnText}>{editingReward ? t('save_changes') : t('create_reward')}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -1292,9 +1293,11 @@ export default function UnifiedRewardsScreen() {
             <View style={styles.deleteIconBg}>
               <Ionicons name="trash" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Delete Reward</Text>
+            <Text style={styles.modalTitle}>{t('delete_reward')}</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to delete "{selectedDeleteReward?.name}" from your catalogue? This action cannot be undone.
+              {locale === 'en'
+                ? `Are you sure you want to delete "${selectedDeleteReward?.name}" from your catalogue? This action cannot be undone.`
+                : `Adakah anda pasti mahu memadamkan "${selectedDeleteReward?.name}" dari katalog anda? Tindakan ini tidak boleh dibatalkan.`}
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
@@ -1302,7 +1305,7 @@ export default function UnifiedRewardsScreen() {
                 onPress={() => setDeleteModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
@@ -1313,7 +1316,7 @@ export default function UnifiedRewardsScreen() {
                 {isDeletingReward ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Delete</Text>
+                  <Text style={styles.modalConfirmText}>{t('delete')}</Text>
                 )}
               </TouchableOpacity>
             </View>
