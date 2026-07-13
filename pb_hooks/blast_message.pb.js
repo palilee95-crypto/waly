@@ -155,9 +155,10 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
           customerIds.add(customerId);
           try {
             const cust = $app.findRecordById("users", customerId);
-            // Attach card stamps collected count for templating
-            cust.set("temp_stamps", cards[i].get("stamps_collected"));
-            customerRecords.push(cust);
+            customerRecords.push({
+              record: cust,
+              stamps: cards[i].get("stamps_collected") || 0
+            });
           } catch (_) {}
         }
       }
@@ -171,8 +172,10 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
         customerIds.add(customerId);
         try {
           const cust = $app.findRecordById("users", customerId);
-          cust.set("temp_stamps", 0);
-          customerRecords.push(cust);
+          customerRecords.push({
+            record: cust,
+            stamps: 0
+          });
         } catch (_) {}
       }
     }
@@ -190,11 +193,12 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const instanceName = `merchant-${merchantId}-${nameSlug}`;
 
     for (let i = 0; i < customerRecords.length; i++) {
-      const customer = customerRecords[i];
+      const customerItem = customerRecords[i];
+      const customer = customerItem.record;
       const customerId = customer.id;
       const phone = customer.get("phone") || "";
       const customerName = customer.getString("name") || "Valued Customer";
-      const customerStamps = customer.get("temp_stamps") || 0;
+      const customerStamps = customerItem.stamps;
 
       // Personalize the message content
       let personalizedMsg = messageTemplate
