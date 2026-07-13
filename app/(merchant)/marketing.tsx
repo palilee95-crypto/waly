@@ -307,20 +307,36 @@ export default function MarketingScreen() {
 
     setIsSavingRule(true);
     try {
-      const payload = {
-        merchant: user.merchant_id,
-        name: arName.trim(),
-        trigger_days: parseInt(arTriggerDays, 10),
-        title: arTitle.trim(),
-        message: arMessage.trim(),
-        send_whatsapp: arSendWhatsApp,
-        is_active: true
-      };
-
       if (selectedAutomation) {
+        const payload = {
+          merchant: user.merchant_id,
+          name: arName.trim(),
+          trigger_days: parseInt(arTriggerDays, 10),
+          title: arTitle.trim(),
+          message: arMessage.trim(),
+          send_whatsapp: arSendWhatsApp,
+          is_active: true
+        };
         await pb.collection('automation_rules').update(selectedAutomation.id, payload);
         Alert.alert('Success', 'Automation rule updated successfully!');
       } else {
+        // Generate a random 15-char lowercase alphanumeric ID to satisfy pocketbase validation
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let randomId = '';
+        for (let i = 0; i < 15; i++) {
+          randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        const payload = {
+          id: randomId,
+          merchant: user.merchant_id,
+          name: arName.trim(),
+          trigger_days: parseInt(arTriggerDays, 10),
+          title: arTitle.trim(),
+          message: arMessage.trim(),
+          send_whatsapp: arSendWhatsApp,
+          is_active: true
+        };
         await pb.collection('automation_rules').create(payload);
         Alert.alert('Success', 'Automation rule created successfully!');
       }
