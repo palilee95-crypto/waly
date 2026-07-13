@@ -140,6 +140,7 @@ export default function GiveStampsScreen() {
           stamps_collected: 0,
           completions: 0,
           status: 'active',
+          opt_in_marketing: true,
         });
       }
 
@@ -338,6 +339,7 @@ export default function GiveStampsScreen() {
                   stamps_collected: 0,
                   completions: 0,
                   status: 'active',
+                  opt_in_marketing: true,
                 });
               }
 
