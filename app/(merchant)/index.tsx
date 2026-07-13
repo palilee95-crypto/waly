@@ -16,6 +16,7 @@ import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-ico
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
 const { width } = Dimensions.get('window');
@@ -33,6 +34,7 @@ type ActivityItem = {
 export default function MerchantDashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState<'Today' | 'This Week' | 'This Month'>('Today');
   const [merchant, setMerchant] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -157,7 +159,7 @@ export default function MerchantDashboard() {
               style={styles.merchantAvatar}
             />
             <View style={styles.profileTextWrap}>
-              <Text style={styles.welcomeSub}>Welcome back</Text>
+              <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
               <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
             </View>
           </View>
@@ -171,7 +173,7 @@ export default function MerchantDashboard() {
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <View style={styles.balanceTextWrap}>
-              <Text style={styles.balanceLabel}>Total Stamps Awarded</Text>
+              <Text style={styles.balanceLabel}>{t('total_stamps_awarded')}</Text>
               <Text style={styles.balanceValue}>
                 {loading ? '...' : totalStampsAwarded.toLocaleString()}
               </Text>
@@ -188,14 +190,14 @@ export default function MerchantDashboard() {
             activeOpacity={0.9}
           >
             <Ionicons name="qr-code-outline" size={16} color="#000000" />
-            <Text style={styles.scanBtnText}>Scan Customer QR</Text>
+            <Text style={styles.scanBtnText}>{t('scan_customer_qr')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Goal Progress Card (Matches the goal/rewards limit progress card) */}
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>This Month's Sales</Text>
+            <Text style={styles.progressTitle}>{t('this_months_sales')}</Text>
             <Ionicons name="trending-up" size={18} color="#000000" />
           </View>
 
@@ -205,7 +207,7 @@ export default function MerchantDashboard() {
             ) : (
               `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             )}{' '}
-            <Text style={styles.progressStatsMax}>/ RM {monthlySalesGoal.toLocaleString()} goal</Text>
+            <Text style={styles.progressStatsMax}>/ RM {monthlySalesGoal.toLocaleString()} {t('goal')}</Text>
           </Text>
 
           {/* Sleek Progress Fill Bar */}
@@ -216,15 +218,15 @@ export default function MerchantDashboard() {
           <Text style={styles.remainingText}>
             {loading
               ? '...'
-              : `RM ${remainingSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to go!`}
+              : `RM ${remainingSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('to_go')}`}
           </Text>
         </View>
 
         {/* Recent Stamps List section */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Stamps Issued</Text>
+          <Text style={styles.sectionTitle}>{t('recent_stamps_issued')}</Text>
           <TouchableOpacity>
-            <Text style={styles.seeAllText}>See All</Text>
+            <Text style={styles.seeAllText}>{t('see_all')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -246,7 +248,7 @@ export default function MerchantDashboard() {
                   activeFilter === filter && styles.filterTextActive,
                 ]}
               >
-                {filter}
+                {t(filter.toLowerCase().replace(' ', '_'))}
               </Text>
             </TouchableOpacity>
           ))}
@@ -259,9 +261,9 @@ export default function MerchantDashboard() {
           ) : mappedActivities.length === 0 ? (
             <View style={styles.emptyStateCard}>
               <Ionicons name="receipt-outline" size={40} color="#94A3B8" style={{ marginBottom: 8 }} />
-              <Text style={styles.emptyStateTitle}>No Recent Activities</Text>
+              <Text style={styles.emptyStateTitle}>{t('no_recent_activities')}</Text>
               <Text style={styles.emptyStateSubtitle}>
-                Stamps issued during this period will show up here.
+                {t('stamps_issued_desc')}
               </Text>
             </View>
           ) : (
@@ -282,7 +284,7 @@ export default function MerchantDashboard() {
                 </View>
 
                 <View style={styles.amountCol}>
-                  <Text style={styles.stampDelta}>+{item.stamps} stamps</Text>
+                  <Text style={styles.stampDelta}>+{item.stamps} {t('stamps_label')}</Text>
                   <Text style={styles.transAmount}>{item.amount}</Text>
                 </View>
               </View>

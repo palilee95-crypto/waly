@@ -19,6 +19,7 @@ import { Ionicons, FontAwesome5, FontAwesome, MaterialIcons } from '@expo/vector
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
 const { width } = Dimensions.get('window');
@@ -91,6 +92,7 @@ const AnimatedStampSlot = ({ index, children, style }: { index: number; children
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
   const [loyaltyCards, setLoyaltyCards] = useState<LoyaltyCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -477,11 +479,11 @@ export default function CustomerDashboard() {
           <View style={styles.welcomeCard}>
             <View style={styles.cardHeader}>
               <View style={styles.welcomeTextWrap}>
-                <Text style={styles.welcomeSubtitle}>Welcome back,</Text>
+                <Text style={styles.welcomeSubtitle}>{t('welcome_back')},</Text>
                 <Text style={styles.welcomeName}>{user?.name || 'Ahmad Fazli'}</Text>
               </View>
               <View style={styles.pointsWrap}>
-                <Text style={styles.pointsLabel}>TOTAL STAMPS</Text>
+                <Text style={styles.pointsLabel}>{t('total_stamps_awarded')}</Text>
                 <View style={styles.pointsRow}>
                   <View style={styles.coinGraphic}>
                     <Ionicons name="star" size={12} color="#D97706" />
@@ -497,9 +499,11 @@ export default function CustomerDashboard() {
             <View style={styles.cardDivider} />
 
             <View style={styles.taglineRow}>
-              <Text style={styles.taglineBold}>Every visit, rewarded.</Text>
+              <Text style={styles.taglineBold}>{t('every_visit_rewarded')}</Text>
               <Text style={styles.taglineSub}>
-                You have {loyaltyCards.length} active stamp card{loyaltyCards.length === 1 ? '' : 's'}
+                {locale === 'en'
+                  ? `You have ${loyaltyCards.length} active stamp card${loyaltyCards.length === 1 ? '' : 's'}`
+                  : `Anda mempunyai ${loyaltyCards.length} kad setem aktif`}
               </Text>
             </View>
 
@@ -511,7 +515,7 @@ export default function CustomerDashboard() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="qr-code" size={14} color="#FFFFFF" />
-                <Text style={styles.capsuleActiveText}>Show My QR Code</Text>
+                <Text style={styles.capsuleActiveText}>{t('show_my_qr_code')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -520,7 +524,7 @@ export default function CustomerDashboard() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="search" size={14} color="#004ac6" />
-                <Text style={styles.capsuleInactiveText}>Discover Shops</Text>
+                <Text style={styles.capsuleInactiveText}>{t('discover_shops')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -528,27 +532,27 @@ export default function CustomerDashboard() {
           {/* RISEV Campaign Promo Banner */}
           <View style={styles.promoCard}>
             <View style={styles.promoHeaderRow}>
-              <Text style={styles.promoTitle}>2x Stamps Weekend</Text>
+              <Text style={styles.promoTitle}>{t('promo_title')}</Text>
               <View style={styles.promoBadge}>
-                <Text style={styles.promoBadgeText}>LIMITED</Text>
+                <Text style={styles.promoBadgeText}>{t('promo_badge')}</Text>
               </View>
             </View>
-            <Text style={styles.promoDesc}>Visit any RISEV partner shop this weekend and earn double stamps!</Text>
+            <Text style={styles.promoDesc}>{t('promo_desc')}</Text>
             <TouchableOpacity
               style={styles.viewPromoBtn}
               onPress={() => router.push('/(customer)/explore')}
               activeOpacity={0.9}
             >
-              <Text style={styles.viewPromoText}>Explore Now</Text>
+              <Text style={styles.viewPromoText}>{t('explore_now')}</Text>
               <Ionicons name="arrow-forward" size={12} color="#000000" />
             </TouchableOpacity>
           </View>
 
           {/* My Stamp Cards Header */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>My Stamp Cards</Text>
+            <Text style={styles.sectionTitle}>{t('my_stamp_cards')}</Text>
             <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
-              <Text style={styles.viewAllText}>Add Card</Text>
+              <Text style={styles.viewAllText}>{t('add_card')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -559,15 +563,15 @@ export default function CustomerDashboard() {
             ) : loyaltyCards.length === 0 ? (
               <View style={styles.emptyStateCard}>
                 <Ionicons name="card-outline" size={48} color="#94A3B8" />
-                <Text style={styles.emptyStateTitle}>No Active Cards</Text>
+                <Text style={styles.emptyStateTitle}>{t('no_active_cards')}</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Start visiting our partner merchants to collect stamps and earn rewards!
+                  {t('no_active_cards_desc')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.emptyStateBtn} 
                   onPress={() => router.push('/(customer)/explore')}
                 >
-                  <Text style={styles.emptyStateBtnText}>Discover Shops</Text>
+                  <Text style={styles.emptyStateBtnText}>{t('discover_shops')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (

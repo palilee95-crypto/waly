@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, Activit
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
 // Custom Bottom Tab Bar / Sidebar to match the clean minimalist black/white design
@@ -11,6 +12,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const { width } = useWindowDimensions();
+  const { t } = useLanguage();
   const isDesktop = width >= 768;
 
   if (isDesktop) {
@@ -19,7 +21,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         {/* Branding */}
         <View style={styles.sidebarBrand}>
           <Text style={styles.brandTitle}>RISEV</Text>
-          <Text style={styles.brandSubtitle}>Loyalty Wallet</Text>
+          <Text style={styles.brandSubtitle}>{t('loyalty_wallet')}</Text>
         </View>
 
         {/* Navigation Links */}
@@ -42,16 +44,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             };
 
             let iconName = 'home';
-            let label = 'Home';
+            let label = t('home');
             if (route.name === 'explore') {
               iconName = 'compass';
-              label = 'Explore';
+              label = t('explore');
             } else if (route.name === 'vouchers') {
               iconName = 'ticket';
-              label = 'Voucher';
+              label = t('vouchers');
             } else if (route.name === 'profile') {
               iconName = 'person';
-              label = 'Profile';
+              label = t('profile');
             }
 
             return (
@@ -85,7 +87,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.7}>
             <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-            <Text style={styles.logoutBtnText}>Log Out</Text>
+            <Text style={styles.logoutBtnText}>{t('logout')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -114,16 +116,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           };
 
           let iconName = 'home';
-          let label = 'Home';
+          let label = t('home');
           if (route.name === 'explore') {
             iconName = 'compass';
-            label = 'Explore';
+            label = t('explore');
           } else if (route.name === 'vouchers') {
             iconName = 'ticket';
-            label = 'Voucher';
+            label = t('vouchers');
           } else if (route.name === 'profile') {
             iconName = 'person';
-            label = 'Profile';
+            label = t('profile');
           }
 
           return (

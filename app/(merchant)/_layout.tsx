@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
 // Custom Merchant Tab Bar / Sidebar component
@@ -12,6 +13,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const { width } = useWindowDimensions();
+  const { t } = useLanguage();
   const isDesktop = width >= 768;
 
   if (isDesktop) {
@@ -20,7 +22,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
         {/* Branding */}
         <View style={styles.sidebarBrand}>
           <Text style={styles.brandTitle}>RISEV</Text>
-          <Text style={styles.brandSubtitle}>Merchant Console</Text>
+          <Text style={styles.brandSubtitle}>{t('merchant_console')}</Text>
         </View>
 
         {/* Navigation Links */}
@@ -41,19 +43,19 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
             };
 
             let iconName = 'home';
-            let label = 'Home';
+            let label = t('home');
             if (route.name === 'customers') {
               iconName = 'people';
-              label = 'Customers';
+              label = t('customers');
             } else if (route.name === 'give') {
               iconName = 'scan';
-              label = 'Scan Member';
+              label = t('scan_member');
             } else if (route.name === 'marketing') {
               iconName = 'megaphone';
-              label = 'Marketing';
+              label = t('marketing');
             } else if (route.name === 'profile') {
               iconName = 'person';
-              label = 'Profile';
+              label = t('profile');
             }
 
             return (
@@ -87,7 +89,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.7}>
             <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-            <Text style={styles.logoutBtnText}>Log Out</Text>
+            <Text style={styles.logoutBtnText}>{t('logout')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -126,16 +128,16 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
         }
 
         let iconName = 'home';
-        let label = 'Home';
+        let label = t('home');
         if (route.name === 'customers') {
           iconName = 'people';
-          label = 'Customer';
+          label = t('customers');
         } else if (route.name === 'marketing') {
           iconName = 'megaphone';
-          label = 'Marketing';
+          label = t('marketing');
         } else if (route.name === 'profile') {
           iconName = 'person';
-          label = 'Profile';
+          label = t('profile');
         }
 
         return (
