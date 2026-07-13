@@ -29,6 +29,7 @@ type ActivityItem = {
   amount: string;
   stamps: number;
   status?: 'Pending' | 'Success';
+  customerId?: string;
 };
 
 export default function MerchantDashboard() {
@@ -133,7 +134,8 @@ export default function MerchantDashboard() {
       date: new Date(tx.created).toLocaleDateString(),
       amount: billAmt > 0 ? `RM ${Number(billAmt).toFixed(2)}` : 'RM 0.00',
       stamps: tx.stamps || 0,
-      status: tx.type === 'adjust' ? 'Pending' : 'Success'
+      status: tx.type === 'adjust' ? 'Pending' : 'Success',
+      customerId: cust?.id || ''
     };
   });
 
@@ -268,7 +270,19 @@ export default function MerchantDashboard() {
             </View>
           ) : (
             mappedActivities.map((item) => (
-              <View key={item.id} style={styles.activityCard}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.activityCard}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (item.customerId) {
+                    router.push({
+                      pathname: '/(merchant)/customers',
+                      params: { customerId: item.customerId }
+                    });
+                  }
+                }}
+              >
                 <Image source={{ uri: item.avatar }} style={styles.customerAvatar} />
                 
                 <View style={styles.activityDetails}>
@@ -287,7 +301,7 @@ export default function MerchantDashboard() {
                   <Text style={styles.stampDelta}>+{item.stamps} {t('stamps_label')}</Text>
                   <Text style={styles.transAmount}>{item.amount}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>

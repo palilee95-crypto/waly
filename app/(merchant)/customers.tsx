@@ -20,6 +20,7 @@ import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -54,6 +55,8 @@ const getInitials = (name: string) => {
 export default function CustomersScreen() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const params = useLocalSearchParams<{ customerId?: string }>();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Purchase' | 'Redemption' | 'Adjustment'>('All');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -128,6 +131,51 @@ export default function CustomersScreen() {
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  const closeCustomerModal = () => {
+    setCustomerModalVisible(false);
+    setSelectedCustomer(null);
+    router.setParams({ customerId: undefined } as any);
+  };
+
+  useEffect(() => {
+    if (params.customerId && selectedCustomer?.customerId !== params.customerId) {
+      const existing = transactions.find(t => t.customerId === params.customerId);
+      if (existing) {
+        openCustomerDetails(existing);
+      } else {
+        const fetchAndOpen = async () => {
+          try {
+            const cust = await pb.collection('users').getOne(params.customerId!);
+            const name = cust.name || 'Walk-in Customer';
+            const initials = getInitials(name);
+            const dummyTx: TransactionItem = {
+              id: 'dummy-' + cust.id,
+              dateTime: new Date(cust.created).toLocaleDateString(),
+              name,
+              memberId: `ID: ${cust.id ? cust.id.substring(cust.id.length - 4).toUpperCase() : '----'}`,
+              initials,
+              bgCircleColor: '#F3F4F6',
+              type: 'PURCHASE',
+              stamps: 0,
+              points: 0,
+              customerId: cust.id,
+              customerPhone: cust.phone || 'No Phone',
+              avatar: cust.avatar 
+                ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
+                : null,
+              created: cust.created,
+              metadata: {},
+            };
+            openCustomerDetails(dummyTx);
+          } catch (err) {
+            console.warn("Failed to fetch user for details navigation:", err);
+          }
+        };
+        fetchAndOpen();
+      }
+    }
+  }, [params.customerId, transactions, selectedCustomer]);
 
   const openCustomerDetails = async (tx: TransactionItem) => {
     if (!tx.customerId) return;
@@ -652,19 +700,18 @@ export default function CustomersScreen() {
         </View>
       </ScrollView>
 
-      {/* Customer Detail Modal */}
       <Modal
         visible={customerModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setCustomerModalVisible(false)}
+        onRequestClose={closeCustomerModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {/* Header info */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('customer_profile')}</Text>
-              <TouchableOpacity onPress={() => setCustomerModalVisible(false)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={closeCustomerModal} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#000000" />
               </TouchableOpacity>
             </View>
