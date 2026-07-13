@@ -62,7 +62,7 @@ function runAutomations() {
       
       const recentNotifs = $app.findRecordsByFilter(
         "notifications",
-        `recipient = "${customerId}" && created >= "${limitStr}" && type = "campaign" && metadata ~ "${merchantId}"`,
+        `recipient = "${customerId}" && created >= "${limitStr}" && type = "campaign" && data.merchant_id = "${merchantId}"`,
         "-created",
         10,
         0
