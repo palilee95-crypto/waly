@@ -98,7 +98,7 @@ function runAutomations() {
         .replace(/\{\{\s*name\s*\}\}/g, customerName)
         .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount));
 
-      const formattedWhatsAppMsg = `💌 *Susulan Automatik daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Balas STOP untuk berhenti melanggan notifikasi._`;
+      const formattedWhatsAppMsg = `💌 *Susulan Automatik daripada ${merchantName}*\n\n📣 *${title}*\n───────────────────\n${personalizedMsg}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV._`;
 
       // A. Create In-App Notification
       createNotification(
