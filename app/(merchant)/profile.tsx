@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 
@@ -54,11 +55,19 @@ const SettingItem = ({
 );
 
 export default function ProfileScreen() {
-  const { logout, user, switchRole } = useAuth();
+  const { logout, user, switchRole, updateProfile } = useAuth();
   const router = useRouter();
+  const { locale, setLocale, t } = useLanguage();
   const [merchant, setMerchant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  // Language & Password modals
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
@@ -153,6 +162,29 @@ export default function ProfileScreen() {
     } else {
       setShowQrModal(true);
       fetchWhatsappStatus(true);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    if (newPassword.length < 8) {
+      Alert.alert(t('validation_error'), t('password_length'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert(t('validation_error'), t('password_mismatch'));
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      await updateProfile(user?.name || '', null, newPassword, confirmPassword);
+      setPasswordModalVisible(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert(t('success'), t('password_updated'));
+    } catch (err: any) {
+      Alert.alert(t('error'), err.message || t('password_update_failed'));
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -547,15 +579,15 @@ export default function ProfileScreen() {
       return (
         <View style={styles.hoursList}>
           <View style={styles.hoursRow}>
-            <Text style={styles.hoursDay}>Monday - Friday</Text>
+            <Text style={styles.hoursDay}>{t('monday')} - {t('friday')}</Text>
             <Text style={styles.hoursTime}>08:00 - 22:00</Text>
           </View>
           <View style={styles.hoursRow}>
-            <Text style={styles.hoursDay}>Saturday</Text>
+            <Text style={styles.hoursDay}>{t('saturday')}</Text>
             <Text style={styles.hoursTime}>09:00 - 23:00</Text>
           </View>
           <View style={styles.hoursRow}>
-            <Text style={styles.hoursDay}>Sunday</Text>
+            <Text style={styles.hoursDay}>{t('sunday')}</Text>
             <Text style={styles.hoursTime}>09:00 - 21:00</Text>
           </View>
         </View>
@@ -565,10 +597,12 @@ export default function ProfileScreen() {
       <View style={styles.hoursList}>
         {Object.entries(hrs).map(([day, time]) => {
           const isClosed = String(time).toLowerCase() === 'closed';
+          const localizedDay = t(day.toLowerCase());
+          const localizedTime = isClosed ? t('closed') : String(time);
           return (
             <View key={day} style={styles.hoursRow}>
-              <Text style={styles.hoursDay}>{day}</Text>
-              <Text style={[styles.hoursTime, isClosed && { color: '#EF4444' }]}>{String(time)}</Text>
+              <Text style={styles.hoursDay}>{localizedDay}</Text>
+              <Text style={[styles.hoursTime, isClosed && { color: '#EF4444' }]}>{localizedTime}</Text>
             </View>
           );
         })}
@@ -596,7 +630,7 @@ export default function ProfileScreen() {
           <View style={styles.logoBadge}>
             <Ionicons name="cafe" size={16} color="#000000" />
           </View>
-          <Text style={styles.headerLogoText}>Merchant Portal</Text>
+          <Text style={styles.headerLogoText}>{t('merchant_portal')}</Text>
         </View>
         <Image
           source={require('../../theme/rise_officiallogo.png')}
@@ -610,9 +644,9 @@ export default function ProfileScreen() {
       >
         {/* Screen Intro */}
         <View style={styles.introSection}>
-          <Text style={styles.screenTitle}>Profile & Settings</Text>
+          <Text style={styles.screenTitle}>{t('profile_settings')}</Text>
           <Text style={styles.screenSubtitle}>
-            Manage your store business profile and account preferences.
+            {t('profile_subtitle')}
           </Text>
         </View>
 
@@ -628,14 +662,14 @@ export default function ProfileScreen() {
               <View style={styles.partnerRow}>
                 <View style={styles.goldPartnerBadge}>
                   <Text style={styles.goldPartnerText}>
-                    {merchant?.is_verified ? 'VERIFIED PARTNER' : 'GOLD PARTNER'}
+                    {merchant?.is_verified ? t('verified_partner') : t('gold_partner')}
                   </Text>
                 </View>
                 <Text style={styles.locationText}>Kuala Lumpur</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.updateBtn} onPress={handleOpenEdit} activeOpacity={0.8}>
-              <Text style={styles.updateBtnText}>Update</Text>
+              <Text style={styles.updateBtnText}>{t('update')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -645,21 +679,21 @@ export default function ProfileScreen() {
           {/* Details list */}
           <View style={styles.detailsList}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>BUSINESS EMAIL</Text>
+              <Text style={styles.detailLabel}>{t('business_email')}</Text>
               <Text style={styles.detailValue}>
                 {merchant?.metadata?.email || merchant?.website || (user as any)?.email || 'hello@thecoffeehouse.my'}
               </Text>
             </View>
             
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>PHONE NUMBER</Text>
+              <Text style={styles.detailLabel}>{t('phone_number')}</Text>
               <Text style={styles.detailValue}>
                 {merchant?.metadata?.phone || user?.phone || '+60 3-1234 5678'}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>ADDRESS</Text>
+              <Text style={styles.detailLabel}>{t('address')}</Text>
               <Text style={styles.detailValue}>
                 {merchant?.description || 'Lot G-12, Premium Galleries, Persiaran KLCC, 50088 Kuala Lumpur'}
               </Text>
@@ -672,12 +706,12 @@ export default function ProfileScreen() {
           <View style={styles.switchHeader}>
             <Ionicons name="people-outline" size={24} color="#000000" />
             <View style={styles.switchInfo}>
-              <Text style={styles.switchTitle}>Personal Account?</Text>
-              <Text style={styles.switchSubtitle}>Switch back to customer console to view your loyalty cards and catalog rewards.</Text>
+              <Text style={styles.switchTitle}>{t('personal_account')}</Text>
+              <Text style={styles.switchSubtitle}>{t('switch_customer_desc')}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.switchButton} onPress={handleSwitchToCustomer} activeOpacity={0.8}>
-            <Text style={styles.switchButtonText}>Switch to Customer Mode</Text>
+            <Text style={styles.switchButtonText}>{t('switch_customer_btn')}</Text>
             <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -687,7 +721,7 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={styles.hoursHeader}>
               <Ionicons name="time-outline" size={20} color="#D97706" />
-              <Text style={styles.hoursTitle}>Operating Hours</Text>
+              <Text style={styles.hoursTitle}>{t('operating_hours')}</Text>
             </View>
             <Ionicons name="create-outline" size={18} color="#64748B" />
           </View>
@@ -696,7 +730,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Account Settings Section Header */}
-        <Text style={styles.sectionHeader}>Account Settings</Text>
+        <Text style={styles.sectionHeader}>{t('account_settings')}</Text>
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
@@ -704,24 +738,24 @@ export default function ProfileScreen() {
             <>
               <SettingItem
                 iconName="people-outline"
-                title="Manage Staff"
-                subtitle="Invite and remove store staff"
+                title={t('manage_staff')}
+                subtitle={t('manage_staff_desc')}
                 iconBgColor="#F1F5F9"
                 iconColor="#000000"
                 onPress={() => router.push('/(merchant)/staff' as any)}
               />
               <SettingItem
                 iconName="logo-whatsapp"
-                title="Link WhatsApp"
-                subtitle={whatsappStatus === 'connected' ? 'Connected (Tap to manage)' : whatsappStatus === 'checking' ? 'Checking status...' : 'Link store WhatsApp account'}
+                title={t('link_whatsapp')}
+                subtitle={whatsappStatus === 'connected' ? t('whatsapp_connected') : whatsappStatus === 'checking' ? t('whatsapp_checking') : t('link_whatsapp_desc')}
                 iconBgColor="#E8F5E9"
                 iconColor="#25D366"
                 onPress={handleWhatsappPress}
               />
               <SettingItem
                 iconName="gift-outline"
-                title="Manage Rewards"
-                subtitle="Setup and manage rewards catalog"
+                title={t('manage_rewards')}
+                subtitle={t('manage_rewards_desc')}
                 iconBgColor="#FFF3E0"
                 iconColor="#FF9800"
                 onPress={() => router.push('/(merchant)/rewards' as any)}
@@ -730,36 +764,38 @@ export default function ProfileScreen() {
           )}
           <SettingItem
             iconName="notifications-outline"
-            title="Notifications"
-            subtitle="Push, Email & SMS Alerts"
+            title={t('notifications')}
+            subtitle={t('notifications_desc')}
             iconBgColor="#F1F5F9"
             iconColor="#000000"
           />
           <SettingItem
             iconName="shield-checkmark-outline"
-            title="Security"
-            subtitle="Password & 2FA settings"
+            title={t('security')}
+            subtitle={t('security_desc')}
             iconBgColor="#F1F5F9"
             iconColor="#000000"
+            onPress={() => setPasswordModalVisible(true)}
           />
           <SettingItem
             iconName="globe-outline"
-            title="Language"
-            subtitle="English"
+            title={t('language')}
+            subtitle={locale === 'en' ? 'English' : 'Bahasa Melayu'}
             iconBgColor="#F1F5F9"
             iconColor="#000000"
+            onPress={() => setLanguageModalVisible(true)}
           />
           <SettingItem
             iconName="card-outline"
-            title="Payment Method"
-            subtitle="Credit & Bank Transfers"
+            title={t('payment_method')}
+            subtitle={t('payment_method_desc')}
             iconBgColor="#F1F5F9"
             iconColor="#000000"
           />
           <SettingItem
             iconName="document-text-outline"
-            title="Privacy Policy"
-            subtitle="Terms & Conditions"
+            title={t('privacy_policy')}
+            subtitle={t('privacy_policy_desc')}
             iconBgColor="#F1F5F9"
             iconColor="#000000"
           />
@@ -775,8 +811,8 @@ export default function ProfileScreen() {
             <Ionicons name="log-out-outline" size={22} color="#EF4444" />
           </View>
           <View style={styles.logoutInfo}>
-            <Text style={styles.logoutTitle}>Log Out</Text>
-            <Text style={styles.logoutSubtitle}>End active session</Text>
+            <Text style={styles.logoutTitle}>{t('logout')}</Text>
+            <Text style={styles.logoutSubtitle}>{t('logout_desc')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#FECACA" />
         </TouchableOpacity>
@@ -794,9 +830,9 @@ export default function ProfileScreen() {
             <View style={styles.modalIconBg}>
               <Ionicons name="log-out" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Log Out Account</Text>
+            <Text style={styles.modalTitle}>{t('logout_confirm_title')}</Text>
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to log out of your RISEV account? You will need to verify your mobile number again to sign back in.
+              {t('logout_confirm_desc')}
             </Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
@@ -804,14 +840,14 @@ export default function ProfileScreen() {
                 onPress={() => setLogoutModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
                 onPress={confirmLogout}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalConfirmText}>Log Out</Text>
+                <Text style={styles.modalConfirmText}>{t('logout')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -828,14 +864,14 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { minHeight: 380, justifyContent: 'center', alignItems: 'center', gap: 16 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
-              <Text style={[styles.modalTitle, { textAlign: 'left' }]}>Link WhatsApp</Text>
+              <Text style={[styles.modalTitle, { textAlign: 'left' }]}>{t('link_whatsapp')}</Text>
               <TouchableOpacity onPress={() => setShowQrModal(false)} style={{ padding: 4 }}>
                 <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
             
             <Text style={[styles.modalSubtitle, { textAlign: 'center', paddingHorizontal: 10, marginTop: 4 }]}>
-              Open WhatsApp on your phone, navigate to **Settings {'>'} Linked Devices**, and scan the QR code below.
+              {t('scan_instructions')}
             </Text>
 
             {whatsappQr ? (
@@ -843,14 +879,14 @@ export default function ProfileScreen() {
             ) : (
               <View style={{ width: 180, height: 180, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 }}>
                 <ActivityIndicator size="large" color="#000000" />
-                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>Generating QR...</Text>
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>{t('generating_qr')}</Text>
               </View>
             )}
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <ActivityIndicator size="small" color="#10B981" />
               <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                Waiting for device scan...
+                {t('waiting_scan')}
               </Text>
             </View>
           </View>
@@ -866,7 +902,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.editModalCard, { maxHeight: '90%' }]}>
-            <Text style={[styles.modalTitle, { marginBottom: 12 }]}>Edit Store Profile</Text>
+            <Text style={[styles.modalTitle, { marginBottom: 12 }]}>{t('edit_store_profile')}</Text>
             
             <ScrollView 
               style={{ width: '100%' }} 
@@ -881,12 +917,12 @@ export default function ProfileScreen() {
                     <Ionicons name="camera" size={14} color="#FFFFFF" />
                   </View>
                 </TouchableOpacity>
-                <Text style={styles.avatarPickerLabel}>Tap logo to upload image</Text>
+                <Text style={styles.avatarPickerLabel}>{t('tap_logo_upload')}</Text>
               </View>
 
               {/* Store Name Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Store Name</Text>
+                <Text style={styles.inputLabel}>{t('store_name')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editStoreName}
@@ -901,12 +937,12 @@ export default function ProfileScreen() {
 
               {/* Business Email Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Business Email</Text>
+                <Text style={styles.inputLabel}>{t('business_email')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editBusinessEmail}
                   onChangeText={setEditBusinessEmail}
-                  placeholder="Enter business email"
+                  placeholder={t('business_email')}
                   placeholderTextColor="#94A3B8"
                   autoCapitalize="none"
                   keyboardType="email-address"
@@ -918,12 +954,12 @@ export default function ProfileScreen() {
 
               {/* Phone Number Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Phone Number</Text>
+                <Text style={styles.inputLabel}>{t('phone_number')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editPhoneNumber}
                   onChangeText={setEditPhoneNumber}
-                  placeholder="Enter phone number"
+                  placeholder={t('phone_number')}
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
                   {...Platform.select({
@@ -934,7 +970,7 @@ export default function ProfileScreen() {
 
               {/* Monthly Sales Goal Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Monthly Sales Goal (RM)</Text>
+                <Text style={styles.inputLabel}>{t('monthly_sales_goal')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editMonthlySalesGoal}
@@ -950,15 +986,15 @@ export default function ProfileScreen() {
 
               {/* Category Selector Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Store Category</Text>
+                <Text style={styles.inputLabel}>{t('store_category')}</Text>
                 <View style={styles.categoryChipsRow}>
                   {[
-                    { id: 'food', label: 'Food & Drink' },
-                    { id: 'retail', label: 'Retail' },
-                    { id: 'beauty', label: 'Beauty & Salon' },
-                    { id: 'health', label: 'Health' },
-                    { id: 'entertainment', label: 'Entertainment' },
-                    { id: 'other', label: 'Services / Other' },
+                    { id: 'food' },
+                    { id: 'retail' },
+                    { id: 'beauty' },
+                    { id: 'health' },
+                    { id: 'entertainment' },
+                    { id: 'other' },
                   ].map((cat) => (
                     <TouchableOpacity
                       key={cat.id}
@@ -973,7 +1009,7 @@ export default function ProfileScreen() {
                         styles.categoryChipText,
                         editCategory === cat.id && styles.categoryChipTextActive
                       ]}>
-                        {cat.label}
+                        {t(cat.id)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -982,12 +1018,12 @@ export default function ProfileScreen() {
 
               {/* Address Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Address</Text>
+                <Text style={styles.inputLabel}>{t('address')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editAddress}
                   onChangeText={setEditAddress}
-                  placeholder="Enter business address"
+                  placeholder={t('address')}
                   placeholderTextColor="#94A3B8"
                   {...Platform.select({
                     web: { outlineStyle: 'none' } as any,
@@ -996,10 +1032,10 @@ export default function ProfileScreen() {
               </View>
 
               {/* Coordinates & Map Pin */}
-              <Text style={[styles.sectionLabel, { marginTop: 12, marginBottom: 4 }]}>MAP LOCATION COORDINATES</Text>
+              <Text style={[styles.sectionLabel, { marginTop: 12, marginBottom: 4 }]}>{t('map_location_coords')}</Text>
               <View style={styles.hoursInputsRow}>
                 <View style={[styles.inputContainer, { flex: 1, marginVertical: 0 }]}>
-                  <Text style={[styles.inputLabel, { fontSize: 10 }]}>Latitude</Text>
+                  <Text style={[styles.inputLabel, { fontSize: 10 }]}>{t('latitude')}</Text>
                   <TextInput
                     style={[styles.textInput, { fontSize: 12, paddingHorizontal: 8, paddingVertical: 6 }]}
                     value={editLat}
@@ -1013,7 +1049,7 @@ export default function ProfileScreen() {
                   />
                 </View>
                 <View style={[styles.inputContainer, { flex: 1, marginLeft: 8, marginVertical: 0 }]}>
-                  <Text style={[styles.inputLabel, { fontSize: 10 }]}>Longitude</Text>
+                  <Text style={[styles.inputLabel, { fontSize: 10 }]}>{t('longitude')}</Text>
                   <TextInput
                     style={[styles.textInput, { fontSize: 12, paddingHorizontal: 8, paddingVertical: 6 }]}
                     value={editLng}
@@ -1044,7 +1080,7 @@ export default function ProfileScreen() {
                 disabled={isSaving}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtnBlack}
@@ -1055,7 +1091,7 @@ export default function ProfileScreen() {
                 {isSaving ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Save</Text>
+                  <Text style={styles.modalConfirmText}>{t('save')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1072,7 +1108,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.editModalCard]}>
-            <Text style={[styles.modalTitle, { marginBottom: 12 }]}>Edit Operating Hours</Text>
+            <Text style={[styles.modalTitle, { marginBottom: 12 }]}>{t('edit_operating_hours')}</Text>
 
             <ScrollView 
               style={{ width: '100%', maxHeight: 320 }} 
@@ -1082,9 +1118,9 @@ export default function ProfileScreen() {
               {/* Monday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Monday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('monday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={monClosed}
                       onValueChange={setMonClosed}
@@ -1106,7 +1142,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1114,9 +1150,9 @@ export default function ProfileScreen() {
               {/* Tuesday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Tuesday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('tuesday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={tueClosed}
                       onValueChange={setTueClosed}
@@ -1138,7 +1174,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1146,9 +1182,9 @@ export default function ProfileScreen() {
               {/* Wednesday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Wednesday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('wednesday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={wedClosed}
                       onValueChange={setWedClosed}
@@ -1170,7 +1206,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1178,9 +1214,9 @@ export default function ProfileScreen() {
               {/* Thursday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Thursday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('thursday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={thuClosed}
                       onValueChange={setThuClosed}
@@ -1202,7 +1238,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1210,9 +1246,9 @@ export default function ProfileScreen() {
               {/* Friday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Friday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('friday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={friClosed}
                       onValueChange={setFriClosed}
@@ -1234,7 +1270,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1242,9 +1278,9 @@ export default function ProfileScreen() {
               {/* Saturday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Saturday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('saturday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={satClosed}
                       onValueChange={setSatClosed}
@@ -1266,7 +1302,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1274,9 +1310,9 @@ export default function ProfileScreen() {
               {/* Sunday Row */}
               <View style={styles.hoursEditRow}>
                 <View style={styles.hoursDayHeader}>
-                  <Text style={styles.hoursDayLabel}>Sunday</Text>
+                  <Text style={styles.hoursDayLabel}>{t('sunday')}</Text>
                   <View style={styles.closedToggleRow}>
-                    <Text style={styles.closedToggleText}>Closed</Text>
+                    <Text style={styles.closedToggleText}>{t('closed')}</Text>
                     <Switch
                       value={sunClosed}
                       onValueChange={setSunClosed}
@@ -1298,7 +1334,7 @@ export default function ProfileScreen() {
                   />
                 ) : (
                   <View style={[styles.textInput, styles.disabledInput]}>
-                    <Text style={styles.disabledInputText}>Closed</Text>
+                    <Text style={styles.disabledInputText}>{t('closed')}</Text>
                   </View>
                 )}
               </View>
@@ -1312,7 +1348,7 @@ export default function ProfileScreen() {
                 disabled={isSavingHours}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtnBlack}
@@ -1323,7 +1359,139 @@ export default function ProfileScreen() {
                 {isSavingHours ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Save</Text>
+                  <Text style={styles.modalConfirmText}>{t('save')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Premium Language Selection Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { paddingBottom: 24 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>{t('language')}</Text>
+              <TouchableOpacity onPress={() => setLanguageModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.languageOptionRow, locale === 'en' && styles.languageOptionRowActive]}
+              onPress={async () => {
+                await setLocale('en');
+                setLanguageModalVisible(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.languageOptionText, locale === 'en' && styles.languageOptionTextActive]}>English</Text>
+              {locale === 'en' && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.languageOptionRow, locale === 'ms' && styles.languageOptionRowActive]}
+              onPress={async () => {
+                await setLocale('ms');
+                setLanguageModalVisible(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.languageOptionText, locale === 'ms' && styles.languageOptionTextActive]}>Bahasa Melayu</Text>
+              {locale === 'ms' && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Premium Change Password Modal */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.editModalCard, { maxHeight: '90%' }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>{t('change_password')}</Text>
+              <TouchableOpacity onPress={() => {
+                setPasswordModalVisible(false);
+                setNewPassword('');
+                setConfirmPassword('');
+              }} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={{ width: '100%' }} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ width: '100%', alignItems: 'stretch', paddingBottom: 16 }}
+            >
+              {/* New Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>{t('new_password')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder={t('enter_new_password')}
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry
+                  {...Platform.select({
+                    web: { outlineStyle: 'none' } as any,
+                  })}
+                />
+              </View>
+
+              {/* Confirm Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>{t('confirm_password')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder={t('enter_confirm_password')}
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry
+                  {...Platform.select({
+                    web: { outlineStyle: 'none' } as any,
+                  })}
+                />
+              </View>
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setPasswordModalVisible(false);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+                disabled={isUpdatingPassword}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmBtnBlack}
+                onPress={handleSavePassword}
+                disabled={isUpdatingPassword}
+                activeOpacity={0.8}
+              >
+                {isUpdatingPassword ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>{t('save')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1860,5 +2028,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#94A3B8',
+  },
+  languageOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 10,
+    width: '100%',
+  },
+  languageOptionRowActive: {
+    borderColor: '#000000',
+    backgroundColor: '#F8FAFC',
+  },
+  languageOptionText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0b1c30',
+  },
+  languageOptionTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
   },
 });

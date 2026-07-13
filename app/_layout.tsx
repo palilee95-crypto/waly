@@ -12,6 +12,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NotificationBanner from '@/components/NotificationBanner';
 
@@ -97,10 +98,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <AppContent />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <StatusBar style="light" />
+          <AppContent />
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
