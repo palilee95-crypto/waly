@@ -138,7 +138,7 @@ export default function MarketingScreen() {
   const [loadingRules, setLoadingRules] = useState(false);
   const [selectedAutomation, setSelectedAutomation] = useState<any | null>(null);
   const [arName, setArName] = useState('');
-  const [arTriggerDays, setArTriggerDays] = useState<'3' | '7' | '14' | '30'>('7');
+  const [arTriggerDays, setArTriggerDays] = useState<string>('7');
   const [arTitle, setArTitle] = useState('We Miss You! ❤️');
   const [arMessage, setArMessage] = useState('Hi {{name}}! 👋\n\nIt\'s been a while since your last visit. Come back soon to collect your next stamp! ✨');
   const [arSendWhatsApp, setArSendWhatsApp] = useState(true);
@@ -305,13 +305,19 @@ export default function MarketingScreen() {
       return;
     }
 
+    const triggerDaysInt = parseInt(arTriggerDays, 10);
+    if (isNaN(triggerDaysInt) || triggerDaysInt <= 0) {
+      Alert.alert('Validation Error', 'Please select or enter a valid number of inactive days (greater than 0).');
+      return;
+    }
+
     setIsSavingRule(true);
     try {
       if (selectedAutomation) {
         const payload = {
           merchant: user.merchant_id,
           name: arName.trim(),
-          trigger_days: parseInt(arTriggerDays, 10),
+          trigger_days: triggerDaysInt,
           title: arTitle.trim(),
           message: arMessage.trim(),
           send_whatsapp: arSendWhatsApp,
@@ -331,7 +337,7 @@ export default function MarketingScreen() {
           id: randomId,
           merchant: user.merchant_id,
           name: arName.trim(),
-          trigger_days: parseInt(arTriggerDays, 10),
+          trigger_days: triggerDaysInt,
           title: arTitle.trim(),
           message: arMessage.trim(),
           send_whatsapp: arSendWhatsApp,
@@ -343,6 +349,7 @@ export default function MarketingScreen() {
 
       // Reset form
       setArName('');
+      setArTriggerDays('7');
       setArTitle('We Miss You! ❤️');
       setArMessage("Hi {{name}}! 👋\n\nIt's been a while since your last visit. Come back soon to collect your next stamp! ✨");
       setArSendWhatsApp(true);
@@ -1186,7 +1193,7 @@ export default function MarketingScreen() {
                           styles.triggerDayBtn,
                           arTriggerDays === day && styles.triggerDayBtnActive
                         ]}
-                        onPress={() => setArTriggerDays(day as any)}
+                        onPress={() => setArTriggerDays(day)}
                         activeOpacity={0.8}
                       >
                         <Text style={[
@@ -1197,7 +1204,40 @@ export default function MarketingScreen() {
                         </Text>
                       </TouchableOpacity>
                     ))}
+                    <TouchableOpacity
+                      style={[
+                        styles.triggerDayBtn,
+                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnActive
+                      ]}
+                      onPress={() => {
+                        if (['3', '7', '14', '30'].includes(arTriggerDays)) {
+                          setArTriggerDays('');
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[
+                        styles.triggerDayBtnText,
+                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnTextActive
+                      ]}>
+                        {t('custom')}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+
+                  {!['3', '7', '14', '30'].includes(arTriggerDays) && (
+                    <TextInput
+                      style={styles.modalTextInput}
+                      value={arTriggerDays}
+                      onChangeText={(val) => {
+                        const cleaned = val.replace(/[^\d]/g, '');
+                        setArTriggerDays(cleaned);
+                      }}
+                      placeholder={t('custom_days_placeholder')}
+                      placeholderTextColor="#BEC6E0"
+                      keyboardType="numeric"
+                    />
+                  )}
 
                   <Text style={styles.inputLabelSmall}>{t('rule_name')}</Text>
                   <TextInput
@@ -1266,6 +1306,7 @@ export default function MarketingScreen() {
                       onPress={() => {
                         setSelectedAutomation(null);
                         setArName('');
+                        setArTriggerDays('7');
                         setArTitle('We Miss You! ❤️');
                         setArMessage("Hi {{name}}! 👋\n\nIt's been a while since your last visit. Come back soon to collect your next stamp! ✨");
                         setArSendWhatsApp(true);
@@ -1318,7 +1359,7 @@ export default function MarketingScreen() {
                             onPress={() => {
                               setSelectedAutomation(rule);
                               setArName(rule.name);
-                              setArTriggerDays(String(rule.trigger_days) as any);
+                              setArTriggerDays(String(rule.trigger_days));
                               setArTitle(rule.title);
                               setArMessage(rule.message);
                               setArSendWhatsApp(rule.send_whatsapp);
@@ -2499,14 +2540,16 @@ const styles = StyleSheet.create({
   },
   triggerDaysRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 6,
     marginBottom: 8,
     width: '100%',
   },
   triggerDayBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: '18%',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
