@@ -693,10 +693,6 @@ export default function ProfileScreen() {
           </View>
 
           {renderProfileOperatingHours()}
-
-          <TouchableOpacity style={styles.holidaysLink} activeOpacity={0.7}>
-            <Text style={styles.holidaysLinkText}>MANAGE PUBLIC HOLIDAYS</Text>
-          </TouchableOpacity>
         </TouchableOpacity>
 
         {/* Account Settings Section Header */}
@@ -1517,16 +1513,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0b1c30',
-  },
-  holidaysLink: {
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  holidaysLinkText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black manage link text
-    letterSpacing: 0.5,
   },
   sectionHeader: {
     fontSize: 16,
