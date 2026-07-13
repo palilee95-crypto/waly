@@ -146,8 +146,7 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const customerRecords = [];
 
     if (programIds.length > 0) {
-      // Find cards where opt_in_marketing != false
-      const filter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ") && opt_in_marketing != false";
+      const filter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ") && (opt_in_marketing != false || opt_in_marketing = null)";
       const cards = $app.findRecordsByFilter("loyalty_cards", filter, "-created", 1000, 0);
       for (let i = 0; i < cards.length; i++) {
         const customerId = cards[i].get("customer");

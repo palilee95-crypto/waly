@@ -42,7 +42,7 @@ cronAdd("run_loyalty_automations", "0 10 * * *", () => {
       if (programIds.length === 0) continue;
 
       const programFilter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ")";
-      const filter = `${programFilter} && updated >= "${startStr}" && updated <= "${endStr}" && opt_in_marketing != false`;
+      const filter = `${programFilter} && updated >= "${startStr}" && updated <= "${endStr}" && (opt_in_marketing != false || opt_in_marketing = null)`;
       
       const cards = $app.findRecordsByFilter("loyalty_cards", filter, "-created", 1000, 0);
       if (cards.length === 0) continue;

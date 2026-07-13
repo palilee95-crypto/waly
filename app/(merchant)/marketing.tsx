@@ -397,7 +397,7 @@ export default function MarketingScreen() {
     try {
       const [cards, txs] = await Promise.all([
         pb.collection('loyalty_cards').getFullList({
-          filter: `merchant = '${user.merchant_id}' && opt_in_marketing != false`
+          filter: `merchant = '${user.merchant_id}' && (opt_in_marketing != false || opt_in_marketing = null)`
         }),
         pb.collection('transactions').getFullList({
           filter: `merchant = '${user.merchant_id}'`
