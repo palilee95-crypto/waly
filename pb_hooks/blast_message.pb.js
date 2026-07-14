@@ -45,6 +45,24 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
         integration: "WHATSAPP-BAILEYS"
       });
 
+      if (createRes.status === 403) {
+        // Self-healing: If instance exists but is corrupted/hidden, delete it and recreate it!
+        callEvo("DELETE", `/instance/delete/${instanceName}`);
+        const retryRes = callEvo("POST", "/instance/create", {
+          instanceName: instanceName,
+          qrcode: true,
+          integration: "WHATSAPP-BAILEYS"
+        });
+        if (retryRes.status >= 400) {
+          return e.json(retryRes.status, { message: "Failed to recreate WhatsApp instance", error: retryRes.data });
+        }
+        const qrBase64 = retryRes.data?.qrcode?.base64 || "";
+        return e.json(200, {
+          status: "disconnected",
+          qrcode: qrBase64
+        });
+      }
+
       if (createRes.status >= 400) {
         return e.json(createRes.status, { message: "Failed to create WhatsApp instance", error: createRes.data });
       }
