@@ -131,9 +131,14 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
       - POCKETBASE_URL=http://pocketbase:8090
       - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
       - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - BANK_NAME=${BANK_NAME}
+      - BANK_ACC_NUM=${BANK_ACC_NUM}
+      - BANK_ACC_NAME=${BANK_ACC_NAME}
+      - QR_CODE_FILE=${QR_CODE_FILE}
     networks:
       - risev-network
 
