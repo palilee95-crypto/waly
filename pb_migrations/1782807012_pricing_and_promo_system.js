@@ -13,12 +13,28 @@ migrate((app) => {
     "deleteRule": null,
     "fields": [
       {
-        "id": "text_id_ps",
+        "id": "text3208210256",
         "name": "id",
         "type": "text",
         "system": true,
         "required": true,
         "primaryKey": true
+      },
+      {
+        "id": "autodate2990389176",
+        "name": "created",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": false
+      },
+      {
+        "id": "autodate3332085495",
+        "name": "updated",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": true
       },
       {
         "id": "num_base_price_ps",
@@ -72,12 +88,28 @@ migrate((app) => {
     "deleteRule": null,
     "fields": [
       {
-        "id": "text_id_spc",
+        "id": "text3208210256",
         "name": "id",
         "type": "text",
         "system": true,
         "required": true,
         "primaryKey": true
+      },
+      {
+        "id": "autodate2990389176",
+        "name": "created",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": false
+      },
+      {
+        "id": "autodate3332085495",
+        "name": "updated",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": true
       },
       {
         "id": "text_code_spc",
@@ -122,6 +154,7 @@ migrate((app) => {
   const promoCol = app.findCollectionByNameOrId("subscription_promo_codes");
   
   const promo1 = new Record(promoCol);
+  promo1.set("id", "promocode10off1");
   promo1.set("code", "RISEV10");
   promo1.set("discount_type", "percentage");
   promo1.set("discount_value", 10);
@@ -129,6 +162,7 @@ migrate((app) => {
   app.save(promo1);
 
   const promo2 = new Record(promoCol);
+  promo2.set("id", "promocode50off1");
   promo2.set("code", "RISEV50");
   promo2.set("discount_type", "fixed");
   promo2.set("discount_value", 50);
