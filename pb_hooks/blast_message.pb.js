@@ -238,8 +238,19 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
         const cleanPhone = phone.replace(/[^\d]/g, '');
         if (cleanPhone) {
           try {
-            // Spaced out queue delay: delay increments by 4 seconds for each recipient, plus 5-9 seconds typing delay
-            const queueDelay = (i * 4000) + Math.floor(Math.random() * 4000) + 5000;
+            // 1. Spaced out delay: 20 seconds base interval, plus 0 to 10 seconds random variance
+            const baseInterval = 20000; // 20 seconds
+            const randomVariance = Math.floor(Math.random() * 10000); // 0-10 seconds
+            const typingDelay = 5000; // 5 seconds typing status
+
+            // 2. Sleep Time: Add 10 minutes of pause after every 50 messages
+            const batchSize = 50;
+            const sleepDuration = 10 * 60 * 1000; // 10 minutes in milliseconds
+            const batchCount = Math.floor(i / batchSize);
+            const totalSleepTime = batchCount * sleepDuration;
+
+            // 3. Final calculated queue delay
+            const queueDelay = (i * baseInterval) + randomVariance + typingDelay + totalSleepTime;
 
             $http.send({
               url: `${evolutionUrl}/message/sendText/${instanceName}`,
