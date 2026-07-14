@@ -75,6 +75,8 @@ export default function ProfileScreen() {
   const [whatsappPhone, setWhatsappPhone] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultModalConfig, setResultModalConfig] = useState({ title: '', desc: '', type: 'success' });
 
   // Edit store profile states
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -150,17 +152,19 @@ export default function ProfileScreen() {
       setWhatsappStatus('disconnected');
       setWhatsappQr('');
       setWhatsappPhone('');
-      if (Platform.OS === 'web') {
-        window.alert('Your WhatsApp account has been disconnected.');
-      } else {
-        Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
-      }
+      setResultModalConfig({
+        title: locale === 'en' ? 'Disconnected' : 'Dinyahsambung',
+        desc: locale === 'en' ? 'Your WhatsApp account has been disconnected.' : 'Akaun WhatsApp anda telah diputuskan sambungan.',
+        type: 'success'
+      });
+      setShowResultModal(true);
     } catch (err) {
-      if (Platform.OS === 'web') {
-        window.alert('Failed to disconnect WhatsApp account.');
-      } else {
-        Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
-      }
+      setResultModalConfig({
+        title: locale === 'en' ? 'Error' : 'Ralat',
+        desc: locale === 'en' ? 'Failed to disconnect WhatsApp account.' : 'Gagal memutuskan sambungan akaun WhatsApp.',
+        type: 'error'
+      });
+      setShowResultModal(true);
       setWhatsappStatus('connected');
     }
   };
@@ -242,7 +246,12 @@ export default function ProfileScreen() {
               setWhatsappPhone(res.phone);
             }
             setShowQrModal(false);
-            Alert.alert('Success', 'WhatsApp connected successfully!');
+            setResultModalConfig({
+              title: locale === 'en' ? 'Success' : 'Berjaya',
+              desc: locale === 'en' ? 'WhatsApp connected successfully!' : 'WhatsApp berjaya disambungkan!',
+              type: 'success'
+            });
+            setShowResultModal(true);
             if (intervalId) clearInterval(intervalId);
           } else if (res.qrcode) {
             setWhatsappQr(res.qrcode);
@@ -912,6 +921,39 @@ export default function ProfileScreen() {
               >
                 <Text style={styles.modalConfirmText}>
                   {locale === 'en' ? 'Disconnect' : 'Putus Sambung'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Premium WhatsApp Result Modal (Success or Error notification) */}
+      <Modal
+        visible={showResultModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowResultModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconBg, { backgroundColor: resultModalConfig.type === 'success' ? '#E8F5E9' : '#FEE2E2' }]}>
+              <Ionicons
+                name={resultModalConfig.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                size={28}
+                color={resultModalConfig.type === 'success' ? '#25D366' : '#EF4444'}
+              />
+            </View>
+            <Text style={styles.modalTitle}>{resultModalConfig.title}</Text>
+            <Text style={styles.modalSubtitle}>{resultModalConfig.desc}</Text>
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { flex: 1, backgroundColor: '#000000' }]}
+                onPress={() => setShowResultModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {locale === 'en' ? 'OK' : 'OK'}
                 </Text>
               </TouchableOpacity>
             </View>
