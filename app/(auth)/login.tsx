@@ -260,14 +260,14 @@ export default function LoginScreen() {
 
                 {step === 'register' && (
                   <>
-                    <Text style={styles.inputLabel}>FULL NAME</Text>
+                    <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
                     <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
                       <TextInput
                         style={[
                           styles.input,
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
-                        placeholder="John Doe"
+                        placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
                         placeholderTextColor="#BEC6E0"
                         value={name}
                         onChangeText={setName}
