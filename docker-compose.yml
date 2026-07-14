@@ -143,9 +143,23 @@ services:
     networks:
       - risev-network
 
+  # Portainer Visual Container Console
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: risev-portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - risev-network
+
 volumes:
   caddy_data:
   caddy_config:
+  portainer_data:
 
 networks:
   risev-network:
