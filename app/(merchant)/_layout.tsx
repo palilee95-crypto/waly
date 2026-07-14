@@ -267,13 +267,26 @@ export default function MerchantLayout() {
     }
 
     let mapInstance: any = null;
+    let checkInterval: any = null;
+    let isCleanedUp = false;
 
     function initMap() {
+      if (isCleanedUp) return;
       const L = (window as any).L;
       if (!L) return;
 
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+      }
+
       const mapDiv = document.getElementById('onboarding-map');
       if (!mapDiv) return;
+
+      // Avoid double initialization
+      if ((mapDiv as any)._leaflet_id) {
+        return;
+      }
 
       const startLat = parseFloat(storeLat) || 6.2443;
       const startLng = parseFloat(storeLng) || 100.4217;
@@ -302,7 +315,7 @@ export default function MerchantLayout() {
 
         // Trigger resize event to render correctly
         setTimeout(() => {
-          if (mapInstance) {
+          if (mapInstance && !isCleanedUp) {
             mapInstance.invalidateSize();
           }
         }, 200);
@@ -322,11 +335,24 @@ export default function MerchantLayout() {
       };
       document.head.appendChild(script);
     } else {
-      // If already loaded, initialize directly
-      setTimeout(initMap, 100);
+      if ((window as any).L) {
+        // If script is in DOM and L is ready, initialize map
+        setTimeout(initMap, 50);
+      } else {
+        // If script is in DOM but L is not ready (still loading), poll for L
+        checkInterval = setInterval(() => {
+          if ((window as any).L) {
+            initMap();
+          }
+        }, 50);
+      }
     }
 
     return () => {
+      isCleanedUp = true;
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
       if (mapInstance) {
         mapInstance.remove();
       }
