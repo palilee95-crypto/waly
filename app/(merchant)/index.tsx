@@ -156,12 +156,12 @@ export default function MerchantDashboard() {
     const promoSuffix = appliedPromo ? `_${appliedPromo.code}` : '';
     
     // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
-    const telegramUrl = `https://t.me/WalyBillingBot?start=${cleanMerchantId}_${months}${promoSuffix}`;
+    const telegramUrl = `https://t.me/RisevBillingBot?start=${cleanMerchantId}_${months}${promoSuffix}`;
     
     try {
       await Linking.openURL(telegramUrl);
     } catch (err) {
-      alert('Could not open Telegram. Please open Telegram and search for @WalyBillingBot.');
+      alert('Could not open Telegram. Please open Telegram and search for @RisevBillingBot.');
     }
   };
 
