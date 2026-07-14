@@ -78,49 +78,31 @@ export default function CustomerProfile() {
     if (!user) return;
     setIsSubscribing(true);
     try {
-      // 1. Simulate webhook/payment ID generation
-      const paymentId = 'chipin_' + Math.random().toString(36).substring(2, 10);
-      
-      // 2. Create active merchant record in database
+      // 1. Create merchant record with pending status (which starts their 7-day free trial)
       const newMerchant = await pb.collection('merchants').create({
         name: `${user.name}'s Shop`,
         owner: user.id,
         category: 'food',
-        status: 'active',
+        status: 'pending',
       });
 
-      // 3. Link merchant profile to user and change role to merchant
+      // 2. Link merchant profile to user and change role to merchant
       await pb.collection('users').update(user.id, {
         role: 'merchant',
         merchant_id: newMerchant.id,
       });
 
-      // 4. Create active subscription record in database for history logging
-      const periodEnd = new Date();
-      periodEnd.setDate(periodEnd.getDate() + 30);
-      const periodEndStr = periodEnd.toISOString().replace('T', ' ').substring(0, 19);
-
-      await pb.collection('subscriptions').create({
-        merchant: newMerchant.id,
-        status: 'active',
-        plan: 'pro',
-        chipin_payment_id: paymentId,
-        chipin_customer_email: (user.phone || 'merchant') + '@risev.app',
-        current_period_end: periodEndStr,
-        cancel_at_period_end: false,
-      });
-
-      // 5. Refresh local authStore session to align updated records
+      // 3. Refresh local authStore session to align updated records
       await refreshSession();
 
-      // 6. Switch role locally
+      // 4. Switch role locally
       await switchRole('merchant');
       
-      Alert.alert('Subscription Active', 'Welcome to RISEV Merchant Pro! Your shop console is now active.');
+      Alert.alert('Free Trial Started!', 'Welcome to RISEV Merchant Pro! Your 7-day free trial is now active.');
       setSubscribeModalVisible(false);
       router.replace('/(merchant)');
     } catch (err: any) {
-      Alert.alert('Subscription Error', err.message || 'Payment processing failed.');
+      Alert.alert('Setup Error', err.message || 'Failed to start free trial.');
     } finally {
       setIsSubscribing(false);
     }
@@ -675,7 +657,7 @@ export default function CustomerProfile() {
                 <Text style={styles.priceText}>79</Text>
                 <Text style={styles.billingPeriod}>/month</Text>
               </View>
-              <Text style={styles.pricingDesc}>Recurring billing. Cancel anytime.</Text>
+              <Text style={styles.pricingDesc}>7-day free trial, then RM79/month billed manually.</Text>
             </View>
 
             <View style={styles.featuresList}>
@@ -706,7 +688,7 @@ export default function CustomerProfile() {
               {isSubscribing ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.subscribeBtnText}>Subscribe & Activate Console</Text>
+                <Text style={styles.subscribeBtnText}>Start 7-Day Free Trial</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -501,7 +501,7 @@ export default function MerchantLayout() {
     }
   };
 
-  const handleSimulatePayment = async () => {
+  const handleWhatsAppPayment = async () => {
     let merchantId = user?.merchant_id;
     if (!merchantId) {
       try {
@@ -514,38 +514,14 @@ export default function MerchantLayout() {
       }
     }
 
-    if (!merchantId) {
-      alert("Error: Merchant ID is missing from your session. Please log out and log back in to refresh your auth session.");
-      return;
-    }
-    setIsPaying(true);
+    const message = `Hello, I'd like to manually activate my RISEV Merchant Pro subscription for my store (Merchant ID: ${merchantId || 'N/A'}).`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/601110209669?text=${encodedMessage}`;
+    
     try {
-      // Simulate webhook call to Chip-in payment gateway
-      const paymentId = 'chipin_' + Math.random().toString(36).substring(2, 10);
-      const res = await fetch(`${pb.baseUrl}/api/risev/chipin-webhook`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: paymentId,
-          status: 'success',
-          email: (user?.phone || 'merchant') + '@risev.app',
-          reference: merchantId,
-        }),
-      });
-
-      const resJson = await res.json();
-      if (resJson.success) {
-        // Success! Reload session using AuthContext refresh helper
-        await refreshSession();
-      } else {
-        alert(resJson.error || 'payment gateway simulation failed.');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Payment simulation failed.');
-    } finally {
-      setIsPaying(false);
+      await Linking.openURL(whatsappUrl);
+    } catch (err) {
+      Alert.alert('Error', 'Could not open WhatsApp. Please contact 01110209669 manually.');
     }
   };
 
@@ -575,7 +551,7 @@ export default function MerchantLayout() {
           </View>
           <Text style={styles.gateTitle}>Activate Store Console</Text>
           <Text style={styles.gateSubtitle}>
-            Your merchant console is currently pending subscription setup. Subscribe to Pro to start issuing stamps and scan member rewards.
+            Your merchant console is currently pending activation. Contact support via WhatsApp to complete your subscription and activate your store console.
           </Text>
 
           <View style={styles.pricingSection}>
@@ -585,23 +561,16 @@ export default function MerchantLayout() {
               <Text style={styles.price}>79</Text>
               <Text style={styles.period}>/month</Text>
             </View>
-            <Text style={styles.periodDetail}>Billed securely via Chip-in. Cancel anytime.</Text>
+            <Text style={styles.periodDetail}>Billed manually. RM79/month.</Text>
           </View>
 
           <TouchableOpacity
             style={styles.payBtn}
-            onPress={handleSimulatePayment}
-            disabled={isPaying}
+            onPress={handleWhatsAppPayment}
             activeOpacity={0.8}
           >
-            {isPaying ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.payBtnText}>Pay & Activate Store</Text>
-              </>
-            )}
+            <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.payBtnText}>Contact Support & Activate</Text>
           </TouchableOpacity>
           
           <TouchableOpacity

@@ -10,6 +10,7 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -62,33 +63,14 @@ export default function MerchantDashboard() {
   const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
 
   const handleUpgradePress = async () => {
-    setIsUpgrading(true);
+    const message = `Hello, I'd like to manually upgrade my RISEV Merchant Pro subscription for my store (Merchant ID: ${user?.merchant_id || 'N/A'}).`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/601110209669?text=${encodedMessage}`;
+    
     try {
-      const paymentId = 'chipin_' + Math.random().toString(36).substring(2, 10);
-      const res = await fetch(`${pb.baseUrl}/api/risev/chipin-webhook`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: paymentId,
-          status: 'success',
-          email: (user?.phone || 'merchant') + '@risev.app',
-          reference: user?.merchant_id,
-        }),
-      });
-
-      const resJson = await res.json();
-      if (resJson.success) {
-        await refreshSession();
-        alert('Success! Your Merchant Pro subscription is now active.');
-      } else {
-        alert(resJson.error || 'Payment gateway simulation failed.');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Payment simulation failed.');
-    } finally {
-      setIsUpgrading(false);
+      await Linking.openURL(whatsappUrl);
+    } catch (err) {
+      alert('Could not open WhatsApp. Please contact 01110209669 manually.');
     }
   };
 
@@ -240,14 +222,9 @@ export default function MerchantDashboard() {
             <TouchableOpacity
               style={styles.trialUpgradeBtn}
               onPress={handleUpgradePress}
-              disabled={isUpgrading}
               activeOpacity={0.9}
             >
-              {isUpgrading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.trialUpgradeBtnText}>Upgrade to Pro</Text>
-              )}
+              <Text style={styles.trialUpgradeBtnText}>Upgrade via WhatsApp</Text>
             </TouchableOpacity>
           </View>
         )}
