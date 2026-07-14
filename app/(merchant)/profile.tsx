@@ -74,6 +74,7 @@ export default function ProfileScreen() {
   const [whatsappQr, setWhatsappQr] = useState<string>('');
   const [whatsappPhone, setWhatsappPhone] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
   // Edit store profile states
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -166,23 +167,7 @@ export default function ProfileScreen() {
 
   const handleWhatsappPress = () => {
     if (whatsappStatus === 'connected') {
-      if (Platform.OS === 'web') {
-        const confirmDisconnect = window.confirm(
-          'WhatsApp Settings\n\nYour store WhatsApp account is currently connected. Do you want to disconnect it?'
-        );
-        if (confirmDisconnect) {
-          handleDisconnectWhatsapp();
-        }
-      } else {
-        Alert.alert(
-          'WhatsApp Settings',
-          'Your store WhatsApp account is currently connected. Do you want to disconnect it?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Disconnect', style: 'destructive', onPress: handleDisconnectWhatsapp }
-          ]
-        );
-      }
+      setShowDisconnectModal(true);
     } else {
       setShowQrModal(true);
       fetchWhatsappStatus(true);
@@ -881,6 +866,53 @@ export default function ProfileScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.modalConfirmText}>{t('logout')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Premium WhatsApp Disconnect Confirmation Modal */}
+      <Modal
+        visible={showDisconnectModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDisconnectModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconBg, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="logo-whatsapp" size={28} color="#EF4444" />
+            </View>
+            <Text style={styles.modalTitle}>
+              {locale === 'en' ? 'Disconnect WhatsApp' : 'Putuskan WhatsApp'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {locale === 'en'
+                ? 'Your store WhatsApp account is currently connected. Do you want to disconnect it?'
+                : 'Akaun WhatsApp kedai anda sedang bersambung. Adakah anda ingin memutus sambungan?'}
+            </Text>
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowDisconnectModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>
+                  {locale === 'en' ? 'Cancel' : 'Batal'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#EF4444' }]}
+                onPress={async () => {
+                  setShowDisconnectModal(false);
+                  await handleDisconnectWhatsapp();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {locale === 'en' ? 'Disconnect' : 'Putus Sambung'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
