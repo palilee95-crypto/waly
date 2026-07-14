@@ -582,7 +582,7 @@ export default function MerchantLayout() {
     }
   };
 
-  const handleWhatsAppPayment = async () => {
+  const handleTelegramPayment = async () => {
     let merchantId = user?.merchant_id;
     if (!merchantId) {
       try {
@@ -595,64 +595,22 @@ export default function MerchantLayout() {
       }
     }
 
-    let merchantName = 'My Store';
-    try {
-      if (merchantId) {
-        const merchant = await pb.collection('merchants').getOne(merchantId);
-        merchantName = merchant.name;
-      }
-    } catch (e) {
-      console.warn("Failed to fetch merchant details for WhatsApp message:", e);
+    if (!merchantId) {
+      Alert.alert('Error', 'Could not find Merchant ID. Please log in again.');
+      return;
     }
 
-    const basePrice = pricing.base_price_1m;
     const months = selectedMonths;
-    const rawTotal = basePrice * months;
+    const cleanMerchantId = merchantId.replace('merchant-', '');
+    const promoSuffix = appliedPromo ? `_${appliedPromo.code}` : '';
     
-    let durationDiscountPercent = 0;
-    if (months === 3) durationDiscountPercent = pricing.discount_3m;
-    else if (months === 6) durationDiscountPercent = pricing.discount_6m;
-    else if (months === 9) durationDiscountPercent = pricing.discount_9m;
-    else if (months === 12) durationDiscountPercent = pricing.discount_12m;
-
-    const durationDiscountAmount = rawTotal * (durationDiscountPercent / 100);
-    const priceAfterDurationDiscount = rawTotal - durationDiscountAmount;
-
-    let promoDiscountAmount = 0;
-    if (appliedPromo) {
-      if (appliedPromo.discount_type === 'percentage') {
-        promoDiscountAmount = priceAfterDurationDiscount * (appliedPromo.discount_value / 100);
-      } else {
-        promoDiscountAmount = Math.min(priceAfterDurationDiscount, appliedPromo.discount_value);
-      }
-    }
-
-    const finalPrice = Math.max(0, priceAfterDurationDiscount - promoDiscountAmount);
-
-    const message = `Hello RISEV Support! I'd like to manually activate my Merchant Pro subscription:
-
-🏪 Store Details:
-• Store Name: ${merchantName}
-• Merchant ID: ${merchantId || 'N/A'}
-• Owner Name: ${user?.name || 'N/A'}
-• Contact Phone: ${user?.phone || 'N/A'}
-
-💳 Plan Selection:
-• Plan: RISEV Merchant Pro
-• Duration: ${months} Month(s)
-• Base Price: RM${basePrice}/month
-• Raw Total: RM${rawTotal.toFixed(2)}
-${durationDiscountPercent > 0 ? `• Multi-month Discount: -${durationDiscountPercent}% (-RM${durationDiscountAmount.toFixed(2)})\n` : ''}${appliedPromo ? `• Promo Voucher (${appliedPromo.code}): -${appliedPromo.discount_type === 'percentage' ? `${appliedPromo.discount_value}%` : `RM${appliedPromo.discount_value}`} (-RM${promoDiscountAmount.toFixed(2)})\n` : ''}• Final Price: RM${finalPrice.toFixed(2)} (Billed manually)
-
-Please guide me with the bank transfer details and receipt upload instructions. Thank you!`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/601110209669?text=${encodedMessage}`;
+    // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
+    const telegramUrl = `https://t.me/WalyBillingBot?start=${cleanMerchantId}_${months}${promoSuffix}`;
     
     try {
-      await Linking.openURL(whatsappUrl);
+      await Linking.openURL(telegramUrl);
     } catch (err) {
-      Alert.alert('Error', 'Could not open WhatsApp. Please contact 01110209669 manually.');
+      Alert.alert('Error', 'Could not open Telegram. Please open Telegram and search for @WalyBillingBot.');
     }
   };
 
@@ -835,11 +793,11 @@ Please guide me with the bank transfer details and receipt upload instructions. 
 
           <TouchableOpacity
             style={[styles.payBtn, { marginTop: 16 }]}
-            onPress={handleWhatsAppPayment}
+            onPress={handleTelegramPayment}
             activeOpacity={0.8}
           >
-            <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.payBtnText}>Contact Support & Activate</Text>
+            <Ionicons name="paper-plane" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.payBtnText}>Upgrade via Telegram</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
