@@ -59,6 +59,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
   const [merchant, setMerchant] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -201,6 +202,37 @@ export default function ProfileScreen() {
     }
   };
 
+  // Helper to determine trial status
+  const getTrialStatus = () => {
+    if (user?.merchant_status === 'pending' && user?.merchant_created) {
+      const createdTime = new Date(user.merchant_created).getTime();
+      const now = new Date().getTime();
+      const diffMs = now - createdTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays >= 0 && diffDays < 7) {
+        return {
+          isInTrial: true,
+          daysRemaining: Math.max(0, Math.ceil(7 - diffDays))
+        };
+      }
+    }
+    return { isInTrial: false, daysRemaining: 0 };
+  };
+
+  const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
+
+  const getExpiryLabel = () => {
+    if (!subscription || !subscription.current_period_end) return '';
+    try {
+      const dateOnly = subscription.current_period_end.split(' ')[0]; // yyyy-mm-dd
+      const parsedDate = new Date(dateOnly);
+      const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `Exp: ${parsedDate.getDate()} ${monthsList[parsedDate.getMonth()]} ${parsedDate.getFullYear()}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   useEffect(() => {
     const fetchMerchant = async () => {
       if (!user || !user.merchant_id) return;
@@ -211,6 +243,14 @@ export default function ProfileScreen() {
         // Fetch WhatsApp status only if user is owner
         if (mRec.owner === user.id) {
           fetchWhatsappStatus();
+        }
+
+        // Fetch subscription record
+        try {
+          const subRec = await pb.collection('subscriptions').getFirstListItem(`merchant = "${user.merchant_id}"`);
+          setSubscription(subRec);
+        } catch (e) {
+          console.log("No active subscription row found for profile view:", e.message);
         }
 
         const locs = await pb.collection('store_locations').getFullList({
@@ -681,12 +721,27 @@ export default function ProfileScreen() {
             <View style={styles.shopMainInfo}>
               <Text style={styles.shopName}>{merchant?.name || user?.name || 'The Coffee House'}</Text>
               <View style={styles.partnerRow}>
-                <View style={styles.goldPartnerBadge}>
-                  <Text style={styles.goldPartnerText}>
-                    {merchant?.is_verified ? t('verified_partner') : t('gold_partner')}
-                  </Text>
-                </View>
-                <Text style={styles.locationText}>Kuala Lumpur</Text>
+                {merchant?.status === 'active' ? (
+                  <>
+                    <View style={styles.proBadge}>
+                      <Text style={styles.proBadgeText}>PRO</Text>
+                    </View>
+                    {subscription?.current_period_end && (
+                      <Text style={styles.locationText}>{getExpiryLabel()}</Text>
+                    )}
+                  </>
+                ) : isInTrial ? (
+                  <>
+                    <View style={styles.trialBadge}>
+                      <Text style={styles.trialBadgeText}>TRIAL</Text>
+                    </View>
+                    <Text style={styles.locationText}>{trialDaysRemaining}d left</Text>
+                  </>
+                ) : (
+                  <View style={styles.expiredBadge}>
+                    <Text style={styles.expiredBadgeText}>SUSPENDED</Text>
+                  </View>
+                )}
               </View>
             </View>
             <TouchableOpacity style={styles.updateBtn} onPress={handleOpenEdit} activeOpacity={0.8}>
@@ -1703,20 +1758,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  goldPartnerBadge: {
-    backgroundColor: '#F1F5F9', // Light gray badge instead of amber
+  proBadge: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  goldPartnerText: {
+  proBadgeText: {
     fontSize: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569', // Dark slate color text
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#3B82F6',
+  },
+  trialBadge: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  trialBadgeText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#D97706',
+  },
+  expiredBadge: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  expiredBadgeText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#EF4444',
   },
   locationText: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#737686',
   },
   updateBtn: {
