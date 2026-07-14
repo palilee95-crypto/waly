@@ -88,36 +88,38 @@ export default function GiveStampsScreen() {
 
   const redeemVoucherCode = async (code: string) => {
     setIsSubmitting(true);
-    try {
-      const voucher = await pb.collection('vouchers').getFirstListItem(
-        `code = "${code.trim().toUpperCase()}" && status = "active"`,
-        { expand: 'reward,customer' }
-      );
+    setTimeout(async () => {
+      try {
+        const voucher = await pb.collection('vouchers').getFirstListItem(
+          `code = "${code.trim().toUpperCase()}" && status = "active"`,
+          { expand: 'reward,customer' }
+        );
 
-      if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
-        throw new Error('This voucher has expired.');
+        if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+          throw new Error('This voucher has expired.');
+        }
+
+        // Mark voucher as used
+        await pb.collection('vouchers').update(voucher.id, {
+          status: 'used',
+          used_at: new Date().toISOString(),
+        });
+
+        setSuccessType('voucher');
+        setVoucherDetails({
+          code: voucher.code,
+          customerName: voucher.expand?.customer?.name || 'Unknown Customer',
+          rewardName: voucher.expand?.reward?.name || 'Voucher Reward',
+        });
+        setShowSuccessModal(true);
+        setPhoneNumber('');
+      } catch (err: any) {
+        console.warn(err);
+        Alert.alert('Redemption Failed', err.message || 'Invalid, expired, or already used voucher.');
+      } finally {
+        setIsSubmitting(false);
       }
-
-      // Mark voucher as used
-      await pb.collection('vouchers').update(voucher.id, {
-        status: 'used',
-        used_at: new Date().toISOString(),
-      });
-
-      setSuccessType('voucher');
-      setVoucherDetails({
-        code: voucher.code,
-        customerName: voucher.expand?.customer?.name || 'Unknown Customer',
-        rewardName: voucher.expand?.reward?.name || 'Voucher Reward',
-      });
-      setShowSuccessModal(true);
-      setPhoneNumber('');
-    } catch (err: any) {
-      console.warn(err);
-      Alert.alert('Redemption Failed', err.message || 'Invalid, expired, or already used voucher.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, 20);
   };
 
   const proceedWithIssuingStamps = async (customer: any, count: number, rawInput: string) => {
@@ -212,55 +214,58 @@ export default function GiveStampsScreen() {
 
     setIsSubmitting(true);
     const count = parseInt(stampsCount || '1', 10);
-    let customer;
     const normalizedPhone = normalizePhoneNumber(rawInput);
-    try {
-      // Find the user by phone
-      customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-      await proceedWithIssuingStamps(customer, count, rawInput);
-    } catch (err: any) {
-      console.warn("Phone lookup failed (customer doesn't exist yet):", err);
-      // Trigger the custom beautiful in-app modal instead of browser native Alerts!
-      setTempPhone(normalizedPhone);
-      setTempCount(count);
-      setShowCreateConfirmModal(true);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setTimeout(async () => {
+      try {
+        // Find the user by phone
+        const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+        await proceedWithIssuingStamps(customer, count, rawInput);
+      } catch (err: any) {
+        console.warn("Phone lookup failed (customer doesn't exist yet):", err);
+        // Trigger the custom beautiful in-app modal instead of browser native Alerts!
+        setTempPhone(normalizedPhone);
+        setTempCount(count);
+        setShowCreateConfirmModal(true);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }, 20);
   };
 
   const handleCreateAndIssue = async () => {
     setIsSubmitting(true);
-    try {
-      const cleanNum = tempPhone.replace(/[^\d]/g, '');
-      const emailVal = `user_${cleanNum}@risev.app`;
-      const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
+    setTimeout(async () => {
+      try {
+        const cleanNum = tempPhone.replace(/[^\d]/g, '');
+        const emailVal = `user_${cleanNum}@risev.app`;
+        const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
 
-      // Create new customer
-      const newCustomer = await pb.collection('users').create({
-        phone: tempPhone,
-        email: emailVal,
-        name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
-        role: 'customer',
-        password: randomPassword,
-        passwordConfirm: randomPassword,
-        total_points: 0,
-        tier: 'bronze',
-      });
+        // Create new customer
+        const newCustomer = await pb.collection('users').create({
+          phone: tempPhone,
+          email: emailVal,
+          name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
+          role: 'customer',
+          password: randomPassword,
+          passwordConfirm: randomPassword,
+          total_points: 0,
+          tier: 'bronze',
+        });
 
-      setNewCustomerName('');
+        setNewCustomerName('');
 
-      // Continue the stamp issue process using the new customer!
-      await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
-      setShowCreateConfirmModal(false);
-    } catch (createErr: any) {
-      console.error("Auto customer creation failed:", createErr);
-      Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
-      setScanned(false);
-      setShowCreateConfirmModal(false);
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Continue the stamp issue process using the new customer!
+        await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
+        setShowCreateConfirmModal(false);
+      } catch (createErr: any) {
+        console.error("Auto customer creation failed:", createErr);
+        Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+        setScanned(false);
+        setShowCreateConfirmModal(false);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }, 20);
   };
 
   const handleCreateAndIssueSubmit = async () => {
@@ -429,25 +434,29 @@ export default function GiveStampsScreen() {
     }
 
     setScanned(true);
+    setIsSubmitting(true);
 
-    if (isVoucherCode(rawInput)) {
-      // It's a voucher redemption scan!
-      await redeemVoucherCode(rawInput);
-    } else {
-      // It's a loyalty card stamp issue scan!
-      const count = parseInt(stampsCount || '1', 10);
-      const normalizedPhone = normalizePhoneNumber(rawInput);
-      try {
-        const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-        await proceedWithIssuingStamps(customer, count, rawInput);
-      } catch (err: any) {
-        console.warn("QR Phone lookup failed:", err);
-        // If the customer doesn't exist, trigger the customer creation modal
-        setTempPhone(normalizedPhone);
-        setTempCount(count);
-        setShowCreateConfirmModal(true);
+    setTimeout(async () => {
+      if (isVoucherCode(rawInput)) {
+        // It's a voucher redemption scan!
+        await redeemVoucherCode(rawInput);
+      } else {
+        // It's a loyalty card stamp issue scan!
+        const count = parseInt(stampsCount || '1', 10);
+        const normalizedPhone = normalizePhoneNumber(rawInput);
+        try {
+          const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+          await proceedWithIssuingStamps(customer, count, rawInput);
+        } catch (err: any) {
+          console.warn("QR Phone lookup failed:", err);
+          // If the customer doesn't exist, trigger the customer creation modal
+          setTempPhone(normalizedPhone);
+          setTempCount(count);
+          setIsSubmitting(false);
+          setShowCreateConfirmModal(true);
+        }
       }
-    }
+    }, 20);
   };
 
   const { width: windowWidth } = useWindowDimensions();
