@@ -67,6 +67,7 @@ export default function GiveStampsScreen() {
     customerName: string;
     rewardName: string;
   } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const normalizePhoneNumber = (phone: string) => {
     let cleaned = phone.trim().replace(/[-\s]/g, ''); // Remove spaces and dashes
@@ -86,6 +87,7 @@ export default function GiveStampsScreen() {
   };
 
   const redeemVoucherCode = async (code: string) => {
+    setIsSubmitting(true);
     try {
       const voucher = await pb.collection('vouchers').getFirstListItem(
         `code = "${code.trim().toUpperCase()}" && status = "active"`,
@@ -113,10 +115,13 @@ export default function GiveStampsScreen() {
     } catch (err: any) {
       console.warn(err);
       Alert.alert('Redemption Failed', err.message || 'Invalid, expired, or already used voucher.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const proceedWithIssuingStamps = async (customer: any, count: number, rawInput: string) => {
+    setIsSubmitting(true);
     let program;
     try {
       // Fetch merchant's active loyalty program
@@ -124,6 +129,7 @@ export default function GiveStampsScreen() {
     } catch (err: any) {
       console.warn("Active loyalty campaign search failed:", err);
       setShowNoCampaignModal(true);
+      setIsSubmitting(false);
       return;
     }
 
@@ -182,6 +188,8 @@ export default function GiveStampsScreen() {
     } catch (err: any) {
       console.warn(err);
       Alert.alert('Error', err.message || 'Failed to award stamps.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -202,6 +210,7 @@ export default function GiveStampsScreen() {
       return;
     }
 
+    setIsSubmitting(true);
     const count = parseInt(stampsCount || '1', 10);
     let customer;
     const normalizedPhone = normalizePhoneNumber(rawInput);
@@ -215,10 +224,13 @@ export default function GiveStampsScreen() {
       setTempPhone(normalizedPhone);
       setTempCount(count);
       setShowCreateConfirmModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateAndIssue = async () => {
+    setIsSubmitting(true);
     try {
       const cleanNum = tempPhone.replace(/[^\d]/g, '');
       const emailVal = `user_${cleanNum}@risev.app`;
@@ -240,10 +252,14 @@ export default function GiveStampsScreen() {
 
       // Continue the stamp issue process using the new customer!
       await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
+      setShowCreateConfirmModal(false);
     } catch (createErr: any) {
       console.error("Auto customer creation failed:", createErr);
       Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
       setScanned(false);
+      setShowCreateConfirmModal(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -597,13 +613,18 @@ export default function GiveStampsScreen() {
 
             {/* Action Button */}
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
               onPress={handleManualSubmit}
               activeOpacity={0.9}
+              disabled={isSubmitting}
             >
-              <Text style={styles.submitBtnText}>
-                {isVoucherCode(phoneNumber) ? t('redeem_voucher') : t('issue_stamps_btn')}
-              </Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.submitBtnText}>
+                  {isVoucherCode(phoneNumber) ? t('redeem_voucher') : t('issue_stamps_btn')}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -731,15 +752,9 @@ export default function GiveStampsScreen() {
             </Text>
 
             {/* Optional Customer Name Input */}
-            <View style={{ width: '100%', marginBottom: 20 }}>
-              <Text style={{
-                fontSize: 10,
-                fontFamily: 'PlusJakartaSans_700Bold',
-                color: '#94A3B8',
-                letterSpacing: 0.5,
-                marginBottom: 6,
-              }}>
-                {t('customer_name_optional')}
+            <View style={{ gap: 6, width: '100%', marginBottom: 20 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
+                {t('customer_name') || 'CUSTOMER NAME'}
               </Text>
               <View style={{
                 flexDirection: 'row',
@@ -767,6 +782,7 @@ export default function GiveStampsScreen() {
                   onChangeText={setNewCustomerName}
                   placeholder={t('customer_name_placeholder')}
                   placeholderTextColor="#94A3B8"
+                  editable={!isSubmitting}
                 />
               </View>
             </View>
@@ -783,7 +799,9 @@ export default function GiveStampsScreen() {
                   borderWidth: 1.5,
                   borderColor: '#E2E8F0',
                   backgroundColor: '#FFFFFF',
+                  opacity: isSubmitting ? 0.5 : 1,
                 }}
+                disabled={isSubmitting}
                 onPress={() => {
                   setShowCreateConfirmModal(false);
                   setScanned(false);
@@ -798,21 +816,23 @@ export default function GiveStampsScreen() {
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  backgroundColor: '#000000',
+                  backgroundColor: isSubmitting ? '#475569' : '#000000',
                   borderRadius: 16,
                   height: 48,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                onPress={async () => {
-                  setShowCreateConfirmModal(false);
-                  await handleCreateAndIssue();
-                }}
+                disabled={isSubmitting}
+                onPress={handleCreateAndIssue}
                 activeOpacity={0.9}
               >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  {t('create_issue')}
-                </Text>
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    {t('create_issue')}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
