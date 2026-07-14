@@ -672,7 +672,7 @@ export default function CustomerProfile() {
               <Text style={styles.pricingLabel}>PRO PLAN</Text>
               <View style={styles.pricingRow}>
                 <Text style={styles.currencySymbol}>RM</Text>
-                <Text style={styles.priceText}>99</Text>
+                <Text style={styles.priceText}>79</Text>
                 <Text style={styles.billingPeriod}>/month</Text>
               </View>
               <Text style={styles.pricingDesc}>Recurring billing. Cancel anytime.</Text>

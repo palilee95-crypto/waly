@@ -179,9 +179,29 @@ export default function MerchantLayout() {
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [isSubmittingOnboarding, setIsSubmittingOnboarding] = React.useState(false);
 
+  // Helper to determine trial status
+  const getTrialStatus = () => {
+    if (user?.merchant_status === 'pending' && user?.merchant_created) {
+      const createdTime = new Date(user.merchant_created).getTime();
+      const now = new Date().getTime();
+      const diffMs = now - createdTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays >= 0 && diffDays < 7) {
+        return {
+          isInTrial: true,
+          daysRemaining: Math.max(0, Math.ceil(7 - diffDays))
+        };
+      }
+    }
+    return { isInTrial: false, daysRemaining: 0 };
+  };
+
+  const { isInTrial } = getTrialStatus();
+
   React.useEffect(() => {
     async function checkMerchantProfile() {
-      if (!user || !user.merchant_id || user.merchant_status !== 'active') {
+      const isAllowed = user?.merchant_status === 'active' || isInTrial;
+      if (!user || !user.merchant_id || !isAllowed) {
         setCheckingProfile(false);
         return;
       }
@@ -520,7 +540,7 @@ export default function MerchantLayout() {
   }
 
   // Gateway subscription gate blocker
-  if (user?.merchant_status !== 'active') {
+  if (user?.merchant_status !== 'active' && !isInTrial) {
     return (
       <View style={styles.gateContainer}>
         <View style={styles.gateCard}>
@@ -536,7 +556,7 @@ export default function MerchantLayout() {
             <Text style={styles.pricingLabel}>PRO MERCHANT PLAN</Text>
             <View style={styles.pricingRow}>
               <Text style={styles.currency}>RM</Text>
-              <Text style={styles.price}>99</Text>
+              <Text style={styles.price}>79</Text>
               <Text style={styles.period}>/month</Text>
             </View>
             <Text style={styles.periodDetail}>Billed securely via Chip-in. Cancel anytime.</Text>

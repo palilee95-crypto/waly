@@ -33,13 +33,64 @@ type ActivityItem = {
 };
 
 export default function MerchantDashboard() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState<'Today' | 'This Week' | 'This Month'>('Today');
   const [merchant, setMerchant] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // Helper to determine trial status
+  const getTrialStatus = () => {
+    if (user?.merchant_status === 'pending' && user?.merchant_created) {
+      const createdTime = new Date(user.merchant_created).getTime();
+      const now = new Date().getTime();
+      const diffMs = now - createdTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays >= 0 && diffDays < 7) {
+        return {
+          isInTrial: true,
+          daysRemaining: Math.max(0, Math.ceil(7 - diffDays))
+        };
+      }
+    }
+    return { isInTrial: false, daysRemaining: 0 };
+  };
+
+  const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
+
+  const handleUpgradePress = async () => {
+    setIsUpgrading(true);
+    try {
+      const paymentId = 'chipin_' + Math.random().toString(36).substring(2, 10);
+      const res = await fetch(`${pb.baseUrl}/api/risev/chipin-webhook`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: paymentId,
+          status: 'success',
+          email: (user?.phone || 'merchant') + '@risev.app',
+          reference: user?.merchant_id,
+        }),
+      });
+
+      const resJson = await res.json();
+      if (resJson.success) {
+        await refreshSession();
+        alert('Success! Your Merchant Pro subscription is now active.');
+      } else {
+        alert(resJson.error || 'Payment gateway simulation failed.');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Payment simulation failed.');
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
 
   const fetchMerchantData = async () => {
     if (!user || !user.merchant_id) {
@@ -170,6 +221,36 @@ export default function MerchantDashboard() {
             style={{ width: 110, height: 38, resizeMode: 'contain' }}
           />
         </View>
+
+        {isInTrial && (
+          <View style={styles.trialBanner}>
+            <View style={styles.trialBannerContent}>
+              <View style={styles.trialIconWrap}>
+                <Ionicons name="sparkles" size={20} color="#D97706" />
+              </View>
+              <View style={styles.trialTextWrap}>
+                <Text style={styles.trialTitle}>
+                  {trialDaysRemaining} {trialDaysRemaining === 1 ? 'Day' : 'Days'} Left on Free Trial
+                </Text>
+                <Text style={styles.trialSubtitle}>
+                  You are currently using the 7-day Free Trial of Merchant Pro. Upgrade today to ensure uninterrupted access.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.trialUpgradeBtn}
+              onPress={handleUpgradePress}
+              disabled={isUpgrading}
+              activeOpacity={0.9}
+            >
+              {isUpgrading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.trialUpgradeBtnText}>Upgrade to Pro</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Total Stamp Issued Metric Card */}
         <View style={styles.balanceCard}>
@@ -572,5 +653,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 20,
+  },
+  trialBanner: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    gap: 16,
+  },
+  trialBannerContent: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  trialIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  trialTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  trialTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+  },
+  trialSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#B45309',
+    lineHeight: 18,
+  },
+  trialUpgradeBtn: {
+    backgroundColor: '#D97706',
+    borderRadius: 14,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trialUpgradeBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
 });

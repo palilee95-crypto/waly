@@ -72,6 +72,7 @@ interface AuthUser {
   activeRole: UserRole; // currently active mode
   merchant_id?: string; // linked merchant ID
   merchant_status?: 'active' | 'suspended' | 'pending';
+  merchant_created?: string;
   tier?: string;
   total_points?: number;
 }
@@ -104,9 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initAuth();
   }, []);
 
-  const ensureMerchantProfile = async (record: any): Promise<{ id?: string; status?: 'active' | 'suspended' | 'pending' }> => {
+  const ensureMerchantProfile = async (record: any): Promise<{ id?: string; status?: 'active' | 'suspended' | 'pending'; created?: string }> => {
     let merchantId = record.merchant_id;
     let status: 'active' | 'suspended' | 'pending' = 'pending';
+    let created: string | undefined = undefined;
     
     if (record.role === 'merchant' || record.role === 'both') {
       let merchantRecord = null;
@@ -137,6 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (merchantRecord) {
             merchantId = merchantRecord.id;
             status = (merchantRecord.status as any) || 'pending';
+            created = merchantRecord.created;
             // Link it to the user profile
             await pb.collection('users').update(record.id, {
               merchant_id: merchantRecord.id,
@@ -148,9 +151,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         merchantId = merchantRecord.id;
         status = (merchantRecord.status as any) || 'pending';
+        created = merchantRecord.created;
       }
     }
-    return { id: merchantId, status };
+    return { id: merchantId, status, created };
   };
 
   const initAuth = async () => {
@@ -175,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           activeRole: role,
           merchant_id: merchantData.id,
           merchant_status: merchantData.status,
+          merchant_created: merchantData.created,
           tier: record.tier || undefined,
           total_points: record.total_points || 0,
         });
@@ -236,6 +241,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       activeRole: role,
       merchant_id: merchantData.id,
       merchant_status: merchantData.status,
+      merchant_created: merchantData.created,
       tier: authRecord.tier || undefined,
       total_points: authRecord.total_points || 0,
     });
@@ -262,6 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       activeRole: role,
       merchant_id: merchantData.id,
       merchant_status: merchantData.status,
+      merchant_created: merchantData.created,
       tier: authRecord.tier || undefined,
       total_points: authRecord.total_points || 0,
     });
@@ -290,9 +297,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await pb.collection('users').update(user.id, { role });
     await storage.setItem('risev_active_role', role || 'customer');
     
-    let merchantData: { id?: string; status?: 'active' | 'suspended' | 'pending' } = { 
+    let merchantData: { id?: string; status?: 'active' | 'suspended' | 'pending'; created?: string } = { 
       id: user.merchant_id, 
-      status: user.merchant_status 
+      status: user.merchant_status,
+      created: user.merchant_created
     };
     if (role === 'merchant') {
       merchantData = await ensureMerchantProfile({ ...user, role });
@@ -303,7 +311,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       role, 
       activeRole: role,
       merchant_id: merchantData.id,
-      merchant_status: merchantData.status
+      merchant_status: merchantData.status,
+      merchant_created: merchantData.created
     } : null);
     setActiveRole(role);
   };
@@ -355,6 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         activeRole: role,
         merchant_id: merchantData.id,
         merchant_status: merchantData.status,
+        merchant_created: merchantData.created,
         tier: record.tier || undefined,
         total_points: record.total_points || 0,
       });
