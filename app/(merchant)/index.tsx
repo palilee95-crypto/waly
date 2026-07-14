@@ -52,6 +52,10 @@ export default function MerchantDashboard() {
     discount_6m: 10,
     discount_9m: 12,
     discount_12m: 15,
+    enable_3m: true,
+    enable_6m: true,
+    enable_9m: true,
+    enable_12m: true,
   });
 
   const [promoCode, setPromoCode] = useState('');
@@ -70,6 +74,10 @@ export default function MerchantDashboard() {
           discount_6m: record.discount_6m || 10,
           discount_9m: record.discount_9m || 12,
           discount_12m: record.discount_12m || 15,
+          enable_3m: record.enable_3m !== false,
+          enable_6m: record.enable_6m !== false,
+          enable_9m: record.enable_9m !== false,
+          enable_12m: record.enable_12m !== false,
         });
       } catch (err) {
         console.warn('Failed to load dynamic pricing, using defaults:', err);
@@ -79,6 +87,14 @@ export default function MerchantDashboard() {
       loadPricing();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Reset selectedMonths to 1 if the selected option gets disabled
+    if (selectedMonths === 3 && !pricing.enable_3m) setSelectedMonths(1);
+    if (selectedMonths === 6 && !pricing.enable_6m) setSelectedMonths(1);
+    if (selectedMonths === 9 && !pricing.enable_9m) setSelectedMonths(1);
+    if (selectedMonths === 12 && !pricing.enable_12m) setSelectedMonths(1);
+  }, [pricing, selectedMonths]);
 
   const handleApplyPromo = async () => {
     setPromoError('');
@@ -494,29 +510,39 @@ Please guide me with the bank transfer details and receipt upload instructions. 
             {/* 1. Select Duration Cards */}
             <Text style={styles.sectionLabel}>SELECT PLAN DURATION</Text>
             <View style={styles.planGrid}>
-              {([1, 3, 6, 12] as const).map((m) => {
-                const isActive = selectedMonths === m;
-                let disc = 0;
-                if (m === 3) disc = pricing.discount_3m;
-                else if (m === 6) disc = pricing.discount_6m;
-                else if (m === 12) disc = pricing.discount_12m;
+              {([1, 3, 6, 9, 12] as const)
+                .filter((m) => {
+                  if (m === 1) return true;
+                  if (m === 3) return pricing.enable_3m;
+                  if (m === 6) return pricing.enable_6m;
+                  if (m === 9) return pricing.enable_9m;
+                  if (m === 12) return pricing.enable_12m;
+                  return false;
+                })
+                .map((m) => {
+                  const isActive = selectedMonths === m;
+                  let disc = 0;
+                  if (m === 3) disc = pricing.discount_3m;
+                  else if (m === 6) disc = pricing.discount_6m;
+                  else if (m === 9) disc = pricing.discount_9m;
+                  else if (m === 12) disc = pricing.discount_12m;
 
-                return (
-                  <TouchableOpacity
-                    key={m}
-                    style={[styles.planCard, isActive && styles.planCardActive]}
-                    onPress={() => setSelectedMonths(m)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.planDuration}>{m} Mo</Text>
-                    {disc > 0 && (
-                      <View style={styles.planDiscountBadge}>
-                        <Text style={styles.planDiscountText}>-{disc}%</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.planCard, isActive && styles.planCardActive]}
+                      onPress={() => setSelectedMonths(m)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.planDuration}>{m} Mo</Text>
+                      {disc > 0 && (
+                        <View style={styles.planDiscountBadge}>
+                          <Text style={styles.planDiscountText}>-{disc}%</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
 
             {/* 2. Promo Code Input */}

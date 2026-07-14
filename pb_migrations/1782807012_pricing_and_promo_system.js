@@ -70,6 +70,30 @@ migrate((app) => {
         "type": "number",
         "required": true,
         "noDecimal": true
+      },
+      {
+        "id": "bool_enable_3m_ps",
+        "name": "enable_3m",
+        "type": "bool",
+        "required": false
+      },
+      {
+        "id": "bool_enable_6m_ps",
+        "name": "enable_6m",
+        "type": "bool",
+        "required": false
+      },
+      {
+        "id": "bool_enable_9m_ps",
+        "name": "enable_9m",
+        "type": "bool",
+        "required": false
+      },
+      {
+        "id": "bool_enable_12m_ps",
+        "name": "enable_12m",
+        "type": "bool",
+        "required": false
       }
     ]
   });
@@ -148,6 +172,10 @@ migrate((app) => {
   defaultSettings.set("discount_6m", 10);
   defaultSettings.set("discount_9m", 12);
   defaultSettings.set("discount_12m", 15);
+  defaultSettings.set("enable_3m", true);
+  defaultSettings.set("enable_6m", true);
+  defaultSettings.set("enable_9m", true);
+  defaultSettings.set("enable_12m", true);
   app.save(defaultSettings);
 
   // 4. Seed sample promo codes
