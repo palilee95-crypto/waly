@@ -297,25 +297,18 @@ export default function MerchantDashboard() {
 
         {isInTrial && (
           <View style={styles.trialBanner}>
-            <View style={styles.trialBannerContent}>
-              <View style={styles.trialIconWrap}>
-                <Ionicons name="sparkles" size={20} color="#D97706" />
-              </View>
-              <View style={styles.trialTextWrap}>
-                <Text style={styles.trialTitle}>
-                  {trialDaysRemaining} {trialDaysRemaining === 1 ? 'Day' : 'Days'} Left on Free Trial
-                </Text>
-                <Text style={styles.trialSubtitle}>
-                  You are currently using the 7-day Free Trial of Merchant Pro. Upgrade today to ensure uninterrupted access.
-                </Text>
-              </View>
+            <View style={styles.trialLeftWrap}>
+              <Ionicons name="sparkles" size={16} color="#D97706" style={{ marginRight: 6 }} />
+              <Text style={styles.trialTitle}>
+                {trialDaysRemaining} {trialDaysRemaining === 1 ? 'Day' : 'Days'} Left on Trial
+              </Text>
             </View>
             <TouchableOpacity
               style={styles.trialUpgradeBtn}
               onPress={handleUpgradePress}
-              activeOpacity={0.9}
+              activeOpacity={0.8}
             >
-              <Text style={styles.trialUpgradeBtnText}>Upgrade to Merchant Pro</Text>
+              <Text style={styles.trialUpgradeBtnText}>Upgrade</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -910,50 +903,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   trialBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFBEB',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#FCD34D',
-    gap: 16,
+    marginBottom: 16,
   },
-  trialBannerContent: {
+  trialLeftWrap: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  trialIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FEF3C7',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  trialTextWrap: {
     flex: 1,
-    gap: 2,
   },
   trialTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#92400E',
   },
-  trialSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#B45309',
-    lineHeight: 18,
-  },
   trialUpgradeBtn: {
     backgroundColor: '#D97706',
-    borderRadius: 14,
-    height: 44,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trialUpgradeBtnText: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
