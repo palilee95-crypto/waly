@@ -51,6 +51,7 @@ export default function GiveStampsScreen() {
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
   const [showNoCampaignModal, setShowNoCampaignModal] = useState(false);
+  const [showSelfIssuanceModal, setShowSelfIssuanceModal] = useState(false);
   const [tempPhone, setTempPhone] = useState('');
   const [tempCount, setTempCount] = useState(1);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -189,7 +190,11 @@ export default function GiveStampsScreen() {
       setBillSubtotal('');
     } catch (err: any) {
       console.warn(err);
-      Alert.alert('Error', err.message || 'Failed to award stamps.');
+      if (err.message && (err.message.includes('Self-issuance') || err.message.includes('self-issuance') || err.status === 403)) {
+        setShowSelfIssuanceModal(true);
+      } else {
+        Alert.alert('Error', err.message || 'Failed to award stamps.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -219,6 +224,11 @@ export default function GiveStampsScreen() {
       try {
         // Find the user by phone
         const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+        if (customer.id === user.id) {
+          setIsSubmitting(false);
+          setShowSelfIssuanceModal(true);
+          return;
+        }
         await proceedWithIssuingStamps(customer, count, rawInput);
       } catch (err: any) {
         console.warn("Phone lookup failed (customer doesn't exist yet):", err);
@@ -446,6 +456,12 @@ export default function GiveStampsScreen() {
         const normalizedPhone = normalizePhoneNumber(rawInput);
         try {
           const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+          if (customer.id === user.id) {
+            setIsSubmitting(false);
+            setScanned(false);
+            setShowSelfIssuanceModal(true);
+            return;
+          }
           await proceedWithIssuingStamps(customer, count, rawInput);
         } catch (err: any) {
           console.warn("QR Phone lookup failed:", err);
@@ -844,6 +860,60 @@ export default function GiveStampsScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Self-Issuance Warning Modal */}
+      <Modal
+        visible={showSelfIssuanceModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSelfIssuanceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Red Warning/Shield Icon */}
+            <View style={[styles.successIconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="alert-circle" size={48} color="#EF4444" />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: '#991B1B', marginBottom: 12, textAlign: 'center' }]}>
+              {locale === 'en' ? 'Self-Issuance Blocked' : 'Pengeluaran Sendiri Disekat'}
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_600SemiBold',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 18,
+              marginBottom: 24,
+            }}>
+              {locale === 'en' 
+                ? 'You cannot award stamps or points to your own account. Self-issuance is blocked to ensure system fairness.' 
+                : 'Anda tidak boleh memberikan setem atau mata ganjaran kepada akaun anda sendiri. Pengeluaran sendiri disekat untuk keselamatan sistem.'}
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                backgroundColor: '#DC2626',
+                borderRadius: 16,
+                height: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={() => {
+                setShowSelfIssuanceModal(false);
+                setScanned(false);
+              }}
+              activeOpacity={0.9}
+            >
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                {locale === 'en' ? 'Understood' : 'Faham'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
