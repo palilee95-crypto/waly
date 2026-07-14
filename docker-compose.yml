@@ -122,7 +122,7 @@ services:
   # Telegram Auto Payment & Gemini Receipt Verification Bot
   payment-bot:
     build:
-      context: ../payment-bot
+      context: ./payment-bot
       dockerfile: Dockerfile
     container_name: risev-payment-bot
     restart: unless-stopped
