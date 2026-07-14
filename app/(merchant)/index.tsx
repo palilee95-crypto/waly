@@ -156,12 +156,12 @@ export default function MerchantDashboard() {
     const promoSuffix = appliedPromo ? `_${appliedPromo.code}` : '';
     
     // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
-    const telegramUrl = `https://t.me/RisevBillingBot?start=${cleanMerchantId}_${months}${promoSuffix}`;
+    const telegramUrl = `https://t.me/RisevBilling_bot?start=${cleanMerchantId}_${months}${promoSuffix}`;
     
     try {
       await Linking.openURL(telegramUrl);
     } catch (err) {
-      alert('Could not open Telegram. Please open Telegram and search for @RisevBillingBot.');
+      alert('Could not open Telegram. Please open Telegram and search for @RisevBilling_bot.');
     }
   };
 
@@ -315,7 +315,7 @@ export default function MerchantDashboard() {
               onPress={handleUpgradePress}
               activeOpacity={0.9}
             >
-              <Text style={styles.trialUpgradeBtnText}>Upgrade via WhatsApp</Text>
+              <Text style={styles.trialUpgradeBtnText}>Upgrade to Merchant Pro</Text>
             </TouchableOpacity>
           </View>
         )}
