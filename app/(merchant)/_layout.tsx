@@ -514,7 +514,30 @@ export default function MerchantLayout() {
       }
     }
 
-    const message = `Hello, I'd like to manually activate my RISEV Merchant Pro subscription for my store (Merchant ID: ${merchantId || 'N/A'}).`;
+    let merchantName = 'My Store';
+    try {
+      if (merchantId) {
+        const merchant = await pb.collection('merchants').getOne(merchantId);
+        merchantName = merchant.name;
+      }
+    } catch (e) {
+      console.warn("Failed to fetch merchant details for WhatsApp message:", e);
+    }
+
+    const message = `Hello RISEV Support! I'd like to manually activate my Merchant Pro subscription:
+
+🏪 Store Details:
+• Store Name: ${merchantName}
+• Merchant ID: ${merchantId || 'N/A'}
+• Owner Name: ${user?.name || 'N/A'}
+• Contact Phone: ${user?.phone || 'N/A'}
+
+💳 Plan Selection:
+• Plan: RISEV Merchant Pro
+• Price: RM79/month (Manual billing)
+
+Please guide me with the bank transfer details and receipt upload instructions. Thank you!`;
+
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/601110209669?text=${encodedMessage}`;
     

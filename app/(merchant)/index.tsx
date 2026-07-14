@@ -63,7 +63,21 @@ export default function MerchantDashboard() {
   const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
 
   const handleUpgradePress = async () => {
-    const message = `Hello, I'd like to manually upgrade my RISEV Merchant Pro subscription for my store (Merchant ID: ${user?.merchant_id || 'N/A'}).`;
+    const merchantName = merchant?.name || 'My Store';
+    const message = `Hello RISEV Support! I'd like to manually upgrade my Merchant Pro subscription:
+
+🏪 Store Details:
+• Store Name: ${merchantName}
+• Merchant ID: ${user?.merchant_id || 'N/A'}
+• Owner Name: ${user?.name || 'N/A'}
+• Contact Phone: ${user?.phone || 'N/A'}
+
+💳 Plan Selection:
+• Plan: RISEV Merchant Pro
+• Price: RM79/month (Manual billing)
+
+Please guide me with the bank transfer details and receipt upload instructions. Thank you!`;
+
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/601110209669?text=${encodedMessage}`;
     
