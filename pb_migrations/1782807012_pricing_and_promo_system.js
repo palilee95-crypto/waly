@@ -2,7 +2,7 @@
 migrate((app) => {
   // 1. Create pricing_settings collection
   const pricingSettings = new Collection({
-    "id": "pbc_pricing_settings",
+    "id": "pricingsettings",
     "name": "pricing_settings",
     "type": "base",
     "system": false,
@@ -61,7 +61,7 @@ migrate((app) => {
 
   // 2. Create subscription_promo_codes collection
   const promoCodes = new Collection({
-    "id": "pbc_promo_codes",
+    "id": "promocodes12345",
     "name": "subscription_promo_codes",
     "type": "base",
     "system": false,
@@ -110,7 +110,7 @@ migrate((app) => {
   // 3. Seed default config
   const settingsCol = app.findCollectionByNameOrId("pricing_settings");
   const defaultSettings = new Record(settingsCol);
-  defaultSettings.set("id", "pricing_config");
+  defaultSettings.set("id", "pricesettings01");
   defaultSettings.set("base_price_1m", 119);
   defaultSettings.set("discount_3m", 5);
   defaultSettings.set("discount_6m", 10);

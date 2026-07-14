@@ -63,7 +63,7 @@ export default function MerchantDashboard() {
   useEffect(() => {
     const loadPricing = async () => {
       try {
-        const record = await pb.collection('pricing_settings').getOne('pricing_config');
+        const record = await pb.collection('pricing_settings').getOne('pricesettings01');
         setPricing({
           base_price_1m: record.base_price_1m || 119,
           discount_3m: record.discount_3m || 5,
