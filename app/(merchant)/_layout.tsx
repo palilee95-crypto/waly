@@ -253,6 +253,13 @@ export default function MerchantLayout() {
     }
   };
 
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoCode('');
+    setPromoSuccess('');
+    setPromoError('');
+  };
+
   // Helper to determine trial status
   const getTrialStatus = () => {
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
@@ -780,18 +787,23 @@ Please guide me with the bank transfer details and receipt upload instructions. 
           {/* 2. Promo Code Input */}
           <View style={styles.promoRow}>
             <TextInput
-              style={styles.promoInput}
+              style={[styles.promoInput, appliedPromo && { backgroundColor: '#F1F5F9', color: '#64748B' }]}
               value={promoCode}
               onChangeText={setPromoCode}
               placeholder="Promo or voucher code"
               placeholderTextColor="#94A3B8"
               autoCapitalize="characters"
+              editable={!appliedPromo}
               {...Platform.select({
                 web: { outlineStyle: 'none' } as any,
               })}
             />
-            <TouchableOpacity style={styles.promoBtn} onPress={handleApplyPromo} activeOpacity={0.8}>
-              <Text style={styles.promoBtnText}>Apply</Text>
+            <TouchableOpacity
+              style={[styles.promoBtn, appliedPromo && { backgroundColor: '#EF4444' }]}
+              onPress={appliedPromo ? handleRemovePromo : handleApplyPromo}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.promoBtnText}>{appliedPromo ? 'Remove' : 'Apply'}</Text>
             </TouchableOpacity>
           </View>
           {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
