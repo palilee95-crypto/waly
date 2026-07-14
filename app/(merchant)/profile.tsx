@@ -149,23 +149,40 @@ export default function ProfileScreen() {
       setWhatsappStatus('disconnected');
       setWhatsappQr('');
       setWhatsappPhone('');
-      Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
+      if (Platform.OS === 'web') {
+        window.alert('Your WhatsApp account has been disconnected.');
+      } else {
+        Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
+      }
     } catch (err) {
-      Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
+      if (Platform.OS === 'web') {
+        window.alert('Failed to disconnect WhatsApp account.');
+      } else {
+        Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
+      }
       setWhatsappStatus('connected');
     }
   };
 
   const handleWhatsappPress = () => {
     if (whatsappStatus === 'connected') {
-      Alert.alert(
-        'WhatsApp Settings',
-        'Your store WhatsApp account is currently connected. Do you want to disconnect it?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Disconnect', style: 'destructive', onPress: handleDisconnectWhatsapp }
-        ]
-      );
+      if (Platform.OS === 'web') {
+        const confirmDisconnect = window.confirm(
+          'WhatsApp Settings\n\nYour store WhatsApp account is currently connected. Do you want to disconnect it?'
+        );
+        if (confirmDisconnect) {
+          handleDisconnectWhatsapp();
+        }
+      } else {
+        Alert.alert(
+          'WhatsApp Settings',
+          'Your store WhatsApp account is currently connected. Do you want to disconnect it?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Disconnect', style: 'destructive', onPress: handleDisconnectWhatsapp }
+          ]
+        );
+      }
     } else {
       setShowQrModal(true);
       fetchWhatsappStatus(true);
