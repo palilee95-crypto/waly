@@ -179,6 +179,63 @@ export default function MerchantLayout() {
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [isSubmittingOnboarding, setIsSubmittingOnboarding] = React.useState(false);
 
+  const [pricing, setPricing] = React.useState({
+    base_price_1m: 119,
+    discount_3m: 5,
+    discount_6m: 10,
+    discount_9m: 12,
+    discount_12m: 15,
+  });
+
+  const [promoCode, setPromoCode] = React.useState('');
+  const [promoError, setPromoError] = React.useState('');
+  const [promoSuccess, setPromoSuccess] = React.useState('');
+  const [appliedPromo, setAppliedPromo] = React.useState<any>(null);
+  const [selectedMonths, setSelectedMonths] = React.useState<1 | 3 | 6 | 9 | 12>(1);
+
+  React.useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const record = await pb.collection('pricing_settings').getOne('pricing_config');
+        setPricing({
+          base_price_1m: record.base_price_1m || 119,
+          discount_3m: record.discount_3m || 5,
+          discount_6m: record.discount_6m || 10,
+          discount_9m: record.discount_9m || 12,
+          discount_12m: record.discount_12m || 15,
+        });
+      } catch (err) {
+        console.warn('Failed to load dynamic pricing, using defaults:', err);
+      }
+    };
+    if (user) {
+      loadPricing();
+    }
+  }, [user]);
+
+  const handleApplyPromo = async () => {
+    setPromoError('');
+    setPromoSuccess('');
+    const code = promoCode.trim();
+    if (!code) return;
+    try {
+      const record = await pb.collection('subscription_promo_codes').getFirstListItem(`code = "${code}" && is_active = true`);
+      setAppliedPromo({
+        code: record.code,
+        discount_type: record.discount_type,
+        discount_value: record.discount_value,
+      });
+      setPromoSuccess(
+        record.discount_type === 'percentage'
+          ? `Promo applied! -${record.discount_value}% off`
+          : `Promo applied! -RM${record.discount_value} off`
+      );
+    } catch (err) {
+      setPromoError('Invalid or expired promo code.');
+      setAppliedPromo(null);
+    }
+  };
+
   // Helper to determine trial status
   const getTrialStatus = () => {
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
@@ -524,6 +581,30 @@ export default function MerchantLayout() {
       console.warn("Failed to fetch merchant details for WhatsApp message:", e);
     }
 
+    const basePrice = pricing.base_price_1m;
+    const months = selectedMonths;
+    const rawTotal = basePrice * months;
+    
+    let durationDiscountPercent = 0;
+    if (months === 3) durationDiscountPercent = pricing.discount_3m;
+    else if (months === 6) durationDiscountPercent = pricing.discount_6m;
+    else if (months === 9) durationDiscountPercent = pricing.discount_9m;
+    else if (months === 12) durationDiscountPercent = pricing.discount_12m;
+
+    const durationDiscountAmount = rawTotal * (durationDiscountPercent / 100);
+    const priceAfterDurationDiscount = rawTotal - durationDiscountAmount;
+
+    let promoDiscountAmount = 0;
+    if (appliedPromo) {
+      if (appliedPromo.discount_type === 'percentage') {
+        promoDiscountAmount = priceAfterDurationDiscount * (appliedPromo.discount_value / 100);
+      } else {
+        promoDiscountAmount = Math.min(priceAfterDurationDiscount, appliedPromo.discount_value);
+      }
+    }
+
+    const finalPrice = Math.max(0, priceAfterDurationDiscount - promoDiscountAmount);
+
     const message = `Hello RISEV Support! I'd like to manually activate my Merchant Pro subscription:
 
 🏪 Store Details:
@@ -534,7 +615,10 @@ export default function MerchantLayout() {
 
 💳 Plan Selection:
 • Plan: RISEV Merchant Pro
-• Price: RM79/month (Manual billing)
+• Duration: ${months} Month(s)
+• Base Price: RM${basePrice}/month
+• Raw Total: RM${rawTotal.toFixed(2)}
+${durationDiscountPercent > 0 ? `• Multi-month Discount: -${durationDiscountPercent}% (-RM${durationDiscountAmount.toFixed(2)})\n` : ''}${appliedPromo ? `• Promo Voucher (${appliedPromo.code}): -${appliedPromo.discount_type === 'percentage' ? `${appliedPromo.discount_value}%` : `RM${appliedPromo.discount_value}`} (-RM${promoDiscountAmount.toFixed(2)})\n` : ''}• Final Price: RM${finalPrice.toFixed(2)} (Billed manually)
 
 Please guide me with the bank transfer details and receipt upload instructions. Thank you!`;
 
@@ -566,29 +650,115 @@ Please guide me with the bank transfer details and receipt upload instructions. 
 
   // Gateway subscription gate blocker
   if (user?.merchant_status !== 'active' && !isInTrial) {
+    const basePrice = pricing.base_price_1m;
+    const months = selectedMonths;
+    const rawTotal = basePrice * months;
+    
+    let durationDiscountPercent = 0;
+    if (months === 3) durationDiscountPercent = pricing.discount_3m;
+    else if (months === 6) durationDiscountPercent = pricing.discount_6m;
+    else if (months === 9) durationDiscountPercent = pricing.discount_9m;
+    else if (months === 12) durationDiscountPercent = pricing.discount_12m;
+
+    const durationDiscountAmount = rawTotal * (durationDiscountPercent / 100);
+    const priceAfterDurationDiscount = rawTotal - durationDiscountAmount;
+
+    let promoDiscountAmount = 0;
+    if (appliedPromo) {
+      if (appliedPromo.discount_type === 'percentage') {
+        promoDiscountAmount = priceAfterDurationDiscount * (appliedPromo.discount_value / 100);
+      } else {
+        promoDiscountAmount = Math.min(priceAfterDurationDiscount, appliedPromo.discount_value);
+      }
+    }
+
+    const finalPrice = Math.max(0, priceAfterDurationDiscount - promoDiscountAmount);
+
     return (
       <View style={styles.gateContainer}>
-        <View style={styles.gateCard}>
-          <View style={styles.gateIconBg}>
-            <Ionicons name="lock-closed" size={28} color="#EF4444" />
+        <View style={[styles.gateCard, { maxWidth: 420 }]}>
+          <View style={[styles.gateIconBg, { backgroundColor: '#F0FDF4' }]}>
+            <Ionicons name="sparkles" size={28} color="#10B981" />
           </View>
-          <Text style={styles.gateTitle}>Activate Store Console</Text>
-          <Text style={styles.gateSubtitle}>
-            Your merchant console is currently pending activation. Contact support via WhatsApp to complete your subscription and activate your store console.
+          <Text style={styles.gateTitle}>Unlock Risev Pro Merchant</Text>
+          <Text style={[styles.gateSubtitle, { marginBottom: 12 }]}>
+            Grow your business with loyalty cards, broadcast blasts, staff management, and automatic WhatsApp notifications.
           </Text>
 
-          <View style={styles.pricingSection}>
-            <Text style={styles.pricingLabel}>PRO MERCHANT PLAN</Text>
-            <View style={styles.pricingRow}>
-              <Text style={styles.currency}>RM</Text>
-              <Text style={styles.price}>79</Text>
-              <Text style={styles.period}>/month</Text>
+          {/* 1. Select Duration Cards */}
+          <Text style={[styles.sectionLabel, { alignSelf: 'flex-start', marginTop: 4, marginBottom: 8 }]}>SELECT PLAN DURATION</Text>
+          <View style={styles.planGrid}>
+            {([1, 3, 6, 12] as const).map((m) => {
+              const isActive = selectedMonths === m;
+              let disc = 0;
+              if (m === 3) disc = pricing.discount_3m;
+              else if (m === 6) disc = pricing.discount_6m;
+              else if (m === 12) disc = pricing.discount_12m;
+
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.planCard, isActive && styles.planCardActive]}
+                  onPress={() => setSelectedMonths(m)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.planDuration}>{m} Mo</Text>
+                  {disc > 0 && (
+                    <View style={styles.planDiscountBadge}>
+                      <Text style={styles.planDiscountText}>-{disc}%</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* 2. Promo Code Input */}
+          <View style={styles.promoRow}>
+            <TextInput
+              style={styles.promoInput}
+              value={promoCode}
+              onChangeText={setPromoCode}
+              placeholder="Promo or voucher code"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="characters"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+            <TouchableOpacity style={styles.promoBtn} onPress={handleApplyPromo} activeOpacity={0.8}>
+              <Text style={styles.promoBtnText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+          {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
+          {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
+
+          {/* 3. Pricing Summary */}
+          <View style={styles.summarySection}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Subscription ({months} Mo)</Text>
+              <Text style={styles.summaryValue}>RM {rawTotal.toFixed(2)}</Text>
             </View>
-            <Text style={styles.periodDetail}>Billed manually. RM79/month.</Text>
+            {durationDiscountAmount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Plan Discount (-{durationDiscountPercent}%)</Text>
+                <Text style={[styles.summaryValue, { color: '#10B981' }]}>-RM {durationDiscountAmount.toFixed(2)}</Text>
+              </View>
+            )}
+            {promoDiscountAmount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Voucher Discount</Text>
+                <Text style={[styles.summaryValue, { color: '#10B981' }]}>-RM {promoDiscountAmount.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={styles.summaryTotalRow}>
+              <Text style={styles.summaryTotalLabel}>Total Price</Text>
+              <Text style={styles.summaryTotalValue}>RM {finalPrice.toFixed(2)}</Text>
+            </View>
           </View>
 
           <TouchableOpacity
-            style={styles.payBtn}
+            style={[styles.payBtn, { marginTop: 16 }]}
             onPress={handleWhatsAppPayment}
             activeOpacity={0.8}
           >
@@ -1250,5 +1420,130 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
+  },
+  planGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginVertical: 4,
+    width: '100%',
+  },
+  planCard: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  planCardActive: {
+    borderColor: '#000000',
+    backgroundColor: '#F8FAFC',
+  },
+  planDuration: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1E293B',
+  },
+  planDiscountBadge: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  planDiscountText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  promoRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 8,
+    width: '100%',
+  },
+  promoInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    backgroundColor: '#FFFFFF',
+  },
+  promoBtn: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  promoSuccessText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#10B981',
+    marginTop: 2,
+    alignSelf: 'flex-start',
+  },
+  promoErrorText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#EF4444',
+    marginTop: 2,
+    alignSelf: 'flex-start',
+  },
+  summarySection: {
+    width: '100%',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 12,
+    marginTop: 12,
+    gap: 6,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  summaryValue: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  summaryTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 8,
+    marginTop: 6,
+  },
+  summaryTotalLabel: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  summaryTotalValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
   },
 });
