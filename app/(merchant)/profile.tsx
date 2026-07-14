@@ -72,6 +72,7 @@ export default function ProfileScreen() {
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [whatsappQr, setWhatsappQr] = useState<string>('');
+  const [whatsappPhone, setWhatsappPhone] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
 
   // Edit store profile states
@@ -122,6 +123,11 @@ export default function ProfileScreen() {
         }
       });
       setWhatsappStatus(res.status);
+      if (res.phone) {
+        setWhatsappPhone(res.phone);
+      } else {
+        setWhatsappPhone('');
+      }
       if (res.qrcode) {
         setWhatsappQr(res.qrcode);
       }
@@ -142,6 +148,7 @@ export default function ProfileScreen() {
       });
       setWhatsappStatus('disconnected');
       setWhatsappQr('');
+      setWhatsappPhone('');
       Alert.alert('Disconnected', 'Your WhatsApp account has been disconnected.');
     } catch (err) {
       Alert.alert('Error', 'Failed to disconnect WhatsApp account.');
@@ -229,6 +236,9 @@ export default function ProfileScreen() {
           });
           if (res.status === 'connected') {
             setWhatsappStatus('connected');
+            if (res.phone) {
+              setWhatsappPhone(res.phone);
+            }
             setShowQrModal(false);
             Alert.alert('Success', 'WhatsApp connected successfully!');
             if (intervalId) clearInterval(intervalId);
@@ -747,7 +757,13 @@ export default function ProfileScreen() {
               <SettingItem
                 iconName="logo-whatsapp"
                 title={t('link_whatsapp')}
-                subtitle={whatsappStatus === 'connected' ? t('whatsapp_connected') : whatsappStatus === 'checking' ? t('whatsapp_checking') : t('link_whatsapp_desc')}
+                subtitle={
+                  whatsappStatus === 'connected'
+                    ? `${locale === 'en' ? 'Connected' : 'Disambung'}: ${whatsappPhone || ''} (${locale === 'en' ? 'Tap to manage' : 'Ketik untuk urus'})`
+                    : whatsappStatus === 'checking'
+                      ? t('whatsapp_checking')
+                      : t('link_whatsapp_desc')
+                }
                 iconBgColor="#E8F5E9"
                 iconColor="#25D366"
                 onPress={handleWhatsappPress}

@@ -22,13 +22,17 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
     const nameSlug = merchantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const instanceName = `merchant-${merchantId}-${nameSlug}`;
 
-    // A. Check connection state
-    let stateRes = callEvo("GET", `/instance/connectionState/${instanceName}`);
+    // A. Check connection state by fetching all instances
+    let fetchRes = callEvo("GET", `/instance/fetchInstances`);
+    let instanceInfo = null;
+    if (fetchRes.status === 200 && Array.isArray(fetchRes.data)) {
+      instanceInfo = fetchRes.data.find(inst => inst.name === instanceName);
+    }
 
     const generateQr = e.requestInfo().query.generateQr === 'true';
 
     // If instance doesn't exist
-    if (stateRes.status === 404 || (stateRes.data && (stateRes.data.status === 404 || stateRes.data.status === 'error'))) {
+    if (!instanceInfo) {
       if (!generateQr) {
         return e.json(200, {
           status: "disconnected"
@@ -52,11 +56,14 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
       });
     }
 
-    const state = stateRes.data?.instance?.state || "close";
+    const state = instanceInfo.connectionStatus || "close";
 
     if (state === "open") {
+      const ownerJid = instanceInfo.ownerJid || "";
+      const phoneNum = ownerJid ? ownerJid.split("@")[0] : "";
       return e.json(200, {
-        status: "connected"
+        status: "connected",
+        phone: phoneNum ? "+" + phoneNum : ""
       });
     } else {
       // Instance exists but is closed
