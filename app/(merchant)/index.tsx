@@ -497,7 +497,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxWidth: 420 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 16 }}>
-              <Text style={styles.modalTitle}>Upgrade to Risev Pro</Text>
+              <Text style={styles.modalTitle}>Upgrade to Merchant Pro</Text>
               <TouchableOpacity onPress={() => setShowUpgradeModal(false)} style={{ padding: 4 }}>
                 <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
@@ -534,7 +534,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
                       onPress={() => setSelectedMonths(m)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.planDuration}>{m} Mo</Text>
+                      <Text style={styles.planDuration}>{m === 1 ? '1 Month' : `${m} Months`}</Text>
                       {disc > 0 && (
                         <View style={styles.planDiscountBadge}>
                           <Text style={styles.planDiscountText}>-{disc}%</Text>
@@ -594,7 +594,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
               return (
                 <View style={styles.summarySection}>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Subscription ({months} Mo)</Text>
+                    <Text style={styles.summaryLabel}>Subscription ({months === 1 ? '1 Month' : `${months} Months`})</Text>
                     <Text style={styles.summaryValue}>RM {rawTotal.toFixed(2)}</Text>
                   </View>
                   {durationDiscountAmount > 0 && (

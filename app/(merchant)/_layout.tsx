@@ -696,7 +696,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
           <View style={[styles.gateIconBg, { backgroundColor: '#F0FDF4' }]}>
             <Ionicons name="sparkles" size={28} color="#10B981" />
           </View>
-          <Text style={styles.gateTitle}>Unlock Risev Pro Merchant</Text>
+          <Text style={styles.gateTitle}>Unlock Merchant Pro</Text>
           <Text style={[styles.gateSubtitle, { marginBottom: 12 }]}>
             Grow your business with loyalty cards, broadcast blasts, staff management, and automatic WhatsApp notifications.
           </Text>
@@ -728,7 +728,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
                     onPress={() => setSelectedMonths(m)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.planDuration}>{m} Mo</Text>
+                    <Text style={styles.planDuration}>{m === 1 ? '1 Month' : `${m} Months`}</Text>
                     {disc > 0 && (
                       <View style={styles.planDiscountBadge}>
                         <Text style={styles.planDiscountText}>-{disc}%</Text>
@@ -762,7 +762,7 @@ Please guide me with the bank transfer details and receipt upload instructions. 
           {/* 3. Pricing Summary */}
           <View style={styles.summarySection}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subscription ({months} Mo)</Text>
+              <Text style={styles.summaryLabel}>Subscription ({months === 1 ? '1 Month' : `${months} Months`})</Text>
               <Text style={styles.summaryValue}>RM {rawTotal.toFixed(2)}</Text>
             </View>
             {durationDiscountAmount > 0 && (
