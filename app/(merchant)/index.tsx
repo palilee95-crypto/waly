@@ -63,6 +63,7 @@ export default function MerchantDashboard() {
   const [promoSuccess, setPromoSuccess] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 9 | 12>(1);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const loadPricing = async () => {
@@ -507,42 +508,79 @@ Please guide me with the bank transfer details and receipt upload instructions. 
               Ensure uninterrupted access to dynamic loyalty cards, broadcast blasts, and auto WhatsApp notifications.
             </Text>
 
-            {/* 1. Select Duration Cards */}
+            {/* 1. Select Duration Dropdown */}
             <Text style={styles.sectionLabel}>SELECT PLAN DURATION</Text>
-            <View style={styles.planGrid}>
-              {([1, 3, 6, 9, 12] as const)
-                .filter((m) => {
-                  if (m === 1) return true;
-                  if (m === 3) return pricing.enable_3m;
-                  if (m === 6) return pricing.enable_6m;
-                  if (m === 9) return pricing.enable_9m;
-                  if (m === 12) return pricing.enable_12m;
-                  return false;
-                })
-                .map((m) => {
-                  const isActive = selectedMonths === m;
-                  let disc = 0;
-                  if (m === 3) disc = pricing.discount_3m;
-                  else if (m === 6) disc = pricing.discount_6m;
-                  else if (m === 9) disc = pricing.discount_9m;
-                  else if (m === 12) disc = pricing.discount_12m;
-
-                  return (
-                    <TouchableOpacity
-                      key={m}
-                      style={[styles.planCard, isActive && styles.planCardActive]}
-                      onPress={() => setSelectedMonths(m)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.planDuration}>{m === 1 ? '1 Month' : `${m} Months`}</Text>
-                      {disc > 0 && (
-                        <View style={styles.planDiscountBadge}>
+            <View style={{ width: '100%', marginBottom: 12 }}>
+              <TouchableOpacity
+                style={styles.dropdownHeader}
+                onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.dropdownHeaderText}>
+                    {selectedMonths === 1 ? '1 Month' : `${selectedMonths} Months`}
+                  </Text>
+                  {(() => {
+                    let disc = 0;
+                    if (selectedMonths === 3) disc = pricing.discount_3m;
+                    else if (selectedMonths === 6) disc = pricing.discount_6m;
+                    else if (selectedMonths === 9) disc = pricing.discount_9m;
+                    else if (selectedMonths === 12) disc = pricing.discount_12m;
+                    if (disc > 0) {
+                      return (
+                        <View style={[styles.planDiscountBadge, { marginTop: 0 }]}>
                           <Text style={styles.planDiscountText}>-{disc}%</Text>
                         </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+                      );
+                    }
+                    return null;
+                  })()}
+                </View>
+                <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color="#64748B" />
+              </TouchableOpacity>
+
+              {isDropdownOpen && (
+                <View style={styles.dropdownList}>
+                  {([1, 3, 6, 9, 12] as const)
+                    .filter((m) => {
+                      if (m === 1) return true;
+                      if (m === 3) return pricing.enable_3m;
+                      if (m === 6) return pricing.enable_6m;
+                      if (m === 9) return pricing.enable_9m;
+                      if (m === 12) return pricing.enable_12m;
+                      return false;
+                    })
+                    .map((m) => {
+                      const isSelected = selectedMonths === m;
+                      let disc = 0;
+                      if (m === 3) disc = pricing.discount_3m;
+                      else if (m === 6) disc = pricing.discount_6m;
+                      else if (m === 9) disc = pricing.discount_9m;
+                      else if (m === 12) disc = pricing.discount_12m;
+
+                      return (
+                        <TouchableOpacity
+                          key={m}
+                          style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+                          onPress={() => {
+                            setSelectedMonths(m);
+                            setIsDropdownOpen(false);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
+                            {m === 1 ? '1 Month' : `${m} Months`}
+                          </Text>
+                          {disc > 0 && (
+                            <View style={[styles.planDiscountBadge, { marginTop: 0 }]}>
+                              <Text style={styles.planDiscountText}>-{disc}%</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+              )}
             </View>
 
             {/* 2. Promo Code Input */}
@@ -1127,5 +1165,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+  },
+  dropdownHeaderText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#1E293B',
+  },
+  dropdownList: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginTop: 6,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#F8FAFC',
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  dropdownItemTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0040e0',
   },
 });
