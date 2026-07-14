@@ -139,6 +139,7 @@ services:
       - BANK_ACC_NUM=${BANK_ACC_NUM}
       - BANK_ACC_NAME=${BANK_ACC_NAME}
       - QR_CODE_FILE=${QR_CODE_FILE}
+      - SUPPORT_WHATSAPP=${SUPPORT_WHATSAPP}
     networks:
       - risev-network
 
