@@ -133,6 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               owner: record.id,
               category: 'food',
               status: 'pending',
+              metadata: {},
             });
           }
           

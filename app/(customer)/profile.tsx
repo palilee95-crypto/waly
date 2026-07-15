@@ -84,6 +84,7 @@ export default function CustomerProfile() {
         owner: user.id,
         category: 'food',
         status: 'pending',
+        metadata: {},
       });
 
       // 2. Link merchant profile to user and change role to merchant
