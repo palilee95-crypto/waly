@@ -81,29 +81,31 @@ export default function ExploreScreen() {
         ? await pb.collection('loyalty_cards').getFullList({ filter: `customer = '${user.id}'` })
         : [];
 
-      const mapped = merchantList.map((m: any) => {
-        const program = programList.find((p: any) => p.merchant === m.id);
-        const card = cardList.find((c: any) => c.merchant === m.id);
+      const mapped = merchantList
+        .map((m: any) => {
+          const program = programList.find((p: any) => p.merchant === m.id);
+          if (!program) return null;
 
-        return {
-          id: m.id,
-          name: m.name,
-          category: m.category || 'Other',
-          logo: m.logo 
-            ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
-            : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=120',
-          coverImage: m.logo 
-            ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
-            : 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=400',
-          distance: '0.5 km away',
-          stampsRule: program 
-            ? `Complete ${program.stamp_goal} stamps for ${program.reward_description}`
-            : 'No active stamp program',
-          collectedStamps: card ? card.stamps_collected : 0,
-          totalStamps: program ? program.stamp_goal : 10,
-          featuredTag: m.is_verified ? 'Verified' : undefined,
-        };
-      });
+          const card = cardList.find((c: any) => c.merchant === m.id);
+
+          return {
+            id: m.id,
+            name: m.name,
+            category: m.category || 'Other',
+            logo: m.logo 
+              ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
+              : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=120',
+            coverImage: m.logo 
+              ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
+              : 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=400',
+            distance: '0.5 km away',
+            stampsRule: `Complete ${program.stamp_goal} stamps for ${program.reward_description}`,
+            collectedStamps: card ? card.stamps_collected : 0,
+            totalStamps: program.stamp_goal,
+            featuredTag: m.is_verified ? 'Verified' : undefined,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
       setMerchants(mapped);
     } catch (err) {
