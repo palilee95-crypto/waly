@@ -119,6 +119,8 @@ export default function MarketingScreen() {
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [showValidationWarning, setShowValidationWarning] = useState(false);
+  const [launchSuccessModalVisible, setLaunchSuccessModalVisible] = useState(false);
 
   // Broadcast & WhatsApp Blast states
   const [broadcastsList, setBroadcastsList] = useState<any[]>([]);
@@ -201,13 +203,31 @@ export default function MarketingScreen() {
 
   const handleCreateCampaign = async () => {
     if (!user || !user.merchant_id) return;
+    setShowValidationWarning(false);
     if (!cName.trim()) {
-      Alert.alert('Validation Error', 'Please enter a Campaign Name.');
+      setShowValidationWarning(true);
       return;
     }
     
     setIsCreatingCampaign(true);
     try {
+      // Check if there are any active points rewards if launching a points promotion
+      if (cType === 'double_points' || cType === 'flat_bonus') {
+        const activePointsRewards = await pb.collection('rewards').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}" && is_active = true && points_cost > 0`
+        });
+        if (activePointsRewards.items.length === 0) {
+          Alert.alert(
+            locale === 'en' ? "Points Rewards Required" : "Ganjaran Mata Diperlukan",
+            locale === 'en'
+              ? "You must have at least one active reward that costs points in your Catalogue before you can launch points-based promotions (Double Points or Flat Bonus)."
+              : "Anda mesti mempunyai sekurang-kurangnya satu ganjaran aktif yang memerlukan mata dalam Katalog anda sebelum anda boleh melancarkan promosi berasaskan mata (Mata Berganda atau Bonus Rata)."
+          );
+          setIsCreatingCampaign(false);
+          return;
+        }
+      }
+
       const payload: any = {
         merchant: user.merchant_id,
         name: cName.trim(),
@@ -232,7 +252,7 @@ export default function MarketingScreen() {
 
       await pb.collection('campaigns').create(payload);
 
-      Alert.alert('Campaign Created', 'Your new promotional campaign has been successfully launched!');
+      setLaunchSuccessModalVisible(true);
       setCreateModalVisible(false);
       
       // Reset form fields
@@ -1408,9 +1428,15 @@ export default function MarketingScreen() {
                 {/* Form fields */}
                 <Text style={styles.modalInputLabel}>{t('campaign_name')}</Text>
                 <TextInput
-                  style={styles.modalTextInput}
+                  style={[
+                    styles.modalTextInput,
+                    showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 }
+                  ]}
                   value={cName}
-                  onChangeText={setCName}
+                  onChangeText={(val) => {
+                    setCName(val);
+                    if (val.trim()) setShowValidationWarning(false);
+                  }}
                   placeholder={locale === 'en' ? "e.g. Double Points Weekend, Autumn Festival" : "cth. Hujung Minggu Mata Berganda, Pesta Musim Luruh"}
                   placeholderTextColor="#BEC6E0"
                   {...Platform.select({
@@ -1419,6 +1445,11 @@ export default function MarketingScreen() {
                     } as any,
                   })}
                 />
+                {showValidationWarning && (
+                  <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: -8, marginBottom: -8, marginLeft: 4 }}>
+                    {locale === 'en' ? 'Campaign name is mandatory' : 'Nama kempen adalah wajib'}
+                  </Text>
+                )}
 
                 <Text style={styles.modalInputLabel}>{t('description')}</Text>
                 <TextInput
@@ -1625,6 +1656,39 @@ export default function MarketingScreen() {
                 );
               })}
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Launch Success Modal */}
+      <Modal
+        visible={launchSuccessModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setLaunchSuccessModalVisible(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={[styles.confirmContent, { alignItems: 'center', maxWidth: 360 }]}>
+            <View style={{ backgroundColor: '#E8F5E9', width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+              <Ionicons name="checkmark-circle" size={32} color="#10B981" />
+            </View>
+            <Text style={[styles.confirmTitle, { textAlign: 'center' }]}>
+              {locale === 'en' ? 'Campaign Launched' : 'Kempen Dilancarkan'}
+            </Text>
+            <Text style={[styles.confirmMsg, { textAlign: 'center', color: '#64748B' }]}>
+              {locale === 'en' 
+                ? 'Your new promotional campaign has been successfully launched!' 
+                : 'Kempen promosi baharu anda telah berjaya dilancarkan!'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.confirmBtnAction, { width: '100%', backgroundColor: '#000000', height: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginTop: 8 }]}
+              onPress={() => setLaunchSuccessModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.confirmBtnActionText, { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                {locale === 'en' ? 'OK' : 'OK'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
