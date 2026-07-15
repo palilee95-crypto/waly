@@ -29,7 +29,7 @@ onRecordAfterCreateSuccess((e) => {
     // Load environment settings
     const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
     const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'risev_dev_api_key';
-    const appUrl = $os.getenv('APP_URL') || 'https://risev-five.vercel.app';
+    const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
 
     // 2. Determine if customer is a brand new account
     // We check if the customer was created in the last 15 seconds
