@@ -52,6 +52,9 @@ export default function GiveStampsScreen() {
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
   const [showNoCampaignModal, setShowNoCampaignModal] = useState(false);
   const [showSelfIssuanceModal, setShowSelfIssuanceModal] = useState(false);
+  const [showScanAwardModal, setShowScanAwardModal] = useState(false);
+  const [scannedCustomer, setScannedCustomer] = useState<any | null>(null);
+  const [scannedRawInput, setScannedRawInput] = useState('');
   const [tempPhone, setTempPhone] = useState('');
   const [tempCount, setTempCount] = useState(1);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -275,7 +278,11 @@ export default function GiveStampsScreen() {
         setNewCustomerName('');
 
         // Continue the stamp issue process using the new customer!
-        await proceedWithIssuingStamps(newCustomer, tempCount, tempPhone);
+        setScannedCustomer(newCustomer);
+        setScannedRawInput(tempPhone);
+        setBillSubtotal('');
+        setStampsCount(tempCount.toString());
+        setShowScanAwardModal(true);
         setShowCreateConfirmModal(false);
       } catch (createErr: any) {
         console.error("Auto customer creation failed:", createErr);
@@ -479,7 +486,13 @@ export default function GiveStampsScreen() {
             setShowSelfIssuanceModal(true);
             return;
           }
-          await proceedWithIssuingStamps(customer, count, rawInput);
+          // Instead of proceeding immediately, open the scan subtotal modal
+          setScannedCustomer(customer);
+          setScannedRawInput(rawInput);
+          setBillSubtotal('');
+          setStampsCount(count.toString());
+          setIsSubmitting(false);
+          setShowScanAwardModal(true);
         } catch (err: any) {
           console.warn("QR Phone lookup failed:", err);
           // If the customer doesn't exist, trigger the customer creation modal
@@ -886,6 +899,200 @@ export default function GiveStampsScreen() {
                 ) : (
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
                     {t('create_issue')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Scan Award Modal (Ask for Subtotal and Stamps after QR scan) */}
+      <Modal
+        visible={showScanAwardModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowScanAwardModal(false);
+          setScanned(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Elegant Prompt Icon */}
+            <View style={[styles.successIconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <Ionicons name="gift-outline" size={40} color="#0284C7" />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: 6, textAlign: 'center' }]}>
+              {locale === 'en' ? 'Award Stamps & Points' : 'Berikan Setem & Mata'}
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_600SemiBold',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 18,
+              marginBottom: 20,
+            }}>
+              {locale === 'en' ? 'Customer Profile Found:' : 'Profil Pelanggan Ditemui:'} {'\n'}
+              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                {scannedCustomer?.name || 'Customer'} ({scannedCustomer?.phone})
+              </Text>
+            </Text>
+
+            {/* Bill Subtotal input */}
+            <View style={{ gap: 6, width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
+                {t('bill_subtotal') || 'BILL SUBTOTAL'}
+              </Text>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderWidth: 1.5,
+                borderColor: '#E2E8F0',
+                borderRadius: 12,
+                height: 48,
+                paddingHorizontal: 12,
+                backgroundColor: '#F8FAFC',
+              }}>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginRight: 4 }}>RM</Text>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    fontSize: 14,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#000000',
+                    ...Platform.select({
+                      web: {
+                        outlineStyle: 'none',
+                      } as any,
+                    }),
+                  }}
+                  value={billSubtotal}
+                  onChangeText={setBillSubtotal}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="decimal-pad"
+                  editable={!isSubmitting}
+                />
+              </View>
+            </View>
+
+            {/* Stamps count adjustment */}
+            <View style={{ gap: 6, width: '100%', marginBottom: 24 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
+                {t('stamps_to_issue') || 'STAMPS TO ISSUE'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: '#E2E8F0',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                  onPress={() => setStampsCount(Math.max(1, parseInt(stampsCount || '1') - 1).toString())}
+                >
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold' }}>-</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    borderWidth: 1.5,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    height: 40,
+                    textAlign: 'center',
+                    fontSize: 14,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    backgroundColor: '#F8FAFC',
+                  }}
+                  value={stampsCount}
+                  onChangeText={setStampsCount}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: '#E2E8F0',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                  onPress={() => setStampsCount((parseInt(stampsCount || '1') + 1).toString())}
+                >
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold' }}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  opacity: isSubmitting ? 0.5 : 1,
+                }}
+                disabled={isSubmitting}
+                onPress={() => {
+                  setShowScanAwardModal(false);
+                  setScanned(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                  {t('cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  borderRadius: 16,
+                  height: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#000000',
+                  opacity: isSubmitting ? 0.5 : 1,
+                }}
+                disabled={isSubmitting}
+                onPress={async () => {
+                  if (scannedCustomer) {
+                    setIsSubmitting(true);
+                    setShowScanAwardModal(false);
+                    const count = parseInt(stampsCount || '1', 10);
+                    try {
+                      await proceedWithIssuingStamps(scannedCustomer, count, scannedRawInput);
+                    } catch (err) {
+                      setScanned(false);
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    {t('confirm') || 'Confirm'}
                   </Text>
                 )}
               </TouchableOpacity>
