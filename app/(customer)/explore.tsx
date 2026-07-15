@@ -28,6 +28,7 @@ type MerchantItem = {
   id: string;
   name: string;
   category: string;
+  rawCategory: string;
   logo: string;
   coverImage: string;
   distance: string;
@@ -95,10 +96,19 @@ export default function ExploreScreen() {
             resolvedCover = `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`;
           }
 
+          const labelMap: Record<string, string> = {
+            food: 'Food & Drink',
+            retail: 'Retail / Fashion',
+            beauty: 'Beauty & Salon',
+            health: 'Health',
+            entertainment: 'Entertainment',
+            other: 'Services / Other'
+          };
           return {
             id: m.id,
             name: m.name,
-            category: m.category || 'Other',
+            category: labelMap[m.category] || m.category || 'Other',
+            rawCategory: m.category || 'other',
             logo: m.logo 
               ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
               : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=120',
@@ -133,10 +143,12 @@ export default function ExploreScreen() {
     }
     // Filter by Category
     if (activeCategory !== 'All') {
-      if (activeCategory === 'Cafes' && m.category !== 'Cafe & Eatery') return false;
-      if (activeCategory === 'Food' && !['Cafe & Eatery', 'Bakery & Sweets'].includes(m.category)) return false;
-      if (activeCategory === 'Fashion' && m.category !== 'Fashion & Apparel') return false;
-      if (activeCategory === 'Bakery' && m.category !== 'Bakery & Sweets') return false;
+      const cat = m.rawCategory;
+      if (activeCategory === 'Cafes' && cat !== 'food') return false;
+      if (activeCategory === 'Food' && cat !== 'food') return false;
+      if (activeCategory === 'Fashion' && cat !== 'retail') return false;
+      if (activeCategory === 'Beauty' && cat !== 'beauty') return false;
+      if (activeCategory === 'Bakery' && cat !== 'food') return false;
     }
     return true;
   });
