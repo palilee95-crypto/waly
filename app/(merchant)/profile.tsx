@@ -91,6 +91,8 @@ export default function ProfileScreen() {
   const [editLng, setEditLng] = useState('100.4217');
   const [logoFile, setLogoFile] = useState<any>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<any>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [locationRecord, setLocationRecord] = useState<any>(null);
 
@@ -400,6 +402,11 @@ export default function ProfileScreen() {
     setEditLng(String(locationRecord?.lng || '100.4217'));
     setLogoPreview(logoUrl);
     setLogoFile(null);
+    const bannerUrl = merchant?.banner 
+      ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.banner}`
+      : null;
+    setBannerPreview(bannerUrl);
+    setBannerFile(null);
     setEditModalVisible(true);
   };
 
@@ -457,6 +464,60 @@ export default function ProfileScreen() {
     }
   };
 
+  const handlePickBanner = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 600;
+              const MAX_HEIGHT = 300;
+              let width = img.width;
+              let height = img.height;
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width;
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height;
+                  height = MAX_HEIGHT;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(img, 0, 0, width, height);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_banner.jpg", {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  setBannerFile(compressedFile);
+                  setBannerPreview(URL.createObjectURL(compressedFile));
+                }
+              }, 'image/jpeg', 0.8);
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert('Not Supported', 'Image upload is currently web-only in this demo.');
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!editStoreName.trim()) {
       Alert.alert('Validation Error', 'Store Name is required.');
@@ -484,6 +545,9 @@ export default function ProfileScreen() {
 
       if (logoFile) {
         formData.append('logo', logoFile);
+      }
+      if (bannerFile) {
+        formData.append('banner', bannerFile);
       }
 
       const updatedMerchant = await pb.collection('merchants').update(merchant.id, formData);
@@ -1080,6 +1144,54 @@ export default function ProfileScreen() {
                   </View>
                 </TouchableOpacity>
                 <Text style={styles.avatarPickerLabel}>{t('tap_logo_upload')}</Text>
+              </View>
+
+              {/* Background Banner Picker */}
+              <View style={{ width: '100%', marginVertical: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', alignSelf: 'flex-start', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {locale === 'en' ? 'Background Banner' : 'Banner Latar Belakang'}
+                </Text>
+                
+                <TouchableOpacity 
+                  style={{
+                    width: '100%',
+                    height: 120,
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: '#E2E8F0',
+                    borderStyle: 'dashed',
+                    backgroundColor: '#F8FAFC',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    overflow: 'hidden',
+                  }} 
+                  onPress={handlePickBanner} 
+                  activeOpacity={0.85}
+                >
+                  {bannerPreview ? (
+                    <Image source={{ uri: bannerPreview }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Tap to upload background banner' : 'Ketik untuk memuat naik banner'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[styles.avatarPencilIcon, { top: 8, right: 8, bottom: undefined }]}>
+                    <Ionicons name="camera" size={14} color="#FFFFFF" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Tooltip Description */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 4 }}>
+                  <Ionicons name="information-circle-outline" size={13} color="#64748B" />
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    {locale === 'en' 
+                      ? 'This image will be displayed as the background banner in customer explore.' 
+                      : 'Imej ini akan dipaparkan sebagai banner latar belakang dalam carian pelanggan.'}
+                  </Text>
+                </View>
               </View>
 
               {/* Store Name Input */}

@@ -95,9 +95,9 @@ export default function ExploreScreen() {
             logo: m.logo 
               ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
               : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=120',
-            coverImage: m.logo 
-              ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
-              : 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=400',
+            coverImage: m.banner 
+              ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.banner}`
+              : 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=600',
             distance: '0.5 km away',
             stampsRule: `Complete ${program.stamp_goal} stamps for ${program.reward_description}`,
             collectedStamps: card ? card.stamps_collected : 0,
