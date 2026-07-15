@@ -363,7 +363,10 @@ export default function MerchantLayout() {
       }
 
       const mapDiv = document.getElementById('onboarding-map');
-      if (!mapDiv) return;
+      if (!mapDiv) {
+        setTimeout(initMap, 100);
+        return;
+      }
 
       // Avoid double initialization
       if ((mapDiv as any)._leaflet_id) {
@@ -951,7 +954,7 @@ export default function MerchantLayout() {
           {/* Leaflet Map Div (Web Only) */}
           {Platform.OS === 'web' && (
             <View style={{ width: '100%', height: 160, borderRadius: 12, overflow: 'hidden', marginTop: 8, borderWidth: 1.5, borderColor: '#E2E8F0' }}>
-              <div id="onboarding-map" style={{ width: '100%', height: '100%' }} />
+              <div id="onboarding-map" style={{ width: '100%', height: '100%', minHeight: '160px' }} />
             </View>
           )}
 
