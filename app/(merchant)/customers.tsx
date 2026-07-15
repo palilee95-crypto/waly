@@ -41,6 +41,7 @@ type TransactionItem = {
   avatar: string | null;
   created: string;
   metadata: any;
+  bill_amount?: number;
 };
 
 const getInitials = (name: string) => {
@@ -108,6 +109,7 @@ export default function CustomersScreen() {
             : null,
           created: rec.created,
           metadata: typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : (rec.metadata || {}),
+          bill_amount: rec.bill_amount,
         };
       });
       setTransactions(mapped);
@@ -319,7 +321,8 @@ export default function CustomersScreen() {
             customerId: cust?.id || '',
             customerPhone: cust?.phone || 'No Phone',
             created: rec.created,
-            metadata
+            metadata,
+            bill_amount: rec.bill_amount
           };
         });
       }
@@ -327,7 +330,7 @@ export default function CustomersScreen() {
       const headers = ["Date", "Time", "Customer Name", "Customer Phone", "Type", "Stamps", "Points", "Sale Amount (RM)", "Issued By"];
       const rows = recordsToExport.map((tx: any) => {
         const txDate = new Date(tx.created);
-        const saleAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+        const saleAmt = tx.bill_amount ?? tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
         return [
           txDate.toLocaleDateString(),
           txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

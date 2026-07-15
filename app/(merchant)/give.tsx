@@ -175,6 +175,7 @@ export default function GiveStampsScreen() {
         loyalty_card: loyaltyCard!.id,
         type: 'earn',
         points: amountPaid, // Hook will multiply points
+        bill_amount: amountPaid,
         stamps: count,
         metadata: {
           bill_amount: amountPaid,

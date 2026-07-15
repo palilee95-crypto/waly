@@ -239,7 +239,7 @@ export default function MerchantDashboard() {
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     })
     .reduce((acc, tx) => {
-      const amt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+      const amt = tx.bill_amount ?? tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
       return acc + Number(amt);
     }, 0);
 
@@ -248,7 +248,7 @@ export default function MerchantDashboard() {
 
   const mappedActivities: ActivityItem[] = filteredTransactions.map((tx: any) => {
     const cust = tx.expand?.customer;
-    const billAmt = tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+    const billAmt = tx.bill_amount ?? tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
     return {
       id: tx.id,
       name: cust?.name || 'Walk-in Customer',

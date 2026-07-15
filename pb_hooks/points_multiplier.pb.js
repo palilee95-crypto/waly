@@ -92,7 +92,7 @@ onRecordCreate((e) => {
   }
 
   // 6. Calculate final points
-  const basePoints = e.record.get('points') || 0; // represent the bill amount
+  const basePoints = e.record.get('bill_amount') || e.record.get('points') || 0; // represent the bill amount
   const finalPoints = Math.floor(basePoints * tierMult * campaignMult * streakMult) + flatBonus;
   e.record.set('points', finalPoints);
 
