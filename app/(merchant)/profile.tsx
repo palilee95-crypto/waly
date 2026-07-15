@@ -251,7 +251,7 @@ export default function ProfileScreen() {
         try {
           const subRec = await pb.collection('subscriptions').getFirstListItem(`merchant = "${user.merchant_id}"`);
           setSubscription(subRec);
-        } catch (e) {
+        } catch (e: any) {
           console.log("No active subscription row found for profile view:", e.message);
         }
 
