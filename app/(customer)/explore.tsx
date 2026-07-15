@@ -72,7 +72,7 @@ export default function ExploreScreen() {
     try {
       setLoading(true);
       const merchantList = await pb.collection('merchants').getFullList({
-        filter: 'status = "active"',
+        filter: 'status = "active" || status = "pending"',
       });
       const programList = await pb.collection('loyalty_programs').getFullList({
         filter: 'is_active = true',
