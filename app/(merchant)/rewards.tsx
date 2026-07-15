@@ -147,6 +147,8 @@ export default function UnifiedRewardsScreen() {
 
   const [expiryFocused, setExpiryFocused] = useState(false);
   const [rewardFocused, setRewardFocused] = useState(false);
+  const [saveSuccessModalVisible, setSaveSuccessModalVisible] = useState(false);
+  const [showValidationWarning, setShowValidationWarning] = useState(false);
 
   const activeIconObj = stampIcons.find((i) => i.id === selectedIcon) || stampIcons[0];
 
@@ -361,8 +363,9 @@ export default function UnifiedRewardsScreen() {
 
   const handleSaveCardConfig = async () => {
     if (!user || !user.merchant_id) return;
+    setShowValidationWarning(false);
     if (!rewardDesc.trim()) {
-      Alert.alert("Validation Error", "Please enter a Reward Description.");
+      setShowValidationWarning(true);
       return;
     }
     const days = parseInt(expiryDays, 10);
@@ -419,7 +422,7 @@ export default function UnifiedRewardsScreen() {
         }
       }
 
-      Alert.alert("Configuration Saved", "Your loyalty reward program card design and settings have been synced successfully.");
+      setSaveSuccessModalVisible(true);
     } catch (err: any) {
       console.warn(err);
       Alert.alert("Error", err.message || "Failed to save card configuration.");
@@ -943,11 +946,19 @@ export default function UnifiedRewardsScreen() {
               </View>
 
               <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('stamp_completion_desc')}</Text>
-              <View style={[styles.inputWrapper, rewardFocused && styles.inputWrapperFocused, { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }]}>
+              <View style={[
+                styles.inputWrapper, 
+                rewardFocused && styles.inputWrapperFocused, 
+                showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 },
+                { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }
+              ]}>
                 <TextInput
                   style={styles.nestedTextInputMultiline}
                   value={rewardDesc}
-                  onChangeText={setRewardDesc}
+                  onChangeText={(val) => {
+                    setRewardDesc(val);
+                    if (val.trim()) setShowValidationWarning(false);
+                  }}
                   placeholder={locale === 'en' ? "e.g. One Free Double Cheeseburger" : "cth. Satu Burger Keju Ganda Percuma"}
                   placeholderTextColor="#94A3B8"
                   multiline
@@ -955,6 +966,11 @@ export default function UnifiedRewardsScreen() {
                   onBlur={() => setRewardFocused(false)}
                 />
               </View>
+              {showValidationWarning && (
+                <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 4, marginLeft: 4 }}>
+                  {locale === 'en' ? 'Reward description is mandatory' : 'Keterangan ganjaran adalah wajib'}
+                </Text>
+              )}
             </View>
 
             {/* Live Visual Preview Header */}
@@ -1318,6 +1334,39 @@ export default function UnifiedRewardsScreen() {
                 ) : (
                   <Text style={styles.modalConfirmText}>{t('delete')}</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save Success Modal */}
+      <Modal
+        visible={saveSuccessModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveSuccessModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.deleteIconBg, { backgroundColor: '#E8F5E9', width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 4 }]}>
+              <Ionicons name="checkmark-circle" size={32} color="#10B981" />
+            </View>
+            <Text style={styles.modalTitle}>{locale === 'en' ? 'Configuration Saved' : 'Konfigurasi Disimpan'}</Text>
+            <Text style={styles.modalSubtitle}>
+              {locale === 'en' 
+                ? 'Your loyalty reward program card design and settings have been synced successfully.' 
+                : 'Reka bentuk kad dan tetapan program ganjaran kesetiaan anda telah berjaya diselaraskan.'}
+            </Text>
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#000000', flex: 1 }]}
+                onPress={() => setSaveSuccessModalVisible(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {locale === 'en' ? 'OK' : 'OK'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
