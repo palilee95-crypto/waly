@@ -61,6 +61,9 @@ export default function GiveStampsScreen() {
     awardedCount: number;
     totalStamps: number;
     billAmount?: number;
+    pointsEarned?: number;
+    pointsMultiplier?: number;
+    pointsFlatBonus?: number;
   } | null>(null);
   const [successType, setSuccessType] = useState<'stamps' | 'voucher'>('stamps');
   const [voucherDetails, setVoucherDetails] = useState<{
@@ -163,7 +166,7 @@ export default function GiveStampsScreen() {
 
       // 2. Issue earn transaction log
       const amountPaid = parseFloat(billSubtotal) || 0;
-      await pb.collection('transactions').create({
+      const txn = await pb.collection('transactions').create({
         customer: customer.id,
         merchant: user!.merchant_id,
         loyalty_card: loyaltyCard!.id,
@@ -184,6 +187,9 @@ export default function GiveStampsScreen() {
         awardedCount: count,
         totalStamps: newStamps,
         billAmount: amountPaid,
+        pointsEarned: txn.points || 0,
+        pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
+        pointsFlatBonus: txn.metadata?.flat_bonus || 0,
       });
       setShowSuccessModal(true);
       setPhoneNumber('');
@@ -382,7 +388,7 @@ export default function GiveStampsScreen() {
               });
 
               const amountPaid = parseFloat(billSubtotal) || 10.0;
-              await pb.collection('transactions').create({
+              const txn = await pb.collection('transactions').create({
                 customer: customer.id,
                 merchant: user.merchant_id,
                 loyalty_card: loyaltyCard!.id,
@@ -403,6 +409,9 @@ export default function GiveStampsScreen() {
                 awardedCount: 1,
                 totalStamps: newStamps,
                 billAmount: amountPaid,
+                pointsEarned: txn.points || 0,
+                pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
+                pointsFlatBonus: txn.metadata?.flat_bonus || 0,
               });
               setBillSubtotal('');
               setShowSuccessModal(true);
@@ -694,6 +703,19 @@ export default function GiveStampsScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{t('bill_amount')}</Text>
                     <Text style={styles.detailValue}>RM {successDetails.billAmount.toFixed(2)}</Text>
+                  </View>
+                )}
+                
+                {successDetails.pointsEarned !== undefined && successDetails.pointsEarned > 0 && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>
+                      {locale === 'en' ? 'Points Earned' : 'Mata Dikumpul'}
+                    </Text>
+                    <Text style={[styles.detailValue, { color: '#3B82F6', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                      +{successDetails.pointsEarned} Pts
+                      {successDetails.pointsMultiplier !== undefined && successDetails.pointsMultiplier > 1 && ` (${successDetails.pointsMultiplier}x Promo)`}
+                      {successDetails.pointsFlatBonus !== undefined && successDetails.pointsFlatBonus > 0 && ` (+${successDetails.pointsFlatBonus} Bonus)`}
+                    </Text>
                   </View>
                 )}
                 

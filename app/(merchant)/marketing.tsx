@@ -213,8 +213,18 @@ export default function MarketingScreen() {
     try {
       // Check if there are any active points rewards if launching a points promotion
       if (cType === 'double_points' || cType === 'flat_bonus') {
+        const prog = await pb.collection('loyalty_programs')
+          .getFirstListItem(`merchant = "${user.merchant_id}"`)
+          .catch(() => null);
+        const linkedRewardId = prog?.linked_reward || null;
+
+        let filterStr = `merchant = "${user.merchant_id}" && is_active = true && points_cost > 0`;
+        if (linkedRewardId) {
+          filterStr += ` && id != "${linkedRewardId}"`;
+        }
+
         const activePointsRewards = await pb.collection('rewards').getList(1, 1, {
-          filter: `merchant = "${user.merchant_id}" && is_active = true && points_cost > 0`
+          filter: filterStr
         });
         if (activePointsRewards.items.length === 0) {
           Alert.alert(
