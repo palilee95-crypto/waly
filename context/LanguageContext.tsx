@@ -157,9 +157,10 @@ const translations: Record<Locale, Record<string, string>> = {
     customer_name_placeholder: "Enter name (e.g. Adam)",
     create_issue: "Create & Issue",
     campaign_inactive: "CAMPAIGN INACTIVE",
-    campaign_inactive_desc: "No active loyalty program found for your store. Please go to the Marketing section to create a campaign and enable it first.",
+    campaign_inactive_desc: "No active loyalty program found for your store. Please go to the Rewards section to setup a program and enable it first.",
     close: "Close",
     go_to_marketing: "Go to Marketing",
+    go_to_rewards: "Go to Rewards",
     // Marketing Screen
     promotions: "Promotions",
     broadcast: "Broadcast",
@@ -533,9 +534,10 @@ const translations: Record<Locale, Record<string, string>> = {
     customer_name_placeholder: "Masukkan nama (cth. Adam)",
     create_issue: "Cipta & Berikan",
     campaign_inactive: "KEMPEN TIDAK AKTIF",
-    campaign_inactive_desc: "Tiada program kesetiaan aktif ditemui untuk kedai anda. Sila pergi ke bahagian Pemasaran untuk mencipta kempen dan mengaktifkannya terlebih dahulu.",
+    campaign_inactive_desc: "Tiada program kesetiaan aktif ditemui untuk kedai anda. Sila pergi ke bahagian Ganjaran untuk menetapkan program dan mengaktifkannya terlebih dahulu.",
     close: "Tutup",
     go_to_marketing: "Pergi ke Pemasaran",
+    go_to_rewards: "Pergi ke Ganjaran",
     // Marketing Screen
     promotions: "Promosi",
     broadcast: "Hebahan",

@@ -979,12 +979,12 @@ export default function GiveStampsScreen() {
                 }}
                 onPress={() => {
                   setShowNoCampaignModal(false);
-                  router.push('/(merchant)/marketing' as any);
+                  router.push('/(merchant)/rewards' as any);
                 }}
                 activeOpacity={0.9}
               >
                 <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  {t('go_to_marketing')}
+                  {t('go_to_rewards')}
                 </Text>
               </TouchableOpacity>
             </View>
