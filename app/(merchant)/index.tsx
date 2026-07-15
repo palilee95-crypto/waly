@@ -130,7 +130,8 @@ export default function MerchantDashboard() {
   // Helper to determine trial status
   const getTrialStatus = () => {
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
-      const createdTime = new Date(user.merchant_created).getTime();
+      const formattedDate = user.merchant_created.replace(' ', 'T');
+      const createdTime = new Date(formattedDate).getTime();
       const now = new Date().getTime();
       const diffMs = now - createdTime;
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
