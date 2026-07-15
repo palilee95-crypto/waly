@@ -180,12 +180,16 @@ export default function GiveStampsScreen() {
         }
       });
 
+      const awardedStamps = txn.stamps || count;
+      const bonusStampsAwarded = awardedStamps - count;
+      const finalTotalStamps = newStamps + bonusStampsAwarded;
+
       setSuccessType('stamps');
       setSuccessDetails({
         customerName: customer.name || rawInput,
         customerPhone: customer.phone,
-        awardedCount: count,
-        totalStamps: newStamps,
+        awardedCount: awardedStamps,
+        totalStamps: finalTotalStamps,
         billAmount: amountPaid,
         pointsEarned: txn.points || 0,
         pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
@@ -402,12 +406,16 @@ export default function GiveStampsScreen() {
                 }
               });
 
+              const awardedStamps = txn.stamps || 1;
+              const bonusStampsAwarded = awardedStamps - 1;
+              const finalTotalStamps = newStamps + bonusStampsAwarded;
+
               setSuccessType('stamps');
               setSuccessDetails({
                 customerName: customer.name || targetPhone,
                 customerPhone: customer.phone,
-                awardedCount: 1,
-                totalStamps: newStamps,
+                awardedCount: awardedStamps,
+                totalStamps: finalTotalStamps,
                 billAmount: amountPaid,
                 pointsEarned: txn.points || 0,
                 pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
