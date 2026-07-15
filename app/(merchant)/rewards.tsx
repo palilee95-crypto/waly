@@ -620,11 +620,13 @@ export default function UnifiedRewardsScreen() {
                             <View style={styles.typeBadge}>
                               <Text style={styles.typeBadgeText}>{getRewardTypeLabel(reward.type)}</Text>
                             </View>
-                            <View style={[styles.statusBadge, { backgroundColor: reward.is_active ? '#E8F5E9' : '#F1F5F9' }]}>
-                              <Text style={[styles.statusBadgeText, { color: reward.is_active ? '#10B981' : '#64748B' }]}>
-                                {reward.is_active ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Draft' : 'Deraf')}
-                              </Text>
-                            </View>
+                            {reward.id !== linkedRewardId && (
+                              <View style={[styles.statusBadge, { backgroundColor: reward.is_active ? '#E8F5E9' : '#F1F5F9' }]}>
+                                <Text style={[styles.statusBadgeText, { color: reward.is_active ? '#10B981' : '#64748B' }]}>
+                                  {reward.is_active ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Draft' : 'Deraf')}
+                                </Text>
+                              </View>
+                            )}
                           </View>
 
                           <Text style={styles.rewardTitle} numberOfLines={1}>{reward.name}</Text>
@@ -639,21 +641,23 @@ export default function UnifiedRewardsScreen() {
                                 </Text>
                               </View>
                             ) : (
-                              <View style={styles.pointsCostContainer}>
-                                <Ionicons name="gift" size={14} color="#10B981" />
-                                <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
-                              </View>
+                              <>
+                                <View style={styles.pointsCostContainer}>
+                                  <Ionicons name="gift" size={14} color="#10B981" />
+                                  <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
+                                </View>
+                                <Text style={styles.stockText}>{locale === 'en' ? 'Stock' : 'Stok'}: {reward.stock || '0'}</Text>
+                              </>
                             )}
-                            <Text style={styles.stockText}>{locale === 'en' ? 'Stock' : 'Stok'}: {reward.stock || '0'}</Text>
                           </View>
                         </View>
 
                         <View style={styles.cardActions}>
                           {reward.id === linkedRewardId ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.8 }}>
-                              <Ionicons name="lock-closed-outline" size={14} color="#64748B" />
-                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                                {locale === 'en' ? 'Synced' : 'Diselaraskan'}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="lock-closed-outline" size={14} color="#10B981" />
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>
+                                {locale === 'en' ? 'Active' : 'Aktif'}
                               </Text>
                             </View>
                           ) : (
