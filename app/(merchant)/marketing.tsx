@@ -295,6 +295,33 @@ export default function MarketingScreen() {
     }
   };
 
+  const handleDeleteCampaign = (campaign: any) => {
+    Alert.alert(
+      locale === 'en' ? 'Delete Promotion?' : 'Padam Promosi?',
+      locale === 'en'
+        ? `Are you sure you want to permanently delete "${campaign.name}"? This action cannot be undone.`
+        : `Adakah anda pasti ingin memadamkan "${campaign.name}" secara kekal? Tindakan ini tidak boleh diundur.`,
+      [
+        {
+          text: locale === 'en' ? 'Cancel' : 'Batal',
+          style: 'cancel'
+        },
+        {
+          text: locale === 'en' ? 'Delete' : 'Padam',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await pb.collection('campaigns').delete(campaign.id);
+              fetchCampaigns();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete campaign.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const fetchBroadcasts = async () => {
     if (!user || !user.merchant_id) return;
     try {
@@ -870,12 +897,17 @@ export default function MarketingScreen() {
                             </Text>
                           </View>
                         </View>
-                        <Switch
-                          value={camp.is_active}
-                          onValueChange={() => toggleCampaignActive(camp)}
-                          trackColor={{ false: '#E2E8F0', true: '#A3A3A3' }}
-                          thumbColor={camp.is_active ? '#000000' : '#9CA3AF'}
-                        />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                          <Switch
+                            value={camp.is_active}
+                            onValueChange={() => toggleCampaignActive(camp)}
+                            trackColor={{ false: '#E2E8F0', true: '#A3A3A3' }}
+                            thumbColor={camp.is_active ? '#000000' : '#9CA3AF'}
+                          />
+                          <TouchableOpacity onPress={() => handleDeleteCampaign(camp)} style={{ padding: 4 }}>
+                            <Feather name="trash-2" size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
 
                       <Text style={styles.campCardDesc}>{camp.description || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>

@@ -41,10 +41,17 @@ onRecordCreate((e) => {
       '-created', 1, 0, { mid: merchantId, now }
     );
     if (campaigns.length > 0) {
-      campaignMult = campaigns[0].get('multiplier') || 2.0;
+      const camp = campaigns[0];
+      const maxRed = camp.get('max_redemptions') || 0;
+      const curRed = camp.get('current_redemptions') || 0;
+      if (maxRed === 0 || curRed < maxRed) {
+        campaignMult = camp.get('multiplier') || 2.0;
+        camp.set('current_redemptions', curRed + 1);
+        $app.save(camp);
+      }
     }
   } catch (err) {
-    // Ignore error
+    console.log("[MULTIPLIER HOOK] Double points campaign error:", err.message || err);
   }
 
   // 4. Fetch active flat_bonus campaign
@@ -55,10 +62,17 @@ onRecordCreate((e) => {
       '-created', 1, 0, { mid: merchantId, now }
     );
     if (flatCampaigns.length > 0) {
-      flatBonus = flatCampaigns[0].get('bonus_value') || 0;
+      const camp = flatCampaigns[0];
+      const maxRed = camp.get('max_redemptions') || 0;
+      const curRed = camp.get('current_redemptions') || 0;
+      if (maxRed === 0 || curRed < maxRed) {
+        flatBonus = camp.get('bonus_value') || 0;
+        camp.set('current_redemptions', curRed + 1);
+        $app.save(camp);
+      }
     }
   } catch (err) {
-    // Ignore
+    console.log("[MULTIPLIER HOOK] Flat bonus campaign error:", err.message || err);
   }
 
   // 5. Fetch active streak multiplier
@@ -90,10 +104,17 @@ onRecordCreate((e) => {
       '-created', 1, 0, { mid: merchantId, now }
     );
     if (stampCampaigns.length > 0) {
-      bonusStamps = stampCampaigns[0].get('bonus_value') || 0;
+      const camp = stampCampaigns[0];
+      const maxRed = camp.get('max_redemptions') || 0;
+      const curRed = camp.get('current_redemptions') || 0;
+      if (maxRed === 0 || curRed < maxRed) {
+        bonusStamps = camp.get('bonus_value') || 0;
+        camp.set('current_redemptions', curRed + 1);
+        $app.save(camp);
+      }
     }
   } catch (err) {
-    // Ignore
+    console.log("[MULTIPLIER HOOK] Bonus stamps campaign error:", err.message || err);
   }
 
   if (bonusStamps > 0) {
