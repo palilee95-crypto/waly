@@ -402,12 +402,14 @@ export default function UnifiedRewardsScreen() {
           setBgImage(updated.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${updated.id}/${updated.card_background}` : '');
           setBgFile(null);
           setRemoveBgImage(false);
+          setLinkedRewardId(updated.linked_reward || null);
         } else {
           const newProg = await pb.collection('loyalty_programs').create(formData);
           setProgramId(newProg.id);
           setBgImage(newProg.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${newProg.id}/${newProg.card_background}` : '');
           setBgFile(null);
           setRemoveBgImage(false);
+          setLinkedRewardId(newProg.linked_reward || null);
         }
       } else {
         if (removeBgImage) {
@@ -415,10 +417,12 @@ export default function UnifiedRewardsScreen() {
         }
 
         if (programId) {
-          await pb.collection('loyalty_programs').update(programId, payload);
+          const updated = await pb.collection('loyalty_programs').update(programId, payload);
+          setLinkedRewardId(updated.linked_reward || null);
         } else {
           const newProg = await pb.collection('loyalty_programs').create(payload);
           setProgramId(newProg.id);
+          setLinkedRewardId(newProg.linked_reward || null);
         }
       }
 
@@ -586,7 +590,7 @@ export default function UnifiedRewardsScreen() {
             {/* Catalogue header title & button is in parent screen header */}
             {loadingRewards ? (
               <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
-            ) : rewards.filter(r => r.id !== linkedRewardId).length === 0 ? (
+            ) : rewards.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyIconBg}>
                   <Ionicons name="gift-outline" size={48} color="#94A3B8" />
@@ -602,7 +606,6 @@ export default function UnifiedRewardsScreen() {
             ) : (
               <View style={styles.rewardsList}>
                 {rewards
-                  .filter(r => r.id !== linkedRewardId)
                   .map((reward) => {
                     const itemImgUrl = reward.image
                       ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
@@ -628,21 +631,41 @@ export default function UnifiedRewardsScreen() {
                           <Text style={styles.rewardDesc} numberOfLines={2}>{reward.description || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>
                           
                           <View style={styles.rewardFooterRow}>
-                            <View style={styles.pointsCostContainer}>
-                              <Ionicons name="gift" size={14} color="#10B981" />
-                              <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
-                            </View>
+                            {reward.id === linkedRewardId ? (
+                              <View style={[styles.pointsCostContainer, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, gap: 4 }]}>
+                                <Ionicons name="card-outline" size={14} color="#2563EB" />
+                                <Text style={[styles.pointsCostText, { color: '#2563EB', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                                  {locale === 'en' ? 'Stamp Card Reward' : 'Ganjaran Kad Setem'}
+                                </Text>
+                              </View>
+                            ) : (
+                              <View style={styles.pointsCostContainer}>
+                                <Ionicons name="gift" size={14} color="#10B981" />
+                                <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
+                              </View>
+                            )}
                             <Text style={styles.stockText}>{locale === 'en' ? 'Stock' : 'Stok'}: {reward.stock || '0'}</Text>
                           </View>
                         </View>
 
                         <View style={styles.cardActions}>
-                          <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenEdit(reward)}>
-                            <Ionicons name="create-outline" size={18} color="#475569" />
-                          </TouchableOpacity>
-                          <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenDelete(reward)}>
-                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                          </TouchableOpacity>
+                          {reward.id === linkedRewardId ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.8 }}>
+                              <Ionicons name="lock-closed-outline" size={14} color="#64748B" />
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                                {locale === 'en' ? 'Synced' : 'Diselaraskan'}
+                              </Text>
+                            </View>
+                          ) : (
+                            <>
+                              <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenEdit(reward)}>
+                                <Ionicons name="create-outline" size={18} color="#475569" />
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.actionIconBtn} onPress={() => handleOpenDelete(reward)}>
+                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                              </TouchableOpacity>
+                            </>
+                          )}
                         </View>
                       </View>
                     );
