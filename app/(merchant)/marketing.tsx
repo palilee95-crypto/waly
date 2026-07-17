@@ -755,8 +755,6 @@ export default function MarketingScreen() {
           {activeIconObj.family === 'MaterialIcons' && (
             <MaterialIcons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
             )}
-
-            {broadcastMode === 'smart' && <SmartFollowUp styles={styles} Alert={Alert} />}
           </View>
       );
     }
@@ -1025,15 +1023,6 @@ export default function MarketingScreen() {
                 <Ionicons name="send-outline" size={15} color={broadcastMode === 'manual' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
                 <Text style={[styles.modeSegmentBtnText, broadcastMode === 'manual' && styles.modeSegmentBtnTextActive]}>
                   {t('instant_blast')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeSegmentBtn, broadcastMode === 'automated' && styles.modeSegmentBtnActive]}
-                onPress={() => setBroadcastMode('automated')}
-              >
-                <Ionicons name="time-outline" size={15} color={broadcastMode === 'automated' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
-                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'automated' && styles.modeSegmentBtnTextActive]}>
-                  {t('auto_follow_up')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1455,6 +1444,12 @@ export default function MarketingScreen() {
                     ))}
                   </View>
                 )}
+              </View>
+            )}
+
+            {broadcastMode === 'smart' && (
+              <View style={{ width: '100%' }}>
+                <SmartFollowUp styles={styles} Alert={Alert} />
               </View>
             )}
           </View>
