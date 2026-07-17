@@ -44,6 +44,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [isSavingSmart, setIsSavingSmart] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
     if (user) fetchSmartGroups();
@@ -73,6 +74,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
     setSmartSequences([]);
     setSmartMembers([]);
     setSmartWizardStep(1);
+    setValidationError('');
     setShowSmartWizard(false);
   };
 
@@ -217,9 +219,9 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
   const handleSaveSmartGroup = async () => {
     if (!user || !user.merchant_id) return;
-    if (!smartGroupName.trim()) { Alert.alert('Validation', 'Group name is required.'); return; }
-    if (smartSequences.length === 0) { Alert.alert('Validation', 'Add at least one sequence.'); return; }
-    if (smartMembers.length === 0) { Alert.alert('Validation', 'Add at least one member.'); return; }
+    if (!smartGroupName.trim()) { setValidationError('Group name is required.'); return; }
+    if (smartSequences.length === 0) { setValidationError('Add at least one sequence.'); return; }
+    if (smartMembers.length === 0) { setValidationError('Add at least one member.'); return; }
 
     setIsSavingSmart(true);
     try {
@@ -487,6 +489,16 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
               })}
             </View>
 
+            {validationError ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FEE2E2', marginBottom: 16, gap: 8 }}>
+                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Text style={{ flex: 1, fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{validationError}</Text>
+                <TouchableOpacity onPress={() => setValidationError('')} activeOpacity={0.7} style={{ padding: 2 }}>
+                  <Ionicons name="close" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {/* Scrollable Container */}
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
               {/* STEP 1: GROUP INFO */}
@@ -499,7 +511,10 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     <TextInput 
                       style={inputStyles.input} 
                       value={smartGroupName} 
-                      onChangeText={setSmartGroupName} 
+                      onChangeText={(v) => {
+                        setSmartGroupName(v);
+                        if (validationError) setValidationError('');
+                      }} 
                       placeholder="e.g. 7-Day Winback Campaign" 
                       placeholderTextColor="#BEC6E0" 
                     />
@@ -752,14 +767,15 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                 <TouchableOpacity 
                   style={[btnStyles.btn, { flex: 1 }]} 
                   onPress={() => {
+                    setValidationError('');
                     if (smartWizardStep === 1) {
                       if (!smartGroupName.trim()) {
-                        Alert.alert('Validation', 'Please enter a Group Name before proceeding.');
+                        setValidationError('Please enter a Group Name before proceeding.');
                         return;
                       }
                     } else if (smartWizardStep === 2) {
                       if (smartSequences.length === 0) {
-                        Alert.alert('Validation', 'Please add at least one Sequence step before proceeding.');
+                        setValidationError('Please add at least one Sequence step before proceeding.');
                         return;
                       }
                     }
