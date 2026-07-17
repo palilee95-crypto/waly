@@ -1038,116 +1038,17 @@ export default function MarketingScreen() {
 
             {broadcastMode === 'manual' && (
               <View style={{ width: '100%' }}>
-                {/* Compose Broadcast Card */}
-                <View style={styles.configCard}>
-                  {activeFollowUpParent ? (
-                    <View style={styles.followUpBanner}>
-                      <Text style={styles.followUpBannerText}>
-                        {locale === 'en' ? 'Replying to: ' : 'Membalas kepada: '}<Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{activeFollowUpParent.title}</Text>
-                      </Text>
-                      <TouchableOpacity onPress={() => {
-                        setActiveFollowUpParent(null);
-                        setBTitle('Exclusive Promotion! 🎁');
-                      }}>
-                        <Ionicons name="close-circle" size={16} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <Text style={styles.cardSectionTitle}>{t('compose_broadcast')}</Text>
-                  )}
-                  <Text style={styles.cardSectionDesc}>
-                    {activeFollowUpParent 
-                      ? (locale === 'en' ? 'Compose a threaded follow-up reply that will target the same customer list.' : 'Gubal jawapan susulan berulir yang akan menyasarkan senarai pelanggan yang sama.')
-                      : t('compose_subtitle')}
-                  </Text>
-
-                  {/* Campaign Picker Horizontal Tags (disabled in follow-up mode) */}
-                  {!activeFollowUpParent && (
-                    <>
-                      <Text style={styles.inputLabelSmall}>{t('link_campaign')}</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagScrollGap}>
-                        <TouchableOpacity
-                          style={[styles.tagButton, !bCampaignId && styles.tagButtonActive]}
-                          onPress={() => {
-                            setBCampaignId('');
-                            setBTitle('Exclusive Promotion! 🎁');
-                            setBMessage('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.tagText, !bCampaignId && styles.tagTextActive]}>{t('no_campaign_link')}</Text>
-                        </TouchableOpacity>
-                        {campaignsList.map((camp) => (
-                          <TouchableOpacity
-                            key={camp.id}
-                            style={[styles.tagButton, bCampaignId === camp.id && styles.tagButtonActive]}
-                            onPress={() => {
-                              setBCampaignId(camp.id);
-                              setBTitle(`Promo: ${camp.name}`);
-                              setBMessage(camp.description || '');
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={[styles.tagText, bCampaignId === camp.id && styles.tagTextActive]}>{camp.name}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </>
-                  )}
-
-                  <Text style={styles.inputLabelSmall}>{t('broadcast_title')}</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={bTitle}
-                    onChangeText={setBTitle}
-                    placeholder="e.g. 2x Stamps Weekend!"
-                    placeholderTextColor="#BEC6E0"
-                  />
-
-                  <Text style={styles.inputLabelSmall}>{t('message_body')}</Text>
-                  <TextInput
-                    style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
-                    multiline
-                    numberOfLines={4}
-                    value={bMessage}
-                    onChangeText={setBMessage}
-                    placeholder="Type message here..."
-                    placeholderTextColor="#BEC6E0"
-                  />
-                  <Text style={styles.helperText}>
-                    {t('template_helper_desc')}
-                  </Text>
-
-                  {/* Toggle WhatsApp Blast */}
-                  <View style={styles.switchRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchLabel}>{t('send_whatsapp_message')}</Text>
-                      <Text style={styles.switchDesc}>{t('whatsapp_blast_desc')}</Text>
-                    </View>
-                    <Switch
-                      value={bSendWhatsApp}
-                      onValueChange={setBSendWhatsApp}
-                      trackColor={{ false: '#E2E8F0', true: '#000000' }}
-                      thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : bSendWhatsApp ? '#000000' : '#F4F3F4'}
-                    />
+                {/* In Development Lock Screen */}
+                <View style={[styles.campEmptyState, { paddingVertical: 56, backgroundColor: '#FFFFFF', borderStyle: 'solid', borderColor: '#E5E7EB', marginBottom: 20 }]}>
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <Ionicons name="construct-outline" size={30} color="#D97706" />
                   </View>
-
-                  <TouchableOpacity
-                    style={[styles.saveBtn, audienceEstimate === 0 && { opacity: 0.6 }]}
-                    onPress={handleSendBlast}
-                    disabled={isSendingBlast || audienceEstimate === 0}
-                    activeOpacity={0.9}
-                  >
-                    {isSendingBlast ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.saveBtnText}>
-                        {activeFollowUpParent 
-                          ? (locale === 'en' ? 'Send Thread Follow-Up' : 'Hantar Susulan Utas')
-                          : t('send_broadcast_btn')}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  <Text style={[styles.campEmptyTitle, { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }]}>
+                    In Development
+                  </Text>
+                  <Text style={[styles.campEmptySub, { textAlign: 'center', maxWidth: 320, color: '#64748B', lineHeight: 20, marginTop: 4 }]}>
+                    Instant Blast is currently under active development. Stay tuned for single-click customer broadcasts!
+                  </Text>
                 </View>
 
                 {/* Broadcast History Title */}
