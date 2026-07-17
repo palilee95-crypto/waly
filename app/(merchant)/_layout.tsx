@@ -27,8 +27,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
 
         {/* Navigation Links */}
         <View style={styles.sidebarLinks}>
-          {state.routes.filter((route: any) => route.name !== 'staff' && route.name !== 'rewards').map((route: any, index: number) => {
-            const isFocused = state.index === index;
+          {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
+            const isFocused = state.routes[state.index]?.name === route.name;
 
             const onPress = () => {
               const event = navigation.emit({
@@ -99,8 +99,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
   // Mobile Bottom Tab Bar view
   return (
     <View style={[styles.mobileTabBar, { paddingBottom: insets.bottom + 8 }]}>
-      {state.routes.filter((route: any) => route.name !== 'staff' && route.name !== 'rewards').map((route: any, index: number) => {
-        const isFocused = state.index === index;
+      {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
+        const isFocused = state.routes[state.index]?.name === route.name;
         const onPress = () => {
           const event = navigation.emit({
             type: 'tabPress',

@@ -103,6 +103,23 @@ function runSmartFollowUp() {
       const customerName = customer.getString("name") || "Valued Customer";
       const totalPoints = customer.get("total_points") || 0;
 
+      // Fetch customer's active loyalty card for this merchant to get stamps count
+      let stampsCount = 0;
+      try {
+        const cards = $app.findRecordsByFilter(
+          "loyalty_cards",
+          `merchant = "${merchantId}" && customer = "${customerId}"`,
+          "-created",
+          1,
+          0
+        );
+        if (cards.length > 0) {
+          stampsCount = cards[0].get("stamps_collected") || 0;
+        }
+      } catch (err) {
+        console.log(`Failed to fetch stamps for customer ${customerId}:`, err.message || err);
+      }
+
       // Get messages for this sequence
       const seqMessages = $app.findRecordsByFilter(
         "follow_up_messages",
@@ -119,7 +136,7 @@ function runSmartFollowUp() {
         let body = msg.getString("message_body") || "";
         body = body
           .replace(/\{\{\s*name\s*\}\}/g, customerName)
-          .replace(/\{\{\s*stamps\s*\}\}/g, "0")
+          .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
           .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
           .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
           .replace(/\{\{\s*login_link\s*\}\}/g, "https://risev.app/login");
