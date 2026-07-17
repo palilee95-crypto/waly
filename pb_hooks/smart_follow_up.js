@@ -41,7 +41,7 @@ function runSmartFollowUp() {
     const members = $app.findRecordsByFilter(
       "follow_up_members",
       `group = "${groupId}" && (status = 'enrolled' || status = 'in_progress')`,
-      "enrolled_at",
+      "created",
       5000,
       0
     );
@@ -70,7 +70,7 @@ function runSmartFollowUp() {
       const anchorTime = getConversationAnchor(customerId, merchantId, nextSeq.getString("conversation_type"), member, groupId);
       if (!anchorTime) {
         // No anchor found — use enrolled_at as fallback
-        const enrolledAt = member.getDateTime("enrolled_at");
+        const enrolledAt = member.getDateTime("created");
         if (!enrolledAt) continue;
         const anchorMs = enrolledAt.unixMillis();
         const delayMs = calcDelayMs(nextSeq);
@@ -82,10 +82,11 @@ function runSmartFollowUp() {
 
       // Anti-spam: check if customer received a message from this group in last 24h
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const oneDayAgoStr = oneDayAgo.toISOString().replace('T', ' ').substring(0, 19);
       const recentLogs = $app.findRecordsByFilter(
         "follow_up_logs",
-        `group = "${groupId}" && customer = "${customerId}" && sent_at >= "${oneDayAgo.toISOString()}"`,
-        "-sent_at",
+        `group = "${groupId}" && customer = "${customerId}" && created >= "${oneDayAgoStr}"`,
+        "-created",
         1,
         0
       );
@@ -234,16 +235,16 @@ function getConversationAnchor(customerId, merchantId, type, member, groupId) {
       const logs = $app.findRecordsByFilter(
         "follow_up_logs",
         `member = "${member.id}"`,
-        "-sent_at",
+        "-created",
         1,
         0
       );
       if (logs.length > 0) {
-        const sentAt = logs[0].getDateTime("sent_at");
+        const sentAt = logs[0].getDateTime("created");
         return sentAt ? new Date(sentAt.unixMillis()) : null;
       }
-      // Fallback to enrolled_at
-      const enrolledAt = member.getDateTime("enrolled_at");
+      // Fallback to enrolled_at (created)
+      const enrolledAt = member.getDateTime("created");
       return enrolledAt ? new Date(enrolledAt.unixMillis()) : null;
     }
 
@@ -252,10 +253,10 @@ function getConversationAnchor(customerId, merchantId, type, member, groupId) {
     case "last_customer_msg": {
       // For these types, we check the transactions/loyalty_cards as a proxy
       // since we don't have direct WhatsApp message history access in hooks
-      // Fallback: use the member's last_message_sent_at or enrolled_at
+      // Fallback: use the member's last_message_sent_at or created (enrolled time)
       const lastSent = member.getDateTime("last_message_sent_at");
       if (lastSent) return new Date(lastSent.unixMillis());
-      const enrolledAt = member.getDateTime("enrolled_at");
+      const enrolledAt = member.getDateTime("created");
       return enrolledAt ? new Date(enrolledAt.unixMillis()) : null;
     }
 
