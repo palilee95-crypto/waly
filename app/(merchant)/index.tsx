@@ -62,6 +62,7 @@ export default function MerchantDashboard() {
   const [promoError, setPromoError] = useState('');
   const [promoSuccess, setPromoSuccess] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [activePromos, setActivePromos] = useState<any[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 9 | 12>(1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -84,8 +85,20 @@ export default function MerchantDashboard() {
         console.warn('Failed to load dynamic pricing, using defaults:', err);
       }
     };
+    const loadPromos = async () => {
+      try {
+        const records = await pb.collection('subscription_promo_codes').getFullList({
+          filter: 'is_active = true',
+          sort: '-created',
+        });
+        setActivePromos(records);
+      } catch (err) {
+        console.warn('Failed to load promo codes:', err);
+      }
+    };
     if (user) {
       loadPricing();
+      loadPromos();
     }
   }, [user]);
 
@@ -309,23 +322,80 @@ export default function MerchantDashboard() {
             <View style={styles.trialBarWrap}>
               <View style={[styles.trialBarFill, { width: `${Math.round(((7 - trialDaysRemaining) / 7) * 100)}%` }]} />
             </View>
-            <View style={styles.trialBottomRow}>
-              <View style={styles.trialFeatures}>
-                <View style={styles.trialFeat}>
-                  <Ionicons name="checkmark-circle" size={14} color="#111827" />
+            <View style={styles.trialFeatures}>
+              <View style={styles.trialFeat}>
+                <Ionicons name="checkmark-circle" size={14} color="#111827" />
                   <Text style={styles.trialFeatText}>Unlimited stamps</Text>
                 </View>
                 <View style={styles.trialFeat}>
                   <Ionicons name="checkmark-circle" size={14} color="#111827" />
-                  <Text style={styles.trialFeatText}>WhatsApp blast</Text>
-                </View>
+                <Text style={styles.trialFeatText}>WhatsApp blast</Text>
+              </View>
+            </View>
+            {activePromos.length > 0 && (
+              <View style={styles.trialPromoRow}>
+                {activePromos.map((promo) => {
+                  const isApplied = appliedPromo?.code === promo.code;
+                  return (
+                    <TouchableOpacity
+                      key={promo.id}
+                      style={[styles.trialPromoChip, isApplied && styles.trialPromoChipActive]}
+                      onPress={() => {
+                        if (isApplied) {
+                          setAppliedPromo(null);
+                          setPromoSuccess('');
+                        } else {
+                          setAppliedPromo({
+                            code: promo.code,
+                            discount_type: promo.discount_type,
+                            discount_value: promo.discount_value,
+                          });
+                          setPromoSuccess(
+                            promo.discount_type === 'percentage'
+                              ? `-${promo.discount_value}% off`
+                              : `-RM${promo.discount_value} off`
+                          );
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.trialPromoChipText, isApplied && styles.trialPromoChipTextActive]}>
+                        {promo.code}
+                      </Text>
+                      <Text style={[styles.trialPromoChipDesc, isApplied && styles.trialPromoChipDescActive]}>
+                        {promo.discount_type === 'percentage' ? `${promo.discount_value}% off` : `RM${promo.discount_value} off`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            {promoSuccess ? (
+              <Text style={styles.trialPromoSuccess}>{promoSuccess}</Text>
+            ) : promoError ? (
+              <Text style={styles.trialPromoError}>{promoError}</Text>
+            ) : null}
+            <View style={styles.trialBottomRow}>
+              <View>
+                {appliedPromo ? (
+                  <View style={styles.trialPriceRow}>
+                    <Text style={styles.trialPriceStrikethrough}>RM{pricing.base_price_1m}/mo</Text>
+                    <Text style={styles.trialPriceDiscounted}>
+                      RM{appliedPromo.discount_type === 'percentage'
+                        ? Math.round(pricing.base_price_1m * (1 - appliedPromo.discount_value / 100))
+                        : Math.max(0, pricing.base_price_1m - appliedPromo.discount_value)}/mo
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.trialPrice}>RM{pricing.base_price_1m}/mo</Text>
+                )}
               </View>
               <TouchableOpacity
                 style={styles.trialUpgradeBtn}
                 onPress={handleUpgradePress}
                 activeOpacity={0.8}
               >
-                <Text style={styles.trialUpgradeBtnText}>Upgrade — RM79/mo</Text>
+                <Text style={styles.trialUpgradeBtnText}>Upgrade</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -981,14 +1051,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1340',
     borderRadius: 3,
   },
-  trialBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   trialFeatures: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: 10,
   },
   trialFeat: {
     flexDirection: 'row',
@@ -1000,16 +1066,91 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#6B7280',
   },
+  trialPromoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  trialPromoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F4F2FF',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E4E0F5',
+  },
+  trialPromoChipActive: {
+    backgroundColor: '#1C1340',
+    borderColor: '#1C1340',
+  },
+  trialPromoChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1C1340',
+  },
+  trialPromoChipTextActive: {
+    color: '#FFFFFF',
+  },
+  trialPromoChipDesc: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#6B7280',
+  },
+  trialPromoChipDescActive: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  trialPromoSuccess: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#22C55E',
+    marginBottom: 8,
+  },
+  trialPromoError: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#EF4444',
+    marginBottom: 8,
+  },
+  trialBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  trialPrice: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#111827',
+  },
+  trialPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trialPriceStrikethrough: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  trialPriceDiscounted: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#22C55E',
+  },
   trialUpgradeBtn: {
     backgroundColor: '#1C1340',
     borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 34,
+    paddingHorizontal: 18,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trialUpgradeBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
