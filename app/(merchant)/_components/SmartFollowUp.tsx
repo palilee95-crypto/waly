@@ -441,13 +441,13 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                           width: 36, 
                           height: 36, 
                           borderRadius: 18, 
-                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#5C3BCC' : '#F1F5F9', 
+                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#000000' : '#F1F5F9', 
                           borderWidth: isActive ? 0 : 1,
                           borderColor: isCompleted ? '#A7F3D0' : '#E2E8F0',
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           marginBottom: 6,
-                          shadowColor: isActive ? '#5C3BCC' : '#000',
+                          shadowColor: isActive ? '#000000' : '#000',
                           shadowOffset: { width: 0, height: isActive ? 3 : 0 },
                           shadowOpacity: isActive ? 0.2 : 0,
                           shadowRadius: isActive ? 5 : 0,
@@ -874,14 +874,14 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                             paddingVertical: 8, 
                             borderRadius: 10, 
                             borderWidth: 1, 
-                            borderColor: isActive ? '#5C3BCC' : '#E2E8F0', 
-                            backgroundColor: isActive ? '#F5F3FF' : '#FFFFFF',
+                            borderColor: isActive ? '#000000' : '#E2E8F0', 
+                            backgroundColor: isActive ? '#000000' : '#FFFFFF',
                             marginBottom: 4
                           }} 
                           onPress={() => setSeqConvType(ct.v)}
                           activeOpacity={0.7}
                         >
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#5C3BCC' : '#475569' }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
                             {ct.l}
                           </Text>
                         </TouchableOpacity>
@@ -894,7 +894,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
                     <TouchableOpacity onPress={() => openMsgModal(null)}>
-                      <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
+                      <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
                     </TouchableOpacity>
                   </View>
                   
@@ -956,17 +956,17 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       <TouchableOpacity 
                         key={v} 
                         style={{ 
-                          backgroundColor: '#F5F3FF', 
+                          backgroundColor: '#F1F5F9', 
                           borderRadius: 8, 
                           paddingHorizontal: 10, 
                           paddingVertical: 5,
                           borderWidth: 1,
-                          borderColor: '#E9E3FF'
+                          borderColor: '#E2E8F0'
                         }} 
                         onPress={() => insertVariable(v)}
                         activeOpacity={0.7}
                       >
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#5C3BCC' }}>{`{{${v}}}`}</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{`{{${v}}}`}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -989,29 +989,39 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     <Text style={inputStyles.label}>Interactive Action Buttons ({msgButtons.length}/3)</Text>
                     {msgButtons.length < 3 && (
                       <TouchableOpacity onPress={addActionButton}>
-                        <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
+                        <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                   
                   {msgButtons.map((btn, i) => (
-                    <View key={i} style={{ flexDirection: 'row', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-                      <TextInput 
-                        style={[inputStyles.input, { flex: 1.2 }]} 
-                        value={btn.label} 
-                        onChangeText={(v) => updateActionButton(i, 'label', v)} 
-                        placeholder="Button label" 
-                        placeholderTextColor="#BEC6E0" 
-                      />
-                      <TextInput 
-                        style={[inputStyles.input, { flex: 2 }]} 
-                        value={btn.url} 
-                        onChangeText={(v) => updateActionButton(i, 'url', v)} 
-                        placeholder="URL (optional)" 
-                        placeholderTextColor="#BEC6E0" 
-                      />
-                      <TouchableOpacity onPress={() => removeActionButton(i)} activeOpacity={0.7}>
-                        <Ionicons name="close-circle" size={22} color="#EF4444" />
+                    <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, gap: 8, position: 'relative' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>Button Label</Text>
+                        <TextInput 
+                          style={inputStyles.input} 
+                          value={btn.label} 
+                          onChangeText={(v) => updateActionButton(i, 'label', v)} 
+                          placeholder="Button label" 
+                          placeholderTextColor="#BEC6E0" 
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>URL (optional)</Text>
+                        <TextInput 
+                          style={inputStyles.input} 
+                          value={btn.url} 
+                          onChangeText={(v) => updateActionButton(i, 'url', v)} 
+                          placeholder="URL (optional)" 
+                          placeholderTextColor="#BEC6E0" 
+                        />
+                      </View>
+                      <TouchableOpacity 
+                        style={{ position: 'absolute', top: 12, right: 12, padding: 4 }} 
+                        onPress={() => removeActionButton(i)} 
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
                   ))}
