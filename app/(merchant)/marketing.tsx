@@ -21,7 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
-import SmartFollowUp from './SmartFollowUp';
+import SmartFollowUp from './_components/SmartFollowUp';
 
 
 
