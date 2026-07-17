@@ -274,8 +274,17 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     let intervalId: any;
+    let attemptCount = 0;
+    const MAX_ATTEMPTS = 20; // ~5min total with backoff; stops storming a broken backend
     if (showQrModal && user && user.merchant_id) {
       const poll = async () => {
+        attemptCount += 1;
+        if (attemptCount > MAX_ATTEMPTS) {
+          console.warn('WhatsApp QR polling exceeded max attempts, stopping.');
+          if (intervalId) clearTimeout(intervalId);
+          setWhatsappStatus('disconnected');
+          return;
+        }
         try {
           const res = await pb.send('/api/risev/merchant/whatsapp/status?generateQr=true', {
             method: 'GET',
@@ -295,19 +304,21 @@ export default function ProfileScreen() {
               type: 'success'
             });
             setShowResultModal(true);
-            if (intervalId) clearInterval(intervalId);
+            if (intervalId) clearTimeout(intervalId);
           } else if (res.qrcode) {
             setWhatsappQr(res.qrcode);
           }
         } catch (err) {
           console.warn('Polling WhatsApp status failed:', err);
         }
+        // Exponential backoff capped at 30s: 3s, 6s, 12s, 24s, 30s, 30s...
+        const delay = Math.min(3000 * Math.pow(2, attemptCount - 1), 30000);
+        intervalId = setTimeout(poll, delay);
       };
       poll();
-      intervalId = setInterval(poll, 3000);
     }
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) clearTimeout(intervalId);
     };
   }, [showQrModal]);
 
