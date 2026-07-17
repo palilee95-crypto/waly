@@ -289,12 +289,18 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
   return (
     <View style={{ width: '100%' }}>
-      <View style={s.configCard}>
-        <Text style={s.cardSectionTitle}>Smart Follow Up</Text>
-        <Text style={s.cardSectionDesc}>Create multi-step automated follow-up sequences with smart triggers.</Text>
-        <TouchableOpacity style={[btnStyles.btn, { alignSelf: 'flex-start', marginTop: 12 }]} onPress={() => setShowSmartWizard(true)} activeOpacity={0.8}>
-          <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={btnStyles.btnText}>Create Smart Follow Up</Text>
+      <View style={[s.campHeaderRow, { marginBottom: 20 }]}>
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <Text style={s.campTitle}>Smart Follow Up</Text>
+          <Text style={s.campSubtitle}>Create multi-step automated follow-up sequences with smart triggers.</Text>
+        </View>
+        <TouchableOpacity 
+          style={s.createCampBtn} 
+          onPress={() => setShowSmartWizard(true)} 
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text style={s.createCampBtnText}>New Group</Text>
         </TouchableOpacity>
       </View>
 
@@ -302,9 +308,16 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
       ) : smartGroups.length === 0 ? (
         <View style={s.campEmptyState}>
-          <Ionicons name="git-branch-outline" size={40} color="#94A3B8" />
+          <Ionicons name="git-branch-outline" size={48} color="#94A3B8" />
           <Text style={s.campEmptyTitle}>No Smart Follow Up Groups</Text>
           <Text style={s.campEmptySub}>Create your first multi-step follow-up sequence to engage customers automatically.</Text>
+          <TouchableOpacity 
+            style={s.campEmptyBtn}
+            onPress={() => setShowSmartWizard(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={s.campEmptyBtnText}>Create Smart Follow Up</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={s.campList}>
@@ -315,8 +328,41 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   <View style={{ gap: 4, flex: 1 }}>
                     <Text style={s.campCardName}>{group.name}</Text>
                     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                      <View style={[badgeStyles.badge, { backgroundColor: group.status === 'active' ? '#22C55E' : group.status === 'paused' ? '#F59E0B' : '#6B7280' }]}>
-                        <Text style={badgeStyles.text}>{group.status.toUpperCase()}</Text>
+                      <View 
+                        style={[
+                          s.statusDotBadge, 
+                          group.status === 'active' && { backgroundColor: '#ECFDF5' },
+                          group.status === 'paused' && { backgroundColor: '#FFFBEB' },
+                          group.status === 'draft' && { backgroundColor: '#F1F5F9' },
+                          group.status === 'archived' && { backgroundColor: '#F1F5F9' }
+                        ]}
+                      >
+                        <View 
+                          style={[
+                            s.statusDot, 
+                            { 
+                              backgroundColor: group.status === 'active' 
+                                ? '#10B981' 
+                                : group.status === 'paused' 
+                                ? '#F59E0B' 
+                                : '#64748B' 
+                            }
+                          ]} 
+                        />
+                        <Text 
+                          style={[
+                            s.statusDotText,
+                            { 
+                              color: group.status === 'active' 
+                                ? '#047857' 
+                                : group.status === 'paused' 
+                                ? '#B45309' 
+                                : '#475569' 
+                            }
+                          ]}
+                        >
+                          {group.status.toUpperCase()}
+                        </Text>
                       </View>
                       <Text style={{ fontSize: 11, color: '#6B7280', fontFamily: 'PlusJakartaSans_500Medium' }}>
                         {group.member_count} members · {group.sequence_count} sequences
@@ -329,11 +375,37 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
               {expandedGroup === group.id && (
                 <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity style={[btnStyles.btn, { flex: 1, backgroundColor: group.status === 'active' ? '#F59E0B' : '#22C55E' }]} onPress={() => toggleSmartGroupStatus(group)}>
-                      <Text style={btnStyles.btnText}>{group.status === 'active' ? 'Pause' : 'Activate'}</Text>
+                    <TouchableOpacity 
+                      style={[
+                        btnStyles.btn, 
+                        { 
+                          flex: 1, 
+                          backgroundColor: group.status === 'active' ? '#FFF7ED' : '#F0FDF4',
+                          borderWidth: 1,
+                          borderColor: group.status === 'active' ? '#FFEDD5' : '#DCFCE7'
+                        }
+                      ]} 
+                      onPress={() => toggleSmartGroupStatus(group)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[btnStyles.btnText, { color: group.status === 'active' ? '#D97706' : '#16A34A' }]}>
+                        {group.status === 'active' ? 'Pause' : 'Activate'}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[btnStyles.btn, { flex: 1, backgroundColor: '#EF4444' }]} onPress={() => deleteSmartGroup(group.id)}>
-                      <Text style={btnStyles.btnText}>Delete</Text>
+                    <TouchableOpacity 
+                      style={[
+                        btnStyles.btn, 
+                        { 
+                          flex: 1, 
+                          backgroundColor: '#FEF2F2',
+                          borderWidth: 1,
+                          borderColor: '#FEE2E2'
+                        }
+                      ]} 
+                      onPress={() => deleteSmartGroup(group.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[btnStyles.btnText, { color: '#EF4444' }]}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -582,8 +654,25 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 }
 
 const btnStyles = StyleSheet.create({
-  btn: { backgroundColor: '#1C1340', borderRadius: 10, paddingHorizontal: 18, height: 36, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  btnText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
+  btn: { 
+    backgroundColor: '#000000', 
+    borderRadius: 12, 
+    paddingHorizontal: 18, 
+    height: 38, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    flexDirection: 'row',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  btnText: { 
+    fontSize: 13, 
+    fontFamily: 'PlusJakartaSans_700Bold', 
+    color: '#FFFFFF' 
+  },
 });
 
 const badgeStyles = StyleSheet.create({
