@@ -419,124 +419,366 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
       <Modal visible={showSmartWizard} transparent animationType="slide" onRequestClose={resetSmartWizard}>
         <View style={modalStyles.overlay}>
           <View style={modalStyles.card}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Text style={modalStyles.title}>Create Smart Follow Up</Text>
-              <TouchableOpacity onPress={resetSmartWizard}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+              <TouchableOpacity onPress={resetSmartWizard} style={{ padding: 4 }} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', marginBottom: 24, gap: 8 }}>
-              {[1, 2, 3].map((step) => (
-                <View key={step} style={{ flex: 1, alignItems: 'center' }}>
-                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: smartWizardStep >= step ? '#1C1340' : '#E4E0F5', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                    <Text style={{ color: smartWizardStep >= step ? '#FFFFFF' : '#6B7280', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>{step}</Text>
+
+            {/* Premium Step Progress Indicator */}
+            <View style={{ flexDirection: 'row', marginBottom: 28, gap: 16, alignItems: 'center', paddingHorizontal: 4 }}>
+              {[1, 2, 3].map((step) => {
+                const isCompleted = step < smartWizardStep;
+                const isActive = step === smartWizardStep;
+                
+                return (
+                  <View key={step} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <View 
+                        style={{ 
+                          width: 36, 
+                          height: 36, 
+                          borderRadius: 18, 
+                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#5C3BCC' : '#F1F5F9', 
+                          borderWidth: isActive ? 0 : 1,
+                          borderColor: isCompleted ? '#A7F3D0' : '#E2E8F0',
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          marginBottom: 6,
+                          shadowColor: isActive ? '#5C3BCC' : '#000',
+                          shadowOffset: { width: 0, height: isActive ? 3 : 0 },
+                          shadowOpacity: isActive ? 0.2 : 0,
+                          shadowRadius: isActive ? 5 : 0,
+                          elevation: isActive ? 4 : 0
+                        }}
+                      >
+                        {isCompleted ? (
+                          <Ionicons name="checkmark" size={18} color="#10B981" />
+                        ) : (
+                          <Text style={{ color: isActive ? '#FFFFFF' : '#64748B', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {step}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={{ 
+                        fontSize: 11, 
+                        color: isActive ? '#0F172A' : '#64748B', 
+                        fontFamily: isActive ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_500Medium' 
+                      }}>
+                        {step === 1 ? 'Group Info' : step === 2 ? 'Sequences' : 'Members'}
+                      </Text>
+                    </View>
+                    
+                    {step < 3 && (
+                      <View style={{ 
+                        width: '100%', 
+                        height: 2, 
+                        backgroundColor: isCompleted ? '#10B981' : '#E2E8F0',
+                        position: 'absolute',
+                        left: '70%',
+                        top: 18,
+                        zIndex: -1
+                      }} />
+                    )}
                   </View>
-                  <Text style={{ fontSize: 10, color: '#6B7280', fontFamily: 'PlusJakartaSans_500Medium' }}>{step === 1 ? 'Group Info' : step === 2 ? 'Sequences' : 'Members'}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
-            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+
+            {/* Scrollable Container */}
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* STEP 1: GROUP INFO */}
               {smartWizardStep === 1 && (
-                <View style={{ gap: 16 }}>
+                <View style={{ gap: 20 }}>
                   <View>
-                    <Text style={inputStyles.label}>Group Name</Text>
-                    <TextInput style={inputStyles.input} value={smartGroupName} onChangeText={setSmartGroupName} placeholder="e.g. 7-Day Winback Campaign" placeholderTextColor="#BEC6E0" />
+                    <Text style={inputStyles.label}>
+                      Group Name <Text style={{ color: '#EF4444' }}>*</Text>
+                    </Text>
+                    <TextInput 
+                      style={inputStyles.input} 
+                      value={smartGroupName} 
+                      onChangeText={setSmartGroupName} 
+                      placeholder="e.g. 7-Day Winback Campaign" 
+                      placeholderTextColor="#BEC6E0" 
+                    />
                   </View>
+                  
                   <View style={s.switchRow}>
-                    <View style={{ flex: 1 }}><Text style={s.switchLabel}>Active</Text><Text style={s.switchDesc}>Start sending immediately after creation</Text></View>
-                    <Switch value={smartActive} onValueChange={setSmartActive} trackColor={{ false: '#E2E8F0', true: '#000000' }} />
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={s.switchLabel}>Active Status</Text>
+                      <Text style={s.switchDesc}>Start sending messages immediately after creation</Text>
+                    </View>
+                    <Switch 
+                      value={smartActive} 
+                      onValueChange={setSmartActive} 
+                      trackColor={{ false: '#E2E8F0', true: '#10B981' }} 
+                      thumbColor="#FFFFFF"
+                    />
                   </View>
+                  
                   <View style={s.switchRow}>
-                    <View style={{ flex: 1 }}><Text style={s.switchLabel}>Archive After Complete</Text><Text style={s.switchDesc}>Auto-archive when all members finish</Text></View>
-                    <Switch value={smartArchiveAfter} onValueChange={setSmartArchiveAfter} trackColor={{ false: '#E2E8F0', true: '#000000' }} />
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={s.switchLabel}>Archive After Complete</Text>
+                      <Text style={s.switchDesc}>Auto-archive the group when all members finish the sequence</Text>
+                    </View>
+                    <Switch 
+                      value={smartArchiveAfter} 
+                      onValueChange={setSmartArchiveAfter} 
+                      trackColor={{ false: '#E2E8F0', true: '#000000' }} 
+                      thumbColor="#FFFFFF"
+                    />
                   </View>
+                  
                   <View>
                     <Text style={inputStyles.label}>Interval Between Contacts (minutes)</Text>
-                    <TextInput style={inputStyles.input} value={smartInterval} onChangeText={setSmartInterval} keyboardType="numeric" placeholder="5" placeholderTextColor="#BEC6E0" />
+                    <TextInput 
+                      style={inputStyles.input} 
+                      value={smartInterval} 
+                      onChangeText={setSmartInterval} 
+                      keyboardType="numeric" 
+                      placeholder="5" 
+                      placeholderTextColor="#BEC6E0" 
+                    />
                   </View>
                 </View>
               )}
+
+              {/* STEP 2: SEQUENCES */}
               {smartWizardStep === 2 && (
-                <View style={{ gap: 12 }}>
-                  <Text style={s.cardSectionDesc}>Add sequences sent in order. Each can contain multiple messages.</Text>
-                  {smartSequences.map((seq, i) => (
-                    <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E4E0F5' }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111827' }}>{seq.title || 'Untitled'}</Text>
-                          <Text style={{ fontSize: 11, color: '#6B7280' }}>After {seq.send_after_days}d {seq.send_after_hours}h {seq.send_after_minutes}m · {(seq.messages || []).length} msgs</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TouchableOpacity onPress={() => openSeqModal(i)}><Feather name="edit-2" size={14} color="#475569" /></TouchableOpacity>
-                          <TouchableOpacity onPress={() => removeSequence(i)}><Feather name="trash-2" size={14} color="#EF4444" /></TouchableOpacity>
-                        </View>
-                      </View>
+                <View style={{ gap: 16 }}>
+                  <Text style={[s.cardSectionDesc, { marginBottom: 4 }]}>
+                    Build your automated funnel. Sequences will execute in order based on the set delay.
+                  </Text>
+                  
+                  {smartSequences.length === 0 ? (
+                    <View style={{ padding: 24, borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 8, marginVertical: 8 }}>
+                      <Ionicons name="git-commit-outline" size={32} color="#94A3B8" />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No sequences added yet</Text>
+                      <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', maxWidth: 240 }}>Add a sequence step to start drafting automated messages.</Text>
                     </View>
-                  ))}
-                  <TouchableOpacity style={[btnStyles.btn, { alignSelf: 'center' }]} onPress={() => openSeqModal(null)}>
-                    <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} /><Text style={btnStyles.btnText}>Add Sequence</Text>
+                  ) : (
+                    <View style={{ gap: 10 }}>
+                      {smartSequences.map((seq, i) => (
+                        <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#EEF2F6', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="git-commit-outline" size={20} color="#475569" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{seq.title || 'Untitled Sequence'}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                              Sends after: {seq.send_after_days}d {seq.send_after_hours}h {seq.send_after_minutes}m · {(seq.messages || []).length} message{(seq.messages || []).length !== 1 ? 's' : ''}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity onPress={() => openSeqModal(i)} style={{ padding: 4 }} activeOpacity={0.7}>
+                              <Feather name="edit-2" size={16} color="#475569" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeSequence(i)} style={{ padding: 4 }} activeOpacity={0.7}>
+                              <Feather name="trash-2" size={16} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity 
+                    style={[btnStyles.btn, { alignSelf: 'center', backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', width: '100%', marginTop: 8 }]} 
+                    onPress={() => openSeqModal(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={18} color="#0F172A" style={{ marginRight: 6 }} />
+                    <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Add Sequence Step</Text>
                   </TouchableOpacity>
                 </View>
               )}
+
+              {/* STEP 3: MEMBERS */}
               {smartWizardStep === 3 && (
-                <View style={{ gap: 12 }}>
-                  <Text style={s.cardSectionDesc}>Choose how to add members.</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {(['all', 'customer', 'phone'] as const).map((m) => (
-                      <TouchableOpacity key={m} style={[s.triggerDayBtn, memberMethod === m && s.triggerDayBtnActive]} onPress={() => setMemberMethod(m)}>
-                        <Text style={[s.triggerDayBtnText, memberMethod === m && s.triggerDayBtnTextActive]}>{m === 'all' ? 'All Members' : m === 'customer' ? 'By Customer' : 'By Phone'}</Text>
-                      </TouchableOpacity>
-                    ))}
+                <View style={{ gap: 16 }}>
+                  <Text style={s.cardSectionDesc}>Choose which customers should be enrolled in this follow-up loop.</Text>
+                  
+                  {/* Segmented Controller Tab Bar */}
+                  <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 14, padding: 4, gap: 4, marginBottom: 8 }}>
+                    {(['all', 'customer', 'phone'] as const).map((m) => {
+                      const isActive = memberMethod === m;
+                      return (
+                        <TouchableOpacity 
+                          key={m} 
+                          style={{ 
+                            flex: 1, 
+                            paddingVertical: 8, 
+                            borderRadius: 10, 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            backgroundColor: isActive ? '#000000' : 'transparent',
+                          }} 
+                          onPress={() => setMemberMethod(m)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ 
+                            fontSize: 12, 
+                            fontFamily: 'PlusJakartaSans_700Bold', 
+                            color: isActive ? '#FFFFFF' : '#64748B' 
+                          }}>
+                            {m === 'all' ? 'All Holders' : m === 'customer' ? 'Search' : 'By Phone'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
+
                   {memberMethod === 'all' && (
-                    <TouchableOpacity style={[btnStyles.btn, { alignSelf: 'center' }]} onPress={addAllMembers}><Text style={btnStyles.btnText}>Load All Loyalty Card Holders</Text></TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[btnStyles.btn, { width: '100%', backgroundColor: '#000000' }]} 
+                      onPress={addAllMembers}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="people-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={btnStyles.btnText}>Load All Loyalty Card Holders</Text>
+                    </TouchableOpacity>
                   )}
+
                   {memberMethod === 'customer' && (
-                    <View style={{ gap: 8 }}>
+                    <View style={{ gap: 10 }}>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TextInput style={[inputStyles.input, { flex: 1 }]} value={memberSearch} onChangeText={setMemberSearch} placeholder="Search by name or phone" placeholderTextColor="#BEC6E0" />
-                        <TouchableOpacity style={btnStyles.btn} onPress={searchCustomers}><Text style={btnStyles.btnText}>Search</Text></TouchableOpacity>
+                        <TextInput 
+                          style={[inputStyles.input, { flex: 1 }]} 
+                          value={memberSearch} 
+                          onChangeText={setMemberSearch} 
+                          placeholder="Search by name or phone..." 
+                          placeholderTextColor="#BEC6E0" 
+                        />
+                        <TouchableOpacity 
+                          style={[btnStyles.btn, { paddingHorizontal: 16 }]} 
+                          onPress={searchCustomers}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={btnStyles.btnText}>Search</Text>
+                        </TouchableOpacity>
                       </View>
+                      
                       {memberResults.map((cust) => (
-                        <TouchableOpacity key={cust.id} style={{ flexDirection: 'row', padding: 10, backgroundColor: '#F8FAFC', borderRadius: 8, borderWidth: 1, borderColor: '#E4E0F5' }}
-                          onPress={() => { if (!smartMembers.find(m => m.id === cust.id)) setSmartMembers([...smartMembers, cust]); }}>
-                          <Text style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#111827' }}>{cust.name || cust.phone}</Text>
-                          <Text style={{ fontSize: 11, color: '#6B7280' }}>{cust.phone}</Text>
+                        <TouchableOpacity 
+                          key={cust.id} 
+                          style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'space-between', alignItems: 'center' }}
+                          onPress={() => { if (!smartMembers.find(m => m.id === cust.id)) setSmartMembers([...smartMembers, cust]); }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ gap: 2 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{cust.name || 'Unnamed Customer'}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>{cust.phone}</Text>
+                          </View>
+                          <Ionicons name="add-circle" size={20} color="#5C3BCC" />
                         </TouchableOpacity>
                       ))}
                     </View>
                   )}
+
                   {memberMethod === 'phone' && (
                     <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TextInput style={[inputStyles.input, { flex: 1 }]} value={memberPhone} onChangeText={setMemberPhone} placeholder="+60..." placeholderTextColor="#BEC6E0" keyboardType="phone-pad" />
-                      <TouchableOpacity style={btnStyles.btn} onPress={addMemberByPhone}><Text style={btnStyles.btnText}>Add</Text></TouchableOpacity>
+                      <TextInput 
+                        style={[inputStyles.input, { flex: 1 }]} 
+                        value={memberPhone} 
+                        onChangeText={setMemberPhone} 
+                        placeholder="+60123456789" 
+                        placeholderTextColor="#BEC6E0" 
+                        keyboardType="phone-pad" 
+                      />
+                      <TouchableOpacity 
+                        style={[btnStyles.btn, { paddingHorizontal: 20 }]} 
+                        onPress={addMemberByPhone}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={btnStyles.btnText}>Add</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
+
                   {smartMembers.length > 0 && (
-                    <View>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#111827', marginBottom: 8 }}>{smartMembers.length} member{smartMembers.length !== 1 ? 's' : ''} selected</Text>
-                      {smartMembers.slice(0, 10).map((m) => (
-                        <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, gap: 8 }}>
-                          <Text style={{ flex: 1, fontSize: 12, color: '#374151' }}>{m.name || m.phone}</Text>
-                          <TouchableOpacity onPress={() => setSmartMembers(smartMembers.filter(x => x.id !== m.id))}><Ionicons name="close-circle" size={16} color="#EF4444" /></TouchableOpacity>
-                        </View>
-                      ))}
+                    <View style={{ marginTop: 12 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          Selected Target List ({smartMembers.length})
+                        </Text>
+                        <TouchableOpacity onPress={() => setSmartMembers([])}>
+                          <Text style={{ fontSize: 11, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Clear All</Text>
+                        </TouchableOpacity>
+                      </View>
+                      
+                      <View style={{ gap: 6 }}>
+                        {smartMembers.slice(0, 10).map((m) => (
+                          <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#F8FAFC', borderRadius: 8, gap: 8 }}>
+                            <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }}>{m.name || m.phone}</Text>
+                            <TouchableOpacity onPress={() => setSmartMembers(smartMembers.filter(x => x.id !== m.id))} activeOpacity={0.7}>
+                              <Ionicons name="close-circle" size={16} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        {smartMembers.length > 10 && (
+                          <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 4 }}>
+                            + {smartMembers.length - 10} more customers...
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   )}
                 </View>
               )}
             </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+
+            {/* Bottom Actions Row */}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
               {smartWizardStep > 1 && (
-                <TouchableOpacity style={[btnStyles.btn, { flex: 1, backgroundColor: '#E4E0F5' }]} onPress={() => setSmartWizardStep(smartWizardStep - 1)}>
-                  <Text style={[btnStyles.btnText, { color: '#111827' }]}>Back</Text>
+                <TouchableOpacity 
+                  style={[
+                    btnStyles.btn, 
+                    { 
+                      flex: 1, 
+                      backgroundColor: '#FFFFFF', 
+                      borderWidth: 1.5, 
+                      borderColor: '#E2E8F0' 
+                    }
+                  ]} 
+                  onPress={() => setSmartWizardStep(smartWizardStep - 1)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[btnStyles.btnText, { color: '#475569' }]}>Back</Text>
                 </TouchableOpacity>
               )}
               {smartWizardStep < 3 ? (
-                <TouchableOpacity style={[btnStyles.btn, { flex: 1 }]} onPress={() => setSmartWizardStep(smartWizardStep + 1)}>
+                <TouchableOpacity 
+                  style={[btnStyles.btn, { flex: 1 }]} 
+                  onPress={() => {
+                    if (smartWizardStep === 1) {
+                      if (!smartGroupName.trim()) {
+                        Alert.alert('Validation', 'Please enter a Group Name before proceeding.');
+                        return;
+                      }
+                    } else if (smartWizardStep === 2) {
+                      if (smartSequences.length === 0) {
+                        Alert.alert('Validation', 'Please add at least one Sequence step before proceeding.');
+                        return;
+                      }
+                    }
+                    setSmartWizardStep(smartWizardStep + 1);
+                  }}
+                  activeOpacity={0.8}
+                >
                   <Text style={btnStyles.btnText}>Next</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={[btnStyles.btn, { flex: 1 }]} onPress={handleSaveSmartGroup} disabled={isSavingSmart}>
-                  <Text style={btnStyles.btnText}>{isSavingSmart ? 'Saving...' : 'Create Group'}</Text>
+                <TouchableOpacity 
+                  style={[btnStyles.btn, { flex: 1, backgroundColor: '#5C3BCC' }]} 
+                  onPress={handleSaveSmartGroup} 
+                  disabled={isSavingSmart}
+                  activeOpacity={0.8}
+                >
+                  <Text style={btnStyles.btnText}>
+                    {isSavingSmart ? 'Saving...' : 'Create Group'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -549,59 +791,147 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         <View style={modalStyles.overlay}>
           <View style={modalStyles.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={modalStyles.title}>{editingSeqIndex !== null ? 'Edit Sequence' : 'New Sequence'}</Text>
-              <TouchableOpacity onPress={() => setShowSeqModal(false)}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+              <Text style={modalStyles.title}>{editingSeqIndex !== null ? 'Edit Sequence Step' : 'New Sequence Step'}</Text>
+              <TouchableOpacity onPress={() => setShowSeqModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 400 }}>
+            
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
               <View style={{ gap: 16 }}>
-                <View><Text style={inputStyles.label}>Title</Text><TextInput style={inputStyles.input} value={seqTitle} onChangeText={setSeqTitle} placeholder="e.g. Day 1 — We Miss You" placeholderTextColor="#BEC6E0" /></View>
                 <View>
-                  <Text style={inputStyles.label}>Status</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {['active', 'inactive'].map((st) => (
-                      <TouchableOpacity key={st} style={[s.triggerDayBtn, seqStatus === st && s.triggerDayBtnActive]} onPress={() => setSeqStatus(st)}>
-                        <Text style={[s.triggerDayBtnText, seqStatus === st && s.triggerDayBtnTextActive]}>{st.charAt(0).toUpperCase() + st.slice(1)}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  <Text style={inputStyles.label}>Step Title <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                  <TextInput 
+                    style={inputStyles.input} 
+                    value={seqTitle} 
+                    onChangeText={setSeqTitle} 
+                    placeholder="e.g. Day 1 — We Miss You" 
+                    placeholderTextColor="#BEC6E0" 
+                  />
+                </View>
+                
+                <View>
+                  <Text style={inputStyles.label}>Step Status</Text>
+                  <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 3, gap: 4 }}>
+                    {['active', 'inactive'].map((st) => {
+                      const isActive = seqStatus === st;
+                      return (
+                        <TouchableOpacity 
+                          key={st} 
+                          style={{ 
+                            flex: 1, 
+                            paddingVertical: 8, 
+                            borderRadius: 9, 
+                            alignItems: 'center', 
+                            backgroundColor: isActive ? '#000000' : 'transparent' 
+                          }} 
+                          onPress={() => setSeqStatus(st)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#64748B' }}>
+                            {st === 'active' ? 'Active' : 'Paused/Inactive'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
+                
                 <View>
-                  <Text style={inputStyles.label}>Send After</Text>
+                  <Text style={inputStyles.label}>Delay Trigger Delay</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     {[{ label: 'Days', val: seqDays, set: setSeqDays }, { label: 'Hours', val: seqHours, set: setSeqHours }, { label: 'Minutes', val: seqMinutes, set: setSeqMinutes }].map((f) => (
                       <View key={f.label} style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 4 }}>{f.label}</Text>
-                        <TextInput style={inputStyles.input} value={f.val} onChangeText={f.set} keyboardType="numeric" placeholder="0" placeholderTextColor="#BEC6E0" />
+                        <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: 4 }}>{f.label}</Text>
+                        <TextInput 
+                          style={inputStyles.input} 
+                          value={f.val} 
+                          onChangeText={f.set} 
+                          keyboardType="numeric" 
+                          placeholder="0" 
+                          placeholderTextColor="#BEC6E0" 
+                        />
                       </View>
                     ))}
                   </View>
                 </View>
+                
                 <View>
-                  <Text style={inputStyles.label}>Conversation Type</Text>
+                  <Text style={inputStyles.label}>Start Timeline From</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {[{ v: 'last_sequence', l: 'Last Sequence' }, { v: 'last_conversation', l: 'Last Conversation' }, { v: 'last_merchant_msg', l: 'Last Merchant Msg' }, { v: 'last_customer_msg', l: 'Last Customer Msg' }].map((ct) => (
-                      <TouchableOpacity key={ct.v} style={[s.triggerDayBtn, seqConvType === ct.v && s.triggerDayBtnActive]} onPress={() => setSeqConvType(ct.v)}>
-                        <Text style={[s.triggerDayBtnText, seqConvType === ct.v && s.triggerDayBtnTextActive]}>{ct.l}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {[
+                      { v: 'last_sequence', l: 'Last Sequence Step' }, 
+                      { v: 'last_conversation', l: 'Last Active Chat' }, 
+                      { v: 'last_merchant_msg', l: 'Last Merchant Broadcast' }, 
+                      { v: 'last_customer_msg', l: 'Last Customer Visit' }
+                    ].map((ct) => {
+                      const isActive = seqConvType === ct.v;
+                      return (
+                        <TouchableOpacity 
+                          key={ct.v} 
+                          style={{ 
+                            paddingHorizontal: 12, 
+                            paddingVertical: 8, 
+                            borderRadius: 10, 
+                            borderWidth: 1, 
+                            borderColor: isActive ? '#5C3BCC' : '#E2E8F0', 
+                            backgroundColor: isActive ? '#F5F3FF' : '#FFFFFF',
+                            marginBottom: 4
+                          }} 
+                          onPress={() => setSeqConvType(ct.v)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#5C3BCC' : '#475569' }}>
+                            {ct.l}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
+                
                 <View>
-                  <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
-                  {seqMessages.map((msg, i) => (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 8, backgroundColor: '#F8FAFC', borderRadius: 8, marginBottom: 6, borderWidth: 1, borderColor: '#E4E0F5' }}>
-                      <Text style={{ flex: 1, fontSize: 12, color: '#374151' }} numberOfLines={1}>{msg.message_body}</Text>
-                      <TouchableOpacity onPress={() => openMsgModal(i)} style={{ marginRight: 8 }}><Feather name="edit-2" size={13} color="#475569" /></TouchableOpacity>
-                      <TouchableOpacity onPress={() => removeMessage(i)}><Feather name="trash-2" size={13} color="#EF4444" /></TouchableOpacity>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
+                    <TouchableOpacity onPress={() => openMsgModal(null)}>
+                      <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {seqMessages.length === 0 ? (
+                    <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
                     </View>
-                  ))}
-                  <TouchableOpacity style={[btnStyles.btn, { alignSelf: 'center', marginTop: 8 }]} onPress={() => openMsgModal(null)}>
-                    <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} /><Text style={btnStyles.btnText}>Add Message</Text>
-                  </TouchableOpacity>
+                  ) : (
+                    <View style={{ gap: 8 }}>
+                      {seqMessages.map((msg, i) => (
+                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                          <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
+                            {msg.message_body}
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
+                            <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
+                              <Feather name="edit-2" size={14} color="#475569" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
+                              <Feather name="trash-2" size={14} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               </View>
             </ScrollView>
-            <TouchableOpacity style={[btnStyles.btn, { marginTop: 16 }]} onPress={saveSequence}><Text style={btnStyles.btnText}>Save Sequence</Text></TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
+              onPress={saveSequence}
+              activeOpacity={0.8}
+            >
+              <Text style={btnStyles.btnText}>Save Sequence Step</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -611,41 +941,91 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         <View style={modalStyles.overlay}>
           <View style={modalStyles.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={modalStyles.title}>{editingMsgIndex !== null ? 'Edit Message' : 'New Message'}</Text>
-              <TouchableOpacity onPress={() => setShowMsgModal(false)}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+              <Text style={modalStyles.title}>{editingMsgIndex !== null ? 'Edit Message Details' : 'New Message Details'}</Text>
+              <TouchableOpacity onPress={() => setShowMsgModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 400 }}>
+            
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
               <View style={{ gap: 16 }}>
                 <View>
-                  <Text style={inputStyles.label}>Insert Variable</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  <Text style={inputStyles.label}>Insert Variables</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                     {['name', 'stamps', 'points', 'points_expiry', 'login_link'].map((v) => (
-                      <TouchableOpacity key={v} style={{ backgroundColor: '#F0EBFF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }} onPress={() => insertVariable(v)}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#5C3BCC' }}>{`{{${v}}}`}</Text>
+                      <TouchableOpacity 
+                        key={v} 
+                        style={{ 
+                          backgroundColor: '#F5F3FF', 
+                          borderRadius: 8, 
+                          paddingHorizontal: 10, 
+                          paddingVertical: 5,
+                          borderWidth: 1,
+                          borderColor: '#E9E3FF'
+                        }} 
+                        onPress={() => insertVariable(v)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#5C3BCC' }}>{`{{${v}}}`}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
+                
                 <View>
-                  <Text style={inputStyles.label}>Message Body</Text>
-                  <TextInput style={[inputStyles.input, { height: 100, textAlignVertical: 'top' }]} multiline value={msgBody} onChangeText={setMsgBody} placeholder="Type your message..." placeholderTextColor="#BEC6E0" />
+                  <Text style={inputStyles.label}>Message Template Body <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                  <TextInput 
+                    style={[inputStyles.input, { height: 110, textAlignVertical: 'top' }]} 
+                    multiline 
+                    value={msgBody} 
+                    onChangeText={setMsgBody} 
+                    placeholder="Type your message body here..." 
+                    placeholderTextColor="#BEC6E0" 
+                  />
                 </View>
+                
                 <View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={inputStyles.label}>Action Buttons ({msgButtons.length}/4)</Text>
-                    {msgButtons.length < 4 && <TouchableOpacity onPress={addActionButton}><Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_600SemiBold' }}>+ Add Button</Text></TouchableOpacity>}
+                    <Text style={inputStyles.label}>Interactive Action Buttons ({msgButtons.length}/3)</Text>
+                    {msgButtons.length < 3 && (
+                      <TouchableOpacity onPress={addActionButton}>
+                        <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
+                  
                   {msgButtons.map((btn, i) => (
                     <View key={i} style={{ flexDirection: 'row', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-                      <TextInput style={[inputStyles.input, { flex: 1 }]} value={btn.label} onChangeText={(v) => updateActionButton(i, 'label', v)} placeholder="Button label" placeholderTextColor="#BEC6E0" />
-                      <TextInput style={[inputStyles.input, { flex: 1 }]} value={btn.url} onChangeText={(v) => updateActionButton(i, 'url', v)} placeholder="URL" placeholderTextColor="#BEC6E0" />
-                      <TouchableOpacity onPress={() => removeActionButton(i)}><Ionicons name="close-circle" size={20} color="#EF4444" /></TouchableOpacity>
+                      <TextInput 
+                        style={[inputStyles.input, { flex: 1.2 }]} 
+                        value={btn.label} 
+                        onChangeText={(v) => updateActionButton(i, 'label', v)} 
+                        placeholder="Button label" 
+                        placeholderTextColor="#BEC6E0" 
+                      />
+                      <TextInput 
+                        style={[inputStyles.input, { flex: 2 }]} 
+                        value={btn.url} 
+                        onChangeText={(v) => updateActionButton(i, 'url', v)} 
+                        placeholder="URL (optional)" 
+                        placeholderTextColor="#BEC6E0" 
+                      />
+                      <TouchableOpacity onPress={() => removeActionButton(i)} activeOpacity={0.7}>
+                        <Ionicons name="close-circle" size={22} color="#EF4444" />
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </View>
               </View>
             </ScrollView>
-            <TouchableOpacity style={[btnStyles.btn, { marginTop: 16 }]} onPress={saveMessage}><Text style={btnStyles.btnText}>Save Message</Text></TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
+              onPress={saveMessage}
+              activeOpacity={0.8}
+            >
+              <Text style={btnStyles.btnText}>Save Message Details</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
