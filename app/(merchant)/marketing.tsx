@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
+import SmartFollowUp from './SmartFollowUp';
 
 
 
@@ -135,7 +136,7 @@ export default function MarketingScreen() {
   const [audienceEstimate, setAudienceEstimate] = useState(0);
 
   // Automated winback rules states
-  const [broadcastMode, setBroadcastMode] = useState<'manual' | 'automated'>('manual');
+  const [broadcastMode, setBroadcastMode] = useState<'manual' | 'automated' | 'smart'>('manual');
   const [automationRules, setAutomationRules] = useState<any[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
   const [selectedAutomation, setSelectedAutomation] = useState<any | null>(null);
@@ -753,8 +754,10 @@ export default function MarketingScreen() {
           )}
           {activeIconObj.family === 'MaterialIcons' && (
             <MaterialIcons name={activeIconObj.name} size={18} color={isEarned ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)'} />
-          )}
-        </View>
+            )}
+
+            {broadcastMode === 'smart' && <SmartFollowUp styles={styles} Alert={Alert} />}
+          </View>
       );
     }
     return previewSlots;
@@ -1031,6 +1034,15 @@ export default function MarketingScreen() {
                 <Ionicons name="time-outline" size={15} color={broadcastMode === 'automated' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
                 <Text style={[styles.modeSegmentBtnText, broadcastMode === 'automated' && styles.modeSegmentBtnTextActive]}>
                   {t('auto_follow_up')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeSegmentBtn, broadcastMode === 'smart' && styles.modeSegmentBtnActive]}
+                onPress={() => setBroadcastMode('smart')}
+              >
+                <Ionicons name="git-branch-outline" size={15} color={broadcastMode === 'smart' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
+                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'smart' && styles.modeSegmentBtnTextActive]}>
+                  Smart Follow Up
                 </Text>
               </TouchableOpacity>
             </View>
