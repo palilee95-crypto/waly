@@ -58,3 +58,6 @@ docs/
 pb_schema.json
 pb_schema_example.json
 
+# OpenCode config
+opencode.jsonc
+

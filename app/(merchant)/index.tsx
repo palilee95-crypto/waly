@@ -298,19 +298,36 @@ export default function MerchantDashboard() {
 
         {isInTrial && (
           <View style={styles.trialBanner}>
-            <View style={styles.trialLeftWrap}>
-              <Ionicons name="sparkles" size={16} color="#D97706" style={{ marginRight: 6 }} />
-              <Text style={styles.trialTitle}>
-                {trialDaysRemaining} {trialDaysRemaining === 1 ? 'Day' : 'Days'} Left on Trial
-              </Text>
+            <View style={styles.trialTopRow}>
+              <View style={styles.trialBadge}>
+                <Text style={styles.trialBadgeText}>FREE TRIAL</Text>
+              </View>
+              <Text style={styles.trialDays}>{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} remaining</Text>
             </View>
-            <TouchableOpacity
-              style={styles.trialUpgradeBtn}
-              onPress={handleUpgradePress}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.trialUpgradeBtnText}>Upgrade</Text>
-            </TouchableOpacity>
+            <Text style={styles.trialTitle}>You're on the Pro plan</Text>
+            <Text style={styles.trialSub}>Unlock unlimited stamps, broadcasts & more</Text>
+            <View style={styles.trialBarWrap}>
+              <View style={[styles.trialBarFill, { width: `${Math.round(((7 - trialDaysRemaining) / 7) * 100)}%` }]} />
+            </View>
+            <View style={styles.trialBottomRow}>
+              <View style={styles.trialFeatures}>
+                <View style={styles.trialFeat}>
+                  <Ionicons name="checkmark-circle" size={14} color="#111827" />
+                  <Text style={styles.trialFeatText}>Unlimited stamps</Text>
+                </View>
+                <View style={styles.trialFeat}>
+                  <Ionicons name="checkmark-circle" size={14} color="#111827" />
+                  <Text style={styles.trialFeatText}>WhatsApp blast</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.trialUpgradeBtn}
+                onPress={handleUpgradePress}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.trialUpgradeBtnText}>Upgrade — RM79/mo</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -904,37 +921,95 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   trialBanner: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: '#E4E0F5',
+    marginBottom: 16,
+    shadowColor: '#1C1340',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  trialTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFBEB',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#FCD34D',
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  trialLeftWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  trialBadge: {
+    backgroundColor: '#1C1340',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  trialBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  trialDays: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#6B7280',
   },
   trialTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#92400E',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  trialSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  trialBarWrap: {
+    height: 6,
+    backgroundColor: '#E4E0F5',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  trialBarFill: {
+    height: '100%',
+    backgroundColor: '#1C1340',
+    borderRadius: 3,
+  },
+  trialBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  trialFeatures: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  trialFeat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trialFeatText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#6B7280',
   },
   trialUpgradeBtn: {
-    backgroundColor: '#D97706',
+    backgroundColor: '#1C1340',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 32,
+    paddingHorizontal: 14,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trialUpgradeBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },

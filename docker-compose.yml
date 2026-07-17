@@ -19,7 +19,7 @@ services:
       - DOMAIN_EVO=${DOMAIN_EVO}
     depends_on:
       - pocketbase
-      - evolution-api
+      - evolution-go
     networks:
       - risev-network
 
@@ -68,14 +68,22 @@ services:
     image: postgres:15-alpine
     container_name: risev-evolution-db
     restart: unless-stopped
+    command: postgres -c max_connections=300 -c shared_buffers=256MB -c idle_in_transaction_session_timeout=60000
     environment:
       POSTGRES_USER: ${EVOLUTION_DB_USER}
       POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
       POSTGRES_DB: ${EVOLUTION_DB_NAME}
     volumes:
       - ./evolution_db_data:/var/lib/postgresql/data
+      - ./evolution_db_init:/docker-entrypoint-initdb.d
     networks:
       - risev-network
+
+  # NOTE: PgBouncer removed 2026-07-17. whatsmeow (inside Evolution Go) uses
+  # server-side prepared statements that break under PgBouncer session pooling
+  # ("bind message supplies N parameters" desync -> driver: bad connection).
+  # Evolution Go now connects directly to evolution-db:5432 (max_connections=300
+  # is sized for it). If you re-add a pooler, do NOT route evolution-go through it.
 
   # Evolution API Cache (Redis)
   evolution-redis:
@@ -87,35 +95,40 @@ services:
     networks:
       - risev-network
 
-  # Evolution API Whatsapp Service
-  evolution-api:
-    image: evoapicloud/evolution-api:latest
-    container_name: risev-evolution-api
+  # Evolution Go Whatsapp Service
+  evolution-go:
+    image: evoapicloud/evolution-go:latest
+    container_name: risev-evolution-go
     restart: unless-stopped
     depends_on:
       - evolution-db
       - evolution-redis
+    volumes:
+      - ./evolution_instances:/evolution/instances
+      - ./evolution_store:/evolution/store
     environment:
-      - SERVER_TYPE=http
+      - SERVER_NAME=risev-evolution-go
       - SERVER_PORT=8080
+      - CLIENT_NAME=evolution
       - SERVER_URL=${EVOLUTION_API_URL}
-      - AUTHENTICATION_TYPE=apikey
+      - GLOBAL_API_KEY=${EVOLUTION_API_KEY}
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      - DATABASE_ENABLED=true
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/${EVOLUTION_DB_NAME}?schema=public
-      - DATABASE_CONNECTION_CLIENT_NAME=risev
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      # whatsmeow uses server-side prepared statements that break under PgBouncer
+      # session pooling ("bind message supplies N parameters" desync -> driver: bad
+      # connection). Point Evolution Go directly at Postgres; max_connections=300
+      # on evolution-db is already sized for it.
+      - POSTGRES_AUTH_DB=postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/evogo_auth?sslmode=disable
+      - POSTGRES_USERS_DB=postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/evogo_users?sslmode=disable
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://evolution-redis:6379/1
       - CACHE_REDIS_PREFIX_KEY=evolution
-      - CACHE_LOCAL_ENABLED=false
-      - DATABASE_SAVE_DATA_INSTANCE=true
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
-      - DATABASE_SAVE_DATA_CONTACTS=false
-      - DATABASE_SAVE_DATA_CHATS=false
-      - DATABASE_SAVE_DATA_HISTORIC=false
-      - DATABASE_SAVE_MESSAGE_UPDATE=false
-      - DATABASE_SAVE_DATA_LABELS=false
+      - DATABASE_SAVE_MESSAGES=false
+      - CONNECT_ON_STARTUP=true
+      - OS_NAME=Evolution GO
+      - WADEBUG=INFO
+      - LOGTYPE=console
+      - WEBHOOK_FILES=true
     networks:
       - risev-network
 
@@ -164,4 +177,3 @@ volumes:
 networks:
   risev-network:
     driver: bridge
-

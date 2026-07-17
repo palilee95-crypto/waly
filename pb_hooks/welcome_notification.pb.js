@@ -27,8 +27,7 @@ onRecordAfterCreateSuccess((e) => {
     const instanceName = `merchant-${merchantId}-${nameSlug}`;
 
     // Load environment settings
-    const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
-    const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'risev_dev_api_key';
+    const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
     const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
 
     // 2. Determine if customer is a brand new account
@@ -75,21 +74,9 @@ onRecordAfterCreateSuccess((e) => {
 
     if (messageText) {
       // Dispatch message via Evolution API using the merchant's WhatsApp instance
-      $http.send({
-        url: `${evolutionUrl}/message/sendText/${instanceName}`,
-        method: 'POST',
-        headers: {
-          'apikey': evolutionKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          number: cleanPhone,
-          text: messageText,
-          options: {
-            delay: 2000,
-            presence: 'composing'
-          }
-        }),
+      sendTextMessage(instanceName, cleanPhone, messageText, {
+        delay: 2000,
+        presence: 'composing'
       });
       
       console.log(`[WHATSAPP HOOK] Dispatched WhatsApp to ${cleanPhone} via ${instanceName}`);

@@ -5,7 +5,7 @@ function runAutomations() {
   const rules = $app.findRecordsByFilter("automation_rules", "is_active = true", "-created", 100, 0);
   if (rules.length === 0) return stats;
 
-  const { evolutionUrl, evolutionKey } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
 
@@ -122,21 +122,9 @@ function runAutomations() {
         if (cleanPhone) {
           try {
             const randomDelay = Math.floor(Math.random() * 4000) + 5000; // 5s to 9s
-            $http.send({
-              url: `${evolutionUrl}/message/sendText/${instanceName}`,
-              method: 'POST',
-              headers: {
-                'apikey': evolutionKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                number: cleanPhone,
-                text: formattedWhatsAppMsg,
-                options: {
-                  delay: randomDelay,
-                  presence: 'composing'
-                }
-              }),
+            sendTextMessage(instanceName, cleanPhone, formattedWhatsAppMsg, {
+              delay: randomDelay,
+              presence: 'composing'
             });
           } catch (whatsappErr) {
             console.log(`Automated WhatsApp error for ${cleanPhone}:`, whatsappErr.message || whatsappErr);

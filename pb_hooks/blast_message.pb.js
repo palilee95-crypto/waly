@@ -135,7 +135,7 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
 
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
-  const { evolutionUrl, evolutionKey } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -277,21 +277,9 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
             // 3. Final calculated queue delay
             const queueDelay = (i * baseInterval) + randomVariance + typingDelay + totalSleepTime;
 
-            $http.send({
-              url: `${evolutionUrl}/message/sendText/${instanceName}`,
-              method: 'POST',
-              headers: {
-                'apikey': evolutionKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                number: cleanPhone,
-                text: formattedWhatsAppMsg,
-                options: {
-                  delay: queueDelay,
-                  presence: 'composing'
-                }
-              }),
+            sendTextMessage(instanceName, cleanPhone, formattedWhatsAppMsg, {
+              delay: queueDelay,
+              presence: 'composing'
             });
           } catch (whatsappErr) {
             console.log(`WhatsApp blast error for ${cleanPhone}:`, whatsappErr.message || whatsappErr);

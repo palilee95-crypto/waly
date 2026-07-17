@@ -154,26 +154,18 @@ onMailerRecordOTPSend((e) => {
   console.log("👉 OTP Code: " + otp);
   console.log("========================================\n");
 
-  const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
-  const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'risev_dev_api_key';
+  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
 
   try {
-    $http.send({
-      url: `${evolutionUrl}/message/sendText/risev-instance`,
-      method: 'POST',
-      headers: {
-        'apikey': evolutionKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        text: `🔑 *Kod Pengesahan RISEV*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan RISEV!`,
-        options: {
-          delay: 2000,
-          presence: 'composing'
-        }
-      }),
-    });
+    sendTextMessage(
+      'risev-instance',
+      cleanPhone,
+      `🔑 *Kod Pengesahan RISEV*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan RISEV!`,
+      {
+        delay: 2000,
+        presence: 'composing'
+      }
+    );
   } catch (err) {
     // Ignore http request errors
   }
