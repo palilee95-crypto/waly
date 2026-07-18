@@ -17,6 +17,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
   const [smartGroups, setSmartGroups] = useState<any[]>([]);
   const [loadingSmartGroups, setLoadingSmartGroups] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [loadingEditGroupId, setLoadingEditGroupId] = useState<string | null>(null);
   const [showSmartWizard, setShowSmartWizard] = useState(false);
   const [smartWizardStep, setSmartWizardStep] = useState(1);
   const [smartGroupName, setSmartGroupName] = useState('');
@@ -76,6 +78,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
     setSmartWizardStep(1);
     setValidationError('');
     setShowSmartWizard(false);
+    setEditingGroupId(null);
   };
 
   const openSeqModal = (index: number | null) => {
@@ -227,23 +230,75 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
     try {
       const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
       const genId = () => { let id = ''; for (let i = 0; i < 15; i++) id += chars.charAt(Math.floor(Math.random() * chars.length)); return id; };
-      const groupId = genId();
+      const groupId = editingGroupId || genId();
+      const statusValue = smartActive ? 'active' : 'draft';
 
-      await pb.collection('follow_up_groups').create({
-        id: groupId, merchant: user.merchant_id, name: smartGroupName.trim(),
-        status: smartActive ? 'active' : 'draft', archive_after_send: smartArchiveAfter,
-        interval_minutes: parseInt(smartInterval, 10) || 5,
-        member_count: smartMembers.length, sequence_count: smartSequences.length,
-      });
+      if (editingGroupId) {
+        await pb.collection('follow_up_groups').update(groupId, {
+          name: smartGroupName.trim(),
+          status: statusValue,
+          archive_after_send: smartArchiveAfter,
+          interval_minutes: parseInt(smartInterval, 10) || 5,
+          member_count: smartMembers.length,
+          sequence_count: smartSequences.length,
+        });
+      } else {
+        await pb.collection('follow_up_groups').create({
+          id: groupId, merchant: user.merchant_id, name: smartGroupName.trim(),
+          status: statusValue, archive_after_send: smartArchiveAfter,
+          interval_minutes: parseInt(smartInterval, 10) || 5,
+          member_count: smartMembers.length, sequence_count: smartSequences.length,
+        });
+      }
+
+      if (editingGroupId) {
+        // Delete sequences that are no longer in our list
+        const dbSeqs = await pb.collection('follow_up_sequences').getFullList({
+          filter: `group = '${groupId}'`,
+        });
+        const newSeqIds = smartSequences.map(s => s.id).filter(Boolean);
+        const seqsToDelete = dbSeqs.filter(ds => !newSeqIds.includes(ds.id));
+        for (const ds of seqsToDelete) {
+          await pb.collection('follow_up_sequences').delete(ds.id);
+        }
+      }
 
       for (let i = 0; i < smartSequences.length; i++) {
         const seq = smartSequences[i];
-        const seqId = genId();
-        await pb.collection('follow_up_sequences').create({
-          id: seqId, group: groupId, title: seq.title, status: seq.status,
-          send_after_days: seq.send_after_days, send_after_hours: seq.send_after_hours,
-          send_after_minutes: seq.send_after_minutes, conversation_type: seq.conversation_type, order: i + 1,
-        });
+        const seqId = seq.id || genId();
+
+        if (seq.id) {
+          await pb.collection('follow_up_sequences').update(seqId, {
+            title: seq.title,
+            status: seq.status,
+            send_after_days: seq.send_after_days,
+            send_after_hours: seq.send_after_hours,
+            send_after_minutes: seq.send_after_minutes,
+            conversation_type: seq.conversation_type,
+            order: i + 1,
+          });
+
+          // Recreate messages for this sequence
+          const existingMsgs = await pb.collection('follow_up_messages').getFullList({
+            filter: `sequence = '${seqId}'`,
+          });
+          for (const em of existingMsgs) {
+            await pb.collection('follow_up_messages').delete(em.id);
+          }
+        } else {
+          await pb.collection('follow_up_sequences').create({
+            id: seqId,
+            group: groupId,
+            title: seq.title,
+            status: seq.status,
+            send_after_days: seq.send_after_days,
+            send_after_hours: seq.send_after_hours,
+            send_after_minutes: seq.send_after_minutes,
+            conversation_type: seq.conversation_type,
+            order: i + 1,
+          });
+        }
+
         for (let k = 0; k < (seq.messages || []).length; k++) {
           const msg = seq.messages[k];
           await pb.collection('follow_up_messages').create({
@@ -253,19 +308,87 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         }
       }
 
-      for (const member of smartMembers) {
+      const existingMembers = await pb.collection('follow_up_members').getFullList({
+        filter: `group = '${groupId}'`,
+      });
+      const existingCustIds = existingMembers.map(m => m.customer);
+      const newCustIds = smartMembers.map(m => m.id);
+
+      const membersToDelete = existingMembers.filter(em => !newCustIds.includes(em.customer));
+      for (const m of membersToDelete) {
+        await pb.collection('follow_up_members').delete(m.id);
+      }
+
+      const custIdsToAdd = newCustIds.filter(cid => !existingCustIds.includes(cid));
+      for (const cid of custIdsToAdd) {
         await pb.collection('follow_up_members').create({
-          id: genId(), group: groupId, customer: member.id, status: 'enrolled', sequence_completed: 0,
+          id: genId(), group: groupId, customer: cid, status: 'enrolled', sequence_completed: 0,
         });
       }
 
-      Alert.alert('Success', 'Smart Follow Up group created!');
+      Alert.alert('Success', editingGroupId ? 'Smart Follow Up group updated!' : 'Smart Follow Up group created!');
       resetSmartWizard();
       fetchSmartGroups();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to create group.');
+      Alert.alert('Error', err.message || 'Failed to save group.');
     } finally {
       setIsSavingSmart(false);
+    }
+  };
+
+  const startEditSmartGroup = async (group: any) => {
+    try {
+      setLoadingEditGroupId(group.id);
+      setEditingGroupId(group.id);
+      setSmartGroupName(group.name);
+      setSmartActive(group.status === 'active');
+      setSmartArchiveAfter(group.archive_after_send);
+      setSmartInterval(String(group.interval_minutes));
+
+      // Fetch sequences
+      const seqRecords = await pb.collection('follow_up_sequences').getFullList({
+        filter: `group = '${group.id}'`,
+        sort: 'order',
+      });
+
+      const parsedSequences = [];
+      for (const seq of seqRecords) {
+        // Fetch messages
+        const msgRecords = await pb.collection('follow_up_messages').getFullList({
+          filter: `sequence = '${seq.id}'`,
+          sort: 'order',
+        });
+        parsedSequences.push({
+          id: seq.id,
+          title: seq.title,
+          status: seq.status,
+          send_after_days: seq.send_after_days,
+          send_after_hours: seq.send_after_hours,
+          send_after_minutes: seq.send_after_minutes,
+          conversation_type: seq.conversation_type,
+          messages: msgRecords.map(m => ({
+            id: m.id,
+            message_body: m.message_body,
+            action_buttons: m.action_buttons || [],
+          })),
+        });
+      }
+      setSmartSequences(parsedSequences);
+
+      // Fetch members
+      const memberRecords = await pb.collection('follow_up_members').getFullList({
+        filter: `group = '${group.id}'`,
+        expand: 'customer',
+      });
+      const customers = memberRecords.map(m => m.expand?.customer).filter(Boolean);
+      setSmartMembers(customers);
+
+      setSmartWizardStep(1);
+      setShowSmartWizard(true);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to load group details: ' + err.message);
+    } finally {
+      setLoadingEditGroupId(null);
     }
   };
 
@@ -373,8 +496,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   </View>
                   <Ionicons name={expandedGroup === group.id ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
                 </View>
-              </TouchableOpacity>
-              {expandedGroup === group.id && (
+              </TouchableOpacity>               {expandedGroup === group.id && (
                 <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity 
@@ -394,6 +516,28 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                         {group.status === 'active' ? 'Pause' : 'Activate'}
                       </Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[
+                        btnStyles.btn, 
+                        { 
+                          flex: 1, 
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0'
+                        }
+                      ]} 
+                      onPress={() => startEditSmartGroup(group)}
+                      disabled={loadingEditGroupId !== null}
+                      activeOpacity={0.8}
+                    >
+                      {loadingEditGroupId === group.id ? (
+                        <ActivityIndicator size="small" color="#000000" />
+                      ) : (
+                        <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Edit</Text>
+                      )}
+                    </TouchableOpacity>
+
                     <TouchableOpacity 
                       style={[
                         btnStyles.btn, 
@@ -423,7 +567,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
           <View style={modalStyles.card}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Text style={modalStyles.title}>Create Smart Follow Up</Text>
+              <Text style={modalStyles.title}>{editingGroupId ? 'Edit Smart Follow Up' : 'Create Smart Follow Up'}</Text>
               <TouchableOpacity onPress={resetSmartWizard} style={{ padding: 4 }} activeOpacity={0.7}>
                 <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
@@ -796,7 +940,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   activeOpacity={0.8}
                 >
                   <Text style={btnStyles.btnText}>
-                    {isSavingSmart ? 'Saving...' : 'Create Group'}
+                    {isSavingSmart ? 'Saving...' : editingGroupId ? 'Save Changes' : 'Create Group'}
                   </Text>
                 </TouchableOpacity>
               )}
