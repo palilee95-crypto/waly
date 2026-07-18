@@ -164,10 +164,15 @@ migrate((app) => {
     "type": "text",
     "required": false
   }));
+  app.save(merchants);
 
-  // 3. Alter referred_by relation on merchants to point to sales_agents (instead of _superusers)
+  // 3. Remove old referred_by relation (targeting _superusers) and save first
+  merchants.fields.removeById("refby_merchant");
+  app.save(merchants);
+
+  // 4. Add new referred_by relation targeting sales_agents and save
   merchants.fields.add(new Field({
-    "id": "refby_merchant",
+    "id": "refby_merchant_new",
     "name": "referred_by",
     "type": "relation",
     "required": false,
@@ -176,10 +181,14 @@ migrate((app) => {
   }));
   app.save(merchants);
 
-  // 4. Alter agent relation on commissions to point to sales_agents (instead of _superusers)
+  // 5. Remove old agent relation (targeting _superusers) and save first
   const commissions = app.findCollectionByNameOrId("commissions");
+  commissions.fields.removeById("rel_agent_comm");
+  app.save(commissions);
+
+  // 6. Add new agent relation targeting sales_agents and save
   commissions.fields.add(new Field({
-    "id": "relation_comm_agent",
+    "id": "relation_comm_agent_new",
     "name": "agent",
     "type": "relation",
     "required": true,
@@ -191,7 +200,8 @@ migrate((app) => {
   // Rollback logic
   try {
     const merchants = app.findCollectionByNameOrId("merchants");
-    // Restore original referred_by relation to _superusers
+    merchants.fields.removeById("refby_merchant_new");
+    app.save(merchants);
     merchants.fields.add(new Field({
       "id": "refby_merchant",
       "name": "referred_by",
@@ -206,9 +216,10 @@ migrate((app) => {
 
   try {
     const commissions = app.findCollectionByNameOrId("commissions");
-    // Restore original agent relation to _superusers
+    commissions.fields.removeById("relation_comm_agent_new");
+    app.save(commissions);
     commissions.fields.add(new Field({
-      "id": "relation_comm_agent",
+      "id": "rel_agent_comm",
       "name": "agent",
       "type": "relation",
       "required": true,

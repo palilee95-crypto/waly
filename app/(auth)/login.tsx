@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,9 @@ import {
   Image,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, storage } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { AntDesign, FontAwesome, Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,20 @@ export default function LoginScreen() {
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+
+  const params = useLocalSearchParams<{ ref?: string }>();
+
+  useEffect(() => {
+    if (params.ref) {
+      storage.setItem('waly_referral_code', params.ref)
+        .then(() => {
+          console.log('[Login] Stored referral code:', params.ref);
+          setRole('merchant'); // Pre-select Merchant role!
+          pb.send(`/api/risev/agent/click?ref=${encodeURIComponent(params.ref || '')}`, { method: 'GET' })
+            .catch(err => console.warn('[Login] Failed to record click:', err));
+        });
+    }
+  }, [params.ref]);
   
   // New Registration fields and state machine steps
   const [step, setStep] = useState<'phone' | 'register' | 'password'>('phone');

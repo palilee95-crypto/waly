@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, storage } from '@/context/AuthContext';
 import { colors, radii } from '@/theme';
 
 type RoleOption = {
@@ -61,6 +61,15 @@ export default function RoleSelectScreen() {
   const { setUserRole, user } = useAuth();
   const [selected, setSelected] = useState<'customer' | 'merchant' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    storage.getItem('waly_referral_code').then((ref) => {
+      if (ref) {
+        setSelected('merchant');
+        console.log('[RoleSelect] Pre-selected Merchant role due to active referral:', ref);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleContinue = async () => {
     if (!selected) return;
