@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (params.ref) {
-      storage.setItem('waly_referral_code', params.ref)
+      storage.setItem('risev_referral_code', params.ref)
         .then(() => {
           console.log('[AuthContext] Stored referral code:', params.ref);
           pb.send(`/api/risev/agent/click?ref=${encodeURIComponent(params.ref || '')}`, { method: 'GET' })
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             merchantRecord = existing[0];
           } else {
             // Retrieve referral code from local storage
-            const refCode = await storage.getItem('waly_referral_code').catch(() => null);
+            const refCode = await storage.getItem('risev_referral_code').catch(() => null);
 
             // Create a new pending merchant record
             merchantRecord = await pb.collection('merchants').create({
@@ -157,7 +157,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
 
             if (refCode) {
-              await storage.deleteItem('waly_referral_code').catch(() => null);
+              await storage.deleteItem('risev_referral_code').catch(() => null);
             }
           }
           

@@ -11,7 +11,7 @@ onRecordCreate((e) => {
   let ref = e.record.get('referral_code') || '';
   if (!ref) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'WALY_';
+    let code = 'RISEV_';
     for (let i = 0; i < 8; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }

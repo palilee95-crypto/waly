@@ -17,7 +17,7 @@ export default function Index() {
       // 1. If there's a ref code in query parameters, store it and record the click
       if (params.ref) {
         try {
-          await storage.setItem('waly_referral_code', params.ref);
+          await storage.setItem('risev_referral_code', params.ref);
           console.log('[Index] Stored referral code:', params.ref);
           
           // Send background click tracking request to server

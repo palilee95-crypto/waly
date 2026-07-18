@@ -36,7 +36,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (params.ref) {
-      storage.setItem('waly_referral_code', params.ref)
+      storage.setItem('risev_referral_code', params.ref)
         .then(() => {
           console.log('[Login] Stored referral code:', params.ref);
           setRole('merchant'); // Pre-select Merchant role!

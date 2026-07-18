@@ -79,7 +79,7 @@ export default function CustomerProfile() {
     setIsSubscribing(true);
     try {
       // Retrieve referral code from local storage
-      const refCode = await storage.getItem('waly_referral_code').catch(() => null);
+      const refCode = await storage.getItem('risev_referral_code').catch(() => null);
 
       // 1. Create merchant record with pending status (which starts their 7-day free trial)
       const newMerchant = await pb.collection('merchants').create({
@@ -92,7 +92,7 @@ export default function CustomerProfile() {
       });
 
       if (refCode) {
-        await storage.deleteItem('waly_referral_code').catch(() => null);
+        await storage.deleteItem('risev_referral_code').catch(() => null);
       }
 
       // 2. Link merchant profile to user and change role to merchant

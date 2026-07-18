@@ -63,7 +63,7 @@ export default function RoleSelectScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    storage.getItem('waly_referral_code').then((ref) => {
+    storage.getItem('risev_referral_code').then((ref) => {
       if (ref) {
         setSelected('merchant');
         console.log('[RoleSelect] Pre-selected Merchant role due to active referral:', ref);
