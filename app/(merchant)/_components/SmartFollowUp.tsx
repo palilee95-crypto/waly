@@ -48,9 +48,22 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [validationError, setValidationError] = useState('');
 
+  const [activeSmartTab, setActiveSmartTab] = useState<'campaigns' | 'analytics'>('campaigns');
+  const [activeAnalyticsSubTab, setActiveAnalyticsSubTab] = useState<'queue' | 'logs'>('queue');
+  const [queueList, setQueueList] = useState<any[]>([]);
+  const [logsList, setLogsList] = useState<any[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analyticsStats, setAnalyticsStats] = useState({ total: 0, active: 0, completed: 0, sent: 0 });
+
   useEffect(() => {
-    if (user) fetchSmartGroups();
-  }, [user]);
+    if (user) {
+      if (activeSmartTab === 'campaigns') {
+        fetchSmartGroups();
+      } else {
+        fetchAnalytics();
+      }
+    }
+  }, [user, activeSmartTab]);
 
   const fetchSmartGroups = async () => {
     if (!user || !user.merchant_id) return;
@@ -65,6 +78,41 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
       console.warn('Failed to fetch smart follow up groups:', err);
     } finally {
       setLoadingSmartGroups(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    if (!user || !user.merchant_id) return;
+    try {
+      setLoadingAnalytics(true);
+
+      // 1. Fetch queue (follow_up_members)
+      const members = await pb.collection('follow_up_members').getFullList({
+        filter: `group.merchant = '${user.merchant_id}'`,
+        expand: 'customer,group',
+        sort: '-created',
+      });
+      setQueueList(members);
+
+      // 2. Fetch sent logs (follow_up_logs)
+      const logs = await pb.collection('follow_up_logs').getFullList({
+        filter: `group.merchant = '${user.merchant_id}'`,
+        expand: 'customer,group,sequence',
+        sort: '-created',
+      });
+      setLogsList(logs);
+
+      // 3. Compute stats
+      const total = members.length;
+      const active = members.filter((m: any) => m.status === 'enrolled' || m.status === 'in_progress').length;
+      const completed = members.filter((m: any) => m.status === 'completed').length;
+      const sent = logs.length;
+
+      setAnalyticsStats({ total, active, completed, sent });
+    } catch (err) {
+      console.warn('Failed to fetch smart follow up analytics:', err);
+    } finally {
+      setLoadingAnalytics(false);
     }
   };
 
@@ -421,7 +469,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         </View>
         <TouchableOpacity 
           style={s.createCampBtn} 
-          onPress={() => setShowSmartWizard(true)} 
+          onPress={() => { resetSmartWizard(); setShowSmartWizard(true); }} 
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -429,136 +477,391 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         </TouchableOpacity>
       </View>
 
-      {loadingSmartGroups ? (
-        <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
-      ) : smartGroups.length === 0 ? (
-        <View style={s.campEmptyState}>
-          <Ionicons name="git-branch-outline" size={48} color="#94A3B8" />
-          <Text style={s.campEmptyTitle}>No Smart Follow Up Groups</Text>
-          <Text style={s.campEmptySub}>Create your first multi-step follow-up sequence to engage customers automatically.</Text>
-          <TouchableOpacity 
-            style={s.campEmptyBtn}
-            onPress={() => setShowSmartWizard(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={s.campEmptyBtnText}>Create Smart Follow Up</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={s.campList}>
-          {smartGroups.map((group) => (
-            <View key={group.id} style={[s.campCard, group.status !== 'active' && { opacity: 0.7 }]}>
-              <TouchableOpacity onPress={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} activeOpacity={0.8}>
-                <View style={s.campCardHeader}>
-                  <View style={{ gap: 4, flex: 1 }}>
-                    <Text style={s.campCardName}>{group.name}</Text>
-                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                      <View 
-                        style={[
-                          s.statusDotBadge, 
-                          group.status === 'active' && { backgroundColor: '#ECFDF5' },
-                          group.status === 'paused' && { backgroundColor: '#FFFBEB' },
-                          group.status === 'draft' && { backgroundColor: '#F1F5F9' },
-                          group.status === 'archived' && { backgroundColor: '#F1F5F9' }
-                        ]}
-                      >
+      {/* Top Tab Bar: Campaigns vs Analytics */}
+      <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 14, padding: 4, gap: 4, marginBottom: 24 }}>
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: activeSmartTab === 'campaigns' ? '#FFFFFF' : 'transparent',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: activeSmartTab === 'campaigns' ? 0.05 : 0,
+            shadowRadius: 4,
+            elevation: activeSmartTab === 'campaigns' ? 2 : 0,
+          }}
+          onPress={() => setActiveSmartTab('campaigns')}
+          activeOpacity={0.8}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="git-branch-outline" size={16} color={activeSmartTab === 'campaigns' ? '#0F172A' : '#64748B'} />
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'campaigns' ? '#0F172A' : '#64748B' }}>
+              Campaigns
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: activeSmartTab === 'analytics' ? '#FFFFFF' : 'transparent',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: activeSmartTab === 'analytics' ? 0.05 : 0,
+            shadowRadius: 4,
+            elevation: activeSmartTab === 'analytics' ? 2 : 0,
+          }}
+          onPress={() => setActiveSmartTab('analytics')}
+          activeOpacity={0.8}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="stats-chart-outline" size={16} color={activeSmartTab === 'analytics' ? '#0F172A' : '#64748B'} />
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'analytics' ? '#0F172A' : '#64748B' }}>
+              Analytics & Logs
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {activeSmartTab === 'campaigns' ? (
+        loadingSmartGroups ? (
+          <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
+        ) : smartGroups.length === 0 ? (
+          <View style={s.campEmptyState}>
+            <Ionicons name="git-branch-outline" size={48} color="#94A3B8" />
+            <Text style={s.campEmptyTitle}>No Smart Follow Up Groups</Text>
+            <Text style={s.campEmptySub}>Create your first multi-step follow-up sequence to engage customers automatically.</Text>
+            <TouchableOpacity 
+              style={s.campEmptyBtn}
+              onPress={() => { resetSmartWizard(); setShowSmartWizard(true); }}
+              activeOpacity={0.8}
+            >
+              <Text style={s.campEmptyBtnText}>Create Smart Follow Up</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={s.campList}>
+            {smartGroups.map((group) => (
+              <View key={group.id} style={[s.campCard, group.status !== 'active' && { opacity: 0.7 }]}>
+                <TouchableOpacity onPress={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} activeOpacity={0.8}>
+                  <View style={s.campCardHeader}>
+                    <View style={{ gap: 4, flex: 1 }}>
+                      <Text style={s.campCardName}>{group.name}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <View 
                           style={[
-                            s.statusDot, 
-                            { 
-                              backgroundColor: group.status === 'active' 
-                                ? '#10B981' 
-                                : group.status === 'paused' 
-                                ? '#F59E0B' 
-                                : '#64748B' 
-                            }
-                          ]} 
-                        />
-                        <Text 
-                          style={[
-                            s.statusDotText,
-                            { 
-                              color: group.status === 'active' 
-                                ? '#047857' 
-                                : group.status === 'paused' 
-                                ? '#B45309' 
-                                : '#475569' 
-                            }
+                            s.statusDotBadge, 
+                            group.status === 'active' && { backgroundColor: '#ECFDF5' },
+                            group.status === 'paused' && { backgroundColor: '#FFFBEB' },
+                            group.status === 'draft' && { backgroundColor: '#F1F5F9' },
+                            group.status === 'archived' && { backgroundColor: '#F1F5F9' }
                           ]}
                         >
-                          {group.status.toUpperCase()}
+                          <View 
+                            style={[
+                              s.statusDot, 
+                              { 
+                                backgroundColor: group.status === 'active' 
+                                  ? '#10B981' 
+                                  : group.status === 'paused' 
+                                  ? '#F59E0B' 
+                                  : '#64748B' 
+                              }
+                            ]} 
+                          />
+                          <Text 
+                            style={[
+                              s.statusDotText,
+                              { 
+                                color: group.status === 'active' 
+                                  ? '#047857' 
+                                  : group.status === 'paused' 
+                                  ? '#B45309' 
+                                  : '#475569' 
+                              }
+                            ]}
+                          >
+                            {group.status.toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#6B7280', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                          {group.member_count} members · {group.sequence_count} sequences
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 11, color: '#6B7280', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                        {group.member_count} members · {group.sequence_count} sequences
-                      </Text>
+                    </View>
+                    <Ionicons name={expandedGroup === group.id ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
+                  </View>
+                </TouchableOpacity>
+                {expandedGroup === group.id && (
+                  <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity 
+                        style={[
+                          btnStyles.btn, 
+                          { 
+                            flex: 1, 
+                            backgroundColor: group.status === 'active' ? '#FFF7ED' : '#F0FDF4',
+                            borderWidth: 1,
+                            borderColor: group.status === 'active' ? '#FFEDD5' : '#DCFCE7'
+                          }
+                        ]} 
+                        onPress={() => toggleSmartGroupStatus(group)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[btnStyles.btnText, { color: group.status === 'active' ? '#D97706' : '#16A34A' }]}>
+                          {group.status === 'active' ? 'Pause' : 'Activate'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={[
+                          btnStyles.btn, 
+                          { 
+                            flex: 1, 
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0'
+                          }
+                        ]} 
+                        onPress={() => startEditSmartGroup(group)}
+                        disabled={loadingEditGroupId !== null}
+                        activeOpacity={0.8}
+                      >
+                        {loadingEditGroupId === group.id ? (
+                          <ActivityIndicator size="small" color="#000000" />
+                        ) : (
+                          <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Edit</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={[
+                          btnStyles.btn, 
+                          { 
+                            flex: 1, 
+                            backgroundColor: '#FEF2F2',
+                            borderWidth: 1,
+                            borderColor: '#FEE2E2'
+                          }
+                        ]} 
+                        onPress={() => deleteSmartGroup(group.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[btnStyles.btnText, { color: '#EF4444' }]}>Delete</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <Ionicons name={expandedGroup === group.id ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
-                </View>
-              </TouchableOpacity>               {expandedGroup === group.id && (
-                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity 
-                      style={[
-                        btnStyles.btn, 
-                        { 
-                          flex: 1, 
-                          backgroundColor: group.status === 'active' ? '#FFF7ED' : '#F0FDF4',
-                          borderWidth: 1,
-                          borderColor: group.status === 'active' ? '#FFEDD5' : '#DCFCE7'
-                        }
-                      ]} 
-                      onPress={() => toggleSmartGroupStatus(group)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[btnStyles.btnText, { color: group.status === 'active' ? '#D97706' : '#16A34A' }]}>
-                        {group.status === 'active' ? 'Pause' : 'Activate'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[
-                        btnStyles.btn, 
-                        { 
-                          flex: 1, 
-                          backgroundColor: '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0'
-                        }
-                      ]} 
-                      onPress={() => startEditSmartGroup(group)}
-                      disabled={loadingEditGroupId !== null}
-                      activeOpacity={0.8}
-                    >
-                      {loadingEditGroupId === group.id ? (
-                        <ActivityIndicator size="small" color="#000000" />
-                      ) : (
-                        <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Edit</Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[
-                        btnStyles.btn, 
-                        { 
-                          flex: 1, 
-                          backgroundColor: '#FEF2F2',
-                          borderWidth: 1,
-                          borderColor: '#FEE2E2'
-                        }
-                      ]} 
-                      onPress={() => deleteSmartGroup(group.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[btnStyles.btnText, { color: '#EF4444' }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+                )}
+              </View>
+            ))}
+          </View>
+        )
+      ) : (
+        /* ── Analytics & Logs View ── */
+        loadingAnalytics ? (
+          <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
+        ) : (
+          <View style={{ width: '100%', gap: 20 }}>
+            {/* Summary Cards */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Enrolled</Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 4 }}>{analyticsStats.total}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Queue</Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#5C3BCC', marginTop: 4 }}>{analyticsStats.active}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Completed</Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981', marginTop: 4 }}>{analyticsStats.completed}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Messages Sent</Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#F59E0B', marginTop: 4 }}>{analyticsStats.sent}</Text>
+              </View>
             </View>
-          ))}
-        </View>
+
+            {/* Sub-tab Pill Switcher */}
+            <View style={{ flexDirection: 'row', gap: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, alignItems: 'center' }}>
+              <TouchableOpacity 
+                onPress={() => setActiveAnalyticsSubTab('queue')}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  borderRadius: 99,
+                  backgroundColor: activeAnalyticsSubTab === 'queue' ? '#0F172A' : 'transparent',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'queue' ? '#FFFFFF' : '#475569' }}>
+                  Active Queue ({queueList.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setActiveAnalyticsSubTab('logs')}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  borderRadius: 99,
+                  backgroundColor: activeAnalyticsSubTab === 'logs' ? '#0F172A' : 'transparent',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'logs' ? '#FFFFFF' : '#475569' }}>
+                  Dispatch History ({logsList.length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={fetchAnalytics}
+                style={{ marginLeft: 'auto', padding: 8, borderRadius: 10, backgroundColor: '#F1F5F9' }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="refresh" size={16} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Queue Tab content */}
+            {activeAnalyticsSubTab === 'queue' ? (
+              queueList.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 8 }}>
+                  <Ionicons name="people-outline" size={36} color="#94A3B8" />
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No Enrolled Members</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', maxWidth: 280 }}>
+                    Customers will appear here once they are added or enrolled into active smart follow-up groups.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 12 }}>
+                  {queueList.map((member) => {
+                    const customer = member.expand?.customer || {};
+                    const group = member.expand?.group || {};
+                    const stepText = `Step ${member.sequence_completed} of ${group.sequence_count || 0}`;
+                    
+                    return (
+                      <View key={member.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ gap: 2 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {customer.name || customer.phone || 'Unnamed Customer'}
+                            </Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                              {customer.phone || 'No phone'}
+                            </Text>
+                          </View>
+                          <View 
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 4,
+                              borderRadius: 8,
+                              backgroundColor: 
+                                member.status === 'completed' ? '#ECFDF5' :
+                                member.status === 'in_progress' ? '#EFF6FF' :
+                                member.status === 'enrolled' ? '#FFFBEB' : '#F1F5F9'
+                            }}
+                          >
+                            <Text 
+                              style={{ 
+                                fontSize: 10, 
+                                fontFamily: 'PlusJakartaSans_700Bold', 
+                                color: 
+                                  member.status === 'completed' ? '#047857' :
+                                  member.status === 'in_progress' ? '#1D4ED8' :
+                                  member.status === 'enrolled' ? '#B45309' : '#475569'
+                              }}
+                            >
+                              {(member.status || 'unknown').toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12 }}>
+                          <View style={{ gap: 2, flex: 1, minWidth: 120 }}>
+                            <Text style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', textTransform: 'uppercase' }}>Campaign Group</Text>
+                            <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>{group.name || 'Unnamed Campaign'}</Text>
+                          </View>
+                          <View style={{ gap: 2, flex: 1, minWidth: 80, alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', textTransform: 'uppercase' }}>Current Progress</Text>
+                            <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>{stepText}</Text>
+                          </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            Enrolled: {new Date(member.created).toLocaleString()}
+                          </Text>
+                          {member.last_message_sent_at && (
+                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                              Last Sent: {new Date(member.last_message_sent_at).toLocaleString()}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )
+            ) : (
+              /* Logs Tab content */
+              logsList.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 8 }}>
+                  <Ionicons name="megaphone-outline" size={36} color="#94A3B8" />
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No Sent Messages</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', maxWidth: 280 }}>
+                    Logs of automated follow-ups sent to customers will appear here.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 12 }}>
+                  {logsList.map((log) => {
+                    const customer = log.expand?.customer || {};
+                    const group = log.expand?.group || {};
+                    const sequence = log.expand?.sequence || {};
+                    
+                    return (
+                      <View key={log.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 10 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {customer.name || customer.phone || 'Unnamed Customer'}
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {/* Channel Badge */}
+                            <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                                {(log.channel || 'inapp').toUpperCase()}
+                              </Text>
+                            </View>
+                            {/* Status Badge */}
+                            <View style={{ backgroundColor: log.status === 'failed' ? '#FEF2F2' : '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: log.status === 'failed' ? '#EF4444' : '#047857' }}>
+                                {(log.status || 'sent').toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={{ gap: 2 }}>
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#5C3BCC' }}>
+                            {sequence.title || 'Step'} ({group.name || 'Campaign'})
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            Sent on: {new Date(log.created).toLocaleString()}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )
+            )}
+          </View>
+        )
       )}
 
       {/* ── Wizard Modal ── */}
