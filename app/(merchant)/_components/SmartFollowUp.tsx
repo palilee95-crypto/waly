@@ -1653,7 +1653,7 @@ const parseWhatsAppText = (text: string) => {
     .replace(/\{\{\s*stamps\s*\}\}/g, '3')
     .replace(/\{\{\s*points\s*\}\}/g, '120')
     .replace(/\{\{\s*points_expiry\s*\}\}/g, '2026-12-31')
-    .replace(/\{\{\s*login_link\s*\}\}/g, 'risev.app/l/abc');
+    .replace(/\{\{\s*login_link\s*\}\}/g, 'waly-five.vercel.app');
 
   const parts = [];
   const regex = /(\*[^*]+\*|_[^_]+_)/g;

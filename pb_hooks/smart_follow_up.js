@@ -14,6 +14,7 @@ function runSmartFollowUp() {
   const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
+  const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
 
   for (const group of activeGroups) {
     const groupId = group.id;
@@ -140,9 +141,9 @@ function runSmartFollowUp() {
           .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
           .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
           .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
-          .replace(/\{\{\s*login_link\s*\}\}/g, "https://risev.app/login");
+          .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
 
-        const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV._`;
+        const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
 
         // Create log record
         const logsCol = $app.findCollectionByNameOrId("follow_up_logs");
