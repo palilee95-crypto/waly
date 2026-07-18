@@ -147,6 +147,15 @@ function runSmartFollowUp() {
         // Create log record
         const logsCol = $app.findCollectionByNameOrId("follow_up_logs");
         const logRecord = new Record(logsCol);
+        
+        // Generate random 15-char ID to satisfy PocketBase validation
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let logId = '';
+        for (let i = 0; i < 15; i++) {
+          logId += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        logRecord.set("id", logId);
+
         logRecord.set("group", groupId);
         logRecord.set("sequence", nextSeq.id);
         logRecord.set("member", member.id);
