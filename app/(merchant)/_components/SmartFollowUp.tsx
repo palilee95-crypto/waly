@@ -790,7 +790,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity 
-                  style={[btnStyles.btn, { flex: 1, backgroundColor: '#5C3BCC' }]} 
+                  style={[btnStyles.btn, { flex: 1 }]} 
                   onPress={handleSaveSmartGroup} 
                   disabled={isSavingSmart}
                   activeOpacity={0.8}
@@ -854,6 +854,9 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       );
                     })}
                   </View>
+                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                    Active steps send automatically when due. Paused/Inactive steps are temporarily paused and skipped entirely.
+                  </Text>
                 </View>
                 
                 <View>
