@@ -1263,7 +1263,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={true}>
               <View style={{ gap: 16 }}>
                 <View>
                   <Text style={inputStyles.label}>Step Title <Text style={{ color: '#EF4444' }}>*</Text></Text>
@@ -1304,6 +1304,39 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
                     Active steps send automatically when due. Paused/Inactive steps are temporarily paused and skipped entirely.
                   </Text>
+                </View>
+
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
+                    <TouchableOpacity onPress={() => openMsgModal(null)}>
+                      <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {seqMessages.length === 0 ? (
+                    <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 8 }}>
+                      {seqMessages.map((msg, i) => (
+                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                          <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
+                            {msg.message_body}
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
+                            <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
+                              <Feather name="edit-2" size={14} color="#475569" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
+                              <Feather name="trash-2" size={14} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
                 
                 <View>
@@ -1360,39 +1393,6 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       );
                     })}
                   </View>
-                </View>
-                
-                <View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
-                    <TouchableOpacity onPress={() => openMsgModal(null)}>
-                      <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {seqMessages.length === 0 ? (
-                    <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
-                      <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 8 }}>
-                      {seqMessages.map((msg, i) => (
-                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                          <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
-                            {msg.message_body}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
-                            <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
-                              <Feather name="edit-2" size={14} color="#475569" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
-                              <Feather name="trash-2" size={14} color="#EF4444" />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
                 </View>
               </View>
             </ScrollView>
