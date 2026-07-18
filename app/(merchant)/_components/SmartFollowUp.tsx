@@ -541,7 +541,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     <Switch 
                       value={smartArchiveAfter} 
                       onValueChange={setSmartArchiveAfter} 
-                      trackColor={{ false: '#E2E8F0', true: '#000000' }} 
+                      trackColor={{ false: '#E2E8F0', true: '#10B981' }} 
                       thumbColor="#FFFFFF"
                     />
                   </View>
@@ -556,6 +556,9 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       placeholder="5" 
                       placeholderTextColor="#BEC6E0" 
                     />
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                      Time gap between sending messages to each member in this campaign (staggered to prevent WhatsApp spam blocks).
+                    </Text>
                   </View>
                 </View>
               )}
@@ -870,6 +873,9 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       </View>
                     ))}
                   </View>
+                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                     How long to wait before sending this message after the anchor event (selected in "Start Timeline From" below).
+                   </Text>
                 </View>
                 
                 <View>
