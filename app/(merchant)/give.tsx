@@ -260,37 +260,57 @@ export default function GiveStampsScreen() {
     setIsSubmitting(true);
     setTimeout(async () => {
       try {
-        const cleanNum = tempPhone.replace(/[^\d]/g, '');
-        const emailVal = `user_${cleanNum}@risev.app`;
+        const normalizedPhone = normalizePhoneNumber(tempPhone);
+        const cleanNum = normalizedPhone.replace(/[^\d]/g, '');
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        const emailVal = `user_${cleanNum}_${randomSuffix}@risev.app`;
         const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
 
-        // Create new customer
-        const newCustomer = await pb.collection('users').create({
-          phone: tempPhone,
-          email: emailVal,
-          name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
-          role: 'customer',
-          password: randomPassword,
-          passwordConfirm: randomPassword,
-          total_points: 0,
-          tier: 'bronze',
-        });
+        // Create new customer (with fallback to phone lookup if creation fails)
+        let newCustomer;
+        try {
+          newCustomer = await pb.collection('users').create({
+            phone: tempPhone,
+            email: emailVal,
+            name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
+            role: 'customer',
+            password: randomPassword,
+            passwordConfirm: randomPassword,
+            total_points: 0,
+            tier: 'bronze',
+          });
+        } catch (createErr: any) {
+          // Fallback: the email may already exist (edge case). Try to find the user by phone.
+          console.warn("Auto customer creation failed, trying phone lookup:", createErr.message || createErr);
+          try {
+            const normalizedPhone = normalizePhoneNumber(tempPhone);
+            newCustomer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
+          } catch (lookupErr: any) {
+            console.error("Phone lookup fallback also failed:", lookupErr.message || lookupErr);
+            Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+            setScanned(false);
+            setShowCreateConfirmModal(false);
+            setIsSubmitting(false);
+            return;
+          }
+        }
 
         setNewCustomerName('');
 
-        // Continue the stamp issue process using the new customer!
+        // Continue the stamp issue process using the new (or found) customer!
         setScannedCustomer(newCustomer);
         setScannedRawInput(tempPhone);
-        setBillSubtotal('');
+        // Preserve billSubtotal — don't reset to '' here.
+        // The Scan Award Modal will read it and let the merchant adjust if needed.
         setStampsCount(tempCount.toString());
         setShowScanAwardModal(true);
         setShowCreateConfirmModal(false);
-      } catch (createErr: any) {
-        console.error("Auto customer creation failed:", createErr);
-        Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
+        setIsSubmitting(false);
+      } catch (outerErr: any) {
+        console.error("handleCreateAndIssue outer error:", outerErr);
+        Alert.alert('Error', 'Failed to create new customer account: ' + (outerErr.message || outerErr));
         setScanned(false);
         setShowCreateConfirmModal(false);
-      } finally {
         setIsSubmitting(false);
       }
     }, 20);
@@ -490,7 +510,7 @@ export default function GiveStampsScreen() {
           // Instead of proceeding immediately, open the scan subtotal modal
           setScannedCustomer(customer);
           setScannedRawInput(rawInput);
-          setBillSubtotal('');
+          // Preserve billSubtotal for the scan award modal.
           setStampsCount(count.toString());
           setIsSubmitting(false);
           setShowScanAwardModal(true);

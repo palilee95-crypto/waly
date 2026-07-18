@@ -1,6 +1,22 @@
 const evolutionUrl = $os.getenv('EVOLUTION_API_URL') || 'http://localhost:8080';
 const evolutionKey = $os.getenv('EVOLUTION_API_KEY') || 'waly_dev_api_key';
 
+// Pagination helper: fetch all records matching a filter by looping 500-record pages.
+// PocketBase's findRecordsByFilter caps at perPage records per call — this loops until exhausted.
+// DO NOT pass a perPage > 500; larger values are silently clamped by PB and may miss records.
+function fetchAllRecords(collectionName, filter, sort) {
+  const perPage = 500;
+  let page = 0;
+  let all = [];
+  let batch;
+  do {
+    batch = $app.findRecordsByFilter(collectionName, filter, sort || "-created", perPage, page);
+    for (let i = 0; i < batch.length; i++) all.push(batch[i]);
+    page++;
+  } while (batch.length === perPage);
+  return all;
+}
+
 // Cache resolved tokens in memory to avoid repeated queries
 const tokenCache = {};
 
@@ -386,5 +402,6 @@ module.exports = {
   callEvo,
   getInstances,
   getInstanceToken,
-  sendTextMessage
+  sendTextMessage,
+  fetchAllRecords
 };

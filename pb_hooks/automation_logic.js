@@ -5,7 +5,7 @@ function runAutomations() {
   const rules = $app.findRecordsByFilter("automation_rules", "is_active = true", "-created", 100, 0);
   if (rules.length === 0) return stats;
 
-  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
 
@@ -48,7 +48,7 @@ function runAutomations() {
     console.log(`[Automation Debug] Target UTC Range: ${startStr} to ${endStr}`);
     console.log(`[Automation Debug] Filter: ${filter}`);
 
-    const cards = $app.findRecordsByFilter("loyalty_cards", filter, "-created", 1000, 0);
+    const cards = fetchAllRecords("loyalty_cards", filter, "-created");
     console.log(`[Automation Debug] Found ${cards.length} card(s) matching filter.`);
     if (cards.length === 0) continue;
 

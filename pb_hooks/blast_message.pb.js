@@ -135,7 +135,7 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
 
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
-  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -174,7 +174,7 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     if (programIds.length > 0) {
       // 1. Fetch all cards for the merchant's programs to distinguish opted-in and opted-out customers
       const programFilter = "(" + programIds.map(pid => `program = "${pid}"`).join(" || ") + ")";
-      const cards = $app.findRecordsByFilter("loyalty_cards", programFilter, "-created", 1000, 0);
+      const cards = fetchAllRecords("loyalty_cards", programFilter, "-created");
       for (let i = 0; i < cards.length; i++) {
         const customerId = cards[i].get("customer");
         if (!customerId) continue;
@@ -199,7 +199,7 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
 
     // 2. Also scan transactions to include customers who transacted but might not have active cards (defaulting stamps to 0),
     // making sure we respect the explicit opt-out of customers who have cards where opt_in_marketing is false
-    const txs = $app.findRecordsByFilter("transactions", `merchant = "${merchantId}"`, "-created", 1000, 0);
+    const txs = fetchAllRecords("transactions", `merchant = "${merchantId}"`, "-created");
     for (let i = 0; i < txs.length; i++) {
       const customerId = txs[i].get("customer");
       if (customerId && !customerIds.has(customerId) && !optedOutIds.has(customerId)) {
@@ -218,6 +218,23 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
       return e.json(200, { success: true, count: 0, message: "No customers found to receive broadcasts." });
     }
 
+    // Anti-spam: build a Set of customer IDs who received a campaign notification
+    // from this merchant in the last 24 hours. Skip them in the send loop.
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    const cooldownStr = oneDayAgo.toISOString().replace('T', ' ').substring(0, 19);
+
+    const recentNotifs = fetchAllRecords(
+      "notifications",
+      `type = "campaign" && created >= "${cooldownStr}" && data.merchant_id = "${merchantId}"`,
+      "-created"
+    );
+    const recentlyNotifiedIds = new Set();
+    for (let n = 0; n < recentNotifs.length; n++) {
+      const r = recentNotifs[n].get("recipient");
+      if (r) recentlyNotifiedIds.add(r);
+    }
+
     // Load helper functions
     const { createNotification } = require(`${__hooks}/notification_helper.js`);
     const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
@@ -230,6 +247,9 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
       const customerItem = customerRecords[i];
       const customer = customerItem.record;
       const customerId = customer.id;
+
+      // Anti-spam: skip customers notified in the last 24h
+      if (recentlyNotifiedIds.has(customerId)) continue;
       const phone = customer.get("phone") || "";
       const customerName = customer.getString("name") || "Valued Customer";
       const customerStamps = customerItem.stamps;
