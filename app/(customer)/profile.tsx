@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Platform, Alert, Modal, TextInput, ActivityIndicator, Linking, useWindowDimensions, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, storage } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
@@ -78,14 +78,22 @@ export default function CustomerProfile() {
     if (!user) return;
     setIsSubscribing(true);
     try {
+      // Retrieve referral code from local storage
+      const refCode = await storage.getItem('waly_referral_code').catch(() => null);
+
       // 1. Create merchant record with pending status (which starts their 7-day free trial)
       const newMerchant = await pb.collection('merchants').create({
         name: `${user.name}'s Shop`,
         owner: user.id,
         category: 'food',
         status: 'pending',
+        referral_code: refCode || '',
         metadata: {},
       });
+
+      if (refCode) {
+        await storage.deleteItem('waly_referral_code').catch(() => null);
+      }
 
       // 2. Link merchant profile to user and change role to merchant
       await pb.collection('users').update(user.id, {

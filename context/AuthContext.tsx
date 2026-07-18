@@ -5,6 +5,7 @@ import { pb } from '@/lib/pocketbase';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { useLocalSearchParams } from 'expo-router';
 
 // Helper to register push token in PocketBase for native devices
 const registerPushToken = async (userId: string) => {
@@ -45,7 +46,7 @@ const registerPushToken = async (userId: string) => {
 };
 
 // Cross-platform storage (SecureStore on native, localStorage on web)
-const storage = {
+export const storage = {
   getItem: async (key: string): Promise<string | null> => {
     if (Platform.OS === 'web') return localStorage.getItem(key);
     return SecureStore.getItemAsync(key);
@@ -101,6 +102,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeRole, setActiveRole] = useState<UserRole>(null);
 
+  const params = useLocalSearchParams<{ ref?: string }>();
+
+  useEffect(() => {
+    if (params.ref) {
+      storage.setItem('waly_referral_code', params.ref)
+        .then(() => {
+          console.log('[AuthContext] Stored referral code:', params.ref);
+          pb.send(`/api/risev/agent/click?ref=${encodeURIComponent(params.ref || '')}`, { method: 'GET' })
+            .then(res => console.log('[AuthContext] Click recorded successfully:', res))
+            .catch(err => console.warn('[AuthContext] Failed to record agent click:', err));
+        })
+        .catch(err => console.error('[AuthContext] Failed to store referral code:', err));
+    }
+  }, [params.ref]);
+
   useEffect(() => {
     initAuth();
   }, []);
@@ -127,14 +143,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (existing.length > 0) {
             merchantRecord = existing[0];
           } else {
+            // Retrieve referral code from local storage
+            const refCode = await storage.getItem('waly_referral_code').catch(() => null);
+
             // Create a new pending merchant record
             merchantRecord = await pb.collection('merchants').create({
               name: `${record.name || 'New'}'s Shop`,
               owner: record.id,
               category: 'food',
               status: 'pending',
+              referral_code: refCode || '',
               metadata: {},
             });
+
+            if (refCode) {
+              await storage.deleteItem('waly_referral_code').catch(() => null);
+            }
           }
           
           if (merchantRecord) {
