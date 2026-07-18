@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
   Switch, ActivityIndicator, Modal, Alert as RNAlert, Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
@@ -14,8 +15,11 @@ type Props = {
 
 export default function SmartFollowUp({ styles: s, Alert }: Props) {
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 768;
 
   const [smartGroups, setSmartGroups] = useState<any[]>([]);
+  const [merchantName, setMerchantName] = useState('Your Shop');
   const [loadingSmartGroups, setLoadingSmartGroups] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [loadingEditGroupId, setLoadingEditGroupId] = useState<string | null>(null);
@@ -54,6 +58,16 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   const [logsList, setLogsList] = useState<any[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [analyticsStats, setAnalyticsStats] = useState({ total: 0, active: 0, completed: 0, sent: 0 });
+
+  useEffect(() => {
+    if (user && user.merchant_id) {
+      pb.collection('merchants').getOne(user.merchant_id)
+        .then(rec => {
+          if (rec?.name) setMerchantName(rec.name);
+        })
+        .catch(err => console.warn('Failed to load merchant name for preview:', err));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -1255,7 +1269,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
       {/* ── Sequence Editor Modal ── */}
       <Modal visible={showSeqModal} transparent animationType="slide" onRequestClose={() => setShowSeqModal(false)}>
         <View style={modalStyles.overlay}>
-          <View style={modalStyles.card}>
+          <View style={[modalStyles.card, isDesktop && { maxWidth: 880, width: '95%' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={modalStyles.title}>{editingSeqIndex !== null ? 'Edit Sequence Step' : 'New Sequence Step'}</Text>
               <TouchableOpacity onPress={() => setShowSeqModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
@@ -1263,139 +1277,172 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={true}>
-              <View style={{ gap: 16 }}>
-                <View>
-                  <Text style={inputStyles.label}>Step Title <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                  <TextInput 
-                    style={inputStyles.input} 
-                    value={seqTitle} 
-                    onChangeText={setSeqTitle} 
-                    placeholder="e.g. Day 1 — We Miss You" 
-                    placeholderTextColor="#BEC6E0" 
-                  />
-                </View>
-                
-                <View>
-                  <Text style={inputStyles.label}>Step Status</Text>
-                  <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 3, gap: 4 }}>
-                    {['active', 'inactive'].map((st) => {
-                      const isActive = seqStatus === st;
-                      return (
-                        <TouchableOpacity 
-                          key={st} 
-                          style={{ 
-                            flex: 1, 
-                            paddingVertical: 8, 
-                            borderRadius: 9, 
-                            alignItems: 'center', 
-                            backgroundColor: isActive ? '#000000' : 'transparent' 
-                          }} 
-                          onPress={() => setSeqStatus(st)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#64748B' }}>
-                            {st === 'active' ? 'Active' : 'Paused/Inactive'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
-                    Active steps send automatically when due. Paused/Inactive steps are temporarily paused and skipped entirely.
-                  </Text>
-                </View>
-
-                <View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
-                    <TouchableOpacity onPress={() => openMsgModal(null)}>
-                      <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
-                    </TouchableOpacity>
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24, alignItems: isDesktop ? 'stretch' : 'center' }}>
+              {/* Left Column: Form Controls */}
+              <ScrollView 
+                style={{ flex: isDesktop ? 1.2 : undefined, width: '100%', maxHeight: 450 }} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ paddingRight: 16, paddingBottom: 16 }}
+              >
+                <View style={{ gap: 16 }}>
+                  <View>
+                    <Text style={inputStyles.label}>Step Title <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                    <TextInput 
+                      style={inputStyles.input} 
+                      value={seqTitle} 
+                      onChangeText={setSeqTitle} 
+                      placeholder="e.g. Day 1 — We Miss You" 
+                      placeholderTextColor="#BEC6E0" 
+                    />
                   </View>
                   
-                  {seqMessages.length === 0 ? (
-                    <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
-                      <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
+                  <View>
+                    <Text style={inputStyles.label}>Step Status</Text>
+                    <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 3, gap: 4 }}>
+                      {['active', 'inactive'].map((st) => {
+                        const isActive = seqStatus === st;
+                        return (
+                          <TouchableOpacity 
+                            key={st} 
+                            style={{ 
+                              flex: 1, 
+                              paddingVertical: 8, 
+                              borderRadius: 9, 
+                              alignItems: 'center', 
+                              backgroundColor: isActive ? '#000000' : 'transparent' 
+                            }} 
+                            onPress={() => setSeqStatus(st)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#64748B' }}>
+                              {st === 'active' ? 'Active' : 'Paused/Inactive'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                  ) : (
-                    <View style={{ gap: 8 }}>
-                      {seqMessages.map((msg, i) => (
-                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                          <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
-                            {msg.message_body}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
-                            <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
-                              <Feather name="edit-2" size={14} color="#475569" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
-                              <Feather name="trash-2" size={14} color="#EF4444" />
-                            </TouchableOpacity>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                      Active steps send automatically when due. Paused/Inactive steps are temporarily paused and skipped entirely.
+                    </Text>
+                  </View>
+
+                  <View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
+                      <TouchableOpacity onPress={() => openMsgModal(null)}>
+                        <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {seqMessages.length === 0 ? (
+                      <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
+                      </View>
+                    ) : (
+                      <View style={{ gap: 8 }}>
+                        {seqMessages.map((msg, i) => (
+                          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                            <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
+                              {msg.message_body}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
+                              <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
+                                <Feather name="edit-2" size={14} color="#475569" />
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
+                                <Feather name="trash-2" size={14} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
                           </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                  
+                  <View>
+                    <Text style={inputStyles.label}>Delay Trigger Delay</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {[{ label: 'Days', val: seqDays, set: setSeqDays }, { label: 'Hours', val: seqHours, set: setSeqHours }, { label: 'Minutes', val: seqMinutes, set: setSeqMinutes }].map((f) => (
+                        <View key={f.label} style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: 4 }}>{f.label}</Text>
+                          <TextInput 
+                            style={inputStyles.input} 
+                            value={f.val} 
+                            onChangeText={f.set} 
+                            keyboardType="numeric" 
+                            placeholder="0" 
+                            placeholderTextColor="#BEC6E0" 
+                          />
                         </View>
                       ))}
                     </View>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                       How long to wait before sending this message after the anchor event (selected in "Start Timeline From" below).
+                     </Text>
+                  </View>
+                  
+                  <View>
+                    <Text style={inputStyles.label}>Start Timeline From</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {[
+                        { v: 'last_sequence', l: 'Last Sequence Step' }, 
+                        { v: 'last_conversation', l: 'Last Active Chat' }, 
+                        { v: 'last_merchant_msg', l: 'Last Merchant Broadcast' }, 
+                        { v: 'last_customer_msg', l: 'Last Customer Visit' }
+                      ].map((ct) => {
+                        const isActive = seqConvType === ct.v;
+                        return (
+                          <TouchableOpacity 
+                            key={ct.v} 
+                            style={{ 
+                              paddingHorizontal: 12, 
+                              paddingVertical: 8, 
+                              borderRadius: 10, 
+                              borderWidth: 1, 
+                              borderColor: isActive ? '#000000' : '#E2E8F0', 
+                              backgroundColor: isActive ? '#000000' : '#FFFFFF',
+                              marginBottom: 4
+                            }} 
+                            onPress={() => setSeqConvType(ct.v)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
+                              {ct.l}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* On Mobile: Render Preview Inline at the bottom of the form */}
+                  {!isDesktop && seqMessages.length > 0 && (
+                    <View style={{ marginTop: 24, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 24 }}>
+                      <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
+                      <WhatsAppPreview 
+                        title={seqTitle}
+                        body={seqMessages[0]?.message_body || ''}
+                        buttons={seqMessages[0]?.buttons || []}
+                        merchantName={merchantName}
+                      />
+                    </View>
                   )}
                 </View>
-                
-                <View>
-                  <Text style={inputStyles.label}>Delay Trigger Delay</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {[{ label: 'Days', val: seqDays, set: setSeqDays }, { label: 'Hours', val: seqHours, set: setSeqHours }, { label: 'Minutes', val: seqMinutes, set: setSeqMinutes }].map((f) => (
-                      <View key={f.label} style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: 4 }}>{f.label}</Text>
-                        <TextInput 
-                          style={inputStyles.input} 
-                          value={f.val} 
-                          onChangeText={f.set} 
-                          keyboardType="numeric" 
-                          placeholder="0" 
-                          placeholderTextColor="#BEC6E0" 
-                        />
-                      </View>
-                    ))}
-                  </View>
-                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
-                     How long to wait before sending this message after the anchor event (selected in "Start Timeline From" below).
-                   </Text>
+              </ScrollView>
+
+              {/* Right Column: Live iPhone WhatsApp Preview (Desktop only) */}
+              {isDesktop && (
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                  <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview (First Message)</Text>
+                  <WhatsAppPreview 
+                    title={seqTitle}
+                    body={seqMessages[0]?.message_body || ''}
+                    buttons={seqMessages[0]?.buttons || []}
+                    merchantName={merchantName}
+                  />
                 </View>
-                
-                <View>
-                  <Text style={inputStyles.label}>Start Timeline From</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {[
-                      { v: 'last_sequence', l: 'Last Sequence Step' }, 
-                      { v: 'last_conversation', l: 'Last Active Chat' }, 
-                      { v: 'last_merchant_msg', l: 'Last Merchant Broadcast' }, 
-                      { v: 'last_customer_msg', l: 'Last Customer Visit' }
-                    ].map((ct) => {
-                      const isActive = seqConvType === ct.v;
-                      return (
-                        <TouchableOpacity 
-                          key={ct.v} 
-                          style={{ 
-                            paddingHorizontal: 12, 
-                            paddingVertical: 8, 
-                            borderRadius: 10, 
-                            borderWidth: 1, 
-                            borderColor: isActive ? '#000000' : '#E2E8F0', 
-                            backgroundColor: isActive ? '#000000' : '#FFFFFF',
-                            marginBottom: 4
-                          }} 
-                          onPress={() => setSeqConvType(ct.v)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
-                            {ct.l}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
+              )}
+            </View>
             
             <TouchableOpacity 
               style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
@@ -1411,7 +1458,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
       {/* ── Message Editor Modal ── */}
       <Modal visible={showMsgModal} transparent animationType="slide" onRequestClose={() => setShowMsgModal(false)}>
         <View style={modalStyles.overlay}>
-          <View style={modalStyles.card}>
+          <View style={[modalStyles.card, isDesktop && { maxWidth: 880, width: '95%' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={modalStyles.title}>{editingMsgIndex !== null ? 'Edit Message Details' : 'New Message Details'}</Text>
               <TouchableOpacity onPress={() => setShowMsgModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
@@ -1419,87 +1466,148 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              <View style={{ gap: 16 }}>
-                <View>
-                  <Text style={inputStyles.label}>Insert Variables</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                    {['name', 'stamps', 'points', 'points_expiry', 'login_link'].map((v) => (
-                      <TouchableOpacity 
-                        key={v} 
-                        style={{ 
-                          backgroundColor: '#F1F5F9', 
-                          borderRadius: 8, 
-                          paddingHorizontal: 10, 
-                          paddingVertical: 5,
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0'
-                        }} 
-                        onPress={() => insertVariable(v)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{`{{${v}}}`}</Text>
-                      </TouchableOpacity>
-                    ))}
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24, alignItems: isDesktop ? 'stretch' : 'center' }}>
+              {/* Left Column: Message Editor Form */}
+              <ScrollView 
+                style={{ flex: isDesktop ? 1.2 : undefined, width: '100%', maxHeight: 450 }} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ paddingRight: 16, paddingBottom: 16 }}
+              >
+                <View style={{ gap: 16 }}>
+                  {/* Premium Presets Switcher */}
+                  <View>
+                    <Text style={inputStyles.label}>Use Copywriter Templates</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                      {PRESETS.map((p, idx) => (
+                        <TouchableOpacity
+                          key={idx}
+                          style={{
+                            backgroundColor: '#EEF2FF',
+                            borderColor: '#C7D2FE',
+                            borderWidth: 1,
+                            borderRadius: 20,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                          }}
+                          onPress={() => {
+                            setMsgBody(p.body);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#4F46E5' }}>
+                            {p.title}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
-                </View>
-                
-                <View>
-                  <Text style={inputStyles.label}>Message Template Body <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                  <TextInput 
-                    style={[inputStyles.input, { height: 110, textAlignVertical: 'top' }]} 
-                    multiline 
-                    value={msgBody} 
-                    onChangeText={setMsgBody} 
-                    placeholder="Type your message body here..." 
-                    placeholderTextColor="#BEC6E0" 
-                  />
-                </View>
-                
-                <View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={inputStyles.label}>Interactive Action Buttons ({msgButtons.length}/3)</Text>
-                    {msgButtons.length < 3 && (
-                      <TouchableOpacity onPress={addActionButton}>
-                        <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
-                      </TouchableOpacity>
-                    )}
+
+                  <View>
+                    <Text style={inputStyles.label}>Insert Variables</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {['name', 'stamps', 'points', 'points_expiry', 'login_link'].map((v) => (
+                        <TouchableOpacity 
+                          key={v} 
+                          style={{ 
+                            backgroundColor: '#F1F5F9', 
+                            borderRadius: 8, 
+                            paddingHorizontal: 10, 
+                            paddingVertical: 5,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0'
+                          }} 
+                          onPress={() => insertVariable(v)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{`{{${v}}}`}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
                   
-                  {msgButtons.map((btn, i) => (
-                    <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, gap: 8, position: 'relative' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>Button Label</Text>
-                        <TextInput 
-                          style={inputStyles.input} 
-                          value={btn.label} 
-                          onChangeText={(v) => updateActionButton(i, 'label', v)} 
-                          placeholder="Button label" 
-                          placeholderTextColor="#BEC6E0" 
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>URL (optional)</Text>
-                        <TextInput 
-                          style={inputStyles.input} 
-                          value={btn.url} 
-                          onChangeText={(v) => updateActionButton(i, 'url', v)} 
-                          placeholder="URL (optional)" 
-                          placeholderTextColor="#BEC6E0" 
-                        />
-                      </View>
-                      <TouchableOpacity 
-                        style={{ position: 'absolute', top: 12, right: 12, padding: 4 }} 
-                        onPress={() => removeActionButton(i)} 
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                      </TouchableOpacity>
+                  <View>
+                    <Text style={inputStyles.label}>Message Template Body <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                    <TextInput 
+                      style={[inputStyles.input, { height: 110, textAlignVertical: 'top' }]} 
+                      multiline 
+                      value={msgBody} 
+                      onChangeText={setMsgBody} 
+                      placeholder="Type your message body here..." 
+                      placeholderTextColor="#BEC6E0" 
+                    />
+                  </View>
+                  
+                  <View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={inputStyles.label}>Interactive Action Buttons ({msgButtons.length}/3)</Text>
+                      {msgButtons.length < 3 && (
+                        <TouchableOpacity onPress={addActionButton}>
+                          <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  ))}
+                    
+                    {msgButtons.map((btn, i) => (
+                      <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, gap: 8, position: 'relative' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>Button Label</Text>
+                          <TextInput 
+                            style={inputStyles.input} 
+                            value={btn.label} 
+                            onChangeText={(v) => updateActionButton(i, 'label', v)} 
+                            placeholder="Button label" 
+                            placeholderTextColor="#BEC6E0" 
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>URL (optional)</Text>
+                          <TextInput 
+                            style={inputStyles.input} 
+                            value={btn.url} 
+                            onChangeText={(v) => updateActionButton(i, 'url', v)} 
+                            placeholder="URL (optional)" 
+                            placeholderTextColor="#BEC6E0" 
+                          />
+                        </View>
+                        <TouchableOpacity 
+                          style={{ position: 'absolute', top: 12, right: 12, padding: 4 }} 
+                          onPress={() => removeActionButton(i)} 
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* On Mobile: Render Preview Inline at the bottom of the form */}
+                  {!isDesktop && (
+                    <View style={{ marginTop: 24, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 24 }}>
+                      <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
+                      <WhatsAppPreview 
+                        title=""
+                        body={msgBody}
+                        buttons={msgButtons}
+                        merchantName={merchantName}
+                      />
+                    </View>
+                  )}
                 </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+
+              {/* Right Column: Live iPhone WhatsApp Preview (Desktop only) */}
+              {isDesktop && (
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                  <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview</Text>
+                  <WhatsAppPreview 
+                    title=""
+                    body={msgBody}
+                    buttons={msgButtons}
+                    merchantName={merchantName}
+                  />
+                </View>
+              )}
+            </View>
             
             <TouchableOpacity 
               style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
@@ -1514,6 +1622,332 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
     </View>
   );
 }
+
+// ── PRESETS & HELPERS FOR LIVE PREVIEW ──
+
+const PRESETS = [
+  {
+    title: 'Milestone Reward',
+    body: '🎉 Tahniah {{name}}!\n\nAnda baru sahaja mengumpul *{{stamps}}* cop dan mendapat ganjaran baru! Tebus ganjaran anda pada kunjungan seterusnya.\n\nKlik pautan ini untuk melihat kad anda:\n{{login_link}}',
+  },
+  {
+    title: 'Win-Back Promo',
+    body: 'Kami merindui anda, {{name}}! 🥺\n\nDah lama anda tidak singgah ke kedai kami. Singgah minggu ini dan dapatkan *100 mata bonus* untuk kunjungan anda!\n\nLihat kad ganjaran anda di sini:\n{{login_link}}',
+  },
+  {
+    title: 'Milestone (EN)',
+    body: '🎉 Congrats {{name}}!\n\nYou have collected *{{stamps}}* stamps and unlocked a new reward voucher! Redeem it during your next visit.\n\nView your rewards here:\n{{login_link}}',
+  },
+  {
+    title: 'Win-Back (EN)',
+    body: 'We miss you, {{name}}! 🥺\n\nIt has been a while since your last visit. Come back this week to collect a stamp and get *100 bonus points*!\n\nCheck your card here:\n{{login_link}}',
+  },
+];
+
+const parseWhatsAppText = (text: string) => {
+  if (!text) return [];
+  
+  // Replace variables for preview representation
+  let parsed = text
+    .replace(/\{\{\s*name\s*\}\}/g, 'Fazli')
+    .replace(/\{\{\s*stamps\s*\}\}/g, '3')
+    .replace(/\{\{\s*points\s*\}\}/g, '120')
+    .replace(/\{\{\s*points_expiry\s*\}\}/g, '2026-12-31')
+    .replace(/\{\{\s*login_link\s*\}\}/g, 'risev.app/l/abc');
+
+  const parts = [];
+  const regex = /(\*[^*]+\*|_[^_]+_)/g;
+  const tokens = parsed.split(regex);
+
+  return tokens.map((token, i) => {
+    if (token.startsWith('*') && token.endsWith('*')) {
+      return (
+        <Text key={i} style={{ fontWeight: 'bold' }}>
+          {token.slice(1, -1)}
+        </Text>
+      );
+    }
+    if (token.startsWith('_') && token.endsWith('_')) {
+      return (
+        <Text key={i} style={{ fontStyle: 'italic' }}>
+          {token.slice(1, -1)}
+        </Text>
+      );
+    }
+    return token;
+  });
+};
+
+const WhatsAppPreview = ({ title, body, buttons, merchantName }: { title: string, body: string, buttons: any[], merchantName: string }) => {
+  const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  return (
+    <View style={previewStyles.iphoneContainer}>
+      {/* iPhone Top Speaker / Island */}
+      <View style={previewStyles.iphoneTop}>
+        <View style={previewStyles.iphoneSpeaker} />
+        <View style={previewStyles.iphoneCamera} />
+      </View>
+      
+      {/* Screen container */}
+      <View style={previewStyles.screen}>
+        {/* WhatsApp Header */}
+        <View style={previewStyles.chatHeader}>
+          <Ionicons name="chevron-back" size={20} color="#FFFFFF" style={{ marginRight: 2 }} />
+          <View style={previewStyles.avatar}>
+            <Text style={previewStyles.avatarText}>
+              {merchantName ? merchantName.charAt(0).toUpperCase() : 'M'}
+            </Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={previewStyles.headerTitle} numberOfLines={1}>
+              {merchantName || 'Your Shop'}
+            </Text>
+            <Text style={previewStyles.headerSub}>online</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 14 }}>
+            <Ionicons name="videocam" size={18} color="#FFFFFF" />
+            <Ionicons name="call" size={16} color="#FFFFFF" />
+            <Ionicons name="ellipsis-vertical" size={16} color="#FFFFFF" />
+          </View>
+        </View>
+        
+        {/* WhatsApp Wallpaper Area */}
+        <View style={previewStyles.chatBody}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10, gap: 8 }}>
+            
+            {/* System Encryption Banner */}
+            <View style={previewStyles.systemBadge}>
+              <Text style={previewStyles.systemBadgeText}>
+                🔒 Messages are end-to-end encrypted. No one outside of this chat can read them.
+              </Text>
+            </View>
+
+            {title ? (
+              <View style={[previewStyles.systemBadge, { backgroundColor: '#E0F2FE', alignSelf: 'center' }]}>
+                <Text style={[previewStyles.systemBadgeText, { color: '#0369A1' }]}>
+                  Campaign Step: {title}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Incoming WhatsApp Bubble */}
+            <View style={previewStyles.bubbleWrapper}>
+              <View style={previewStyles.bubble}>
+                <View style={previewStyles.bubbleTail} />
+                <Text style={previewStyles.bubbleSender}>
+                  {merchantName || 'Your Shop'}
+                </Text>
+                <Text style={previewStyles.bubbleText}>
+                  {body ? parseWhatsAppText(body) : (
+                    <Text style={{ color: '#94A3B8', fontStyle: 'italic' }}>
+                      Type a template message on the left to see preview...
+                    </Text>
+                  )}
+                </Text>
+                
+                <View style={previewStyles.bubbleFooter}>
+                  <Text style={previewStyles.bubbleTime}>{timeString}</Text>
+                  <Ionicons name="checkmark-done" size={14} color="#34B7F1" style={{ marginLeft: 3 }} />
+                </View>
+              </View>
+              
+              {/* WhatsApp Interactive Action Buttons */}
+              {buttons && buttons.length > 0 && (
+                <View style={previewStyles.buttonsContainer}>
+                  {buttons.map((btn, idx) => (
+                    <View key={idx} style={previewStyles.templateButton}>
+                      <Ionicons 
+                        name={btn.url ? "link-outline" : "chatbubble-ellipses-outline"} 
+                        size={13} 
+                        color="#0066CC" 
+                        style={{ marginRight: 5 }} 
+                      />
+                      <Text style={previewStyles.templateButtonText} numberOfLines={1}>
+                        {btn.label || `Button ${idx + 1}`}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const previewStyles = StyleSheet.create({
+  iphoneContainer: {
+    width: 250,
+    height: 420,
+    borderRadius: 32,
+    borderWidth: 6,
+    borderColor: '#1E293B',
+    backgroundColor: '#000000',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    alignSelf: 'center',
+  },
+  iphoneTop: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    transform: [{ translateX: -45 }],
+    width: 90,
+    height: 16,
+    backgroundColor: '#1E293B',
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    zIndex: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  iphoneSpeaker: {
+    width: 30,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#475569',
+  },
+  iphoneCamera: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#0B132B',
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: '#efeae2',
+  },
+  chatHeader: {
+    backgroundColor: '#075E54',
+    paddingTop: 20,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#075E54',
+  },
+  headerTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  headerSub: {
+    fontSize: 8,
+    color: '#CBD5E1',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  chatBody: {
+    flex: 1,
+    backgroundColor: '#efeae2',
+  },
+  systemBadge: {
+    backgroundColor: '#FFF9C4',
+    padding: 6,
+    borderRadius: 6,
+    alignSelf: 'center',
+    maxWidth: '95%',
+    marginBottom: 4,
+  },
+  systemBadgeText: {
+    fontSize: 8,
+    color: '#5D4037',
+    textAlign: 'center',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    lineHeight: 11,
+  },
+  bubbleWrapper: {
+    alignSelf: 'flex-start',
+    maxWidth: '90%',
+  },
+  bubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderTopLeftRadius: 0,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 1,
+    elevation: 1,
+    position: 'relative',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    top: 0,
+    left: -6,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderRightWidth: 8,
+    borderRightColor: '#FFFFFF',
+    borderBottomWidth: 8,
+    borderBottomColor: 'transparent',
+  },
+  bubbleSender: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#075E54',
+    marginBottom: 2,
+  },
+  bubbleText: {
+    fontSize: 11,
+    color: '#1E293B',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    lineHeight: 14,
+  },
+  bubbleFooter: {
+    flexDirection: 'row',
+    alignSelf: 'flex-end',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  bubbleTime: {
+    fontSize: 7,
+    color: '#94A3B8',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  buttonsContainer: {
+    backgroundColor: '#E2E8F0',
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    overflow: 'hidden',
+    marginTop: 1,
+    gap: 0.5,
+  },
+  templateButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  templateButtonText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0066CC',
+  },
+});
 
 const btnStyles = StyleSheet.create({
   btn: { 
