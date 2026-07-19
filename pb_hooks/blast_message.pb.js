@@ -169,7 +169,8 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/pair", (e) => {
     console.log("Merchant WhatsApp pair raw result:", JSON.stringify(result));
 
     const dataObj = result.data || result || {};
-    const finalCode = dataObj.pairingCode || 
+    const finalCode = dataObj.PairingCode || 
+                      dataObj.pairingCode || 
                       dataObj.code || 
                       dataObj.pairing_code || 
                       dataObj.pairCode || 

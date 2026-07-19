@@ -143,7 +143,8 @@ routerAdd("POST", "/api/risev/agent/whatsapp/pair", (e) => {
     console.log("Agent WhatsApp pair raw result:", JSON.stringify(result));
 
     const dataObj = result.data || result || {};
-    const finalCode = dataObj.pairingCode || 
+    const finalCode = dataObj.PairingCode || 
+                      dataObj.pairingCode || 
                       dataObj.code || 
                       dataObj.pairing_code || 
                       dataObj.pairCode || 
