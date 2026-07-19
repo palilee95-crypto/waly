@@ -1309,11 +1309,30 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
-                  <ActivityIndicator size="small" color="#10B981" />
-                  <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                    {locale === 'en' ? 'Waiting for device linking...' : 'Menunggu pautan peranti...'}
-                  </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginVertical: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ActivityIndicator size="small" color="#10B981" />
+                    <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                      {locale === 'en' ? 'Waiting for device linking...' : 'Menunggu pautan peranti...'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={handlePair} 
+                    disabled={isPairing}
+                    style={{ padding: 4 }}
+                  >
+                    <Text style={{ 
+                      fontSize: 12, 
+                      color: isPairing ? '#94A3B8' : '#3B82F6', 
+                      fontFamily: 'PlusJakartaSans_700Bold',
+                      textDecorationLine: 'underline' 
+                    }}>
+                      {isPairing 
+                        ? (locale === 'en' ? 'Generating...' : 'Menjana...') 
+                        : (locale === 'en' ? 'Regenerate Code' : 'Jana Semula Kod')}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
