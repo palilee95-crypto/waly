@@ -68,7 +68,7 @@ services:
     image: postgres:15-alpine
     container_name: risev-evolution-db
     restart: unless-stopped
-    command: postgres -c max_connections=300 -c shared_buffers=256MB -c idle_in_transaction_session_timeout=60000
+    command: postgres -c max_connections=300 -c shared_buffers=256MB -c idle_in_transaction_session_timeout=60000 -c idle_session_timeout=300000
     environment:
       POSTGRES_USER: ${EVOLUTION_DB_USER}
       POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
