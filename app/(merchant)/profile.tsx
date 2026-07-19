@@ -324,16 +324,17 @@ export default function ProfileScreen() {
   }, [user]);
 
   useEffect(() => {
+    let active = true;
     let intervalId: any;
     let attemptCount = 0;
     const MAX_ATTEMPTS = 20; // ~5min total with backoff; stops storming a broken backend
     const isModalOpen = showQrModal || showPairModal;
     if (isModalOpen && user && user.merchant_id) {
       const poll = async () => {
+        if (!active) return;
         attemptCount += 1;
         if (attemptCount > MAX_ATTEMPTS) {
           console.warn('WhatsApp polling exceeded max attempts, stopping.');
-          if (intervalId) clearTimeout(intervalId);
           setWhatsappStatus('disconnected');
           return;
         }
@@ -345,6 +346,7 @@ export default function ProfileScreen() {
               'Authorization': 'Bearer ' + pb.authStore.token
             }
           });
+          if (!active) return;
           if (res.status === 'connected') {
             setWhatsappStatus('connected');
             if (res.phone) {
@@ -358,13 +360,14 @@ export default function ProfileScreen() {
               type: 'success'
             });
             setShowResultModal(true);
-            if (intervalId) clearTimeout(intervalId);
+            return;
           } else if (showQrModal && res.qrcode) {
             setWhatsappQr(res.qrcode);
           }
         } catch (err) {
           console.warn('Polling WhatsApp status failed:', err);
         }
+        if (!active) return;
         // Exponential backoff capped at 30s: 3s, 6s, 12s, 24s, 30s, 30s...
         const delay = Math.min(3000 * Math.pow(2, attemptCount - 1), 30000);
         intervalId = setTimeout(poll, delay);
@@ -372,6 +375,7 @@ export default function ProfileScreen() {
       poll();
     }
     return () => {
+      active = false;
       if (intervalId) clearTimeout(intervalId);
     };
   }, [showQrModal, showPairModal]);
