@@ -1240,7 +1240,15 @@ export default function ProfileScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtnBlack, { width: '100%', flex: 0, height: 48, marginTop: 8 }]}
+                  style={{
+                    width: '100%',
+                    height: 48,
+                    borderRadius: 12,
+                    backgroundColor: '#000000',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: 8
+                  }}
                   onPress={handlePair}
                   disabled={isPairing}
                 >
@@ -1305,7 +1313,15 @@ export default function ProfileScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.modalCancelBtn, { width: '100%', flex: 0, height: 48, marginTop: 12 }]}
+                  style={{
+                    width: '100%',
+                    height: 48,
+                    borderRadius: 12,
+                    backgroundColor: '#F1F5F9',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: 12
+                  }}
                   onPress={() => setPairingCode('')}
                 >
                   <Text style={styles.modalCancelText}>

@@ -33,7 +33,7 @@ const sendFailureCache = {}; // { instanceName: { lastFailureTs: <ms> } }
 // frontend poll loop (every 3s) can open dozens of clients and exhaust
 // resources. Once we trigger a connect for an instance, skip subsequent
 // connect calls within this window and just poll /instance/qr for the code.
-const CONNECT_COOLDOWN_MS = 10 * 1000; // 10 seconds
+const CONNECT_COOLDOWN_MS = 30 * 1000; // 30 seconds — prevents connection exhaustion
 const connectCache = {}; // { instanceName: { lastConnectTs: <ms> } }
 
 function generateRandomToken() {
@@ -396,6 +396,41 @@ function sendTextMessage(instanceName, number, text, options = {}) {
   }
 }
 
+// Request a pairing code for phone-based WhatsApp linking (no QR needed).
+// Returns { pairingCode: "XXXX-XXXX" } on success.
+function pairInstance(instanceName, phone) {
+  const token = getInstanceToken(instanceName);
+  if (!token) {
+    throw new Error(`Instance token not found for ${instanceName}. Create the instance first.`);
+  }
+
+  // Normalize phone: remove + prefix, spaces, dashes
+  let cleanPhone = phone.replace(/[\+\s\-]/g, '');
+  if (cleanPhone.startsWith('60')) {
+    // already has country code
+  } else if (cleanPhone.startsWith('0')) {
+    cleanPhone = '60' + cleanPhone.substring(1);
+  }
+
+  const res = $http.send({
+    url: `${evolutionUrl}/instance/pair`,
+    method: 'POST',
+    headers: {
+      "apikey": token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ phone: cleanPhone })
+  });
+
+  if (res.statusCode !== 200 && res.statusCode !== 201) {
+    throw new Error(`Failed to request pairing code. Status: ${res.statusCode}. Response: ${res.raw}`);
+  }
+
+  const data = res.raw ? JSON.parse(res.raw) : null;
+  // Evolution Go returns { pairingCode: "XXXX-XXXX" } or similar
+  return data;
+}
+
 module.exports = {
   evolutionUrl,
   evolutionKey,
@@ -403,5 +438,6 @@ module.exports = {
   getInstances,
   getInstanceToken,
   sendTextMessage,
-  fetchAllRecords
+  fetchAllRecords,
+  pairInstance
 };
