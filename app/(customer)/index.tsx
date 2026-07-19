@@ -792,30 +792,6 @@ export default function CustomerDashboard() {
                           </View>
                         </View>
 
-                        {/* Front Card Specific overlay buttons */}
-                        {isFront && (
-                          <View style={styles.frontCardPillsRow}>
-                            <TouchableOpacity
-                              style={styles.viewAllPill}
-                              onPress={() => router.push('/(customer)/my-cards')}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.viewAllPillText}>View all</Text>
-                              <Ionicons name="chevron-forward" size={10} color="#FFFFFF" />
-                            </TouchableOpacity>
-
-                            {stackedLength > 1 && (
-                              <TouchableOpacity
-                                style={styles.cyclePill}
-                                onPress={cycleCard}
-                                activeOpacity={0.8}
-                              >
-                                <Ionicons name="swap-horizontal" size={12} color="#FFFFFF" />
-                                <Text style={styles.cyclePillText}>Next Card</Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        )}
                       </View>
                     </TouchableOpacity>
                   </Animated.View>
@@ -823,6 +799,72 @@ export default function CustomerDashboard() {
               })
             )}
           </View>
+
+          {/* Card Stack Action Row */}
+          {!loading && loyaltyCards.length > 0 && (
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: 12,
+              marginBottom: 16,
+              width: '100%',
+              paddingHorizontal: 16
+            }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 20,
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 3,
+                  elevation: 1
+                }}
+                onPress={() => router.push('/(customer)/my-cards')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="card-outline" size={14} color="#000000" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                  {locale === 'en' ? 'View All Cards' : 'Lihat Semua Kad'}
+                </Text>
+              </TouchableOpacity>
+
+              {loyaltyCards.length > 1 && (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#000000',
+                    borderRadius: 20,
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 3,
+                    elevation: 2
+                  }}
+                  onPress={cycleCard}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="swap-horizontal" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                    {locale === 'en' ? 'Next Card' : 'Kad Seterusnya'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
