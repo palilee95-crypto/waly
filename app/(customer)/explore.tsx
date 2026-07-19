@@ -451,18 +451,48 @@ export default function ExploreScreen() {
                   }
                 </Text>
                 {!fetchingLocation && merchantLocation?.phone && (
-                  <TouchableOpacity 
-                    style={styles.modalSecondaryBtn} 
-                    onPress={() => {
-                      Linking.openURL(`tel:${merchantLocation.phone}`).catch(() => {
-                        Alert.alert('Error', 'Could not initiate phone call.');
-                      });
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="call-outline" size={16} color="#000000" style={{ marginRight: 6 }} />
-                    <Text style={[styles.modalActionBtnText, { color: '#000000' }]}>Call Store</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, width: '100%' }}>
+                    <TouchableOpacity 
+                      style={[styles.modalSecondaryBtn, { flex: 1, marginTop: 0 }]} 
+                      onPress={() => {
+                        Linking.openURL(`tel:${merchantLocation.phone}`).catch(() => {
+                          Alert.alert('Error', 'Could not initiate phone call.');
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="call-outline" size={16} color="#000000" style={{ marginRight: 6 }} />
+                      <Text style={[styles.modalActionBtnText, { color: '#000000' }]}>Call Store</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#25D366',
+                        borderRadius: 10,
+                        height: 38,
+                        marginTop: 0
+                      }} 
+                      onPress={() => {
+                        let cleanPhone = merchantLocation.phone.replace(/[\+\s\-]/g, '');
+                        if (cleanPhone.startsWith('60')) {
+                          // country code exists
+                        } else if (cleanPhone.startsWith('0')) {
+                          cleanPhone = '60' + cleanPhone.substring(1);
+                        }
+                        Linking.openURL(`https://wa.me/${cleanPhone}`).catch(() => {
+                          Alert.alert('Error', 'Could not open WhatsApp.');
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={[styles.modalActionBtnText, { color: '#FFFFFF' }]}>WhatsApp</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             </ScrollView>
