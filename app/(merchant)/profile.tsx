@@ -217,17 +217,22 @@ export default function ProfileScreen() {
       if (res.success && res.pairingCode) {
         setPairingCode(res.pairingCode);
       } else {
-        Alert.alert(
-          locale === 'en' ? 'Error' : 'Ralat', 
-          res.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.')
-        );
+        const errMsg = res.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.');
+        setResultModalConfig({
+          title: locale === 'en' ? 'Error' : 'Ralat',
+          desc: errMsg,
+          type: 'error'
+        });
+        setShowResultModal(true);
       }
     } catch (err: any) {
       const errMsg = err?.response?.message || err?.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.');
-      Alert.alert(
-        locale === 'en' ? 'Error' : 'Ralat', 
-        errMsg
-      );
+      setResultModalConfig({
+        title: locale === 'en' ? 'Error' : 'Ralat',
+        desc: errMsg,
+        type: 'error'
+      });
+      setShowResultModal(true);
     } finally {
       setIsPairing(false);
     }
