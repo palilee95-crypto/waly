@@ -75,6 +75,10 @@ export default function ProfileScreen() {
   const [whatsappQr, setWhatsappQr] = useState<string>('');
   const [whatsappPhone, setWhatsappPhone] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showPairModal, setShowPairModal] = useState(false);
+  const [pairPhone, setPairPhone] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
+  const [isPairing, setIsPairing] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultModalConfig, setResultModalConfig] = useState({ title: '', desc: '', type: 'success' });
@@ -181,6 +185,53 @@ export default function ProfileScreen() {
     }
   };
 
+  const handlePair = async () => {
+    if (!pairPhone.trim()) {
+      Alert.alert(
+        locale === 'en' ? 'Error' : 'Ralat', 
+        locale === 'en' ? 'Please enter your WhatsApp phone number.' : 'Sila masukkan nombor telefon WhatsApp anda.'
+      );
+      return;
+    }
+    const cleanPhone = pairPhone.trim().replace(/[\s\-]/g, '');
+    if (!/^(\+?60|0)?\d{8,12}$/.test(cleanPhone)) {
+      Alert.alert(
+        locale === 'en' ? 'Error' : 'Ralat', 
+        locale === 'en' ? 'Please enter a valid Malaysian phone number (e.g. 0123456789).' : 'Sila masukkan nombor telefon Malaysia yang sah (cth. 0123456789).'
+      );
+      return;
+    }
+
+    setIsPairing(true);
+    setPairingCode('');
+    try {
+      const res = await pb.send('/api/risev/merchant/whatsapp/pair', {
+        method: 'POST',
+        body: { phone: cleanPhone },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        },
+        requestKey: null,
+      });
+
+      if (res.success && res.pairingCode) {
+        setPairingCode(res.pairingCode);
+      } else {
+        Alert.alert(
+          locale === 'en' ? 'Error' : 'Ralat', 
+          res.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.')
+        );
+      }
+    } catch (err: any) {
+      Alert.alert(
+        locale === 'en' ? 'Error' : 'Ralat', 
+        err?.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.')
+      );
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
   const handleSavePassword = async () => {
     if (newPassword.length < 8) {
       Alert.alert(t('validation_error'), t('password_length'));
@@ -276,17 +327,19 @@ export default function ProfileScreen() {
     let intervalId: any;
     let attemptCount = 0;
     const MAX_ATTEMPTS = 20; // ~5min total with backoff; stops storming a broken backend
-    if (showQrModal && user && user.merchant_id) {
+    const isModalOpen = showQrModal || showPairModal;
+    if (isModalOpen && user && user.merchant_id) {
       const poll = async () => {
         attemptCount += 1;
         if (attemptCount > MAX_ATTEMPTS) {
-          console.warn('WhatsApp QR polling exceeded max attempts, stopping.');
+          console.warn('WhatsApp polling exceeded max attempts, stopping.');
           if (intervalId) clearTimeout(intervalId);
           setWhatsappStatus('disconnected');
           return;
         }
         try {
-          const res = await pb.send('/api/risev/merchant/whatsapp/status?generateQr=true', {
+          const url = `/api/risev/merchant/whatsapp/status${showQrModal ? '?generateQr=true' : ''}`;
+          const res = await pb.send(url, {
             method: 'GET',
             headers: {
               'Authorization': 'Bearer ' + pb.authStore.token
@@ -298,6 +351,7 @@ export default function ProfileScreen() {
               setWhatsappPhone(res.phone);
             }
             setShowQrModal(false);
+            setShowPairModal(false);
             setResultModalConfig({
               title: locale === 'en' ? 'Success' : 'Berjaya',
               desc: locale === 'en' ? 'WhatsApp connected successfully!' : 'WhatsApp berjaya disambungkan!',
@@ -305,7 +359,7 @@ export default function ProfileScreen() {
             });
             setShowResultModal(true);
             if (intervalId) clearTimeout(intervalId);
-          } else if (res.qrcode) {
+          } else if (showQrModal && res.qrcode) {
             setWhatsappQr(res.qrcode);
           }
         } catch (err) {
@@ -320,7 +374,7 @@ export default function ProfileScreen() {
     return () => {
       if (intervalId) clearTimeout(intervalId);
     };
-  }, [showQrModal]);
+  }, [showQrModal, showPairModal]);
 
   // Leaflet Map Injection and Management (Web Only)
   useEffect(() => {
@@ -1100,7 +1154,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowQrModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { minHeight: 380, justifyContent: 'center', alignItems: 'center', gap: 16 }]}>
+          <View style={[styles.modalCard, { minHeight: 400, justifyContent: 'center', alignItems: 'center', gap: 16 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
               <Text style={[styles.modalTitle, { textAlign: 'left' }]}>{t('link_whatsapp')}</Text>
               <TouchableOpacity onPress={() => setShowQrModal(false)} style={{ padding: 4 }}>
@@ -1127,6 +1181,139 @@ export default function ProfileScreen() {
                 {t('waiting_scan')}
               </Text>
             </View>
+
+            <TouchableOpacity 
+              style={{ marginTop: 12, padding: 8 }}
+              onPress={() => {
+                setShowQrModal(false);
+                setPairPhone(merchant?.metadata?.phone || user?.phone || '');
+                setPairingCode('');
+                setShowPairModal(true);
+              }}
+            >
+              <Text style={{ fontSize: 13, color: '#3B82F6', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                {locale === 'en' ? 'Link with phone number instead' : 'Paut dengan nombor telefon sebaliknya'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* WhatsApp Phone Pairing Modal */}
+      <Modal
+        visible={showPairModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPairModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { minHeight: 380, width: '100%', maxWidth: 350, gap: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
+              <Text style={[styles.modalTitle, { textAlign: 'left' }]}>
+                {locale === 'en' ? 'Link with Phone Number' : 'Paut dengan Nombor Telefon'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowPairModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {!pairingCode ? (
+              <>
+                <Text style={[styles.modalSubtitle, { textAlign: 'left', paddingHorizontal: 0, marginTop: 4, alignSelf: 'stretch' }]}>
+                  {locale === 'en' 
+                    ? 'Enter your WhatsApp phone number to request an 8-character pairing code to link your device.' 
+                    : 'Masukkan nombor telefon WhatsApp anda untuk meminta kod berpasangan 8 aksara untuk memautkan peranti anda.'}
+                </Text>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {locale === 'en' ? 'WhatsApp Number' : 'Nombor WhatsApp'}
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={pairPhone}
+                    onChangeText={setPairPhone}
+                    placeholder="e.g. +60123456789"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtnBlack, { width: '100%', flex: 0, height: 48, marginTop: 8 }]}
+                  onPress={handlePair}
+                  disabled={isPairing}
+                >
+                  {isPairing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>
+                      {locale === 'en' ? 'Generate Pairing Code' : 'Jana Kod Berpasangan'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={{ marginTop: 8, padding: 8, alignItems: 'center' }}
+                  onPress={() => {
+                    setShowPairModal(false);
+                    setShowQrModal(true);
+                    fetchWhatsappStatus(true);
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: '#3B82F6', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                    {locale === 'en' ? 'Scan QR Code instead' : 'Imbas Kod QR sebaliknya'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.modalSubtitle, { textAlign: 'left', paddingHorizontal: 0, marginTop: 4, alignSelf: 'stretch' }]}>
+                  {locale === 'en' 
+                    ? 'Enter this pairing code on your phone under Linked Devices > Link with Phone Number:'
+                    : 'Masukkan kod berpasangan ini pada telefon anda di bawah Peranti Pautan > Paut dengan Nombor Telefon:'}
+                </Text>
+
+                <View style={{ 
+                  backgroundColor: '#F8FAFC', 
+                  borderWidth: 1.5, 
+                  borderColor: '#E2E8F0', 
+                  borderRadius: 16, 
+                  paddingVertical: 18, 
+                  paddingHorizontal: 24, 
+                  marginVertical: 12, 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%' 
+                }}>
+                  <Text style={{ 
+                    fontSize: 32, 
+                    fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                    letterSpacing: 4, 
+                    color: '#0F172A',
+                    textAlign: 'center'
+                  }}>
+                    {pairingCode}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+                  <ActivityIndicator size="small" color="#10B981" />
+                  <Text style={{ fontSize: 12, color: '#047857', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                    {locale === 'en' ? 'Waiting for device linking...' : 'Menunggu pautan peranti...'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { width: '100%', flex: 0, height: 48, marginTop: 12 }]}
+                  onPress={() => setPairingCode('')}
+                >
+                  <Text style={styles.modalCancelText}>
+                    {locale === 'en' ? 'Use a different phone number' : 'Gunakan nombor telefon lain'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
