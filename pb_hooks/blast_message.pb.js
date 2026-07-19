@@ -168,11 +168,12 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/pair", (e) => {
     const result = pairInstance(instanceName, phone);
     console.log("Merchant WhatsApp pair raw result:", JSON.stringify(result));
 
-    const finalCode = result.pairingCode || 
-                      result.code || 
-                      result.pairing_code || 
-                      result.pairCode || 
-                      result.pair_code || 
+    const dataObj = result.data || result || {};
+    const finalCode = dataObj.pairingCode || 
+                      dataObj.code || 
+                      dataObj.pairing_code || 
+                      dataObj.pairCode || 
+                      dataObj.pair_code || 
                       "Check your WhatsApp";
 
     return e.json(200, {
