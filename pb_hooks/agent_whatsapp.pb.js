@@ -88,7 +88,7 @@ routerAdd("GET", "/api/risev/agent/whatsapp/status", (e) => {
 
 // 1b. POST Pair WhatsApp with phone number (pairing code — no QR needed)
 routerAdd("POST", "/api/risev/agent/whatsapp/pair", (e) => {
-  const { callEvo, pairInstance } = require(`${__hooks}/whatsapp_helper.js`);
+  const { callEvo, pairInstance, getInstanceToken, evolutionUrl } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -122,9 +122,20 @@ routerAdd("POST", "/api/risev/agent/whatsapp/pair", (e) => {
     } else {
       const connectionStatus = instanceInfo.connectionStatus || instanceInfo.status || "close";
       if (connectionStatus !== "open" && connectionStatus !== "ON" && connectionStatus !== "connecting") {
-        callEvo("GET", `/instance/connect/${instanceName}`);
-        // Give Evolution Go a brief moment to spin up the connection
-        $os.sleep && $os.sleep(1000);
+        const token = getInstanceToken(instanceName);
+        if (token) {
+          $http.send({
+            url: `${evolutionUrl}/instance/connect`,
+            method: 'POST',
+            headers: {
+              "apikey": token,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({})
+          });
+          // Give Evolution Go a brief moment to spin up the connection
+          $os.sleep && $os.sleep(1000);
+        }
       }
     }
 
