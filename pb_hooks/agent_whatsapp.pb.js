@@ -167,7 +167,13 @@ routerAdd("POST", "/api/risev/agent/whatsapp/pair", (e) => {
       raw: result
     });
   } catch (err) {
-    return e.json(500, { message: "Failed to generate pairing code: " + err.message });
+    const errMsg = err.message || err.toString() || "";
+    if (errMsg.indexOf("rate-overlimit") !== -1) {
+      return e.json(429, { 
+        message: "WhatsApp rate-limit exceeded: Too many pairing requests for this phone number. Please wait 20-30 minutes, try a different number, or link via QR code instead. / Had WhatsApp melebihi had: Sila tunggu 20-30 minit, gunakan nombor lain, atau pautkan melalui QR." 
+      });
+    }
+    return e.json(500, { message: "Failed to generate pairing code: " + errMsg });
   }
 }, $apis.requireAuth("sales_agents"));
 

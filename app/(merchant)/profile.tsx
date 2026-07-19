@@ -223,9 +223,10 @@ export default function ProfileScreen() {
         );
       }
     } catch (err: any) {
+      const errMsg = err?.response?.message || err?.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.');
       Alert.alert(
         locale === 'en' ? 'Error' : 'Ralat', 
-        err?.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.')
+        errMsg
       );
     } finally {
       setIsPairing(false);
