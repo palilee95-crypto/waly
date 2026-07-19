@@ -218,6 +218,7 @@ export default function ProfileScreen() {
         setPairingCode(res.pairingCode);
       } else {
         const errMsg = res.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.');
+        setShowPairModal(false);
         setResultModalConfig({
           title: locale === 'en' ? 'Error' : 'Ralat',
           desc: errMsg,
@@ -227,6 +228,7 @@ export default function ProfileScreen() {
       }
     } catch (err: any) {
       const errMsg = err?.response?.message || err?.message || (locale === 'en' ? 'Failed to generate pairing code.' : 'Gagal menjana kod berpasangan.');
+      setShowPairModal(false);
       setResultModalConfig({
         title: locale === 'en' ? 'Error' : 'Ralat',
         desc: errMsg,
