@@ -145,24 +145,34 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/pair", (e) => {
         qrcode: false,
         integration: "WHATSAPP-BAILEYS"
       });
-    } else {
-      const connectionStatus = instanceInfo.connectionStatus || instanceInfo.status || "close";
-      if (connectionStatus !== "open" && connectionStatus !== "ON" && connectionStatus !== "connecting") {
-        const token = getInstanceToken(instanceName);
-        if (token) {
-          $http.send({
-            url: `${evolutionUrl}/instance/connect`,
-            method: 'POST',
-            headers: {
-              "apikey": token,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({})
-          });
-          // Give Evolution Go a brief moment to spin up the connection
-          $os.sleep && $os.sleep(1000);
-        }
-      }
+      // Give a brief moment for creation to settle
+      $os.sleep && $os.sleep(1000);
+    }
+
+    const token = getInstanceToken(instanceName);
+    if (!token) {
+      throw new Error(`Instance token not found for ${instanceName}`);
+    }
+
+    // Refresh instance info to check status
+    fetchRes = callEvo("GET", `/instance/fetchInstances`);
+    if (fetchRes.status === 200 && Array.isArray(fetchRes.data)) {
+      instanceInfo = fetchRes.data.find(inst => inst.name === instanceName);
+    }
+
+    const connectionStatus = instanceInfo ? (instanceInfo.connectionStatus || instanceInfo.status || "close") : "close";
+    if (connectionStatus !== "open" && connectionStatus !== "ON" && connectionStatus !== "connecting") {
+      $http.send({
+        url: `${evolutionUrl}/instance/connect`,
+        method: 'POST',
+        headers: {
+          "apikey": token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
+      });
+      // Give Evolution Go a brief moment to spin up the connection
+      $os.sleep && $os.sleep(1000);
     }
 
     const result = pairInstance(instanceName, phone);
