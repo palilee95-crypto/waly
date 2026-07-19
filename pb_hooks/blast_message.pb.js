@@ -103,6 +103,77 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
   }
 }, $apis.requireAuth("users"));
 
+// 1b. POST Pair WhatsApp with phone number (pairing code — no QR needed)
+routerAdd("POST", "/api/risev/merchant/whatsapp/pair", (e) => {
+  const { callEvo, pairInstance } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    if (authRecord.get("role") !== "merchant" && authRecord.get("role") !== "both") {
+      return e.json(403, { message: "Forbidden" });
+    }
+
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    const body = e.requestInfo().body || {};
+    const phone = (body.phone || "").trim();
+    if (!phone) {
+      return e.json(400, { message: "Phone number is required" });
+    }
+
+    const merchant = $app.findRecordById("merchants", merchantId);
+    const merchantName = merchant.getString("name") || "";
+    const nameSlug = merchantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const instanceName = `merchant-${merchantId}-${nameSlug}`;
+
+    // Ensure instance exists first and is started
+    let fetchRes = callEvo("GET", `/instance/fetchInstances`);
+    let instanceInfo = null;
+    if (fetchRes.status === 200 && Array.isArray(fetchRes.data)) {
+      instanceInfo = fetchRes.data.find(inst => inst.name === instanceName);
+    }
+
+    if (!instanceInfo) {
+      // Create instance without QR (we'll pair via phone)
+      callEvo("POST", "/instance/create", {
+        instanceName: instanceName,
+        qrcode: false,
+        integration: "WHATSAPP-BAILEYS"
+      });
+    } else {
+      const connectionStatus = instanceInfo.connectionStatus || instanceInfo.status || "close";
+      if (connectionStatus !== "open" && connectionStatus !== "ON" && connectionStatus !== "connecting") {
+        callEvo("GET", `/instance/connect/${instanceName}`);
+        // Give Evolution Go a brief moment to spin up the connection
+        $os.sleep && $os.sleep(1000);
+      }
+    }
+
+    const result = pairInstance(instanceName, phone);
+    console.log("Merchant WhatsApp pair raw result:", JSON.stringify(result));
+
+    const finalCode = result.pairingCode || 
+                      result.code || 
+                      result.pairing_code || 
+                      result.pairCode || 
+                      result.pair_code || 
+                      "Check your WhatsApp";
+
+    return e.json(200, {
+      success: true,
+      pairingCode: finalCode,
+      raw: result
+    });
+  } catch (err) {
+    return e.json(500, { message: "Failed to generate pairing code: " + err.message });
+  }
+}, $apis.requireAuth("users"));
+
 // 2. POST Disconnect & Delete WhatsApp Instance
 routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
   const { callEvo } = require(`${__hooks}/whatsapp_helper.js`);
