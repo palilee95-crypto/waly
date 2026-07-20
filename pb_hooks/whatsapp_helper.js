@@ -81,7 +81,24 @@ function getInstanceToken(instanceName, forceRefresh = false) {
       tokenCache[name] = token;
     }
   }
-  return tokenCache[instanceName] || null;
+  if (tokenCache[instanceName]) {
+    return tokenCache[instanceName];
+  }
+
+  // Fallback: If exact instanceName key was not found, search by partial name match
+  if (instances.length > 0) {
+    for (const inst of instances) {
+      const name = inst.name || inst.instanceName;
+      if (instanceName && name && (name.includes(instanceName) || instanceName.includes(name))) {
+        return inst.token;
+      }
+    }
+    // If only 1 instance exists in total, fallback to its token
+    if (instances.length === 1 && instances[0].token) {
+      return instances[0].token;
+    }
+  }
+  return null;
 }
 
 function callEvo(method, path, body = null) {

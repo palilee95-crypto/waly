@@ -506,12 +506,45 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               }
             }
 
-            // Find merchant's loyalty program
+            // 3. If customer still not found in users, auto-register customer by phone
+            if (!customer && cleanPhone) {
+              try {
+                const userCol = $app.findCollectionByNameOrId("users");
+                customer = new Record(userCol);
+                customer.set("id", $security.randomString(15).toLowerCase());
+                customer.set("phone", cleanPhone);
+                customer.set("role", "customer");
+                customer.set("name", "Customer " + cleanPhone.slice(-4));
+                customer.set("birthday", "2000-01-01 00:00:00.000Z");
+                $app.save(customer);
+                console.log(`[WHATSAPP WEBHOOK] Auto-created new customer record for ${cleanPhone}`);
+              } catch (custErr) {
+                console.log("[WHATSAPP WEBHOOK] Failed to auto-create customer:", custErr.message || custErr);
+              }
+            }
+
+            // Find or auto-create merchant's loyalty program
             const programs = $app.findRecordsByFilter("loyalty_programs",
               `merchant = '${merchantId}'`, "created", 1, 0);
 
-            if (programs.length > 0 && customer) {
-              const program = programs[0];
+            let program = programs.length > 0 ? programs[0] : null;
+            if (!program) {
+              try {
+                const progCol = $app.findCollectionByNameOrId("loyalty_programs");
+                program = new Record(progCol);
+                program.set("id", $security.randomString(15).toLowerCase());
+                program.set("merchant", merchantId);
+                program.set("name", "Standard Loyalty Card");
+                program.set("stamp_goal", 10);
+                program.set("status", "active");
+                $app.save(program);
+                console.log(`[WHATSAPP WEBHOOK] Auto-created default loyalty program for merchant ${merchantId}`);
+              } catch (progErr) {
+                console.log("[WHATSAPP WEBHOOK] Failed to auto-create loyalty program:", progErr.message || progErr);
+              }
+            }
+
+            if (program && customer) {
               const programId = program.id;
               const goal = parseInt(program.get("stamp_goal")) || 10;
 
@@ -590,11 +623,12 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
                   replyMsg,
                   { delay: 1000, presence: 'composing' }
                 );
+                console.log(`[WHATSAPP WEBHOOK] Auto-reply dispatched to ${cleanPhone} via instance ${instanceName}: "${replyMsg}"`);
               } catch (replyErr) {
-                console.log("Auto-reply failed:", replyErr.message || replyErr);
+                console.log("[WHATSAPP WEBHOOK] Auto-reply failed:", replyErr.message || replyErr);
               }
 
-              console.log(`QR inbound: ${stampAmount} stamps added for ${customerName} (tx: ${txCode})`);
+              console.log(`[WHATSAPP WEBHOOK] QR inbound success: ${stampAmount} stamps added for ${customerName} (tx: ${txCode})`);
               return e.json(200, { success: true, processed: "qr_stamp" });
             }
           }
