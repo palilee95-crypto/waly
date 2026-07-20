@@ -409,6 +409,19 @@ function sendTextMessage(instanceName, number, text, options = {}) {
     }
 
     if (res.statusCode !== 200 && res.statusCode !== 201) {
+      // Fallback endpoint for Evolution Go (/message/sendText/:instanceName)
+      res = $http.send({
+        url: `${evolutionUrl}/message/sendText/${instanceName}`,
+        method: 'POST',
+        headers: {
+          "apikey": token || evolutionKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ number: number, text: text })
+      });
+    }
+
+    if (res.statusCode !== 200 && res.statusCode !== 201) {
       throw new Error(`Failed to send WhatsApp message. Status: ${res.statusCode}. Response: ${res.raw}`);
     }
     return res.raw ? JSON.parse(res.raw) : null;
