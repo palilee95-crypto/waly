@@ -166,7 +166,7 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  // Verify OTP via PocketBase built-in
+  // Verify OTP via PocketBase auth-with-otp
   // We need the user's email to confirm the OTP
   let resetUser;
   try {
@@ -177,13 +177,12 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
 
   try {
     const res = $http.send({
-      url: "http://127.0.0.1:8090/api/collections/users/confirm-otp",
+      url: "http://127.0.0.1:8090/api/collections/users/auth-with-otp",
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         otpId: otpId,
-        password: otpCode,
-        email: resetUser.getString("email")
+        password: otpCode
       })
     });
 
