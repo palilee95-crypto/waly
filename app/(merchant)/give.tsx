@@ -149,7 +149,7 @@ export default function QRGenerationScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5C3BCC" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />
         }
       >
         {/* Premium Hero Banner */}
@@ -254,7 +254,7 @@ export default function QRGenerationScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>STAMPS TO ISSUE</Text>
                 <View style={styles.inputGroup}>
-                  <Ionicons name="ribbon-outline" size={20} color="#5C3BCC" style={{ marginLeft: 14 }} />
+                  <Ionicons name="ribbon-outline" size={20} color="#0F172A" style={{ marginLeft: 14 }} />
                   <TextInput
                     style={[
                       styles.input,
@@ -312,7 +312,7 @@ export default function QRGenerationScreen() {
           </View>
 
           {loadingTxns ? (
-            <ActivityIndicator size="small" color="#5C3BCC" style={{ marginVertical: 32 }} />
+            <ActivityIndicator size="small" color="#000000" style={{ marginVertical: 32 }} />
           ) : transactions.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconCircle}>
@@ -335,7 +335,7 @@ export default function QRGenerationScreen() {
                 return (
                   <View key={tx.id} style={styles.txnRow}>
                     <View style={styles.txnIconCircle}>
-                      <Ionicons name="receipt-outline" size={18} color="#5C3BCC" />
+                      <Ionicons name="receipt-outline" size={18} color="#0F172A" />
                     </View>
                     <View style={styles.txnLeft}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   inputPrefix: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#5C3BCC',
+    color: '#0F172A',
     paddingHorizontal: 14,
   },
   input: {
@@ -497,8 +497,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   presetChipActive: {
-    backgroundColor: '#5C3BCC',
-    borderColor: '#5C3BCC',
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   presetChipText: {
     fontSize: 12,
@@ -509,16 +509,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   generateBtn: {
-    backgroundColor: '#5C3BCC',
+    backgroundColor: '#000000',
     height: 52,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#5C3BCC',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   qrInfoValueCode: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#5C3BCC',
+    color: '#0F172A',
   },
   qrInfoDivider: {
     width: 1,
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     flex: 1,
-    backgroundColor: '#5C3BCC',
+    backgroundColor: '#000000',
     height: 46,
     borderRadius: 12,
     flexDirection: 'row',
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   txnAmount: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#5C3BCC',
+    color: '#0F172A',
   },
   txnMeta: {
     fontSize: 12,
