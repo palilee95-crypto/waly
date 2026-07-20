@@ -462,6 +462,117 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
     }
     const textMsg = messageText.trim().toUpperCase();
 
+    // ── Inbound QR Transaction Processing ──────────────────────────
+    // Check if the message contains a TxID (QR transaction code)
+    if (messageText && cleanPhone) {
+      try {
+        const txMatch = messageText.match(/TxID:\s*([A-Z0-9]+)/i);
+        if (txMatch && txMatch[1]) {
+          const txCode = txMatch[1].toUpperCase();
+          const txs = $app.findRecordsByFilter("qr_transactions",
+            `tx_code = "${txCode}" && status = "sent"`,
+            "created", 1, 0);
+
+          if (txs.length > 0) {
+            const tx = txs[0];
+            const merchantId = tx.getString("merchant");
+            const stampAmount = parseInt(tx.get("stamp_amount")) || 0;
+            const billAmount = parseFloat(tx.get("bill_amount")) || 0;
+
+            // Find customer by phone (cleanPhone from remoteJid — last 8 digits match)
+            let customer = null;
+            try {
+              const users = $app.findRecordsByFilter("users",
+                `phone LIKE "%${cleanPhone.slice(-8)}%"`,
+                "created", 1, 0);
+              if (users.length > 0) customer = users[0];
+            } catch (err) { /* not found */ }
+
+            // Find merchant's loyalty program
+            const programs = $app.findRecordsByFilter("loyalty_programs",
+              `merchant = "${merchantId}"`, "created", 1, 0);
+
+            if (programs.length > 0 && customer) {
+              const program = programs[0];
+              const programId = program.id;
+
+              // Find or create loyalty card
+              let card = null;
+              try {
+                const cards = $app.findRecordsByFilter("loyalty_cards",
+                  `program = "${programId}" && customer = "${customer.id}"`,
+                  "created", 1, 0);
+                if (cards.length > 0) card = cards[0];
+              } catch (err) { /* no card yet */ }
+
+              if (!card) {
+                // Create new card
+                const cardCol = $app.findCollectionByNameOrId("loyalty_cards");
+                card = new Record(cardCol, {
+                  program: programId,
+                  customer: customer.id,
+                  merchant: merchantId,
+                  stamps_collected: 0,
+                  status: "active",
+                  opt_in_marketing: true,
+                });
+                $app.save(card);
+              }
+
+              // Add stamps
+              const currentStamps = parseInt(card.get("stamps_collected")) || 0;
+              card.set("stamps_collected", currentStamps + stampAmount);
+              card.set("last_activity", new Date().toISOString());
+              $app.save(card);
+
+              // Create transaction record
+              try {
+                const txnCol = $app.findCollectionByNameOrId("transactions");
+                const txn = new Record(txnCol, {
+                  loyalty_card: card.id,
+                  type: "earn",
+                  stamps: stampAmount,
+                  bill_amount: billAmount,
+                  customer: customer.id,
+                  merchant: merchantId,
+                  metadata: { source: "qr_inbound", tx_code: txCode },
+                });
+                $app.save(txn);
+              } catch (txnErr) {
+                console.log("Failed to create transaction record:", txnErr.message || txnErr);
+              }
+
+              // Mark QR transaction as completed
+              tx.set("status", "completed");
+              tx.set("completed_at", new Date().toISOString());
+              $app.save(tx);
+
+              // Send auto-reply to customer
+              const customerName = customer.getString("name") || "there";
+              const instanceName = body.instanceName || "";
+              const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+
+              try {
+                sendTextMessage(
+                  instanceName,
+                  cleanPhone,
+                  `Hi ${customerName}! ${stampAmount} stamps have been added to your loyalty card. You now have ${currentStamps + stampAmount} stamps. Thank you for visiting!`,
+                  { delay: 1000, presence: 'composing' }
+                );
+              } catch (replyErr) {
+                console.log("Auto-reply failed:", replyErr.message || replyErr);
+              }
+
+              console.log(`QR inbound: ${stampAmount} stamps added for ${customerName} (tx: ${txCode})`);
+              return e.json(200, { success: true, processed: "qr_stamp" });
+            }
+          }
+        }
+      } catch (qrErr) {
+        console.log("QR inbound processing error:", qrErr.message || qrErr);
+      }
+    }
+
     if (textMsg === "STOP" && cleanPhone) {
       // Find user by phone number
       const users = $app.findRecordsByFilter("users", `phone LIKE "%${cleanPhone}%"`, "-created", 1, 0);
