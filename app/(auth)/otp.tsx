@@ -103,9 +103,14 @@ export default function OTPScreen() {
     setErrorMsg('');
     try {
       await resetPassword(phone!, currentOtpId!, otp.join(''), newPassword);
-      Alert.alert('Success', 'Password reset successful. Please log in.', [
-        { text: 'OK', onPress: () => router.replace('/(auth)/login') }
-      ]);
+      if (Platform.OS === 'web') {
+        alert('Password reset successful. Please log in.');
+        router.replace('/(auth)/login');
+      } else {
+        Alert.alert('Success', 'Password reset successful. Please log in.', [
+          { text: 'OK', onPress: () => router.replace('/(auth)/login') }
+        ]);
+      }
     } catch (e: any) {
       setErrorMsg(e?.message || 'Failed to reset password.');
     } finally {
