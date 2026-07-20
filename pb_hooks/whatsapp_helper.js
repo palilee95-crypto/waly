@@ -85,7 +85,7 @@ function getInstanceToken(instanceName, forceRefresh = false) {
     return tokenCache[instanceName];
   }
 
-  // Fallback: If exact instanceName key was not found, search by partial name match
+  // Fallback 1: If exact instanceName key was not found, search by partial name match
   if (instances.length > 0) {
     for (const inst of instances) {
       const name = inst.name || inst.instanceName;
@@ -93,12 +93,19 @@ function getInstanceToken(instanceName, forceRefresh = false) {
         return inst.token;
       }
     }
-    // If only 1 instance exists in total, fallback to its token
-    if (instances.length === 1 && instances[0].token) {
+    // Fallback 2: First open/connected instance token
+    const openInst = instances.find(i => i.connected || i.connectionStatus === "open" || i.status === "open");
+    if (openInst && openInst.token) {
+      return openInst.token;
+    }
+    // Fallback 3: First available instance token
+    if (instances[0] && instances[0].token) {
       return instances[0].token;
     }
   }
-  return null;
+
+  // Fallback 4: Global Evolution API Key
+  return evolutionKey;
 }
 
 function callEvo(method, path, body = null) {

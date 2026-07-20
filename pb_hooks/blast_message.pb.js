@@ -453,15 +453,22 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
     const remoteJid = key.remoteJid || data.remoteJid || data.sender || "";
     const cleanPhone = remoteJid.split("@")[0].split(":")[0];
     
-    // Safely extract message text from various WhatsApp payload structures
+    // Safely extract message text from all possible WhatsApp payload structures
     let messageText = "";
-    if (data.message) {
-      messageText = data.message.conversation ||
-        (data.message.extendedTextMessage && data.message.extendedTextMessage.text) ||
-        (data.message.imageMessage && data.message.imageMessage.caption) || "";
-    }
-    if (!messageText && typeof data.text === "string") {
+    if (typeof data.text === "string") {
       messageText = data.text;
+    } else if (typeof data.messageText === "string") {
+      messageText = data.messageText;
+    } else if (typeof data.body === "string") {
+      messageText = data.body;
+    } else if (data.message) {
+      if (typeof data.message === "string") {
+        messageText = data.message;
+      } else {
+        messageText = data.message.conversation ||
+          (data.message.extendedTextMessage && data.message.extendedTextMessage.text) ||
+          (data.message.imageMessage && data.message.imageMessage.caption) || "";
+      }
     }
     const textMsg = messageText.trim().toUpperCase();
 
