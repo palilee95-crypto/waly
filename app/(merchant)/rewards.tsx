@@ -1374,16 +1374,22 @@ export default function UnifiedRewardsScreen() {
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>
-                        {birthdayForm.reward_type === 'discount_percent' ? 'Discount Percentage' :
-                         birthdayForm.reward_type === 'stamps' ? 'Stamps to Add' : 'Reward Value / Code'}
+                        {birthdayForm.reward_type === 'discount_percent' ? 'Discount Percentage (e.g. 10)' :
+                         birthdayForm.reward_type === 'stamps' ? 'Stamps to Add (e.g. 3)' :
+                         birthdayForm.reward_type === 'free_item' ? 'Item Name (e.g. Free Hot Drink)' :
+                         'Reward Description (e.g. Free Coffee)'}
                       </Text>
                       <TextInput
                         style={styles.textInput}
                         value={birthdayForm.reward_value}
                         onChangeText={(text) => setBirthdayForm((f) => ({ ...f, reward_value: text }))}
-                        placeholder={birthdayForm.reward_type === 'voucher_code' ? "e.g. BDAY2026" : "e.g. 10"}
+                        placeholder={birthdayForm.reward_type === 'discount_percent' ? "10" : birthdayForm.reward_type === 'stamps' ? "3" : "e.g. Free Coffee"}
                         placeholderTextColor="#94A3B8"
+                        keyboardType={birthdayForm.reward_type === 'discount_percent' || birthdayForm.reward_type === 'stamps' ? 'number-pad' : 'default'}
                       />
+                      <Text style={styles.helpText}>
+                        Voucher code is auto-generated as BDAY-XXXX per customer.
+                      </Text>
                     </View>
 
                     <View style={styles.twoColumnInputs}>
