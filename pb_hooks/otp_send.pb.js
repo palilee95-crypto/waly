@@ -26,7 +26,20 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
     return e.json(400, { message: "phone query parameter is required" });
   }
 
-  const user = findUserByPhone(phone);
+  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
+    const d = (p || '').replace(/[^\d]/g, '');
+    if (!d) return null;
+    const l8 = d.slice(-8);
+    try {
+      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
+      for (let i = 0; i < users.length; i++) {
+        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
+      }
+    } catch (err) {}
+    return null;
+  };
+
+  const user = lookupFn(phone);
   if (user) {
     return e.json(200, { exists: true, email: user.getString("email") });
   } else {
@@ -51,8 +64,21 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
+  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
+    const d = (p || '').replace(/[^\d]/g, '');
+    if (!d) return null;
+    const l8 = d.slice(-8);
+    try {
+      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
+      for (let i = 0; i < users.length; i++) {
+        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
+      }
+    } catch (err) {}
+    return null;
+  };
+
   // Check phone uniqueness with normalized digits
-  const existingUser = findUserByPhone(phone);
+  const existingUser = lookupFn(phone);
   if (existingUser) {
     return e.json(400, { message: "Phone number is already registered" });
   }
@@ -108,12 +134,25 @@ routerAdd("POST", "/api/risev/login", (e) => {
     return e.json(400, { message: "Identifier and password are required" });
   }
 
+  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
+    const d = (p || '').replace(/[^\d]/g, '');
+    if (!d) return null;
+    const l8 = d.slice(-8);
+    try {
+      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
+      for (let i = 0; i < users.length; i++) {
+        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
+      }
+    } catch (err) {}
+    return null;
+  };
+
   // Try email first, then phone
   let user = null;
   try {
     user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    user = findUserByPhone(identifier);
+    user = lookupFn(identifier);
   }
 
   if (!user || !user.validatePassword(password)) {
@@ -140,7 +179,20 @@ routerAdd("POST", "/api/risev/request-otp", (e) => {
     return e.json(400, { message: "Phone number is required" });
   }
 
-  const user = findUserByPhone(phone);
+  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
+    const d = (p || '').replace(/[^\d]/g, '');
+    if (!d) return null;
+    const l8 = d.slice(-8);
+    try {
+      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
+      for (let i = 0; i < users.length; i++) {
+        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
+      }
+    } catch (err) {}
+    return null;
+  };
+
+  const user = lookupFn(phone);
   if (!user) {
     return e.json(404, { message: "User not found with this phone number" });
   }
@@ -181,7 +233,20 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  const resetUser = findUserByPhone(phone);
+  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
+    const d = (p || '').replace(/[^\d]/g, '');
+    if (!d) return null;
+    const l8 = d.slice(-8);
+    try {
+      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
+      for (let i = 0; i < users.length; i++) {
+        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
+      }
+    } catch (err) {}
+    return null;
+  };
+
+  const resetUser = lookupFn(phone);
   if (!resetUser) {
     return e.json(404, { message: "User not found" });
   }
