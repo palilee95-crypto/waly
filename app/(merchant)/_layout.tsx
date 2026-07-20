@@ -48,8 +48,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
               iconName = 'people';
               label = t('customers');
             } else if (route.name === 'give') {
-              iconName = 'scan';
-              label = t('scan_member');
+                  iconName = 'qr-code';
+                  label = 'QR Code';
             } else if (route.name === 'marketing') {
               iconName = 'megaphone';
               label = t('marketing');
@@ -121,7 +121,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
               activeOpacity={0.9}
             >
               <View style={styles.floatingBtn}>
-                <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
+                <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
           );

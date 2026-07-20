@@ -1,1302 +1,264 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Dimensions,
-  Alert,
   ScrollView,
   Platform,
-  Modal,
   useWindowDimensions,
   ActivityIndicator,
-  Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
-import { useRouter, usePathname } from 'expo-router';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const { width } = Dimensions.get('window');
-
-export default function GiveStampsScreen() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const { t, locale } = useLanguage();
-  const pathname = usePathname();
-  const isFocused = pathname.includes('give');
-  const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-
-  // Automatically request camera permission when screen is focused and permission is not yet granted
-  useEffect(() => {
-    if (isFocused && permission && !permission.granted) {
-      requestPermission().catch((err) => {
-        console.warn("Auto-request camera permission failed:", err);
-      });
-    }
-  }, [isFocused, permission?.granted]);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [stampsCount, setStampsCount] = useState('1');
-  const [phoneFocused, setPhoneFocused] = useState(false);
-  const [billSubtotal, setBillSubtotal] = useState('');
-  const [subtotalFocused, setSubtotalFocused] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
-  const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
-  const [showNoCampaignModal, setShowNoCampaignModal] = useState(false);
-  const [showSelfIssuanceModal, setShowSelfIssuanceModal] = useState(false);
-  const [showScanAwardModal, setShowScanAwardModal] = useState(false);
-  const [scannedCustomer, setScannedCustomer] = useState<any | null>(null);
-  const [scannedRawInput, setScannedRawInput] = useState('');
-  const [tempPhone, setTempPhone] = useState('');
-  const [tempCount, setTempCount] = useState(1);
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [successDetails, setSuccessDetails] = useState<{
-    customerName: string;
-    customerPhone: string;
-    awardedCount: number;
-    totalStamps: number;
-    billAmount?: number;
-    pointsEarned?: number;
-    pointsMultiplier?: number;
-    pointsFlatBonus?: number;
-  } | null>(null);
-  const [successType, setSuccessType] = useState<'stamps' | 'voucher'>('stamps');
-  const [voucherDetails, setVoucherDetails] = useState<{
-    code: string;
-    customerName: string;
-    rewardName: string;
-  } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const normalizePhoneNumber = (phone: string) => {
-    let cleaned = phone.trim().replace(/[-\s]/g, ''); // Remove spaces and dashes
-    if (cleaned.startsWith('0')) {
-      cleaned = '+60' + cleaned.substring(1);
-    } else if (cleaned.startsWith('60')) {
-      cleaned = '+' + cleaned;
-    } else if (!cleaned.startsWith('+') && cleaned.length > 0) {
-      cleaned = '+60' + cleaned;
-    }
-    return cleaned;
-  };
-
-  const isVoucherCode = (input: string) => {
-    const upper = input.trim().toUpperCase();
-    return upper.startsWith('WV-') || upper.startsWith('RV-');
-  };
-
-  const redeemVoucherCode = async (code: string) => {
-    setIsSubmitting(true);
-    setTimeout(async () => {
-      try {
-        const voucher = await pb.collection('vouchers').getFirstListItem(
-          `code = "${code.trim().toUpperCase()}" && status = "active"`,
-          { expand: 'reward,customer' }
-        );
-
-        if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
-          throw new Error('This voucher has expired.');
-        }
-
-        // Mark voucher as used
-        await pb.collection('vouchers').update(voucher.id, {
-          status: 'used',
-          used_at: new Date().toISOString(),
-        });
-
-        setSuccessType('voucher');
-        setVoucherDetails({
-          code: voucher.code,
-          customerName: voucher.expand?.customer?.name || 'Unknown Customer',
-          rewardName: voucher.expand?.reward?.name || 'Voucher Reward',
-        });
-        setShowSuccessModal(true);
-        setPhoneNumber('');
-      } catch (err: any) {
-        console.warn(err);
-        Alert.alert('Redemption Failed', err.message || 'Invalid, expired, or already used voucher.');
-      } finally {
-        setIsSubmitting(false);
-      }
-    }, 20);
-  };
-
-  const proceedWithIssuingStamps = async (customer: any, count: number, rawInput: string) => {
-    setIsSubmitting(true);
-    let program;
-    try {
-      // Fetch merchant's active loyalty program
-      program = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user!.merchant_id}" && is_active = true`);
-    } catch (err: any) {
-      console.warn("Active loyalty campaign search failed:", err);
-      setShowNoCampaignModal(true);
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      let loyaltyCard = await pb.collection('loyalty_cards')
-        .getFirstListItem(`customer = "${customer.id}" && program = "${program.id}"`)
-        .catch(() => null);
-
-      if (!loyaltyCard) {
-        loyaltyCard = await pb.collection('loyalty_cards').create({
-          customer: customer.id,
-          program: program.id,
-          merchant: user!.merchant_id,
-          stamps_collected: 0,
-          completions: 0,
-          status: 'active',
-          opt_in_marketing: true,
-        });
-      }
-
-      const currentStamps = loyaltyCard!.stamps_collected || 0;
-      const newStamps = currentStamps + count;
-
-      // 1. Update the loyalty card stamps collected count
-      await pb.collection('loyalty_cards').update(loyaltyCard!.id, {
-        stamps_collected: newStamps,
-      });
-
-      // 2. Issue earn transaction log
-      const amountPaid = parseFloat(billSubtotal) || 0;
-      const txn = await pb.collection('transactions').create({
-        customer: customer.id,
-        merchant: user!.merchant_id,
-        loyalty_card: loyaltyCard!.id,
-        type: 'earn',
-        points: amountPaid, // Hook will multiply points
-        bill_amount: amountPaid,
-        stamps: count,
-        metadata: {
-          bill_amount: amountPaid,
-          issued_by: user!.id,
-          issued_by_name: user!.name || 'Staff'
-        }
-      });
-
-      const awardedStamps = txn.stamps || count;
-      const bonusStampsAwarded = awardedStamps - count;
-      const finalTotalStamps = newStamps + bonusStampsAwarded;
-
-      setSuccessType('stamps');
-      setSuccessDetails({
-        customerName: customer.name || rawInput,
-        customerPhone: customer.phone,
-        awardedCount: awardedStamps,
-        totalStamps: finalTotalStamps,
-        billAmount: amountPaid,
-        pointsEarned: txn.points || 0,
-        pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
-        pointsFlatBonus: txn.metadata?.flat_bonus || 0,
-      });
-      setShowSuccessModal(true);
-      setPhoneNumber('');
-      setBillSubtotal('');
-    } catch (err: any) {
-      console.warn(err);
-      if (err.message && (err.message.includes('Self-issuance') || err.message.includes('self-issuance') || err.status === 403)) {
-        setShowSelfIssuanceModal(true);
-      } else {
-        Alert.alert('Error', err.message || 'Failed to award stamps.');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    const rawInput = phoneNumber.trim();
-    if (!rawInput) {
-      Alert.alert('Error', 'Please enter a valid phone number or voucher code.');
-      return;
-    }
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Unauthorized merchant account.');
-      return;
-    }
-
-    // If input starts with WV- or RV- prefix, process as voucher redemption
-    if (isVoucherCode(rawInput)) {
-      await redeemVoucherCode(rawInput);
-      return;
-    }
-
-    setIsSubmitting(true);
-    const count = parseInt(stampsCount || '1', 10);
-    const normalizedPhone = normalizePhoneNumber(rawInput);
-    setTimeout(async () => {
-      try {
-        // Find the user by phone
-        const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-        if (customer.id === user.id) {
-          setIsSubmitting(false);
-          setShowSelfIssuanceModal(true);
-          return;
-        }
-        await proceedWithIssuingStamps(customer, count, rawInput);
-      } catch (err: any) {
-        console.warn("Phone lookup failed (customer doesn't exist yet):", err);
-        // Trigger the custom beautiful in-app modal instead of browser native Alerts!
-        setTempPhone(normalizedPhone);
-        setTempCount(count);
-        setShowCreateConfirmModal(true);
-      } finally {
-        setIsSubmitting(false);
-      }
-    }, 20);
-  };
-
-  const handleCreateAndIssue = async () => {
-    setIsSubmitting(true);
-    setTimeout(async () => {
-      try {
-        const normalizedPhone = normalizePhoneNumber(tempPhone);
-        const cleanNum = normalizedPhone.replace(/[^\d]/g, '');
-        const randomSuffix = Math.random().toString(36).substring(2, 8);
-        const emailVal = `user_${cleanNum}_${randomSuffix}@risev.app`;
-        const randomPassword = Math.random().toString(36).substring(2, 12) + 'W!1';
-
-        // Create new customer (with fallback to phone lookup if creation fails)
-        let newCustomer;
-        try {
-          newCustomer = await pb.collection('users').create({
-            phone: tempPhone,
-            email: emailVal,
-            name: newCustomerName.trim() || `User ${tempPhone.slice(-4)}`,
-            role: 'customer',
-            password: randomPassword,
-            passwordConfirm: randomPassword,
-            total_points: 0,
-            tier: 'bronze',
-          });
-        } catch (createErr: any) {
-          // Fallback: the email may already exist (edge case). Try to find the user by phone.
-          console.warn("Auto customer creation failed, trying phone lookup:", createErr.message || createErr);
-          try {
-            const normalizedPhone = normalizePhoneNumber(tempPhone);
-            newCustomer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-          } catch (lookupErr: any) {
-            console.error("Phone lookup fallback also failed:", lookupErr.message || lookupErr);
-            Alert.alert('Error', 'Failed to create new customer account: ' + (createErr.message || createErr));
-            setScanned(false);
-            setShowCreateConfirmModal(false);
-            setIsSubmitting(false);
-            return;
-          }
-        }
-
-        setNewCustomerName('');
-
-        // Continue the stamp issue process using the new (or found) customer!
-        setScannedCustomer(newCustomer);
-        setScannedRawInput(tempPhone);
-        // Preserve billSubtotal — don't reset to '' here.
-        // The Scan Award Modal will read it and let the merchant adjust if needed.
-        setStampsCount(tempCount.toString());
-        setShowScanAwardModal(true);
-        setShowCreateConfirmModal(false);
-        setIsSubmitting(false);
-      } catch (outerErr: any) {
-        console.error("handleCreateAndIssue outer error:", outerErr);
-        Alert.alert('Error', 'Failed to create new customer account: ' + (outerErr.message || outerErr));
-        setScanned(false);
-        setShowCreateConfirmModal(false);
-        setIsSubmitting(false);
-      }
-    }, 20);
-  };
-
-  const handleCreateAndIssueSubmit = async () => {
-    setNewCustomerName('');
-    setShowCreateConfirmModal(false);
-    await handleCreateAndIssue();
-  };
-
-  const simulateVoucherScan = async () => {
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Not logged in as a merchant.');
-      return;
-    }
-    try {
-      const activeVouchers = await pb.collection('vouchers').getFullList({
-        filter: `status = "active" && reward.merchant = "${user.merchant_id}"`,
-        expand: 'reward,customer',
-        limit: 1
-      });
-
-      if (activeVouchers.length === 0) {
-        Alert.alert(
-          'No Active Vouchers',
-          'There are currently no active customer vouchers for your store to simulate scanning. Complete a stamp card first to issue one!'
-        );
-        return;
-      }
-
-      const mockVoucher = activeVouchers[0];
-      const code = mockVoucher.code;
-      const customerName = mockVoucher.expand?.customer?.name || 'Customer';
-      const rewardName = mockVoucher.expand?.reward?.name || 'Reward';
-
-      Alert.alert(
-        'Voucher Scanned',
-        `Simulated scanning voucher code: ${code}\nReward: ${rewardName}\nCustomer: ${customerName}\n\nClick OK to redeem this voucher.`,
-        [
-          {
-            text: 'OK',
-            onPress: async () => {
-              await redeemVoucherCode(code);
-            }
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to simulate voucher scan.');
-    }
-  };
-
-  const simulateStampScan = async () => {
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Not logged in as a merchant.');
-      return;
-    }
-    let targetPhone = phoneNumber.trim();
-    if (!targetPhone) {
-      try {
-        const firstCust = await pb.collection('users').getFirstListItem('role = "customer"');
-        targetPhone = firstCust.phone;
-      } catch (e) {
-        targetPhone = '+601153300472';
-      }
-    } else {
-      targetPhone = normalizePhoneNumber(targetPhone);
-    }
-
-    Alert.alert(
-      'Stamp Card Scanned',
-      `Simulated scanning customer phone number: ${targetPhone}.\nClick OK to award 1 stamp.`,
-      [
-        {
-          text: 'OK',
-          onPress: async () => {
-            try {
-              const customer = await pb.collection('users').getFirstListItem(`phone = "${targetPhone}"`);
-              const program = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user.merchant_id}" && is_active = true`);
-
-              let loyaltyCard = await pb.collection('loyalty_cards')
-                .getFirstListItem(`customer = "${customer.id}" && program = "${program.id}"`)
-                .catch(() => null);
-
-              if (!loyaltyCard) {
-                loyaltyCard = await pb.collection('loyalty_cards').create({
-                  customer: customer.id,
-                  program: program.id,
-                  merchant: user.merchant_id,
-                  stamps_collected: 0,
-                  completions: 0,
-                  status: 'active',
-                  opt_in_marketing: true,
-                });
-              }
-
-              const currentStamps = loyaltyCard!.stamps_collected || 0;
-              const newStamps = currentStamps + 1;
-
-              await pb.collection('loyalty_cards').update(loyaltyCard!.id, {
-                stamps_collected: newStamps,
-              });
-
-              const amountPaid = parseFloat(billSubtotal) || 10.0;
-              const txn = await pb.collection('transactions').create({
-                customer: customer.id,
-                merchant: user.merchant_id,
-                loyalty_card: loyaltyCard!.id,
-                type: 'earn',
-                points: amountPaid,
-                stamps: 1,
-                metadata: {
-                  bill_amount: amountPaid,
-                  issued_by: user.id,
-                  issued_by_name: user.name || 'Staff'
-                }
-              });
-
-              const awardedStamps = txn.stamps || 1;
-              const bonusStampsAwarded = awardedStamps - 1;
-              const finalTotalStamps = newStamps + bonusStampsAwarded;
-
-              setSuccessType('stamps');
-              setSuccessDetails({
-                customerName: customer.name || targetPhone,
-                customerPhone: customer.phone,
-                awardedCount: awardedStamps,
-                totalStamps: finalTotalStamps,
-                billAmount: amountPaid,
-                pointsEarned: txn.points || 0,
-                pointsMultiplier: txn.metadata?.campaign_multiplier || 1,
-                pointsFlatBonus: txn.metadata?.flat_bonus || 0,
-              });
-              setBillSubtotal('');
-              setShowSuccessModal(true);
-            } catch (err: any) {
-              console.warn(err);
-              let errorMsg = 'Failed to award scan stamp.';
-              if (err.status === 404) {
-                errorMsg = 'Customer not found. Please verify that the phone number is registered with RISEV.';
-              } else if (err.message) {
-                errorMsg = err.message;
-              }
-              Alert.alert('Error', errorMsg);
-            }
-          }
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        }
-      ]
+// QR code rendering — uses a simple image-based approach via public API
+function QRCodeImage({ url, size }: { url: string; size: number }) {
+  const encoded = encodeURIComponent(url);
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&bgcolor=FFFFFF&color=000000&qzone=1`;
+  if (Platform.OS === 'web') {
+    return (
+      // @ts-ignore
+      <img src={qrSrc} width={size} height={size} style={{ borderRadius: 12 }} alt="QR Code" />
     );
-  };
+  }
+  return (
+    <View style={[styles.qrPlaceholder, { width: size, height: size }]}>
+      <Ionicons name="qr-code" size={size * 0.5} color="#000000" />
+    </View>
+  );
+}
 
-  const triggerMockScanSuccess = () => {
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Unauthorized merchant account.');
-      return;
-    }
-    setShowSimulateModal(true);
-  };
-
-  const handleBarcodeScanned = async (data: string) => {
-    const rawInput = data.trim();
-    if (!rawInput || scanned) return;
-
-    if (!user || !user.merchant_id) {
-      Alert.alert('Error', 'Unauthorized merchant account.');
-      return;
-    }
-
-    setScanned(true);
-    setIsSubmitting(true);
-
-    setTimeout(async () => {
-      if (isVoucherCode(rawInput)) {
-        // It's a voucher redemption scan!
-        await redeemVoucherCode(rawInput);
-      } else {
-        // It's a loyalty card stamp issue scan!
-        const count = parseInt(stampsCount || '1', 10);
-        const normalizedPhone = normalizePhoneNumber(rawInput);
-        try {
-          const customer = await pb.collection('users').getFirstListItem(`phone = "${normalizedPhone}"`);
-          if (customer.id === user.id) {
-            setIsSubmitting(false);
-            setScanned(false);
-            setShowSelfIssuanceModal(true);
-            return;
-          }
-          // Instead of proceeding immediately, open the scan subtotal modal
-          setScannedCustomer(customer);
-          setScannedRawInput(rawInput);
-          // Preserve billSubtotal for the scan award modal.
-          setStampsCount(count.toString());
-          setIsSubmitting(false);
-          setShowScanAwardModal(true);
-        } catch (err: any) {
-          console.warn("QR Phone lookup failed:", err);
-          // If the customer doesn't exist, trigger the customer creation modal
-          setTempPhone(normalizedPhone);
-          setTempCount(count);
-          setIsSubmitting(false);
-          setShowCreateConfirmModal(true);
-        }
-      }
-    }, 20);
-  };
-
+export default function QRGenerationScreen() {
+  const { user } = useAuth();
+  const { t } = useLanguage();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const [billAmount, setBillAmount] = useState('');
+  const [stampAmount, setStampAmount] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [txCode, setTxCode] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadingTxns, setLoadingTxns] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoadingTxns(true);
+      const res = await pb.send<{ transactions: any[] }>('/api/risev/qr/list', {
+        method: 'GET',
+        requestKey: null,
+      });
+      setTransactions(res.transactions || []);
+    } catch (err) {
+      console.warn('Failed to fetch QR transactions:', err);
+    } finally {
+      setLoadingTxns(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const handleGenerate = async () => {
+    const bill = parseFloat(billAmount) || 0;
+    const stamps = parseInt(stampAmount, 10) || 0;
+
+    if (bill < 0) {
+      return;
+    }
+    if (stamps < 1) {
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const res = await pb.send<{ qrUrl: string; txCode: string }>('/api/risev/qr/generate', {
+        method: 'POST',
+        body: { bill_amount: bill, stamp_amount: stamps },
+        requestKey: null,
+      });
+      setQrUrl(res.qrUrl);
+      setTxCode(res.txCode);
+      fetchTransactions();
+    } catch (err: any) {
+      console.warn('QR generation failed:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleNewQR = () => {
+    setQrUrl(null);
+    setTxCode(null);
+    setBillAmount('');
+    setStampAmount('');
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTransactions();
+    setRefreshing(false);
+  };
+
+  const statusColors: Record<string, string> = {
+    pending: '#64748B',
+    sent: '#475569',
+    completed: '#000000',
+    expired: '#EF4444',
+  };
+
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="cafe" size={15} color="#000000" />
-          </View>
-          <Text style={styles.headerLogoText}>{t('merchant_portal')}</Text>
-        </View>
-        <Image
-          source={require('../../theme/rise_officiallogo.png')}
-          style={{ width: 110, height: 38, resizeMode: 'contain' }}
-        />
+      {/* Header */}
+      <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+        <Text style={styles.headerTitle}>QR Code</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Main Container Area */}
-      <ScrollView contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]} showsVerticalScrollIndicator={false}>
-        {/* Sleek Segmented Mode Selector */}
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, scanMode === 'camera' && styles.segmentBtnActive]}
-            onPress={() => setScanMode('camera')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="camera-outline" size={16} color={scanMode === 'camera' ? '#FFFFFF' : '#64748B'} />
-            <Text style={[styles.segmentText, scanMode === 'camera' && styles.segmentTextActive]}>{t('scan_qr_code')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, scanMode === 'manual' && styles.segmentBtnActive]}
-            onPress={() => setScanMode('manual')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="create-outline" size={16} color={scanMode === 'manual' ? '#FFFFFF' : '#64748B'} />
-            <Text style={[styles.segmentText, scanMode === 'manual' && styles.segmentTextActive]}>{t('manual_input')}</Text>
-          </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Intro */}
+        <View style={styles.introSection}>
+          <Text style={styles.title}>Generate QR Code</Text>
+          <Text style={styles.subtitle}>
+            Enter the bill amount and stamps to issue. Customer scans this QR to send a WhatsApp message and claim their stamps.
+          </Text>
         </View>
 
-        {scanMode === 'camera' ? (
-          // MINIMALIST LIGHT QR CODE SCAN VIEWFINDER
-          <View style={styles.scanWrapper}>
-            <View style={styles.viewfinderCard}>
-              <Text style={styles.scanTitle}>{t('scan_customer_qr')}</Text>
-              <Text style={styles.scanSubtitle}>
-                {t('scan_subtitle')}
+        {/* QR Generation Card */}
+        <View style={styles.card}>
+          {qrUrl ? (
+            // ── QR Display ──────────────────────────────
+            <View style={styles.qrDisplaySection}>
+              <View style={styles.qrImageWrap}>
+                <QRCodeImage url={qrUrl} size={240} />
+              </View>
+
+              <View style={styles.qrInfoRow}>
+                <View style={styles.qrInfoItem}>
+                  <Text style={styles.qrInfoLabel}>BILL</Text>
+                  <Text style={styles.qrInfoValue}>RM {billAmount}</Text>
+                </View>
+                <View style={styles.qrInfoDivider} />
+                <View style={styles.qrInfoItem}>
+                  <Text style={styles.qrInfoLabel}>STAMPS</Text>
+                  <Text style={styles.qrInfoValue}>{stampAmount}</Text>
+                </View>
+                <View style={styles.qrInfoDivider} />
+                <View style={styles.qrInfoItem}>
+                  <Text style={styles.qrInfoLabel}>CODE</Text>
+                  <Text style={styles.qrInfoValue}>{txCode}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.qrHint}>
+                Show this QR to your customer. It expires after they send the WhatsApp message.
               </Text>
 
-              {/* Live Camera / Fallback permission target Area */}
-              <View style={[styles.viewfinderFrame, { overflow: 'hidden' }]}>
-                {permission === null ? (
-                  <ActivityIndicator color="#000000" size="large" />
-                ) : !permission.granted ? (
-                  <View style={styles.permissionContainer}>
-                    <Ionicons name="camera-reverse-outline" size={40} color="#64748B" />
-                    <Text style={styles.permissionText}>{t('camera_permission_required')}</Text>
-                    <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.8}>
-                      <Text style={styles.permissionBtnText}>{t('enable_camera')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : !scanned && isFocused ? (
-                  <CameraView
-                    style={StyleSheet.absoluteFill}
-                    facing="back"
-                    barcodeScannerSettings={{
-                      barcodeTypes: ['qr'],
-                    }}
-                    onBarcodeScanned={({ data }) => handleBarcodeScanned(data)}
-                  />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, styles.scannedPlaceholder]}>
-                    <ActivityIndicator color="#000000" size="large" />
-                    <Text style={styles.processingText}>{t('submitting')}</Text>
-                  </View>
-                )}
-
-                {/* Thin elegant black brackets */}
-                <View style={[styles.bracket, styles.topLeftBracket]} />
-                <View style={[styles.bracket, styles.topRightBracket]} />
-                <View style={[styles.bracket, styles.bottomLeftBracket]} />
-                <View style={[styles.bracket, styles.bottomRightBracket]} />
-                <View style={styles.scanIndicatorDot} />
-              </View>
+              <TouchableOpacity style={styles.newQrBtn} onPress={handleNewQR} activeOpacity={0.8}>
+                <Ionicons name="refresh-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.newQrBtnText}>Generate New QR</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-        ) : (
-          // MANUAL ENTRY FORM MODE
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>{t('manual_stamp_or_voucher')}</Text>
-            <Text style={styles.formSubtitle}>
-              {t('manual_subtitle')}
-            </Text>
-
-            {/* Input field */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{t('phone_number_or_voucher')}</Text>
-              <View style={[styles.inputWrapper, phoneFocused && styles.inputWrapperFocused]}>
-                <Ionicons name="phone-portrait-outline" size={18} color={phoneFocused ? '#000000' : '#94A3B8'} />
-                <TextInput
-                  style={styles.textInput}
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  placeholder={t('phone_or_voucher_placeholder')}
-                  placeholderTextColor="#94A3B8"
-                  autoCapitalize="characters"
-                  onFocus={() => setPhoneFocused(true)}
-                  onBlur={() => setPhoneFocused(false)}
-                />
-              </View>
-            </View>
-
-            {/* Bill Subtotal field */}
-            {!isVoucherCode(phoneNumber) && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('bill_subtotal')}</Text>
-                <View style={[styles.inputWrapper, subtotalFocused && styles.inputWrapperFocused]}>
-                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginRight: 4 }}>RM</Text>
+          ) : (
+            // ── Input Form ──────────────────────────────
+            <>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputPrefix}>RM</Text>
                   <TextInput
-                    style={styles.textInput}
-                    value={billSubtotal}
-                    onChangeText={setBillSubtotal}
+                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    value={billAmount}
+                    onChangeText={(text) => setBillAmount(text.replace(/[^0-9.]/g, ''))}
                     placeholder="0.00"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor="#BEC6E0"
                     keyboardType="decimal-pad"
-                    onFocus={() => setSubtotalFocused(true)}
-                    onBlur={() => setSubtotalFocused(false)}
                   />
                 </View>
               </View>
-            )}
 
-            {/* Count Selector field */}
-            {!isVoucherCode(phoneNumber) && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('stamps_to_issue')}</Text>
-                <View style={styles.stampControls}>
-                  <TouchableOpacity
-                    style={styles.controlBtn}
-                    onPress={() => setStampsCount(Math.max(1, parseInt(stampsCount || '1') - 1).toString())}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="remove" size={18} color="#000000" />
-                  </TouchableOpacity>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>STAMPS TO ISSUE</Text>
+                <View style={styles.inputGroup}>
+                  <Ionicons name="ribbon-outline" size={20} color="#64748B" style={{ marginLeft: 12 }} />
                   <TextInput
-                    style={styles.stampCountInput}
-                    value={stampsCount}
-                    onChangeText={setStampsCount}
+                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    value={stampAmount}
+                    onChangeText={(text) => setStampAmount(text.replace(/[^0-9]/g, ''))}
+                    placeholder="e.g. 2"
+                    placeholderTextColor="#BEC6E0"
                     keyboardType="number-pad"
                   />
-                  <TouchableOpacity
-                    style={styles.controlBtn}
-                    onPress={() => setStampsCount((parseInt(stampsCount || '1') + 1).toString())}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={18} color="#000000" />
-                  </TouchableOpacity>
                 </View>
               </View>
-            )}
-
-            {/* Action Button */}
-            <TouchableOpacity
-              style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]}
-              onPress={handleManualSubmit}
-              activeOpacity={0.9}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.submitBtnText}>
-                  {isVoucherCode(phoneNumber) ? t('redeem_voucher') : t('issue_stamps_btn')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      {/* Success Modal */}
-      <Modal
-        visible={showSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Celebratory Checkmark Icon */}
-            <View style={styles.successIconContainer}>
-              <Ionicons name="checkmark-circle" size={54} color="#10B981" />
-            </View>
-
-            <Text style={styles.modalTitle}>
-              {successType === 'voucher' ? t('voucher_redeemed_upper') : t('stamps_awarded_upper')}
-            </Text>
-            
-            {successType === 'stamps' && successDetails && (
-              <View style={styles.detailsContainer}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('customer')}</Text>
-                  <Text style={styles.detailValue}>{successDetails.customerName}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('phone')}</Text>
-                  <Text style={styles.detailValue}>{successDetails.customerPhone}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('awarded')}</Text>
-                  <Text style={[styles.detailValue, { color: '#10B981', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                    {locale === 'en'
-                      ? `+${successDetails.awardedCount} Stamp${successDetails.awardedCount > 1 ? 's' : ''}`
-                      : `+${successDetails.awardedCount} Setem`}
-                  </Text>
-                </View>
-
-                {successDetails.billAmount !== undefined && successDetails.billAmount > 0 && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>{t('bill_amount')}</Text>
-                    <Text style={styles.detailValue}>RM {successDetails.billAmount.toFixed(2)}</Text>
-                  </View>
-                )}
-                
-                {successDetails.pointsEarned !== undefined && successDetails.pointsEarned > 0 && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>
-                      {locale === 'en' ? 'Points Earned' : 'Mata Dikumpul'}
-                    </Text>
-                    <Text style={[styles.detailValue, { color: '#3B82F6', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                      +{successDetails.pointsEarned} Pts
-                      {successDetails.pointsMultiplier !== undefined && successDetails.pointsMultiplier > 1 && ` (${successDetails.pointsMultiplier}x Promo)`}
-                      {successDetails.pointsFlatBonus !== undefined && successDetails.pointsFlatBonus > 0 && ` (+${successDetails.pointsFlatBonus} Bonus)`}
-                    </Text>
-                  </View>
-                )}
-                
-                <View style={styles.divider} />
-                
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>{t('current_balance')}</Text>
-                  <View style={styles.stampBadge}>
-                    <Text style={styles.stampBadgeText}>
-                      {locale === 'en'
-                        ? `${successDetails.totalStamps} Stamp${successDetails.totalStamps !== 1 ? 's' : ''}`
-                        : `${successDetails.totalStamps} Setem`}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {successType === 'voucher' && voucherDetails && (
-              <View style={styles.detailsContainer}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('customer')}</Text>
-                  <Text style={styles.detailValue}>{voucherDetails.customerName}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('voucher_code')}</Text>
-                  <Text style={styles.detailValue}>{voucherDetails.code}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('reward')}</Text>
-                  <Text style={[styles.detailValue, { color: '#10B981', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                    {voucherDetails.rewardName}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => {
-                setShowSuccessModal(false);
-                setScanned(false);
-              }}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.modalCloseBtnText}>{t('done')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* New Customer Auto-Provisioning Confirmation Modal */}
-      <Modal
-        visible={showCreateConfirmModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCreateConfirmModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Elegant Prompt Icon */}
-            <View style={[styles.successIconContainer, { backgroundColor: '#F1F5F9' }]}>
-              <Ionicons name="person-add-outline" size={40} color="#000000" />
-            </View>
-
-            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: 12, textAlign: 'center' }]}>
-              {t('new_customer_profile')}
-            </Text>
-
-            <Text style={{
-              fontSize: 13,
-              fontFamily: 'PlusJakartaSans_600SemiBold',
-              color: '#64748B',
-              textAlign: 'center',
-              lineHeight: 18,
-              marginBottom: 24,
-            }}>
-              {locale === 'en'
-                ? `Phone number ${phoneNumber} is not registered with RISEV. Create a new guest account to credit these stamps?`
-                : `Nombor telefon ${phoneNumber} tidak didaftarkan dengan RISEV. Cipta akaun tetamu baru untuk mengkreditkan setem ini?`}
-            </Text>
-
-            {/* Optional Customer Name Input */}
-            <View style={{ gap: 6, width: '100%', marginBottom: 20 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
-                {t('customer_name') || 'CUSTOMER NAME'}
-              </Text>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderWidth: 1.5,
-                borderColor: '#E2E8F0',
-                borderRadius: 12,
-                height: 44,
-                paddingHorizontal: 12,
-                backgroundColor: '#F8FAFC',
-              }}>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    fontSize: 13,
-                    fontFamily: 'PlusJakartaSans_600SemiBold',
-                    color: '#000000',
-                    ...Platform.select({
-                      web: {
-                        outlineStyle: 'none',
-                      } as any,
-                    }),
-                  }}
-                  value={newCustomerName}
-                  onChangeText={setNewCustomerName}
-                  placeholder={t('customer_name_placeholder')}
-                  placeholderTextColor="#94A3B8"
-                  editable={!isSubmitting}
-                />
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
-                  backgroundColor: '#FFFFFF',
-                  opacity: isSubmitting ? 0.5 : 1,
-                }}
-                disabled={isSubmitting}
-                onPress={() => {
-                  setShowCreateConfirmModal(false);
-                  setScanned(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                  {t('cancel')}
-                </Text>
-              </TouchableOpacity>
 
               <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: isSubmitting ? '#475569' : '#000000',
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                disabled={isSubmitting}
-                onPress={handleCreateAndIssue}
-                activeOpacity={0.9}
+                style={[styles.generateBtn, (!stampAmount || generating) && styles.generateBtnDisabled]}
+                onPress={handleGenerate}
+                disabled={!stampAmount || generating}
+                activeOpacity={0.8}
               >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                {generating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                    {t('create_issue')}
-                  </Text>
+                  <>
+                    <Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.generateBtnText}>Generate QR Code</Text>
+                  </>
                 )}
               </TouchableOpacity>
-            </View>
-          </View>
+            </>
+          )}
         </View>
-      </Modal>
 
-      {/* Scan Award Modal (Ask for Subtotal and Stamps after QR scan) */}
-      <Modal
-        visible={showScanAwardModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => {
-          setShowScanAwardModal(false);
-          setScanned(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Elegant Prompt Icon */}
-            <View style={[styles.successIconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <Ionicons name="gift-outline" size={40} color="#0284C7" />
+        {/* Recent Transactions */}
+        <View style={styles.historySection}>
+          <Text style={styles.historyTitle}>Recent QR Codes</Text>
+
+          {loadingTxns ? (
+            <ActivityIndicator size="small" color="#000000" style={{ marginVertical: 20 }} />
+          ) : transactions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="qr-code-outline" size={36} color="#E2E8F0" />
+              <Text style={styles.emptyText}>No QR codes generated yet.</Text>
             </View>
-
-            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: 6, textAlign: 'center' }]}>
-              {locale === 'en' ? 'Award Stamps & Points' : 'Berikan Setem & Mata'}
-            </Text>
-
-            <Text style={{
-              fontSize: 13,
-              fontFamily: 'PlusJakartaSans_600SemiBold',
-              color: '#64748B',
-              textAlign: 'center',
-              lineHeight: 18,
-              marginBottom: 20,
-            }}>
-              {locale === 'en' ? 'Customer Profile Found:' : 'Profil Pelanggan Ditemui:'} {'\n'}
-              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                {scannedCustomer?.name || 'Customer'} ({scannedCustomer?.phone})
-              </Text>
-            </Text>
-
-            {/* Bill Subtotal input */}
-            <View style={{ gap: 6, width: '100%', marginBottom: 16 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
-                {t('bill_subtotal') || 'BILL SUBTOTAL'}
-              </Text>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderWidth: 1.5,
-                borderColor: '#E2E8F0',
-                borderRadius: 12,
-                height: 48,
-                paddingHorizontal: 12,
-                backgroundColor: '#F8FAFC',
-              }}>
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginRight: 4 }}>RM</Text>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    fontSize: 14,
-                    fontFamily: 'PlusJakartaSans_600SemiBold',
-                    color: '#000000',
-                    ...Platform.select({
-                      web: {
-                        outlineStyle: 'none',
-                      } as any,
-                    }),
-                  }}
-                  value={billSubtotal}
-                  onChangeText={setBillSubtotal}
-                  placeholder="0.00"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="decimal-pad"
-                  editable={!isSubmitting}
-                />
-              </View>
+          ) : (
+            <View style={styles.txnList}>
+              {transactions.map((tx) => (
+                <View key={tx.id} style={styles.txnRow}>
+                  <View style={styles.txnLeft}>
+                    <Text style={styles.txnCode}>{tx.tx_code}</Text>
+                    <Text style={styles.txnMeta}>
+                      RM {tx.bill_amount} · {tx.stamp_amount} stamps
+                      {tx.customer_phone ? ` · ${tx.customer_phone}` : ''}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: (statusColors[tx.status] || '#64748B') + '15' }]}>
+                    <Text style={[styles.statusText, { color: statusColors[tx.status] || '#64748B' }]}>
+                      {tx.status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
             </View>
-
-            {/* Stamps count adjustment */}
-            <View style={{ gap: 6, width: '100%', marginBottom: 24 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>
-                {t('stamps_to_issue') || 'STAMPS TO ISSUE'}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <TouchableOpacity
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    borderWidth: 1.5,
-                    borderColor: '#E2E8F0',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                  onPress={() => setStampsCount(Math.max(1, parseInt(stampsCount || '1') - 1).toString())}
-                >
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold' }}>-</Text>
-                </TouchableOpacity>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    borderWidth: 1.5,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    height: 40,
-                    textAlign: 'center',
-                    fontSize: 14,
-                    fontFamily: 'PlusJakartaSans_700Bold',
-                    backgroundColor: '#F8FAFC',
-                  }}
-                  value={stampsCount}
-                  onChangeText={setStampsCount}
-                  keyboardType="number-pad"
-                />
-                <TouchableOpacity
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    borderWidth: 1.5,
-                    borderColor: '#E2E8F0',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                  onPress={() => setStampsCount((parseInt(stampsCount || '1') + 1).toString())}
-                >
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold' }}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
-                  backgroundColor: '#FFFFFF',
-                  opacity: isSubmitting ? 0.5 : 1,
-                }}
-                disabled={isSubmitting}
-                onPress={() => {
-                  setShowScanAwardModal(false);
-                  setScanned(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                  {t('cancel') || 'Cancel'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#000000',
-                  opacity: isSubmitting ? 0.5 : 1,
-                }}
-                disabled={isSubmitting}
-                onPress={async () => {
-                  if (scannedCustomer) {
-                    setIsSubmitting(true);
-                    setShowScanAwardModal(false);
-                    const count = parseInt(stampsCount || '1', 10);
-                    try {
-                      await proceedWithIssuingStamps(scannedCustomer, count, scannedRawInput);
-                    } catch (err) {
-                      setScanned(false);
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                    {t('confirm') || 'Confirm'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </View>
-      </Modal>
-
-      {/* Self-Issuance Warning Modal */}
-      <Modal
-        visible={showSelfIssuanceModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSelfIssuanceModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Red Warning/Shield Icon */}
-            <View style={[styles.successIconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <Ionicons name="alert-circle" size={48} color="#EF4444" />
-            </View>
-
-            <Text style={[styles.modalTitle, { color: '#991B1B', marginBottom: 12, textAlign: 'center' }]}>
-              {locale === 'en' ? 'Self-Issuance Blocked' : 'Pengeluaran Sendiri Disekat'}
-            </Text>
-
-            <Text style={{
-              fontSize: 13,
-              fontFamily: 'PlusJakartaSans_600SemiBold',
-              color: '#64748B',
-              textAlign: 'center',
-              lineHeight: 18,
-              marginBottom: 24,
-            }}>
-              {locale === 'en' 
-                ? 'You cannot award stamps or points to your own account. Self-issuance is blocked to ensure system fairness.' 
-                : 'Anda tidak boleh memberikan setem atau mata ganjaran kepada akaun anda sendiri. Pengeluaran sendiri disekat untuk keselamatan sistem.'}
-            </Text>
-
-            <TouchableOpacity
-              style={{
-                width: '100%',
-                backgroundColor: '#DC2626',
-                borderRadius: 16,
-                height: 48,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onPress={() => {
-                setShowSelfIssuanceModal(false);
-                setScanned(false);
-              }}
-              activeOpacity={0.9}
-            >
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                {locale === 'en' ? 'Understood' : 'Faham'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Campaign Inactive Warning Modal */}
-      <Modal
-        visible={showNoCampaignModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowNoCampaignModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Elegant Warning Icon */}
-            <View style={[styles.successIconContainer, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="megaphone-outline" size={40} color="#D97706" />
-            </View>
-
-            <Text style={[styles.modalTitle, { color: '#D97706', marginBottom: 12, textAlign: 'center' }]}>
-              {t('campaign_inactive')}
-            </Text>
-
-            <Text style={{
-              fontSize: 13,
-              fontFamily: 'PlusJakartaSans_600SemiBold',
-              color: '#64748B',
-              textAlign: 'center',
-              lineHeight: 18,
-              marginBottom: 24,
-            }}>
-              {t('campaign_inactive_desc')}
-            </Text>
-
-            {/* Action Buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
-                  backgroundColor: '#FFFFFF',
-                }}
-                onPress={() => setShowNoCampaignModal(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                  {t('close')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: '#000000',
-                  borderRadius: 16,
-                  height: 48,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onPress={() => {
-                  setShowNoCampaignModal(false);
-                  router.push('/(merchant)/rewards' as any);
-                }}
-                activeOpacity={0.9}
-              >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  {t('go_to_rewards')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Simulation Selection Modal */}
-      <Modal
-        visible={showSimulateModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSimulateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { color: '#000000', marginBottom: 12 }]}>Simulate Scan</Text>
-            <Text style={[styles.formSubtitle, { textAlign: 'center', marginBottom: 20 }]}>
-              Select what type of customer QR code you want to simulate scanning:
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.modalCloseBtn, { marginBottom: 12 }]}
-              onPress={async () => {
-                setShowSimulateModal(false);
-                await simulateStampScan();
-              }}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.modalCloseBtnText}>LOYALTY CARD (EARN STAMP)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalCloseBtn, { backgroundColor: '#7C3AED', marginBottom: 12 }]}
-              onPress={async () => {
-                setShowSimulateModal(false);
-                await simulateVoucherScan();
-              }}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.modalCloseBtnText}>VOUCHER CODE (REDEEM)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalCloseBtn, { backgroundColor: '#64748B' }]}
-              onPress={() => setShowSimulateModal(false)}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.modalCloseBtnText}>CANCEL</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -1305,437 +267,223 @@ export default function GiveStampsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Pure clean white matching the theme
+    backgroundColor: '#FFFFFF',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    height: 60,
+    height: 56,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    zIndex: 10,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  headerLogoText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
-  },
-  notifyBtn: {
-    padding: 6,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-    gap: 20,
-  },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 24,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 40,
-    borderRadius: 20,
-    gap: 6,
-  },
-  segmentBtnActive: {
-    backgroundColor: '#000000', // Solid black matching active pills
-  },
-  segmentText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-  },
-  segmentTextActive: {
-    color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
-  },
-  scanWrapper: {
-    width: '100%',
-  },
-  viewfinderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
     padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    gap: 16,
+    paddingBottom: 100,
   },
-  scanTitle: {
-    fontSize: 18,
+  introSection: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
-    textAlign: 'center',
+    marginBottom: 6,
   },
-  scanSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 12,
-  },
-  viewfinderFrame: {
-    width: 200,
-    height: 200,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-  },
-  bracket: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#000000', // Luxury black brackets
-  },
-  topLeftBracket: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 16,
-  },
-  topRightBracket: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 16,
-  },
-  bottomLeftBracket: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 16,
-  },
-  bottomRightBracket: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 16,
-  },
-  qrBgIcon: {
-    opacity: 0.8,
-  },
-  scanIndicatorDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981', // green target indicator
-  },
-  simulateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    height: 44,
-    width: '100%',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  simulateBtnText: {
+  subtitle: {
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-  },
-  tipPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-    width: '100%',
-  },
-  tipText: {
-    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    flex: 1,
+    lineHeight: 19,
   },
-  formCard: {
+  card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 18,
+    padding: 24,
+    marginBottom: 24,
   },
-  formTitle: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-  },
-  formSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  inputGroup: {
-    gap: 6,
+  inputContainer: {
+    marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#94A3B8',
+    color: '#64748B',
     letterSpacing: 0.5,
+    marginBottom: 8,
   },
-  inputWrapper: {
+  inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    height: 48,
-    paddingHorizontal: 16,
-    backgroundColor: '#F8FAFC',
+    height: 52,
+  },
+  inputPrefix: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    paddingHorizontal: 14,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#000000',
+    paddingHorizontal: 8,
+  },
+  generateBtn: {
+    backgroundColor: '#000000',
+    height: 52,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
-  inputWrapperFocused: {
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
+  generateBtnDisabled: {
+    backgroundColor: '#E2E8F0',
   },
-  textInput: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none',
-      } as any,
-    }),
-  },
-  stampControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  controlBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stampCountInput: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-    textAlign: 'center',
-    paddingHorizontal: 12,
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none',
-      } as any,
-    }),
-  },
-  submitBtn: {
-    backgroundColor: '#000000',
-    borderRadius: 16,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    marginTop: 8,
-  },
-  submitBtnText: {
-    fontSize: 14,
+  generateBtnText: {
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
+  // QR Display
+  qrDisplaySection: {
     alignItems: 'center',
-    padding: 24,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    width: '100%',
-    maxWidth: 340,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  successIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#065F46',
-    letterSpacing: 1,
-    marginBottom: 20,
-  },
-  detailsContainer: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+  qrImageWrap: {
     padding: 16,
-    gap: 12,
-    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    marginBottom: 20,
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  detailLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detailValue: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 4,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
-  },
-  stampBadge: {
-    backgroundColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  stampBadgeText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  modalCloseBtn: {
-    backgroundColor: '#000000',
-    borderRadius: 16,
-    height: 50,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCloseBtnText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  permissionContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  qrPlaceholder: {
     backgroundColor: '#F8FAFC',
-    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  permissionText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+  qrInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  qrInfoItem: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  qrInfoLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  qrInfoValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  qrInfoDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#E2E8F0',
+  },
+  qrHint: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 16,
-    lineHeight: 16,
+    lineHeight: 18,
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
-  permissionBtn: {
+  newQrBtn: {
     backgroundColor: '#000000',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    height: 44,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
   },
-  permissionBtnText: {
-    fontSize: 11,
+  newQrBtnText: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  scannedPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 24,
+  // History
+  historySection: {
+    marginBottom: 20,
   },
-  processingText: {
-    fontSize: 11,
+  historyTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 8,
+  },
+  txnList: {
+    gap: 8,
+  },
+  txnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 14,
+  },
+  txnLeft: {
+    flex: 1,
+  },
+  txnCode: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  txnMeta: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    marginTop: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    letterSpacing: 0.5,
   },
 });
