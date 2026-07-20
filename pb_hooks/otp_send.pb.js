@@ -253,6 +253,9 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
 
   const internalUrl = $os.getenv("PB_INTERNAL_URL") || "http://127.0.0.1:8090";
 
+  let otpValid = false;
+
+  // 1. Try built-in PocketBase auth-with-otp endpoint
   try {
     const res = $http.send({
       url: `${internalUrl}/api/collections/users/auth-with-otp`,
@@ -264,11 +267,33 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
       })
     });
 
-    if (res.statusCode >= 400) {
-      return e.json(400, { message: "Invalid or expired OTP code" });
+    if (res.statusCode < 400) {
+      otpValid = true;
+    } else {
+      console.log("auth-with-otp status: " + res.statusCode + ", raw: " + res.raw);
     }
   } catch (err) {
-    return e.json(400, { message: "OTP verification failed: " + err.message });
+    console.log("auth-with-otp error: " + (err.message || err));
+  }
+
+  // 2. Fallback check: lookup _otps collection for this user and code
+  if (!otpValid) {
+    try {
+      const otps = $app.findRecordsByFilter("_otps", `recordRef = '${resetUser.id}'`, "-created", 10, 0);
+      for (let i = 0; i < otps.length; i++) {
+        if (otps[i].getString("password") === otpCode) {
+          otpValid = true;
+          try { $app.delete(otps[i]); } catch (delErr) {}
+          break;
+        }
+      }
+    } catch (fallbackErr) {
+      console.log("Fallback _otps check error: " + (fallbackErr.message || fallbackErr));
+    }
+  }
+
+  if (!otpValid) {
+    return e.json(400, { message: "Invalid or expired OTP code. Please request a new code." });
   }
 
   // Reset password
