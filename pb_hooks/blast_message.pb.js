@@ -450,9 +450,6 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
       return e.json(200, { success: true, message: "Ignored self message" });
     }
 
-    const remoteJid = key.remoteJid || data.remoteJid || data.sender || "";
-    const cleanPhone = remoteJid.split("@")[0].split(":")[0];
-    
     // Safely extract message text from all possible WhatsApp payload structures
     let messageText = "";
     if (typeof data.text === "string") {
@@ -471,6 +468,29 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
       }
     }
     const textMsg = messageText.trim().toUpperCase();
+
+    // Resolve phone number safely (handling WhatsApp LID swap & message text Phone: field)
+    let cleanPhone = "";
+    const phoneMatch = messageText.match(/Phone:\s*\+?(\d+)/i);
+    if (phoneMatch && phoneMatch[1]) {
+      cleanPhone = phoneMatch[1].replace(/[^\d]/g, '');
+    }
+
+    if (!cleanPhone || cleanPhone.length < 8) {
+      const altJid = data.senderAlt || key.participant || data.participant || "";
+      if (altJid && altJid.includes("@s.whatsapp.net")) {
+        cleanPhone = altJid.split("@")[0].split(":")[0];
+      }
+    }
+
+    if (!cleanPhone || cleanPhone.length < 8) {
+      const rawJid = key.remoteJid || data.remoteJid || data.sender || "";
+      cleanPhone = rawJid.split("@")[0].split(":")[0];
+    }
+
+    // Normalize cleanPhone digits (Malaysian 60 country code)
+    if (cleanPhone.startsWith("0")) cleanPhone = "6" + cleanPhone;
+    if (!cleanPhone.startsWith("60") && cleanPhone.length >= 9) cleanPhone = "60" + cleanPhone;
 
     // ── Inbound QR Transaction Processing ──────────────────────────
     // Check if the message contains a TxID (QR transaction code)
