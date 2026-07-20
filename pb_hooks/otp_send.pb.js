@@ -167,6 +167,14 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
   }
 
   // Verify OTP via PocketBase built-in
+  // We need the user's email to confirm the OTP
+  let resetUser;
+  try {
+    resetUser = $app.findFirstRecordByData("users", "phone", phone);
+  } catch (err) {
+    return e.json(404, { message: "User not found" });
+  }
+
   try {
     const res = $http.send({
       url: "http://127.0.0.1:8090/api/collections/users/confirm-otp",
@@ -175,7 +183,7 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
       body: JSON.stringify({
         otpId: otpId,
         password: otpCode,
-        email: "" // will be filled below
+        email: resetUser.getString("email")
       })
     });
 
@@ -186,16 +194,9 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
     return e.json(400, { message: "OTP verification failed: " + err.message });
   }
 
-  // Find user by phone and reset password
-  let user;
-  try {
-    user = $app.findFirstRecordByData("users", "phone", phone);
-  } catch (err) {
-    return e.json(404, { message: "User not found" });
-  }
-
-  user.setPassword(newPassword);
-  $app.save(user);
+  // Reset password
+  resetUser.setPassword(newPassword);
+  $app.save(resetUser);
 
   return e.json(200, { success: true, message: "Password reset successful" });
 });

@@ -80,11 +80,8 @@ export default function OTPScreen() {
   const handleVerify = async (code?: string) => {
     const otpCode = code || otp.join('');
     if (otpCode.length !== OTP_LENGTH) return;
-    setIsLoading(true);
-    setErrorMsg('');
-    // OTP verified — now show new password field
+    // OTP verified — show new password field
     setShowNewPasswordField(true);
-    setIsLoading(false);
   };
 
   const handleResetPassword = async () => {
@@ -238,22 +235,71 @@ export default function OTPScreen() {
                 </View>
               ) : null}
 
-              {/* Verify button */}
-              <TouchableOpacity
-                style={[styles.primaryBtn, filledCount < OTP_LENGTH && styles.primaryBtnDisabled]}
-                onPress={() => handleVerify()}
-                disabled={filledCount < OTP_LENGTH || isLoading}
-                activeOpacity={0.9}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <View style={styles.btnContent}>
-                    <Text style={styles.primaryBtnText}>VERIFY CODE</Text>
-                    <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+              {/* Verify button or New Password form */}
+              {!showNewPasswordField ? (
+                <TouchableOpacity
+                  style={[styles.primaryBtn, filledCount < OTP_LENGTH && styles.primaryBtnDisabled]}
+                  onPress={() => handleVerify()}
+                  disabled={filledCount < OTP_LENGTH || isLoading}
+                  activeOpacity={0.9}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <View style={styles.btnContent}>
+                      <Text style={styles.primaryBtnText}>VERIFY CODE</Text>
+                      <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: '100%', gap: 12, marginTop: 8 }}>
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A', textAlign: 'center' }}>
+                    Set new password
+                  </Text>
+
+                  {/* New Password */}
+                  <View style={styles.inputGroup}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
+                    <TextInput
+                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      placeholder="New password (min 8 chars)"
+                      placeholderTextColor="#BEC6E0"
+                      value={newPassword}
+                      onChangeText={(t) => { setNewPassword(t); setErrorMsg(''); }}
+                      secureTextEntry
+                      autoCapitalize="none"
+                    />
                   </View>
-                )}
-              </TouchableOpacity>
+
+                  {/* Confirm Password */}
+                  <View style={styles.inputGroup}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
+                    <TextInput
+                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      placeholder="Confirm password"
+                      placeholderTextColor="#BEC6E0"
+                      value={confirmNewPassword}
+                      onChangeText={(t) => { setConfirmNewPassword(t); setErrorMsg(''); }}
+                      secureTextEntry
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, (!newPassword || !confirmNewPassword) && styles.primaryBtnDisabled]}
+                    onPress={handleResetPassword}
+                    disabled={!newPassword || !confirmNewPassword || isLoading}
+                    activeOpacity={0.9}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.primaryBtnText}>RESET PASSWORD</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Timer & resend */}
               <View style={styles.resendArea}>
@@ -585,5 +631,22 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#737686',
     opacity: 0.6,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    height: 52,
+    width: '100%',
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#000000',
+    paddingHorizontal: 12,
   },
 });
