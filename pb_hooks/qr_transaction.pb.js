@@ -3,7 +3,7 @@
 
 // ── Generate QR ────────────────────────────────────────────────────
 routerAdd("POST", "/api/risev/qr/generate", (e) => {
-  const auth = e.requestInfo().authRecord;
+  const auth = e.auth || e.requestInfo().authRecord;
   if (!auth) return e.json(401, { message: "Unauthorized" });
 
   const body = e.requestInfo().body;
@@ -15,7 +15,7 @@ routerAdd("POST", "/api/risev/qr/generate", (e) => {
   }
 
   // Find merchant owned by this user
-  const merchants = $app.findRecordsByFilter("merchants", `owner = "${auth.id}"`, "created", 1, 0);
+  const merchants = $app.findRecordsByFilter("merchants", `owner = '${auth.id}'`, "created", 1, 0);
   if (merchants.length === 0) {
     return e.json(404, { message: "Merchant not found" });
   }
@@ -61,7 +61,7 @@ routerAdd("GET", "/api/risev/qr/validate", (e) => {
   }
 
   const txs = $app.findRecordsByFilter("qr_transactions",
-    `tx_code = "${txCode}" && merchant = "${merchantId}"`,
+    `tx_code = '${txCode}' && merchant = '${merchantId}'`,
     "created", 1, 0);
 
   if (txs.length === 0) {
@@ -110,7 +110,7 @@ routerAdd("GET", "/api/risev/qr/validate", (e) => {
 
 // ── Mark QR as sent (customer opened WhatsApp) ─────────────────────
 routerAdd("POST", "/api/risev/qr/mark-sent", (e) => {
-  const auth = e.requestInfo().authRecord;
+  const auth = e.auth || e.requestInfo().authRecord;
   if (!auth) return e.json(401, { message: "Unauthorized" });
 
   const body = e.requestInfo().body;
@@ -118,7 +118,7 @@ routerAdd("POST", "/api/risev/qr/mark-sent", (e) => {
   const customerPhone = body.customer_phone || "";
 
   const txs = $app.findRecordsByFilter("qr_transactions",
-    `tx_code = "${txCode}" && status = "pending"`,
+    `tx_code = '${txCode}' && status = 'pending'`,
     "created", 1, 0);
 
   if (txs.length === 0) {
@@ -155,17 +155,17 @@ routerAdd("GET", "/api/risev/qr/branding", (e) => {
 
 // ── List recent QR transactions for merchant ───────────────────────
 routerAdd("GET", "/api/risev/qr/list", (e) => {
-  const auth = e.requestInfo().authRecord;
+  const auth = e.auth || e.requestInfo().authRecord;
   if (!auth) return e.json(401, { message: "Unauthorized" });
 
-  const merchants = $app.findRecordsByFilter("merchants", `owner = "${auth.id}"`, "created", 1, 0);
+  const merchants = $app.findRecordsByFilter("merchants", `owner = '${auth.id}'`, "created", 1, 0);
   if (merchants.length === 0) {
     return e.json(200, { transactions: [] });
   }
   const merchantId = merchants[0].id;
 
   const txs = $app.findRecordsByFilter("qr_transactions",
-    `merchant = "${merchantId}"`,
+    `merchant = '${merchantId}'`,
     "-created", 20, 0);
 
   const result = txs.map((tx) => ({
