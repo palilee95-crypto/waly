@@ -100,6 +100,13 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [locationRecord, setLocationRecord] = useState<any>(null);
 
+  // Onboarding branding states
+  const [brandingModalVisible, setBrandingModalVisible] = useState(false);
+  const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#000000');
+  const [brandingWelcomeText, setBrandingWelcomeText] = useState('');
+  const [brandingLogoUrl, setBrandingLogoUrl] = useState('');
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+
   // Dedicated Operating Hours Modal States (Individual Days)
   const [hoursModalVisible, setHoursModalVisible] = useState(false);
   const [monHours, setMonHours] = useState('08:00 - 22:00');
@@ -468,6 +475,34 @@ export default function ProfileScreen() {
       }
     };
   }, [editModalVisible]);
+
+  const handleOpenBranding = () => {
+    setBrandingPrimaryColor(merchant?.onboarding_primary_color || '#000000');
+    setBrandingWelcomeText(merchant?.onboarding_welcome_text || '');
+    setBrandingLogoUrl(merchant?.onboarding_logo_url || '');
+    setBrandingModalVisible(true);
+  };
+
+  const handleSaveBranding = async () => {
+    if (!user?.merchant_id) return;
+    setIsSavingBranding(true);
+    try {
+      await pb.collection('merchants').update(user.merchant_id, {
+        onboarding_primary_color: brandingPrimaryColor,
+        onboarding_welcome_text: brandingWelcomeText,
+        onboarding_logo_url: brandingLogoUrl,
+      });
+      // Refresh merchant
+      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+      setMerchant(mRec);
+      setBrandingModalVisible(false);
+      Alert.alert('Saved', 'Onboarding branding updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to save branding.');
+    } finally {
+      setIsSavingBranding(false);
+    }
+  };
 
   const handleOpenEdit = () => {
     setEditStoreName(merchant?.name || user?.name || 'The Coffee House');
@@ -986,6 +1021,14 @@ export default function ProfileScreen() {
               />
             </>
           )}
+          <SettingItem
+            iconName="color-palette-outline"
+            title="Onboarding Setup"
+            subtitle="Customize your customer-facing onboarding page"
+            iconBgColor="#F1F5F9"
+            iconColor="#000000"
+            onPress={handleOpenBranding}
+          />
           <SettingItem
             iconName="notifications-outline"
             title={t('notifications')}
@@ -2015,6 +2058,94 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Onboarding Branding Modal */}
+      <Modal
+        visible={brandingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBrandingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.editModalCard, { maxHeight: '85%' }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>Onboarding Setup</Text>
+              <TouchableOpacity onPress={() => setBrandingModalVisible(false)}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* Primary Color */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.inputLabel}>PRIMARY COLOR</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: brandingPrimaryColor, borderWidth: 1.5, borderColor: '#E2E8F0' }} />
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
+                    <TextInput
+                      style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                      value={brandingPrimaryColor}
+                      onChangeText={setBrandingPrimaryColor}
+                      placeholder="#000000"
+                      placeholderTextColor="#BEC6E0"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 6 }}>
+                  Used for buttons and highlights on the customer onboarding page.
+                </Text>
+              </View>
+
+              {/* Welcome Text */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.inputLabel}>WELCOME TEXT</Text>
+                <View style={{ marginTop: 8, backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, minHeight: 80, paddingHorizontal: 12, paddingVertical: 8 }}>
+                  <TextInput
+                    style={{ flex: 1, minHeight: 80, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', textAlignVertical: 'top', ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                    value={brandingWelcomeText}
+                    onChangeText={setBrandingWelcomeText}
+                    placeholder="Welcome to our loyalty program! Scan to earn stamps."
+                    placeholderTextColor="#BEC6E0"
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              </View>
+
+              {/* Logo URL */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.inputLabel}>LOGO URL (optional)</Text>
+                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                    value={brandingLogoUrl}
+                    onChangeText={setBrandingLogoUrl}
+                    placeholder="https://example.com/logo.png"
+                    placeholderTextColor="#BEC6E0"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[styles.updateBtn, isSavingBranding && { opacity: 0.6 }]}
+                onPress={handleSaveBranding}
+                disabled={isSavingBranding}
+                activeOpacity={0.8}
+              >
+                {isSavingBranding ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.updateBtnText}>Save Branding</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>

@@ -126,6 +126,25 @@ routerAdd("POST", "/api/risev/qr/mark-sent", (e) => {
   return e.json(200, { success: true });
 });
 
+// ── Public merchant branding (for /join page) ──────────────────────
+routerAdd("GET", "/api/risev/qr/branding", (e) => {
+  const query = e.requestInfo().query;
+  const merchantId = query.m || "";
+  if (!merchantId) return e.json(400, { message: "Missing merchant ID" });
+
+  try {
+    const merchant = $app.findRecordById("merchants", merchantId);
+    return e.json(200, {
+      merchantName: merchant.getString("name") || "",
+      primaryColor: merchant.getString("onboarding_primary_color") || "#000000",
+      welcomeText: merchant.getString("onboarding_welcome_text") || "",
+      logoUrl: merchant.getString("onboarding_logo_url") || "",
+    });
+  } catch (err) {
+    return e.json(404, { message: "Merchant not found" });
+  }
+});
+
 // ── List recent QR transactions for merchant ───────────────────────
 routerAdd("GET", "/api/risev/qr/list", (e) => {
   const auth = e.requestInfo().authRecord;
