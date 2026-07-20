@@ -69,9 +69,15 @@ export default function LoginScreen() {
     if (!isValid) return;
     setIsLoading(true);
     try {
-      const res = await checkPhone(getFullPhone());
+      const fullPhone = getFullPhone();
+      const res = await checkPhone(fullPhone);
       if (res.exists) {
-        // User exists, go to password login
+        // Pre-fill user email/phone identifier for password login
+        if (res.email) {
+          setEmail(res.email);
+        } else {
+          setEmail(fullPhone);
+        }
         setStep('password');
       } else {
         // New user, show registration inputs
@@ -272,6 +278,7 @@ export default function LoginScreen() {
                         }}
                         secureTextEntry
                         autoCapitalize="none"
+                        autoFocus={step === 'password'}
                         onFocus={() => setPasswordFocused(true)}
                         onBlur={() => setPasswordFocused(false)}
                       />
