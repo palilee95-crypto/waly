@@ -87,7 +87,7 @@ interface AuthContextType {
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
   checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string }>;
-  register: (phone: string, email: string, name: string, password: string, role: UserRole) => Promise<string>;
+  register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<string>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -240,10 +240,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (phone: string, email: string, name: string, password: string, role: UserRole): Promise<string> => {
+  const register = async (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string): Promise<string> => {
+    const body: any = { phone, email, name, password, role };
+    if (birthday) body.birthday = birthday;
     const res = await pb.send<{ otpId: string }>('/api/risev/register', {
       method: 'POST',
-      body: { phone, email, name, password, role }
+      body,
     });
     return res.otpId;
   };

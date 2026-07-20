@@ -50,11 +50,13 @@ export default function LoginScreen() {
   const [step, setStep] = useState<'phone' | 'register' | 'password'>('phone');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [birthday, setBirthday] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
   const [emailFocused, setEmailFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
+  const [birthdayFocused, setBirthdayFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -87,17 +89,46 @@ export default function LoginScreen() {
   };
 
   const handleRegister = async () => {
-    if (!email || !name || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields.');
+    if (!email || !name || !password || !confirmPassword || !birthday) {
+      Alert.alert('Error', 'Please fill in all fields including birthday.');
       return;
     }
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match.');
       return;
     }
+    // Validate birthday format YYYY-MM-DD and reasonable age
+    const birthdayRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!birthdayRegex.test(birthday)) {
+      Alert.alert('Error', 'Please enter birthday as YYYY-MM-DD.');
+      return;
+    }
+    const [year, month, day] = birthday.split('-').map(Number);
+    const birthDate = new Date(year, month - 1, day);
+    if (
+      birthDate.getFullYear() !== year ||
+      birthDate.getMonth() !== month - 1 ||
+      birthDate.getDate() !== day
+    ) {
+      Alert.alert('Error', 'Please enter a valid birthday date.');
+      return;
+    }
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    if (today.getMonth() < month - 1 || (today.getMonth() === month - 1 && today.getDate() < day)) {
+      age--;
+    }
+    if (age < 13) {
+      Alert.alert('Error', 'You must be at least 13 years old to use Risev.');
+      return;
+    }
+    if (year < 1900 || age > 120) {
+      Alert.alert('Error', 'Please enter a valid birthday.');
+      return;
+    }
     setIsLoading(true);
     try {
-      const otpId = await register(getFullPhone(), email, name, password, role);
+      const otpId = await register(getFullPhone(), email, name, password, role, birthday);
       router.push({ 
         pathname: '/(auth)/otp', 
         params: { phone: getFullPhone(), otpId: otpId, role: role } 
@@ -305,6 +336,36 @@ export default function LoginScreen() {
                         autoCapitalize="none"
                         onFocus={() => setEmailFocused(true)}
                         onBlur={() => setEmailFocused(false)}
+                      />
+                    </View>
+
+                    <Text style={styles.inputLabel}>DATE OF BIRTH</Text>
+                    <View style={[styles.inputGroup, birthdayFocused && styles.inputGroupFocused]}>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
+                        ]}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor="#BEC6E0"
+                        value={birthday}
+                        onChangeText={(text) => {
+                          // Auto-format as user types: YYYY-MM-DD
+                          let cleaned = text.replace(/[^0-9]/g, '');
+                          let formatted = cleaned;
+                          if (cleaned.length >= 4) {
+                            formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+                          }
+                          if (cleaned.length >= 6) {
+                            formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
+                          }
+                          setBirthday(formatted.slice(0, 10));
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={10}
+                        autoCapitalize="none"
+                        onFocus={() => setBirthdayFocused(true)}
+                        onBlur={() => setBirthdayFocused(false)}
                       />
                     </View>
 

@@ -31,6 +31,8 @@ type VoucherItem = {
   status: 'active' | 'used';
   rawStatus: 'active' | 'used' | 'expired';
   color: string;
+  isBirthday?: boolean;
+  merchantId?: string;
 };
 
 export default function VouchersScreen() {
@@ -40,16 +42,26 @@ export default function VouchersScreen() {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
   const [useModalVisible, setUseModalVisible] = useState(false);
   const [vouchers, setVouchers] = useState<VoucherItem[]>([]);
+  const [birthdayRewards, setBirthdayRewards] = useState<VoucherItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchVouchers = async () => {
     if (!user) return;
     try {
-      const records = await pb.collection('vouchers').getFullList({
-        filter: `customer = '${user.id}'`,
-        expand: 'reward,reward.merchant',
-        sort: '-created'
-      });
+      const [records, birthdayLogs] = await Promise.all([
+        pb.collection('vouchers').getFullList({
+          filter: `customer = '${user.id}'`,
+          expand: 'reward,reward.merchant',
+          sort: '-created'
+        }),
+        pb.collection('birthday_logs').getFullList({
+          filter: `customer = '${user.id}' && status = 'sent'`,
+          expand: 'voucher,merchant',
+          sort: '-created',
+          requestKey: null,
+        }),
+      ]);
+
       const mapped = records.map((rec: any) => {
         const reward = rec.expand?.reward;
         const merchant = reward?.expand?.merchant;
@@ -76,6 +88,34 @@ export default function VouchersScreen() {
         };
       });
       setVouchers(mapped);
+
+      const birthdayMapped = birthdayLogs
+        .filter((log: any) => log.expand?.voucher)
+        .map((log: any) => {
+          const voucher = log.expand.voucher;
+          const merchant = log.expand?.merchant;
+          const expiresAt = voucher.expires_at || voucher.valid_until;
+          return {
+            id: voucher.id,
+            merchantName: merchant?.name || 'Unknown Merchant',
+            category: merchant?.category || 'General',
+            logo: merchant?.logo
+              ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
+              : 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?auto=format&fit=crop&q=80&w=120',
+            title: voucher.title || 'Birthday Reward',
+            subtitle: voucher.description || 'Birthday treat',
+            code: voucher.code || 'CODE-PENDING',
+            expiry: expiresAt
+              ? `Valid until ${new Date(expiresAt).toLocaleDateString()}`
+              : 'No expiry',
+            status: 'active' as const,
+            rawStatus: voucher.status as 'active' | 'used' | 'expired',
+            color: '#000000',
+            isBirthday: true,
+            merchantId: merchant?.id,
+          };
+        });
+      setBirthdayRewards(birthdayMapped);
     } catch (err) {
       console.warn('Failed to fetch vouchers:', err);
     } finally {
@@ -161,6 +201,51 @@ export default function VouchersScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Birthday Rewards Section */}
+          {activeTab === 'active' && birthdayRewards.length > 0 && (
+            <View style={styles.birthdaySection}>
+              <View style={styles.birthdaySectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="gift-outline" size={16} color="#0F172A" />
+                  <Text style={styles.birthdaySectionTitle}>Birthday Rewards</Text>
+                </View>
+                <Text style={styles.birthdaySectionMeta}>{birthdayRewards[0]?.expiry || ''}</Text>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.birthdayScrollContent}
+              >
+                {birthdayRewards.map((item) => (
+                  <View key={item.id} style={styles.birthdayCard}>
+                    <View style={styles.birthdayCardHeader}>
+                      <Image source={{ uri: item.logo }} style={styles.birthdayMerchantLogo} />
+                      <Text style={styles.birthdayMerchantName} numberOfLines={1}>{item.merchantName}</Text>
+                    </View>
+
+                    <Text style={styles.birthdayCardTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={styles.birthdayCardExpiry}>{item.expiry}</Text>
+
+                    <View style={styles.birthdayCodeRow}>
+                      <View style={styles.birthdayCodeBox}>
+                        <Text style={styles.birthdayCodeLabel}>CODE</Text>
+                        <Text style={styles.birthdayCodeValue}>{item.code}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.birthdayQrBtn}
+                        onPress={() => handleUseVoucher(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Dotted Ticket-Style Voucher Cards List */}
           <View style={styles.vouchersList}>
@@ -391,6 +476,103 @@ const styles = StyleSheet.create({
   // Dotted Ticket-Style Voucher Cards
   vouchersList: {
     gap: 20,
+  },
+  birthdaySection: {
+    marginBottom: 24,
+  },
+  birthdaySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  birthdaySectionTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  birthdaySectionMeta: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  birthdayScrollContent: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  birthdayCard: {
+    width: 260,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+  },
+  birthdayCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  birthdayMerchantLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  birthdayMerchantName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  birthdayCardTitle: {
+    fontSize: 17,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  birthdayCardExpiry: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  birthdayCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  birthdayCodeBox: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+  },
+  birthdayCodeLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  birthdayCodeValue: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  birthdayQrBtn: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#000000',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ticketCard: {
     flexDirection: 'row',

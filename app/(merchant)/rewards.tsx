@@ -101,7 +101,7 @@ export default function UnifiedRewardsScreen() {
   const fontColorInputRef = React.useRef<any>(null);
 
   // Sub-tabs Selection
-  const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'points_tiers'>('catalogue');
+  const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'points_tiers' | 'birthday'>('catalogue');
 
   // Shared Loading & Authorization States
   const [merchant, setMerchant] = useState<any>(null);
@@ -112,6 +112,22 @@ export default function UnifiedRewardsScreen() {
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
+
+  // Tab 4: Birthday Rewards
+  const [birthdayReward, setBirthdayReward] = useState<any>(null);
+  const [loadingBirthday, setLoadingBirthday] = useState(false);
+  const [birthdayForm, setBirthdayForm] = useState({
+    title: '',
+    description: '',
+    reward_type: 'voucher_code' as 'voucher_code' | 'stamps' | 'discount_percent' | 'free_item',
+    reward_value: '',
+    message_template: 'Happy Birthday {{name}}! {{merchant}} has a special treat for you: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}.',
+    message_template_b: '',
+    expiry_days: '7',
+    send_time: '09:00',
+    is_active: true,
+  });
+  const [savingBirthday, setSavingBirthday] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPointsCost, setFormPointsCost] = useState('100');
@@ -207,10 +223,101 @@ export default function UnifiedRewardsScreen() {
     }
   };
 
+  const fetchBirthdayReward = async () => {
+    if (!user || !user.merchant_id) return;
+    try {
+      setLoadingBirthday(true);
+      const records = await pb.collection('birthday_rewards').getFullList({
+        filter: `merchant = "${user.merchant_id}"`,
+        sort: '-created',
+        requestKey: null,
+      });
+      if (records.length > 0) {
+        const rec = records[0];
+        setBirthdayReward(rec);
+        setBirthdayForm({
+          title: rec.title || '',
+          description: rec.description || '',
+          reward_type: rec.reward_type || 'voucher_code',
+          reward_value: rec.reward_value ? String(rec.reward_value) : '',
+          message_template: rec.message_template || '',
+          message_template_b: rec.message_template_b || '',
+          expiry_days: rec.expiry_days ? String(rec.expiry_days) : '7',
+          send_time: rec.send_time || '09:00',
+          is_active: rec.is_active ?? true,
+        });
+      } else {
+        setBirthdayReward(null);
+      }
+    } catch (err: any) {
+      console.warn("Failed to fetch birthday reward:", err.message || err);
+    } finally {
+      setLoadingBirthday(false);
+    }
+  };
+
   useEffect(() => {
     fetchMerchantAndProgram();
     fetchRewards();
+    fetchBirthdayReward();
   }, [user]);
+
+  // Tab 4: Birthday Rewards Handlers
+  const handleSaveBirthday = async () => {
+    if (!user || !user.merchant_id) return;
+    if (!birthdayForm.title.trim()) {
+      Alert.alert('Validation Error', 'Please enter a reward title.');
+      return;
+    }
+    if (!birthdayForm.reward_value.trim()) {
+      Alert.alert('Validation Error', 'Please enter a reward value.');
+      return;
+    }
+    if (!birthdayForm.message_template.trim()) {
+      Alert.alert('Validation Error', 'Please enter a WhatsApp message template.');
+      return;
+    }
+    const expiryDays = parseInt(birthdayForm.expiry_days, 10);
+    if (isNaN(expiryDays) || expiryDays < 1) {
+      Alert.alert('Validation Error', 'Expiry must be at least 1 day.');
+      return;
+    }
+    const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+    if (!timeRegex.test(birthdayForm.send_time)) {
+      Alert.alert('Validation Error', 'Send time must be HH:MM (e.g. 09:00).');
+      return;
+    }
+
+    setSavingBirthday(true);
+    try {
+      const payload = {
+        merchant: user.merchant_id,
+        title: birthdayForm.title.trim(),
+        description: birthdayForm.description.trim(),
+        reward_type: birthdayForm.reward_type,
+        reward_value: birthdayForm.reward_value.trim(),
+        message_template: birthdayForm.message_template.trim(),
+        message_template_b: birthdayForm.message_template_b.trim() || null,
+        expiry_days: expiryDays,
+        send_time: birthdayForm.send_time,
+        is_active: birthdayForm.is_active,
+      };
+
+      if (birthdayReward) {
+        await pb.collection('birthday_rewards').update(birthdayReward.id, payload, { requestKey: null });
+        Alert.alert('Success', 'Birthday reward updated.');
+      } else {
+        await pb.collection('birthday_rewards').create(payload, { requestKey: null });
+        Alert.alert('Success', 'Birthday reward created.');
+      }
+      fetchBirthdayReward();
+    } catch (err: any) {
+      console.warn('Failed to save birthday reward:', err.message || err);
+      Alert.alert('Error', err.message || 'Failed to save birthday reward.');
+    } finally {
+      setSavingBirthday(false);
+    }
+  };
 
   // Tab 1: Catalogue Handlers
   const handleOpenCreate = () => {
@@ -580,6 +687,15 @@ export default function UnifiedRewardsScreen() {
           >
             <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
               {t('points_tiers_tab')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabBtn, activeTab === 'birthday' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('birthday')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'birthday' && styles.tabBtnTextActive]}>
+              Birthday
             </Text>
           </TouchableOpacity>
         </View>
@@ -1190,10 +1306,174 @@ export default function UnifiedRewardsScreen() {
                 {t('why_tiers_matter_desc')}
               </Text>
             </View>
-
           </View>
         )}
-      </ScrollView>
+
+        {/* TAB 4: Birthday Rewards */}
+        {activeTab === 'birthday' && (
+            <View style={{ marginTop: 12, gap: 16 }}>
+              <View style={styles.configCard}>
+                <View style={styles.cardSectionHeader}>
+                  <Ionicons name="gift-outline" size={22} color="#0F172A" />
+                  <Text style={styles.cardSectionTitle}>Birthday Rewards</Text>
+                </View>
+                <Text style={styles.cardSectionDesc}>
+                  Automatically send a WhatsApp reward to customers on their birthday.
+                </Text>
+
+                {loadingBirthday ? (
+                  <ActivityIndicator size="small" color="#000000" style={{ marginVertical: 20 }} />
+                ) : (
+                  <>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Reward Title</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={birthdayForm.title}
+                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, title: text }))}
+                        placeholder="e.g. Free Birthday Drink"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Description</Text>
+                      <TextInput
+                        style={[styles.textInput, { height: 72, textAlignVertical: 'top' }]}
+                        value={birthdayForm.description}
+                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, description: text }))}
+                        placeholder="e.g. Claim a free hot drink on your birthday."
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                        numberOfLines={3}
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Reward Type</Text>
+                      <View style={styles.typeChipRow}>
+                        {[
+                          { label: 'Voucher Code', value: 'voucher_code' },
+                          { label: 'Free Item', value: 'free_item' },
+                          { label: 'Discount %', value: 'discount_percent' },
+                          { label: 'Bonus Stamps', value: 'stamps' },
+                        ].map((opt) => (
+                          <TouchableOpacity
+                            key={opt.value}
+                            style={[styles.typeChip, birthdayForm.reward_type === opt.value && styles.typeChipActive]}
+                            onPress={() => setBirthdayForm((f) => ({ ...f, reward_type: opt.value as any }))}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.typeChipText, birthdayForm.reward_type === opt.value && styles.typeChipTextActive]}>
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>
+                        {birthdayForm.reward_type === 'discount_percent' ? 'Discount Percentage' :
+                         birthdayForm.reward_type === 'stamps' ? 'Stamps to Add' : 'Reward Value / Code'}
+                      </Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={birthdayForm.reward_value}
+                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, reward_value: text }))}
+                        placeholder={birthdayForm.reward_type === 'voucher_code' ? "e.g. BDAY2026" : "e.g. 10"}
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+
+                    <View style={styles.twoColumnInputs}>
+                      <View style={[styles.inputContainer, { flex: 1 }]}>
+                        <Text style={styles.inputLabel}>Expiry (days)</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          value={birthdayForm.expiry_days}
+                          onChangeText={(text) => setBirthdayForm((f) => ({ ...f, expiry_days: text.replace(/[^0-9]/g, '') }))}
+                          placeholder="7"
+                          placeholderTextColor="#94A3B8"
+                          keyboardType="number-pad"
+                        />
+                      </View>
+                      <View style={[styles.inputContainer, { flex: 1 }]}>
+                        <Text style={styles.inputLabel}>Send Time</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          value={birthdayForm.send_time}
+                          onChangeText={(text) => {
+                            let cleaned = text.replace(/[^0-9:]/g, '');
+                            if (cleaned.length >= 3 && !cleaned.includes(':')) {
+                              cleaned = cleaned.slice(0, 2) + ':' + cleaned.slice(2, 4);
+                            }
+                            setBirthdayForm((f) => ({ ...f, send_time: cleaned.slice(0, 5) }));
+                          }}
+                          placeholder="09:00"
+                          placeholderTextColor="#94A3B8"
+                          maxLength={5}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>WhatsApp Message Template</Text>
+                      <TextInput
+                        style={[styles.textInput, { height: 96, textAlignVertical: 'top' }]}
+                        value={birthdayForm.message_template}
+                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, message_template: text }))}
+                        placeholder="Happy Birthday {{name}}! {{merchant}} has a special treat: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}."
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                        numberOfLines={4}
+                      />
+                      <Text style={styles.helpText}>
+                        Variables: {'{{name}}'}, {'{{merchant}}'}, {'{{title}}'}, {'{{code}}'}, {'{{expiry}}'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Message Template B (for A/B testing)</Text>
+                      <TextInput
+                        style={[styles.textInput, { height: 96, textAlignVertical: 'top' }]}
+                        value={birthdayForm.message_template_b}
+                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, message_template_b: text }))}
+                        placeholder="Optional alternate message. Leave blank to disable A/B test."
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                        numberOfLines={4}
+                      />
+                    </View>
+
+                    <View style={styles.switchRow}>
+                      <Text style={styles.switchLabel}>Active</Text>
+                      <Switch
+                        value={birthdayForm.is_active}
+                        onValueChange={(value) => setBirthdayForm((f) => ({ ...f, is_active: value }))}
+                        trackColor={{ false: '#E2E8F0', true: '#000000' }}
+                        thumbColor="#FFFFFF"
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.saveSubmitBtn, savingBirthday && { opacity: 0.6 }]}
+                      onPress={handleSaveBirthday}
+                      disabled={savingBirthday}
+                      activeOpacity={0.8}
+                    >
+                      {savingBirthday ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.saveSubmitBtnText}>{birthdayReward ? 'Update Birthday Reward' : 'Create Birthday Reward'}</Text>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+          )}
+        </ScrollView>
 
       {/* Save Reward Modal */}
       <Modal
@@ -1659,6 +1939,12 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
     marginBottom: 4,
+  },
+  cardSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   cardSectionDesc: {
     fontSize: 11,
@@ -2446,6 +2732,35 @@ const styles = StyleSheet.create({
   },
   typeSelectTextActive: {
     color: '#FFFFFF',
+  },
+  typeChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  typeChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  typeChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  typeChipTextActive: {
+    color: '#FFFFFF',
+  },
+  twoColumnInputs: {
+    flexDirection: 'row',
+    gap: 12,
   },
   switchRow: {
     flexDirection: 'row',

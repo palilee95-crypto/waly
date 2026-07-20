@@ -19,9 +19,10 @@ routerAdd("POST", "/api/risev/register", (e) => {
   const name = body.name || '';
   const password = body.password || '';
   const role = body.role || 'customer';
+  const birthday = body.birthday || '';
 
-  if (!phone || !email || !password) {
-    return e.json(400, { message: "phone, email, and password are required" });
+  if (!phone || !email || !password || !birthday) {
+    return e.json(400, { message: "phone, email, password, and birthday are required" });
   }
 
   // Verify if phone is already taken
@@ -48,6 +49,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
     user.set("email", email);
     user.set("name", name || `User ${phone.slice(-4)}`);
     user.set("role", role);
+    user.set("birthday", birthday);
     user.setPassword(password);
     $app.save(user);
 
