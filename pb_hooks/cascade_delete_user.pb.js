@@ -75,20 +75,17 @@ onRecordDelete((e) => {
     }
 
     // ---- Step 4: Delete user-dependent records (no merchant dependency) ----
+    // Removed deleted collections: notifications, push_tokens, user_badges,
+    // user_challenges, streaks, tier_history
     const userDependents = [
-        { collection: "notifications", field: "recipient" },
-        { collection: "push_tokens", field: "user" },
         { collection: "redemptions", field: "customer" },
         { collection: "loyalty_cards", field: "customer" },
         { collection: "transactions", field: "customer" },
-        { collection: "user_badges", field: "user" },
-        { collection: "user_challenges", field: "user" },
         { collection: "vouchers", field: "customer" },
-        { collection: "streaks", field: "user" },
-        { collection: "tier_history", field: "user" },
         { collection: "fraud_flags", field: "user" },
         { collection: "follow_up_logs", field: "customer" },
         { collection: "follow_up_members", field: "customer" },
+        { collection: "qr_transactions", field: "customer" },
     ];
 
     for (const dep of userDependents) {
