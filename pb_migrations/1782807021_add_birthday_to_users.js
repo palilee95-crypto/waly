@@ -1,22 +1,23 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
-  // Add birthday field to existing users auth collection
-  const users = app.findCollectionByNameOrId("users");
+  const collection = app.findCollectionByNameOrId("_pb_users_auth_")
 
-  users.fields.addAt(
-    users.fields.length - 2, // insert before autodate updated
-    new SchemaField({
-      id: "date_birthday_user",
-      name: "birthday",
-      type: "date",
-      system: false,
-      required: true,
+  collection.fields.addAt(
+    collection.fields.length - 2,
+    new Field({
+      "id": "date_birthday_user",
+      "name": "birthday",
+      "type": "date",
+      "system": false,
+      "required": true,
+      "presentable": false,
+      "onlyDate": true
     })
-  );
+  )
 
-  return app.save(users);
+  return app.save(collection)
 }, (app) => {
-  const users = app.findCollectionByNameOrId("users");
-  users.fields.removeById("date_birthday_user");
-  return app.save(users);
-});
+  const collection = app.findCollectionByNameOrId("_pb_users_auth_")
+  collection.fields.removeById("date_birthday_user")
+  return app.save(collection)
+})

@@ -1,15 +1,7 @@
-const createNotification = (recipientId, title, body, type, data = {}) => {
-  const col = $app.findCollectionByNameOrId('notifications');
-  const n = new Record(col);
-  n.set('recipient', recipientId);
-  n.set('title', title);
-  n.set('body', body);
-  n.set('type', type);
-  n.set('is_read', false);
-  n.set('data', data);
-  $app.save(n);
-};
+// Stub — notifications collection was deleted in cleanup migration.
+// Kept as no-op to avoid require() crashes in hooks that still import it.
+function createNotification() {
+  // no-op
+}
 
-module.exports = {
-  createNotification,
-};
+module.exports = { createNotification };

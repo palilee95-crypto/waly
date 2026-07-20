@@ -1,92 +1,125 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
   const collection = new Collection({
-    id: "pbc_bday_rewards",
-    name: "birthday_rewards",
-    type: "base",
-    system: false,
-    listRule: "merchant.owner = @request.auth.id",
-    viewRule: "merchant.owner = @request.auth.id",
-    createRule: "@request.auth.id != ''",
-    updateRule: "merchant.owner = @request.auth.id",
-    deleteRule: "merchant.owner = @request.auth.id",
-    options: {},
-    fields: [
-      { id: "id", name: "id", type: "text", system: true, required: true, primaryKey: true },
-      { id: "created", name: "created", type: "autodate", system: true, onCreate: true, onUpdate: false },
-      { id: "updated", name: "updated", type: "autodate", system: true, onCreate: true, onUpdate: true },
+    "id": "pbc_bday_rewards",
+    "name": "birthday_rewards",
+    "type": "base",
+    "system": false,
+    "listRule": "merchant.owner = @request.auth.id",
+    "viewRule": "merchant.owner = @request.auth.id",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "merchant.owner = @request.auth.id",
+    "deleteRule": "merchant.owner = @request.auth.id",
+    "options": {},
+    "fields": [
       {
-        id: "rel_merchant",
-        name: "merchant",
-        type: "relation",
-        required: true,
-        collectionId: "pbc_merchants00",
-        cascadeDelete: true,
-        maxSelect: 1,
+        "id": "text_id_bday_rw",
+        "name": "id",
+        "type": "text",
+        "system": true,
+        "required": true,
+        "primaryKey": true
       },
       {
-        id: "sel_reward_type",
-        name: "reward_type",
-        type: "select",
-        required: true,
-        values: ["voucher_code", "stamps", "discount_percent", "free_item"],
+        "id": "autodate_created_brw",
+        "name": "created",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": false
       },
       {
-        id: "num_reward_value",
-        name: "reward_value",
-        type: "number",
-        required: false,
-        min: 0,
+        "id": "autodate_updated_brw",
+        "name": "updated",
+        "type": "autodate",
+        "system": true,
+        "onCreate": true,
+        "onUpdate": true
       },
       {
-        id: "text_title",
-        name: "title",
-        type: "text",
-        required: true,
+        "id": "rel_merchant_brw",
+        "name": "merchant",
+        "type": "relation",
+        "system": false,
+        "required": true,
+        "collectionId": "pbc_merchants00",
+        "cascadeDelete": true,
+        "minSelect": 0,
+        "maxSelect": 1,
+        "displayFields": null
       },
       {
-        id: "text_description",
-        name: "description",
-        type: "text",
-        required: false,
+        "id": "sel_rw_type_brw",
+        "name": "reward_type",
+        "type": "select",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "values": ["voucher_code", "stamps", "discount_percent", "free_item"]
       },
       {
-        id: "text_message_template",
-        name: "message_template",
-        type: "text",
-        required: true,
+        "id": "text_rw_value_brw",
+        "name": "reward_value",
+        "type": "text",
+        "system": false,
+        "required": false
       },
       {
-        id: "text_template_b",
-        name: "message_template_b",
-        type: "text",
-        required: false,
+        "id": "text_title_brw",
+        "name": "title",
+        "type": "text",
+        "system": false,
+        "required": true
       },
       {
-        id: "num_expiry_days",
-        name: "expiry_days",
-        type: "number",
-        required: true,
-        min: 1,
-        max: 365,
+        "id": "text_desc_brw",
+        "name": "description",
+        "type": "text",
+        "system": false,
+        "required": false
       },
       {
-        id: "text_send_time",
-        name: "send_time",
-        type: "text",
-        required: true,
+        "id": "text_msg_tpl_brw",
+        "name": "message_template",
+        "type": "text",
+        "system": false,
+        "required": true
       },
       {
-        id: "bool_is_active",
-        name: "is_active",
-        type: "bool",
-        required: false,
+        "id": "text_msg_tpl_b_brw",
+        "name": "message_template_b",
+        "type": "text",
+        "system": false,
+        "required": false
       },
-    ],
-  });
+      {
+        "id": "num_expiry_days_brw",
+        "name": "expiry_days",
+        "type": "number",
+        "system": false,
+        "required": true,
+        "min": 1,
+        "max": 365
+      },
+      {
+        "id": "text_send_time_brw",
+        "name": "send_time",
+        "type": "text",
+        "system": false,
+        "required": true
+      },
+      {
+        "id": "bool_is_active_brw",
+        "name": "is_active",
+        "type": "bool",
+        "system": false,
+        "required": false
+      }
+    ]
+  })
 
-  return app.save(collection);
+  return app.save(collection)
 }, (app) => {
-  const collection = app.findCollectionByNameOrId("pbc_bday_rewards");
-  return app.delete(collection);
-});
+  const collection = app.findCollectionByNameOrId("pbc_bday_rewards")
+  return app.delete(collection)
+})
