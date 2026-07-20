@@ -65,18 +65,14 @@ export default function LoginScreen() {
   const getFullPhone = () => `${COUNTRY_CODE}${phone}`;
   const isValid = phone.length >= 9;
 
-  const handleSendOTP = async () => {
+  const handleGetStarted = async () => {
     if (!isValid) return;
     setIsLoading(true);
     try {
       const res = await checkPhone(getFullPhone());
       if (res.exists) {
-        // User exists, request OTP and proceed
-        const otpId = await requestOTP(getFullPhone());
-        router.push({ 
-          pathname: '/(auth)/otp', 
-          params: { phone: getFullPhone(), otpId: otpId, role: role } 
-        });
+        // User exists, go to password login
+        setStep('password');
       } else {
         // New user, show registration inputs
         setStep('register');
@@ -250,7 +246,7 @@ export default function LoginScreen() {
                         editable={step === 'phone'}
                         autoFocus={step === 'phone'}
                         returnKeyType="done"
-                        onSubmitEditing={handleSendOTP}
+                        onSubmitEditing={handleGetStarted}
                         onFocus={() => setIsFocused(true)}
                         onBlur={() => setIsFocused(false)}
                       />
@@ -301,6 +297,34 @@ export default function LoginScreen() {
                         onBlur={() => setPasswordFocused(false)}
                       />
                     </View>
+
+                    {/* Forgot Password Link */}
+                    <TouchableOpacity
+                      onPress={async () => {
+                        if (!phone) {
+                          Alert.alert('Info', 'Please enter your phone number first.');
+                          setStep('phone');
+                          return;
+                        }
+                        try {
+                          setIsLoading(true);
+                          const otpId = await requestOTP(getFullPhone());
+                          router.push({
+                            pathname: '/(auth)/otp',
+                            params: { phone: getFullPhone(), otpId: otpId, role: role }
+                          });
+                        } catch (e: any) {
+                          Alert.alert('Error', e?.message || 'Failed to send OTP.');
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      style={{ alignSelf: 'flex-end', marginTop: 8 }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        Forgot Password?
+                      </Text>
+                    </TouchableOpacity>
                   </>
                 )}
 
@@ -420,10 +444,10 @@ export default function LoginScreen() {
                       </Text>
                     </View>
 
-                    {/* Primary Action Button (Holographic Blue style) */}
+                    {/* Primary Action Button */}
                     <TouchableOpacity
                       style={[styles.primaryBtn, !isValid && styles.primaryBtnDisabled]}
-                      onPress={handleSendOTP}
+                      onPress={handleGetStarted}
                       disabled={!isValid || isLoading}
                       activeOpacity={0.9}
                     >
