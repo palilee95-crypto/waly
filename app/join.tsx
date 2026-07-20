@@ -98,10 +98,11 @@ export default function JoinScreen() {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      // Format phone with +60
-      let phone = phoneInput.trim().replace(/\s/g, '');
-      if (phone.startsWith('01')) phone = '6' + phone;
-      if (!phone.startsWith('6')) phone = '60' + phone.replace(/^0/, '');
+      // Format phone with +60 prefix (e.g. +60123456789)
+      let digits = phoneInput.trim().replace(/\D/g, '');
+      if (digits.startsWith('0')) digits = '6' + digits;
+      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+      const phone = '+' + digits;
 
       const res = await checkPhone(phone);
       if (res.exists) {
@@ -192,7 +193,9 @@ export default function JoinScreen() {
 
     // Open WhatsApp with pre-filled message
     const message = buildWhatsAppMessage();
-    const cleanPhone = merchantPhone.replace(/[^\d]/g, '');
+    let cleanPhone = merchantPhone.replace(/[^\d]/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = '6' + cleanPhone;
+    if (!cleanPhone.startsWith('60') && cleanPhone.length >= 9) cleanPhone = '60' + cleanPhone;
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
     if (Platform.OS === 'web') {

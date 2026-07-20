@@ -1,6 +1,12 @@
 onRecordAfterCreateSuccess((e) => {
   if (e.record.get('type') !== 'earn') return e.next();
 
+  // Skip duplicate notification if transaction was created by inbound QR webhook (which sends its own auto-reply)
+  const metadata = e.record.get('metadata') || {};
+  if (metadata.source === 'qr_inbound') {
+    return e.next();
+  }
+
   const customerId = e.record.get('customer');
   const merchantId = e.record.get('merchant');
   const stampsEarned = e.record.get('stamps') || 0;

@@ -325,19 +325,15 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const cooldownStr = oneDayAgo.toISOString().replace('T', ' ').substring(0, 19);
 
     const recentNotifs = fetchAllRecords(
-      "notifications",
-      `type = "campaign" && created >= "${cooldownStr}" && data.merchant_id = "${merchantId}"`,
+      "broadcasts",
+      `created >= "${cooldownStr}" && merchant = "${merchantId}"`,
       "-created"
     );
     const recentlyNotifiedIds = new Set();
     for (let n = 0; n < recentNotifs.length; n++) {
-      const r = recentNotifs[n].get("recipient");
+      const r = recentNotifs[n].get("merchant");
       if (r) recentlyNotifiedIds.add(r);
     }
-
-    // Load helper functions
-    const { createNotification } = require(`${__hooks}/notification_helper.js`);
-    const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
 
     let sentCount = 0;
     const nameSlug = merchantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -469,8 +465,9 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
         const txMatch = messageText.match(/TxID:\s*([A-Z0-9]+)/i);
         if (txMatch && txMatch[1]) {
           const txCode = txMatch[1].toUpperCase();
+          // Accept status = sent OR status = pending (in case mark-sent request was delayed or skipped)
           const txs = $app.findRecordsByFilter("qr_transactions",
-            `tx_code = "${txCode}" && status = "sent"`,
+            `tx_code = "${txCode}" && (status = "sent" || status = "pending")`,
             "created", 1, 0);
 
           if (txs.length > 0) {
@@ -479,14 +476,28 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
             const stampAmount = parseInt(tx.get("stamp_amount")) || 0;
             const billAmount = parseFloat(tx.get("bill_amount")) || 0;
 
-            // Find customer by phone (cleanPhone from remoteJid — last 8 digits match)
+            // 1. Try to fetch pre-linked customer record from qr_transaction
             let customer = null;
-            try {
-              const users = $app.findRecordsByFilter("users",
-                `phone LIKE "%${cleanPhone.slice(-8)}%"`,
-                "created", 1, 0);
-              if (users.length > 0) customer = users[0];
-            } catch (err) { /* not found */ }
+            const prelinkedCustomerId = tx.getString("customer");
+            if (prelinkedCustomerId) {
+              try {
+                customer = $app.findRecordById("users", prelinkedCustomerId);
+              } catch (err) { /* fallback */ }
+            }
+
+            // 2. Fall back to phone search (normalize phone digits, search by last 8 digits)
+            if (!customer && cleanPhone) {
+              const digitsOnly = cleanPhone.replace(/[^\d]/g, '');
+              const last8 = digitsOnly.slice(-8);
+              if (last8) {
+                try {
+                  const users = $app.findRecordsByFilter("users",
+                    `phone LIKE "%${last8}%"`,
+                    "created", 1, 0);
+                  if (users.length > 0) customer = users[0];
+                } catch (err) { /* not found */ }
+              }
+            }
 
             // Find merchant's loyalty program
             const programs = $app.findRecordsByFilter("loyalty_programs",
@@ -495,6 +506,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
             if (programs.length > 0 && customer) {
               const program = programs[0];
               const programId = program.id;
+              const goal = parseInt(program.get("stamp_goal")) || 10;
 
               // Find or create loyalty card
               let card = null;
@@ -506,7 +518,6 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               } catch (err) { /* no card yet */ }
 
               if (!card) {
-                // Create new card
                 const cardCol = $app.findCollectionByNameOrId("loyalty_cards");
                 card = new Record(cardCol, {
                   program: programId,
@@ -519,9 +530,11 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
                 $app.save(card);
               }
 
-              // Add stamps
               const currentStamps = parseInt(card.get("stamps_collected")) || 0;
-              card.set("stamps_collected", currentStamps + stampAmount);
+              const totalStamps = currentStamps + stampAmount;
+
+              // Update card stamps & activity
+              card.set("stamps_collected", totalStamps);
               card.set("last_activity", new Date().toISOString());
               $app.save(card);
 
@@ -542,21 +555,30 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
                 console.log("Failed to create transaction record:", txnErr.message || txnErr);
               }
 
-              // Mark QR transaction as completed
+              // Mark QR transaction as completed & update customer link
               tx.set("status", "completed");
+              tx.set("customer", customer.id);
               tx.set("completed_at", new Date().toISOString());
               $app.save(tx);
 
-              // Send auto-reply to customer
+              // Build auto-reply message reflecting goal & reward state
               const customerName = customer.getString("name") || "there";
               const instanceName = body.instanceName || "";
               const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+
+              let replyMsg = "";
+              if (totalStamps >= goal) {
+                const remaining = totalStamps % goal;
+                replyMsg = `Hi ${customerName}! 🎉 You earned ${stampAmount} stamps and completed your card! A reward voucher has been added to your account. Your new balance: ${remaining} stamp(s). Thank you for visiting!`;
+              } else {
+                replyMsg = `Hi ${customerName}! ${stampAmount} stamp(s) added! You now have ${totalStamps} / ${goal} stamps. Thank you for visiting!`;
+              }
 
               try {
                 sendTextMessage(
                   instanceName,
                   cleanPhone,
-                  `Hi ${customerName}! ${stampAmount} stamps have been added to your loyalty card. You now have ${currentStamps + stampAmount} stamps. Thank you for visiting!`,
+                  replyMsg,
                   { delay: 1000, presence: 'composing' }
                 );
               } catch (replyErr) {

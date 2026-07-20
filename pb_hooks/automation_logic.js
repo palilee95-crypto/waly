@@ -68,8 +68,8 @@ function runAutomations() {
       const limitStr = sevenDaysAgo.toISOString().replace('T', ' ').substring(0, 19);
       
       const recentNotifs = $app.findRecordsByFilter(
-        "notifications",
-        `recipient = "${customerId}" && created >= "${limitStr}" && type = "campaign" && data.merchant_id = "${merchantId}"`,
+        "broadcasts",
+        `created >= "${limitStr}" && merchant = "${merchantId}"`,
         "-created",
         10,
         0

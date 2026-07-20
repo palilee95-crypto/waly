@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,9 +29,7 @@ function QRCodeImage({ url, size }: { url: string; size: number }) {
     );
   }
   return (
-    <View style={[styles.qrPlaceholder, { width: size, height: size }]}>
-      <Ionicons name="qr-code" size={size * 0.5} color="#000000" />
-    </View>
+    <Image source={{ uri: qrSrc }} style={{ width: size, height: size, borderRadius: 12 }} resizeMode="contain" />
   );
 }
 

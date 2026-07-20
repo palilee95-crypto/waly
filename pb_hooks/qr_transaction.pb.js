@@ -82,11 +82,19 @@ routerAdd("GET", "/api/risev/qr/validate", (e) => {
   const merchant = $app.findRecordById("merchants", merchantId);
   const merchantName = merchant.getString("name") || "";
   
-  // Get merchant owner's phone for WhatsApp
+  // Get merchant owner's phone for WhatsApp (formatted with 60 country code)
   let merchantPhone = "";
   try {
     const owner = $app.findRecordById("users", merchant.getString("owner"));
-    merchantPhone = owner.getString("phone") || "";
+    let rawPhone = owner.getString("phone") || "";
+    let digits = rawPhone.replace(/[^\d]/g, '');
+    if (digits.startsWith("0")) {
+      digits = "6" + digits;
+    }
+    if (!digits.startsWith("60") && digits.length >= 9) {
+      digits = "60" + digits;
+    }
+    merchantPhone = digits;
   } catch (err) {
     // fallback — no phone
   }

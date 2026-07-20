@@ -201,27 +201,6 @@ export default function LoginScreen() {
 
               {/* Input Form */}
               <View style={styles.form}>
-                {/* Segmented Role Switch Toggle */}
-                <View style={styles.segmentedContainer}>
-                  <TouchableOpacity
-                    style={[styles.segmentBtn, role === 'customer' && styles.segmentBtnActive]}
-                    onPress={() => setRole('customer')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.segmentText, role === 'customer' && styles.segmentTextActive]}>
-                      Customer
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.segmentBtn, role === 'merchant' && styles.segmentBtnActive]}
-                    onPress={() => setRole('merchant')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.segmentText, role === 'merchant' && styles.segmentTextActive]}>
-                      Merchant
-                    </Text>
-                  </TouchableOpacity>
-                </View>
 
                 {step !== 'password' && (
                   <>
@@ -434,15 +413,10 @@ export default function LoginScreen() {
 
                 {step === 'phone' && (
                   <>
-                    {/* Consent Checkbox */}
-                    <View style={styles.consentRow}>
-                      <View style={styles.checkboxActive}>
-                        <Ionicons name="checkmark-circle" size={18} color="#000000" />
-                      </View>
-                      <Text style={styles.consentText}>
-                        I accept the <Text style={styles.linkText}>Protocols</Text> and acknowledge the <Text style={styles.linkText}>Privacy Matrix</Text> for data integrity.
-                      </Text>
-                    </View>
+                    {/* Clean Privacy Notice */}
+                    <Text style={[styles.consentText, { textAlign: 'center', marginBottom: 16 }]}>
+                      By continuing, you agree to our Terms & Privacy Policy.
+                    </Text>
 
                     {/* Primary Action Button */}
                     <TouchableOpacity
@@ -532,23 +506,6 @@ export default function LoginScreen() {
                   </>
                 )}
               </View>
-
-
-
-              {/* Secure Login Link */}
-              {step === 'phone' && (
-                <View style={styles.alternativeLinkWrap}>
-                  <Text style={styles.alternativeLinkText}>
-                    Already part of the network?{' '}
-                    <Text 
-                      style={[styles.boldLink, { textDecorationLine: 'underline' }]} 
-                      onPress={() => setStep('password')}
-                    >
-                      Secure Login
-                    </Text>
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
           </View>

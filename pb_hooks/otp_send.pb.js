@@ -1,6 +1,23 @@
 // otp_send.pb.js
 // Registration (no OTP) + OTP for password reset only + phone login endpoint.
 
+// Helper to find user by phone number using normalized digits matching
+function findUserByPhone(phoneInput) {
+  if (!phoneInput) return null;
+  const digits = phoneInput.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const last8 = digits.slice(-8);
+
+  try {
+    const users = $app.findRecordsByFilter("users", `phone LIKE "%${last8}%"`, "created", 5, 0);
+    for (let i = 0; i < users.length; i++) {
+      const uDigits = (users[i].getString("phone") || "").replace(/[^\d]/g, '');
+      if (uDigits.endsWith(last8)) return users[i];
+    }
+  } catch (err) { /* not found */ }
+  return null;
+}
+
 // ── Check if phone exists ──────────────────────────────────────────
 routerAdd("GET", "/api/risev/check-phone", (e) => {
   const query = e.requestInfo().query;
@@ -8,10 +25,11 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
   if (!phone) {
     return e.json(400, { message: "phone query parameter is required" });
   }
-  try {
-    const user = $app.findFirstRecordByData("users", "phone", phone);
+
+  const user = findUserByPhone(phone);
+  if (user) {
     return e.json(200, { exists: true, email: user.getString("email") });
-  } catch (err) {
+  } else {
     return e.json(200, { exists: false });
   }
 });
@@ -33,11 +51,11 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  // Check phone uniqueness
-  try {
-    $app.findFirstRecordByData("users", "phone", phone);
+  // Check phone uniqueness with normalized digits
+  const existingUser = findUserByPhone(phone);
+  if (existingUser) {
     return e.json(400, { message: "Phone number is already registered" });
-  } catch (err) { /* ok */ }
+  }
 
   // Check email uniqueness
   try {
@@ -95,10 +113,7 @@ routerAdd("POST", "/api/risev/login", (e) => {
   try {
     user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    try {
-      const users = $app.findRecordsByFilter("users", `phone = "${identifier}"`, "created", 1, 0);
-      if (users.length > 0) user = users[0];
-    } catch (e2) { /* not found */ }
+    user = findUserByPhone(identifier);
   }
 
   if (!user || !user.validatePassword(password)) {
@@ -125,16 +140,16 @@ routerAdd("POST", "/api/risev/request-otp", (e) => {
     return e.json(400, { message: "Phone number is required" });
   }
 
-  let user;
-  try {
-    user = $app.findFirstRecordByData("users", "phone", phone);
-  } catch (err) {
+  const user = findUserByPhone(phone);
+  if (!user) {
     return e.json(404, { message: "User not found with this phone number" });
   }
 
+  const internalUrl = $os.getenv("PB_INTERNAL_URL") || "http://127.0.0.1:8090";
+
   try {
     const res = $http.send({
-      url: "http://127.0.0.1:8090/api/collections/users/request-otp",
+      url: `${internalUrl}/api/collections/users/request-otp`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: user.getString("email") })
@@ -166,18 +181,16 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  // Verify OTP via PocketBase auth-with-otp
-  // We need the user's email to confirm the OTP
-  let resetUser;
-  try {
-    resetUser = $app.findFirstRecordByData("users", "phone", phone);
-  } catch (err) {
+  const resetUser = findUserByPhone(phone);
+  if (!resetUser) {
     return e.json(404, { message: "User not found" });
   }
 
+  const internalUrl = $os.getenv("PB_INTERNAL_URL") || "http://127.0.0.1:8090";
+
   try {
     const res = $http.send({
-      url: "http://127.0.0.1:8090/api/collections/users/auth-with-otp",
+      url: `${internalUrl}/api/collections/users/auth-with-otp`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
