@@ -30,7 +30,7 @@ routerAdd("POST", "/api/risev/qr/generate", (e) => {
 
   // Create qr_transaction record
   const tx = new Record($app.findCollectionByNameOrId("qr_transactions"));
-  tx.setId($security.randomString(15));
+  tx.set("id", $security.randomString(15));
   tx.set("merchant", merchantId);
   tx.set("bill_amount", billAmount);
   tx.set("stamp_amount", stampAmount);
