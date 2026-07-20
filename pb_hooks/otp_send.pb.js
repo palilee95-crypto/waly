@@ -272,6 +272,9 @@ routerAdd("POST", "/api/risev/reset-password", (e) => {
   }
 
   // Reset password
+  if (!resetUser.get("birthday")) {
+    resetUser.set("birthday", "2000-01-01 00:00:00.000Z");
+  }
   resetUser.setPassword(newPassword);
   $app.save(resetUser);
 
