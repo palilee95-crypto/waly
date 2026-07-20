@@ -2,48 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { pb } from '@/lib/pocketbase';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
 import { useLocalSearchParams } from 'expo-router';
-
-// Helper to register push token in PocketBase for native devices
-const registerPushToken = async (userId: string) => {
-  if (!Device.isDevice) return; // Simulators/web can't receive native push notifications
-
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') return;
-
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-
-    // Check if token already exists for the user
-    const existing = await pb.collection('push_tokens')
-      .getFirstListItem(`user = '${userId}'`)
-      .catch(() => null);
-
-    if (existing) {
-      await pb.collection('push_tokens').update(existing.id, { token, platform: Platform.OS, is_active: true });
-    } else {
-      await pb.collection('push_tokens').create({
-        user: userId,
-        token,
-        platform: Platform.OS,
-        is_active: true,
-      });
-    }
-  } catch (err) {
-    console.warn('Failed to register push token:', err);
-  }
-};
 
 // Cross-platform storage (SecureStore on native, localStorage on web)
 export const storage = {
@@ -83,11 +42,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   activeRole: UserRole;
-  login: (otpId: string, otp: string) => Promise<void>;
+  loginWithIdentifier: (identifier: string, password: string) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
+  resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
   checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string }>;
-  register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<string>;
+  register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -209,8 +169,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           total_points: record.total_points || 0,
         });
         setActiveRole(role);
-        // Register push token for active session
-        registerPushToken(record.id);
       }
     } catch (e) {
       console.error('Auth init error:', e);
@@ -240,41 +198,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string): Promise<string> => {
+  const register = async (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string): Promise<void> => {
     const body: any = { phone, email, name, password, role };
     if (birthday) body.birthday = birthday;
-    const res = await pb.send<{ otpId: string }>('/api/risev/register', {
+    await pb.send('/api/risev/register', {
       method: 'POST',
       body,
+      requestKey: null,
     });
-    return res.otpId;
+    // Auto-login after registration
+    await loginWithPassword(email, password);
   };
 
-  const login = async (otpId: string, otp: string) => {
-    // Authenticate using the otpId and OTP code
-    const authData = await pb.collection('users').authWithOTP(otpId, otp);
-    const authRecord = authData.record;
-    const rawRole = authRecord.role || 'customer';
-    const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
-    await storage.setItem('risev_active_role', role || 'customer');
-    const merchantData = await ensureMerchantProfile(authRecord);
-    setUser({
-      id: authRecord.id,
-      phone: authRecord.phone || '',
-      name: authRecord.name || '',
-      email: authRecord.email || '',
-      avatar: authRecord.avatar || undefined,
-      role,
-      activeRole: role,
-      merchant_id: merchantData.id,
-      merchant_status: merchantData.status,
-      merchant_created: merchantData.created,
-      tier: authRecord.tier || undefined,
-      total_points: authRecord.total_points || 0,
+  const loginWithIdentifier = async (identifier: string, password: string) => {
+    // Try email login first via PocketBase SDK
+    try {
+      await loginWithPassword(identifier, password);
+      return;
+    } catch (e) {
+      // If email fails, try phone login via custom endpoint
+    }
+
+    // Phone-based login: get email from phone, then auth
+    const res = await pb.send<{ exists: boolean; email?: string }>('/api/risev/check-phone', {
+      method: 'GET',
+      params: { phone: identifier },
+      requestKey: null,
     });
-    setActiveRole(role);
-    // Register push token upon login
-    registerPushToken(authRecord.id);
+    if (!res.exists || !res.email) {
+      throw new Error('Invalid credentials');
+    }
+    await loginWithPassword(res.email, password);
+  };
+
+  const resetPassword = async (phone: string, otpId: string, otpCode: string, newPassword: string) => {
+    await pb.send('/api/risev/reset-password', {
+      method: 'POST',
+      body: { phone, otpId, otpCode, newPassword },
+      requestKey: null,
+    });
   };
 
   const loginWithPassword = async (email: string, password: string) => {
@@ -300,8 +262,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       total_points: authRecord.total_points || 0,
     });
     setActiveRole(role);
-    // Register push token upon login
-    registerPushToken(authRecord.id);
   };
 
   const logout = async () => {
@@ -406,9 +366,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isLoading,
       isAuthenticated: !!user,
       activeRole,
-      login,
+      loginWithIdentifier,
       loginWithPassword,
       requestOTP,
+      resetPassword,
       checkPhone,
       register,
       logout,

@@ -25,7 +25,7 @@ const OTP_LENGTH = 6;
 export default function OTPScreen() {
   const router = useRouter();
   const { phone, otpId, role } = useLocalSearchParams<{ phone: string; otpId: string; role: string }>();
-  const { login, requestOTP, setUserRole } = useAuth();
+  const { requestOTP, resetPassword } = useAuth();
 
   const [currentOtpId, setCurrentOtpId] = useState(otpId);
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -33,6 +33,9 @@ export default function OTPScreen() {
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showNewPasswordField, setShowNewPasswordField] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const inputRefs = useRef<TextInput[]>([]);
 
   // Keep track of changing params
@@ -79,22 +82,33 @@ export default function OTPScreen() {
     if (otpCode.length !== OTP_LENGTH) return;
     setIsLoading(true);
     setErrorMsg('');
+    // OTP verified — now show new password field
+    setShowNewPasswordField(true);
+    setIsLoading(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmNewPassword) {
+      setErrorMsg('Please fill in all fields.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrorMsg('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+    setIsLoading(true);
+    setErrorMsg('');
     try {
-      await login(currentOtpId!, otpCode);
-      if (role === 'merchant' || role === 'customer') {
-        try {
-          await setUserRole(role);
-        } catch (err) {
-          console.log('Set user role error:', err);
-        }
-        router.replace(role === 'merchant' ? '/(merchant)' : '/(customer)');
-      } else {
-        router.replace('/(auth)/role-select');
-      }
-    } catch (e) {
-      setErrorMsg('Invalid or expired OTP verification code.');
-      setOtp(Array(OTP_LENGTH).fill(''));
-      inputRefs.current[0]?.focus();
+      await resetPassword(phone!, currentOtpId!, otp.join(''), newPassword);
+      Alert.alert('Success', 'Password reset successful. Please log in.', [
+        { text: 'OK', onPress: () => router.replace('/(auth)/login') }
+      ]);
+    } catch (e: any) {
+      setErrorMsg(e?.message || 'Failed to reset password.');
     } finally {
       setIsLoading(false);
     }

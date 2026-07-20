@@ -1,3 +1,7 @@
+// otp_send.pb.js
+// Registration (no OTP) + OTP for password reset only + phone login endpoint.
+
+// ── Check if phone exists ──────────────────────────────────────────
 routerAdd("GET", "/api/risev/check-phone", (e) => {
   const query = e.requestInfo().query;
   const phone = query.phone || '';
@@ -12,6 +16,7 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
   }
 });
 
+// ── Register (no OTP — direct account creation) ────────────────────
 routerAdd("POST", "/api/risev/register", (e) => {
   const body = e.requestInfo().body;
   const phone = body.phone || '';
@@ -24,81 +29,95 @@ routerAdd("POST", "/api/risev/register", (e) => {
   if (!phone || !email || !password || !birthday) {
     return e.json(400, { message: "phone, email, password, and birthday are required" });
   }
+  if (password.length < 8) {
+    return e.json(400, { message: "Password must be at least 8 characters" });
+  }
 
-  // Verify if phone is already taken
+  // Check phone uniqueness
   try {
     $app.findFirstRecordByData("users", "phone", phone);
     return e.json(400, { message: "Phone number is already registered" });
-  } catch (err) {
-    // Phone is unique, proceed
-  }
+  } catch (err) { /* ok */ }
 
-  // Verify if email is already taken
+  // Check email uniqueness
   try {
     $app.findFirstRecordByData("users", "email", email);
     return e.json(400, { message: "Email address is already registered" });
-  } catch (err) {
-    // Email is unique, proceed
-  }
+  } catch (err) { /* ok */ }
 
-  let user;
   try {
     const collection = $app.findCollectionByNameOrId("users");
-    user = new Record(collection);
+    const user = new Record(collection);
     user.set("phone", phone);
     user.set("email", email);
     user.set("name", name || `User ${phone.slice(-4)}`);
     user.set("role", role);
     user.set("birthday", birthday);
+    user.set("verified", true);
     user.setPassword(password);
     $app.save(user);
 
-    // If the role is merchant or both, auto-create a pending merchant record
+    // Auto-provision merchant if role is merchant or both
     if (role === 'merchant' || role === 'both') {
       try {
-        const merchantCollection = $app.findCollectionByNameOrId("merchants");
-        const merchant = new Record(merchantCollection);
+        const mc = $app.findCollectionByNameOrId("merchants");
+        const merchant = new Record(mc);
         merchant.set("name", `${user.getString("name")}'s Shop`);
         merchant.set("owner", user.id);
         merchant.set("category", "food");
         merchant.set("status", "pending");
         $app.save(merchant);
-
-        // Update user with the merchant ID reference
         user.set("merchant_id", merchant.id);
         $app.save(user);
-      } catch (merchantErr) {
-        console.log("Failed to auto-provision merchant profile during registration:", merchantErr.message || merchantErr);
+      } catch (mErr) {
+        console.log("Merchant provisioning failed: " + (mErr.message || mErr));
       }
     }
-  } catch (createErr) {
-    return e.json(500, { message: "Failed to create user record: " + createErr.message });
-  }
 
-  // Trigger PocketBase's built-in OTP generation
-  try {
-    const res = $http.send({
-      url: "http://127.0.0.1:8090/api/collections/users/request-otp",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email: user.getString("email")
-      })
-    });
-    
-    if (res.statusCode >= 400) {
-      return e.json(res.statusCode, JSON.parse(res.raw));
-    }
-    
-    const resData = JSON.parse(res.raw);
-    return e.json(200, { message: "User registered and OTP sent successfully", otpId: resData.otpId });
-  } catch (otpErr) {
-    return e.json(500, { message: "Failed to trigger OTP: " + otpErr.message });
+    return e.json(200, { success: true, message: "Registration successful" });
+  } catch (createErr) {
+    return e.json(500, { message: "Failed to create user: " + createErr.message });
   }
 });
 
+// ── Login with phone or email + password ───────────────────────────
+routerAdd("POST", "/api/risev/login", (e) => {
+  const body = e.requestInfo().body;
+  const identifier = body.identifier || '';
+  const password = body.password || '';
+
+  if (!identifier || !password) {
+    return e.json(400, { message: "Identifier and password are required" });
+  }
+
+  // Try email first, then phone
+  let user = null;
+  try {
+    user = $app.findAuthRecordByEmail("users", identifier);
+  } catch (err) {
+    try {
+      const users = $app.findRecordsByFilter("users", `phone = "${identifier}"`, "created", 1, 0);
+      if (users.length > 0) user = users[0];
+    } catch (e2) { /* not found */ }
+  }
+
+  if (!user || !user.validatePassword(password)) {
+    return e.json(401, { message: "Invalid credentials" });
+  }
+
+  return e.json(200, {
+    success: true,
+    record: {
+      id: user.id,
+      email: user.getString("email"),
+      name: user.getString("name"),
+      role: user.getString("role"),
+      phone: user.getString("phone"),
+    }
+  });
+});
+
+// ── Request OTP (password reset only) ──────────────────────────────
 routerAdd("POST", "/api/risev/request-otp", (e) => {
   const body = e.requestInfo().body;
   const phone = body.phone || '';
@@ -113,46 +132,87 @@ routerAdd("POST", "/api/risev/request-otp", (e) => {
     return e.json(404, { message: "User not found with this phone number" });
   }
 
-  // Trigger PocketBase's built-in OTP generation by calling the local REST endpoint
   try {
     const res = $http.send({
       url: "http://127.0.0.1:8090/api/collections/users/request-otp",
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email: user.getString("email")
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.getString("email") })
     });
-    
+
     if (res.statusCode >= 400) {
       return e.json(res.statusCode, JSON.parse(res.raw));
     }
-    
+
     const resData = JSON.parse(res.raw);
     return e.json(200, { message: "OTP sent successfully", otpId: resData.otpId, email: user.getString("email") });
   } catch (otpErr) {
-    return e.json(500, { message: "Failed to trigger OTP: " + otpErr.message });
+    return e.json(500, { message: "Failed to send OTP: " + otpErr.message });
   }
 });
 
+// ── Reset password with OTP ────────────────────────────────────────
+routerAdd("POST", "/api/risev/reset-password", (e) => {
+  const body = e.requestInfo().body;
+  const phone = body.phone || '';
+  const otpId = body.otpId || '';
+  const otpCode = body.otpCode || '';
+  const newPassword = body.newPassword || '';
+
+  if (!phone || !otpId || !otpCode || !newPassword) {
+    return e.json(400, { message: "All fields are required" });
+  }
+  if (newPassword.length < 8) {
+    return e.json(400, { message: "Password must be at least 8 characters" });
+  }
+
+  // Verify OTP via PocketBase built-in
+  try {
+    const res = $http.send({
+      url: "http://127.0.0.1:8090/api/collections/users/confirm-otp",
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        otpId: otpId,
+        password: otpCode,
+        email: "" // will be filled below
+      })
+    });
+
+    if (res.statusCode >= 400) {
+      return e.json(400, { message: "Invalid or expired OTP code" });
+    }
+  } catch (err) {
+    return e.json(400, { message: "OTP verification failed: " + err.message });
+  }
+
+  // Find user by phone and reset password
+  let user;
+  try {
+    user = $app.findFirstRecordByData("users", "phone", phone);
+  } catch (err) {
+    return e.json(404, { message: "User not found" });
+  }
+
+  user.setPassword(newPassword);
+  $app.save(user);
+
+  return e.json(200, { success: true, message: "Password reset successful" });
+});
+
+// ── OTP delivery via WhatsApp (password reset) ─────────────────────
 onMailerRecordOTPSend((e) => {
   const email = e.record.get('email') || '';
   const phone = e.record.get('phone') || '';
-  const otp = e.meta.password; // Raw OTP code from mailer event
+  const otp = e.meta.password;
 
   const target = phone || email;
-  if (!target) {
-    return e.next();
-  }
+  if (!target) return e.next();
 
-  // Clean target to numbers only for WhatsApp delivery
   const cleanPhone = target.replace(/[^\d]/g, '');
 
-  // Log OTP to server console for local developer testing!
   console.log("\n========================================");
-  console.log("🔑 [LOCAL TEST OTP] Sent to: " + cleanPhone);
+  console.log("🔑 [PASSWORD RESET OTP] Sent to: " + cleanPhone);
   console.log("👉 OTP Code: " + otp);
   console.log("========================================\n");
 
@@ -162,17 +222,10 @@ onMailerRecordOTPSend((e) => {
     sendTextMessage(
       'risev-instance',
       cleanPhone,
-      `🔑 *Kod Pengesahan RISEV*\n\nKod pengesahan keselamatan anda ialah: *${otp}*\n───────────────────\n⏳ Kod ini sah untuk *5 minit* sahaja.\n⚠️ Demi keselamatan, *jangan kongsi* kod ini dengan sesiapa.\n\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam.\n\nTerima kasih kerana menggunakan RISEV!`,
-      {
-        delay: 2000,
-        presence: 'composing'
-      }
+      `Your RISEV password reset code is: *${otp}*\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
+      { delay: 2000, presence: 'composing' }
     );
   } catch (err) {
-    // Ignore http request errors
+    // Ignore — OTP is also logged to console
   }
-
-  // Do not call e.next() to prevent PocketBase from trying to send the default OTP email,
-  // since we already delivered the OTP via WhatsApp using the Evolution API.
 });
-

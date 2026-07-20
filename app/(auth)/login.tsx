@@ -26,7 +26,7 @@ const COUNTRY_CODE = '+60';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { checkPhone, register, requestOTP, loginWithPassword } = useAuth();
+  const { checkPhone, register, requestOTP, loginWithIdentifier } = useAuth();
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
@@ -128,11 +128,11 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      const otpId = await register(getFullPhone(), email, name, password, role, birthday);
-      router.push({ 
-        pathname: '/(auth)/otp', 
-        params: { phone: getFullPhone(), otpId: otpId, role: role } 
-      });
+      await register(getFullPhone(), email, name, password, role, birthday);
+      // Auto-login happens inside register() — redirect based on role
+      const record = pb.authStore.record;
+      const userRole = record?.role || 'customer';
+      router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
     } catch (e: any) {
       Alert.alert('Registration Error', e?.message || 'Failed to register user. Please try again.');
     } finally {
@@ -148,13 +148,14 @@ export default function LoginScreen() {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      await loginWithPassword(email.trim(), password);
+      // Try email first, then phone
+      await loginWithIdentifier(email.trim(), password);
       const record = pb.authStore.record;
       const userRole = record?.role || 'customer';
       router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
     } catch (e: any) {
       console.warn(e);
-      setErrorMsg('Invalid email or password. Please try again.');
+      setErrorMsg('Invalid credentials. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -259,7 +260,7 @@ export default function LoginScreen() {
 
                 {step === 'password' && (
                   <>
-                    <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                    <Text style={styles.inputLabel}>EMAIL OR PHONE</Text>
                     <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused, errorMsg ? styles.inputGroupError : null]}>
                       <TextInput
                         style={[
