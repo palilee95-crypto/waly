@@ -398,15 +398,15 @@ const styles = StyleSheet.create({
   },
   // Hero Banner
   heroCard: {
-    backgroundColor: '#1C1340',
+    backgroundColor: '#000000',
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#1C1340',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 3,
   },
   heroBadge: {
     flexDirection: 'row',
