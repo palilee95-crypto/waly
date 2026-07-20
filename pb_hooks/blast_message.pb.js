@@ -431,30 +431,37 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   }
 }, $apis.requireAuth("users"));
 
-// 4. POST WhatsApp Webhook Listener (captures STOP opt-outs)
+// 4. POST WhatsApp Webhook Listener (captures STOP opt-outs & inbound QR stamps)
 routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
   try {
-    const body = e.requestInfo().body;
-    const event = body.event;
-    if (event !== "messages.upsert") {
-      return e.json(200, { success: true, message: "Ignored event" });
+    const body = e.requestInfo().body || {};
+    const event = (body.event || "").toLowerCase();
+
+    // Accept both Evolution Go event names ("Message", "messages.upsert", "message")
+    if (event !== "messages.upsert" && event !== "message" && event !== "messages") {
+      return e.json(200, { success: true, message: "Ignored event: " + event });
     }
 
-    const data = body.data;
-    if (!data || data.key?.fromMe) {
-      return e.json(200, { success: true });
+    const data = body.data || body.payload;
+    if (!data) return e.json(200, { success: true, message: "No data payload" });
+
+    const key = data.key || {};
+    if (key.fromMe) {
+      return e.json(200, { success: true, message: "Ignored self message" });
     }
 
-    const remoteJid = data.key?.remoteJid || "";
-    const cleanPhone = remoteJid.split("@")[0];
+    const remoteJid = key.remoteJid || data.remoteJid || data.sender || "";
+    const cleanPhone = remoteJid.split("@")[0].split(":")[0];
     
-    // Safely extract message text
+    // Safely extract message text from various WhatsApp payload structures
     let messageText = "";
     if (data.message) {
-      messageText = data.message.conversation || "";
-      if (!messageText && data.message.extendedTextMessage) {
-        messageText = data.message.extendedTextMessage.text || "";
-      }
+      messageText = data.message.conversation ||
+        (data.message.extendedTextMessage && data.message.extendedTextMessage.text) ||
+        (data.message.imageMessage && data.message.imageMessage.caption) || "";
+    }
+    if (!messageText && typeof data.text === "string") {
+      messageText = data.text;
     }
     const textMsg = messageText.trim().toUpperCase();
 
@@ -563,7 +570,9 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
 
               // Build auto-reply message reflecting goal & reward state
               const customerName = customer.getString("name") || "there";
-              const instanceName = body.instanceName || "";
+              const merchant = $app.findRecordById("merchants", merchantId);
+              const nameSlug = (merchant.getString("name") || "").toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+              const instanceName = body.instanceName || body.instance || `merchant-${merchantId}-${nameSlug}`;
               const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
 
               let replyMsg = "";
