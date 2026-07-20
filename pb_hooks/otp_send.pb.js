@@ -9,7 +9,7 @@ function findUserByPhone(phoneInput) {
   const last8 = digits.slice(-8);
 
   try {
-    const users = $app.findRecordsByFilter("users", `phone LIKE "%${last8}%"`, "created", 5, 0);
+    const users = $app.findRecordsByFilter("users", `phone ~ "${last8}"`, "-created", 5, 0);
     for (let i = 0; i < users.length; i++) {
       const uDigits = (users[i].getString("phone") || "").replace(/[^\d]/g, '');
       if (uDigits.endsWith(last8)) return users[i];

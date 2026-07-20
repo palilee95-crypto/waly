@@ -492,8 +492,8 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               if (last8) {
                 try {
                   const users = $app.findRecordsByFilter("users",
-                    `phone LIKE "%${last8}%"`,
-                    "created", 1, 0);
+                    `phone ~ "${last8}"`,
+                    "-created", 1, 0);
                   if (users.length > 0) customer = users[0];
                 } catch (err) { /* not found */ }
               }
@@ -597,7 +597,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
 
     if (textMsg === "STOP" && cleanPhone) {
       // Find user by phone number
-      const users = $app.findRecordsByFilter("users", `phone LIKE "%${cleanPhone}%"`, "-created", 1, 0);
+      const users = $app.findRecordsByFilter("users", `phone ~ "${cleanPhone.slice(-8)}"`, "-created", 1, 0);
       if (users.length > 0) {
         const userId = users[0].id;
         
