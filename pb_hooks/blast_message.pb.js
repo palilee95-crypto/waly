@@ -467,7 +467,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
           const txCode = txMatch[1].toUpperCase();
           // Accept status = sent OR status = pending (in case mark-sent request was delayed or skipped)
           const txs = $app.findRecordsByFilter("qr_transactions",
-            `tx_code = "${txCode}" && (status = "sent" || status = "pending")`,
+            `tx_code = '${txCode}' && (status = 'sent' || status = 'pending')`,
             "created", 1, 0);
 
           if (txs.length > 0) {
@@ -501,7 +501,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
 
             // Find merchant's loyalty program
             const programs = $app.findRecordsByFilter("loyalty_programs",
-              `merchant = "${merchantId}"`, "created", 1, 0);
+              `merchant = '${merchantId}'`, "created", 1, 0);
 
             if (programs.length > 0 && customer) {
               const program = programs[0];
@@ -512,21 +512,21 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               let card = null;
               try {
                 const cards = $app.findRecordsByFilter("loyalty_cards",
-                  `program = "${programId}" && customer = "${customer.id}"`,
+                  `program = '${programId}' && customer = '${customer.id}'`,
                   "created", 1, 0);
                 if (cards.length > 0) card = cards[0];
               } catch (err) { /* no card yet */ }
 
               if (!card) {
                 const cardCol = $app.findCollectionByNameOrId("loyalty_cards");
-                card = new Record(cardCol, {
-                  program: programId,
-                  customer: customer.id,
-                  merchant: merchantId,
-                  stamps_collected: 0,
-                  status: "active",
-                  opt_in_marketing: true,
-                });
+                card = new Record(cardCol);
+                card.set("id", $security.randomString(15).toLowerCase());
+                card.set("program", programId);
+                card.set("customer", customer.id);
+                card.set("merchant", merchantId);
+                card.set("stamps_collected", 0);
+                card.set("status", "active");
+                card.set("opt_in_marketing", true);
                 $app.save(card);
               }
 
@@ -541,15 +541,15 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               // Create transaction record
               try {
                 const txnCol = $app.findCollectionByNameOrId("transactions");
-                const txn = new Record(txnCol, {
-                  loyalty_card: card.id,
-                  type: "earn",
-                  stamps: stampAmount,
-                  bill_amount: billAmount,
-                  customer: customer.id,
-                  merchant: merchantId,
-                  metadata: { source: "qr_inbound", tx_code: txCode },
-                });
+                const txn = new Record(txnCol);
+                txn.set("id", $security.randomString(15).toLowerCase());
+                txn.set("loyalty_card", card.id);
+                txn.set("type", "earn");
+                txn.set("stamps", stampAmount);
+                txn.set("bill_amount", billAmount);
+                txn.set("customer", customer.id);
+                txn.set("merchant", merchantId);
+                txn.set("metadata", JSON.stringify({ source: "qr_inbound", tx_code: txCode }));
                 $app.save(txn);
               } catch (txnErr) {
                 console.log("Failed to create transaction record:", txnErr.message || txnErr);
