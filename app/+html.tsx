@@ -36,10 +36,19 @@ const responsiveBackground = `
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Enable text selection inside inputs and textareas */
-  input, textarea, [contenteditable] {
+  /* Enable text selection inside inputs and textareas and remove browser focus rings */
+  input, textarea, select, [contenteditable] {
     user-select: text;
     -webkit-user-select: text;
+    outline: none !important;
+    outline-style: none !important;
+    box-shadow: none !important;
+  }
+
+  *:focus, *:focus-visible {
+    outline: none !important;
+    outline-style: none !important;
+    box-shadow: none !important;
   }
 
   #root {

@@ -36,6 +36,8 @@ export default function OTPScreen() {
   const [showNewPasswordField, setShowNewPasswordField] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [newPassFocused, setNewPassFocused] = useState(false);
+  const [confirmPassFocused, setConfirmPassFocused] = useState(false);
   const inputRefs = useRef<TextInput[]>([]);
 
   // Keep track of changing params
@@ -259,30 +261,34 @@ export default function OTPScreen() {
                   </Text>
 
                   {/* New Password */}
-                  <View style={styles.inputGroup}>
-                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
+                  <View style={[styles.inputGroup, newPassFocused && styles.inputGroupFocused]}>
+                    <Ionicons name="lock-closed-outline" size={18} color={newPassFocused ? "#000000" : "#64748B"} style={{ marginLeft: 12 }} />
                     <TextInput
-                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      style={[styles.input, Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } as any : null]}
                       placeholder="New password (min 8 chars)"
                       placeholderTextColor="#BEC6E0"
                       value={newPassword}
                       onChangeText={(t) => { setNewPassword(t); setErrorMsg(''); }}
                       secureTextEntry
                       autoCapitalize="none"
+                      onFocus={() => setNewPassFocused(true)}
+                      onBlur={() => setNewPassFocused(false)}
                     />
                   </View>
 
                   {/* Confirm Password */}
-                  <View style={styles.inputGroup}>
-                    <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
+                  <View style={[styles.inputGroup, confirmPassFocused && styles.inputGroupFocused]}>
+                    <Ionicons name="lock-closed-outline" size={18} color={confirmPassFocused ? "#000000" : "#64748B"} style={{ marginLeft: 12 }} />
                     <TextInput
-                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      style={[styles.input, Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } as any : null]}
                       placeholder="Confirm password"
                       placeholderTextColor="#BEC6E0"
                       value={confirmNewPassword}
                       onChangeText={(t) => { setConfirmNewPassword(t); setErrorMsg(''); }}
                       secureTextEntry
                       autoCapitalize="none"
+                      onFocus={() => setConfirmPassFocused(true)}
+                      onBlur={() => setConfirmPassFocused(false)}
                     />
                   </View>
 
@@ -641,6 +647,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 52,
     width: '100%',
+  },
+  inputGroupFocused: {
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
   },
   input: {
     flex: 1,
