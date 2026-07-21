@@ -122,7 +122,7 @@ export default function NfcClaimModal() {
           {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.iconBg}>
-              <Ionicons name="wifi" size={24} color="#4F46E5" />
+              <Ionicons name="wifi" size={24} color="#0F172A" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>NFC Stamp Claim!</Text>
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   sessionBadge: {
     marginTop: 8,
-    backgroundColor: '#E0E7FF',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   sessionText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#3730A3',
+    color: '#0F172A',
     letterSpacing: 0.5,
   },
   inputRow: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     flex: 2,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },

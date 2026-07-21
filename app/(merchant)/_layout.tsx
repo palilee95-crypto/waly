@@ -1095,7 +1095,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#5C3BCC', // Royal Purple brand styling
+    backgroundColor: '#000000', // Black brand styling
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',

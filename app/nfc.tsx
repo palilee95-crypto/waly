@@ -120,7 +120,7 @@ export default function NfcLandingScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color="#000000" />
           <Text style={styles.loadingText}>Loading store details...</Text>
         </View>
       </SafeAreaView>
@@ -162,7 +162,7 @@ export default function NfcLandingScreen() {
         {/* Store Card Header */}
         <View style={styles.merchantCard}>
           <View style={styles.nfcBadge}>
-            <Ionicons name="wifi-outline" size={16} color="#4F46E5" />
+            <Ionicons name="wifi-outline" size={16} color="#0F172A" />
             <Text style={styles.nfcBadgeText}>NFC CARD SCANNED</Text>
           </View>
           <Text style={styles.merchantName}>{merchantName}</Text>
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   nfcBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#4F46E5',
+    color: '#0F172A',
     letterSpacing: 0.5,
   },
   merchantName: {
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     height: 52,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#000000',
     borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'center',

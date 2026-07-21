@@ -334,18 +334,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   heroCard: {
-    backgroundColor: '#1C1340',
+    backgroundColor: '#0F172A',
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#352470',
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -367,7 +365,7 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#DDD3FF',
+    color: '#94A3B8',
     lineHeight: 20,
   },
   successBanner: {
@@ -465,7 +463,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   presetPillActive: {
-    backgroundColor: '#5C3BCC',
+    backgroundColor: '#0F172A',
   },
   presetText: {
     fontSize: 12,
@@ -477,7 +475,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     height: 54,
-    backgroundColor: '#5C3BCC',
+    backgroundColor: '#0F172A',
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
