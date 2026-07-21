@@ -46,7 +46,7 @@ export default function NfcLandingScreen() {
       }
 
       try {
-        const m = await pb.collection('merchants').getOne(merchantId);
+        const m = await pb.collection('merchants').getOne(merchantId, { expand: 'owner' });
         if (!m || m.status === 'suspended' || m.status === 'rejected') {
           setInvalidReason('This store is currently not accepting stamps.');
           setStep('invalid');
@@ -62,7 +62,7 @@ export default function NfcLandingScreen() {
   }, [params.m]);
 
   const merchantName = merchant?.name || 'Risev Merchant';
-  const merchantPhone = merchant?.phone || '';
+  const merchantPhone = merchant?.phone || merchant?.expand?.owner?.phone || '';
 
   // 2. Submit NFC Notification & Open WhatsApp
   const handleNfcSubmit = async () => {
@@ -99,7 +99,7 @@ export default function NfcLandingScreen() {
       const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
 
       if (Platform.OS === 'web') {
-        window.open(waUrl, '_blank');
+        window.location.href = waUrl;
       } else {
         await Linking.openURL(waUrl);
       }
