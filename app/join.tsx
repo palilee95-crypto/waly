@@ -23,7 +23,7 @@ type Step = 'loading' | 'invalid' | 'phone_entry' | 'login' | 'register' | 'send
 
 export default function JoinScreen() {
   const router = useRouter();
-  const { user, isAuthenticated, loginWithIdentifier, register, checkPhone } = useAuth();
+  const { user, isAuthenticated, loginWithIdentifier, register, checkPhone, quickRegister } = useAuth();
   const params = useLocalSearchParams<{ m: string; bill: string; stamps: string; t: string }>();
 
   const { width: windowWidth } = useWindowDimensions();
@@ -282,110 +282,81 @@ export default function JoinScreen() {
         </View>
 
         {/* Step Content */}
-        {step === 'phone_entry' && (
+        {(step === 'phone_entry' || step === 'register') && (
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Enter your phone number</Text>
-            <Text style={styles.formSubtitle}>We'll check if you have an account.</Text>
-
-            <View style={styles.inputGroup}>
-              <View style={styles.prefixBox}>
-                <Text style={styles.flag}>🇲🇾</Text>
-                <Text style={styles.prefixCode}>+60</Text>
-                <View style={styles.prefixDivider} />
-              </View>
-              <TextInput
-                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                placeholder="11 234 5678"
-                placeholderTextColor="#BEC6E0"
-                value={phoneInput}
-                onChangeText={setPhoneInput}
-                keyboardType="phone-pad"
-                autoFocus
-              />
-            </View>
-
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-            <TouchableOpacity style={[styles.primaryBtn, (!phoneInput || isLoading) && styles.primaryBtnDisabled]} onPress={handlePhoneCheck} disabled={!phoneInput || isLoading} activeOpacity={0.8}>
-              {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Continue</Text>}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {step === 'login' && (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Welcome back</Text>
-            <Text style={styles.formSubtitle}>Enter your password to log in.</Text>
-
-            <View style={styles.inputGroup}>
-              <Ionicons name="lock-closed-outline" size={20} color="#64748B" style={{ marginLeft: 12 }} />
-              <TextInput
-                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                placeholder="Password"
-                placeholderTextColor="#BEC6E0"
-                value={passwordInput}
-                onChangeText={setPasswordInput}
-                secureTextEntry
-                autoFocus
-              />
-            </View>
-
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-            <TouchableOpacity style={[styles.primaryBtn, (!passwordInput || isLoading) && styles.primaryBtnDisabled]} onPress={handleLogin} disabled={!passwordInput || isLoading} activeOpacity={0.8}>
-              {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Log In</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => { setStep('phone_entry'); setPasswordInput(''); setErrorMsg(''); }}>
-              <Text style={styles.linkText}>Use a different phone number</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {step === 'register' && (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Create your account</Text>
-            <Text style={styles.formSubtitle}>Join {merchantName} on Risev.</Text>
+            <Text style={styles.formTitle}>Claim Your Stamps</Text>
+            <Text style={styles.formSubtitle}>Enter your details to receive stamps from {merchantName}.</Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>FULL NAME</Text>
               <View style={styles.inputGroup}>
-                <TextInput style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]} placeholder="John Doe" placeholderTextColor="#BEC6E0" value={nameInput} onChangeText={setNameInput} />
+                <Ionicons name="person-outline" size={20} color="#64748B" style={{ marginLeft: 12 }} />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="e.g. Fazli"
+                  placeholderTextColor="#BEC6E0"
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  autoFocus
+                />
               </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>EMAIL</Text>
+              <Text style={styles.inputLabel}>PHONE NUMBER</Text>
               <View style={styles.inputGroup}>
-                <TextInput style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]} placeholder="user@example.com" placeholderTextColor="#BEC6E0" value={emailInput} onChangeText={setEmailInput} keyboardType="email-address" autoCapitalize="none" />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>DATE OF BIRTH</Text>
-              <View style={styles.inputGroup}>
-                <TextInput style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]} placeholder="YYYY-MM-DD" placeholderTextColor="#BEC6E0" value={birthdayInput} onChangeText={(t) => setBirthdayInput(formatBirthday(t))} keyboardType="number-pad" maxLength={10} />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputGroup}>
-                <TextInput style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]} placeholder="••••••••" placeholderTextColor="#BEC6E0" value={passwordInput} onChangeText={setPasswordInput} secureTextEntry autoCapitalize="none" />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-              <View style={styles.inputGroup}>
-                <TextInput style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]} placeholder="••••••••" placeholderTextColor="#BEC6E0" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" />
+                <View style={styles.prefixBox}>
+                  <Text style={styles.flag}>🇲🇾</Text>
+                  <Text style={styles.prefixCode}>+60</Text>
+                  <View style={styles.prefixDivider} />
+                </View>
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="11 234 5678"
+                  placeholderTextColor="#BEC6E0"
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  keyboardType="phone-pad"
+                />
               </View>
             </View>
 
             {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-            <TouchableOpacity style={[styles.primaryBtn, isLoading && styles.primaryBtnDisabled]} onPress={handleRegister} disabled={isLoading} activeOpacity={0.8}>
-              {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Create Account</Text>}
+            <TouchableOpacity
+              style={[styles.primaryBtn, (!nameInput.trim() || !phoneInput.trim() || isLoading) && styles.primaryBtnDisabled]}
+              onPress={async () => {
+                if (!nameInput.trim() || !phoneInput.trim()) {
+                  setErrorMsg('Please enter your name and phone number.');
+                  return;
+                }
+                setIsLoading(true);
+                setErrorMsg('');
+                try {
+                  let digits = phoneInput.trim().replace(/\D/g, '');
+                  if (digits.startsWith('0')) digits = '6' + digits;
+                  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+                  const phone = '+' + digits;
+
+                  await quickRegister(nameInput.trim(), phone);
+                  await handleSendWhatsApp();
+                } catch (err: any) {
+                  setErrorMsg(err?.message || 'Failed to claim stamps.');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              disabled={!nameInput.trim() || !phoneInput.trim() || isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Claim Stamps via WhatsApp</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         )}

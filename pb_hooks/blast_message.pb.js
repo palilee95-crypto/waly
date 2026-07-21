@@ -79,6 +79,17 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
     if (state === "open") {
       const ownerJid = instanceInfo.ownerJid || "";
       const phoneNum = ownerJid ? ownerJid.split("@")[0] : "";
+
+      // Self-healing: automatically ensure webhook URL is configured for existing instances
+      try {
+        callEvo("POST", `/webhook/set/${instanceName}`, {
+          enabled: true,
+          url: "http://pocketbase:8090/api/risev/whatsapp-webhook",
+          byEvents: false,
+          events: ["MESSAGES_UPSERT", "MESSAGE"]
+        });
+      } catch (whErr) { /* ignore */ }
+
       return e.json(200, {
         status: "connected",
         phone: phoneNum ? "+" + phoneNum : ""
@@ -435,62 +446,137 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
 routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
   try {
     const body = e.requestInfo().body || {};
-    const event = (body.event || "").toLowerCase();
+    const rawEvent = body.event || body.type || body.eventType || "";
+    const event = rawEvent.toLowerCase();
+    const data = body.data || body.payload || body;
 
-    // Accept both Evolution Go event names ("Message", "messages.upsert", "message")
-    if (event !== "messages.upsert" && event !== "message" && event !== "messages") {
-      return e.json(200, { success: true, message: "Ignored event: " + event });
+    console.log(`[WHATSAPP WEBHOOK] Incoming event: "${rawEvent}" | instance: ${body.instance || body.instanceName || "unknown"}`);
+
+    // Flexible event filter: accept any message-related event or payload containing message text
+    const isMessageEvent = event.includes("message") || event.includes("upsert") || (data && (data.message || data.text || data.conversation));
+    if (!isMessageEvent) {
+      console.log(`[WHATSAPP WEBHOOK] Ignored non-message event: "${rawEvent}"`);
+      return e.json(200, { success: true, message: "Ignored event: " + rawEvent });
     }
 
-    const data = body.data || body.payload;
-    if (!data) return e.json(200, { success: true, message: "No data payload" });
+    if (!data) {
+      console.log("[WHATSAPP WEBHOOK] Ignored event with empty data payload");
+      return e.json(200, { success: true, message: "No data payload" });
+    }
 
-    const key = data.key || {};
-    if (key.fromMe) {
+    const info = data.Info || data.info || {};
+    const key = data.key || (data.message ? data.message.key : {}) || (data.Message ? data.Message.key : {}) || {};
+    const fromMe = info.IsFromMe === true || info.isFromMe === true || key.fromMe === true || data.fromMe === true;
+
+    if (fromMe) {
       return e.json(200, { success: true, message: "Ignored self message" });
     }
 
-    // Safely extract message text from all possible WhatsApp payload structures
-    let messageText = "";
-    if (typeof data.text === "string") {
-      messageText = data.text;
-    } else if (typeof data.messageText === "string") {
-      messageText = data.messageText;
-    } else if (typeof data.body === "string") {
-      messageText = data.body;
-    } else if (data.message) {
-      if (typeof data.message === "string") {
-        messageText = data.message;
-      } else {
-        messageText = data.message.conversation ||
-          (data.message.extendedTextMessage && data.message.extendedTextMessage.text) ||
-          (data.message.imageMessage && data.message.imageMessage.caption) || "";
+    // Failsafe recursive text extraction (handles both uppercase and lowercase field names)
+    function extractText(obj) {
+      if (!obj) return "";
+      if (typeof obj === "string") return obj;
+      if (typeof obj !== "object") return "";
+
+      if (typeof obj.conversation === "string" && obj.conversation.length > 0) return obj.conversation;
+      if (typeof obj.text === "string" && obj.text.length > 0) return obj.text;
+      if (typeof obj.messageText === "string" && obj.messageText.length > 0) return obj.messageText;
+      if (typeof obj.body === "string" && obj.body.length > 0) return obj.body;
+      if (typeof obj.caption === "string" && obj.caption.length > 0) return obj.caption;
+
+      if (obj.extendedTextMessage) {
+        var ext1 = extractText(obj.extendedTextMessage);
+        if (ext1) return ext1;
       }
+      if (obj.ExtendedTextMessage) {
+        var ext2 = extractText(obj.ExtendedTextMessage);
+        if (ext2) return ext2;
+      }
+
+      if (obj.Message) {
+        var msg1 = extractText(obj.Message);
+        if (msg1) return msg1;
+      }
+      if (obj.message) {
+        var msg2 = extractText(obj.message);
+        if (msg2) return msg2;
+      }
+
+      if (obj.imageMessage) {
+        var img1 = extractText(obj.imageMessage);
+        if (img1) return img1;
+      }
+      if (obj.ImageMessage) {
+        var img2 = extractText(obj.ImageMessage);
+        if (img2) return img2;
+      }
+
+      if (obj.payload) {
+        var pld = extractText(obj.payload);
+        if (pld) return pld;
+      }
+      return "";
     }
+
+    let messageText = extractText(data);
+    if (!messageText && body) {
+      messageText = extractText(body);
+    }
+
     const textMsg = messageText.trim().toUpperCase();
 
-    // Resolve phone number safely (handling WhatsApp LID swap & message text Phone: field)
+    // Failsafe phone number extraction
     let cleanPhone = "";
-    const phoneMatch = messageText.match(/Phone:\s*\+?(\d+)/i);
-    if (phoneMatch && phoneMatch[1]) {
-      cleanPhone = phoneMatch[1].replace(/[^\d]/g, '');
-    }
-
-    if (!cleanPhone || cleanPhone.length < 8) {
-      const altJid = data.senderAlt || key.participant || data.participant || "";
-      if (altJid && altJid.includes("@s.whatsapp.net")) {
-        cleanPhone = altJid.split("@")[0].split(":")[0];
+    if (messageText) {
+      const phoneMatch = messageText.match(/Phone:\s*\+?(\d+)/i);
+      if (phoneMatch && phoneMatch[1]) {
+        cleanPhone = phoneMatch[1].replace(/[^\d]/g, '');
       }
     }
 
     if (!cleanPhone || cleanPhone.length < 8) {
-      const rawJid = key.remoteJid || data.remoteJid || data.sender || "";
-      cleanPhone = rawJid.split("@")[0].split(":")[0];
+      const candidates = [
+        info.Sender,
+        info.SenderAlt,
+        info.Chat,
+        data.senderAlt,
+        data.sender,
+        key.participant,
+        data.participant,
+        key.remoteJid,
+        data.remoteJid,
+        body.sender,
+        body.senderAlt
+      ];
+      for (let i = 0; i < candidates.length; i++) {
+        const jid = candidates[i];
+        if (typeof jid === "string" && jid.indexOf("@s.whatsapp.net") !== -1) {
+          const p = jid.split("@")[0].split(":")[0].replace(/[^\d]/g, '');
+          if (p.length >= 8) {
+            cleanPhone = p;
+            break;
+          }
+        }
+      }
     }
 
-    // Normalize cleanPhone digits (Malaysian 60 country code)
-    if (cleanPhone.startsWith("0")) cleanPhone = "6" + cleanPhone;
-    if (!cleanPhone.startsWith("60") && cleanPhone.length >= 9) cleanPhone = "60" + cleanPhone;
+    if (cleanPhone) {
+      if (cleanPhone.indexOf("0") === 0) cleanPhone = "6" + cleanPhone;
+      if (cleanPhone.indexOf("60") !== 0 && cleanPhone.length >= 9) cleanPhone = "60" + cleanPhone;
+    }
+
+    // Ignore standard personal/group chat messages silently
+    const hasTxId = /TxID:\s*[A-Z0-9]+/i.test(messageText);
+    const isStop = textMsg === "STOP";
+    if (!hasTxId && !isStop) {
+      return e.json(200, { success: true, message: "Ignored standard chat message" });
+    }
+
+    if (!messageText) {
+      console.log(`[WHATSAPP WEBHOOK] WARNING: messageText empty! Raw payload body: ${JSON.stringify(body)}`);
+    } else {
+      console.log(`[WHATSAPP WEBHOOK] Extracted messageText: "${messageText.replace(/\n/g, ' ')}" | Phone: ${cleanPhone}`);
+    }
 
     // ── Inbound QR Transaction Processing ──────────────────────────
     // Check if the message contains a TxID (QR transaction code)
@@ -499,10 +585,16 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
         const txMatch = messageText.match(/TxID:\s*([A-Z0-9]+)/i);
         if (txMatch && txMatch[1]) {
           const txCode = txMatch[1].toUpperCase();
+          console.log(`[WHATSAPP WEBHOOK] Detected TxID: ${txCode}. Searching qr_transactions...`);
+
           // Accept status = sent OR status = pending (in case mark-sent request was delayed or skipped)
           const txs = $app.findRecordsByFilter("qr_transactions",
             `tx_code = '${txCode}' && (status = 'sent' || status = 'pending')`,
             "created", 1, 0);
+
+          if (txs.length === 0) {
+            console.log(`[WHATSAPP WEBHOOK] No active qr_transactions found matching tx_code = '${txCode}' with status 'sent' or 'pending'`);
+          }
 
           if (txs.length > 0) {
             const tx = txs[0];
@@ -564,6 +656,9 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
                 program.set("name", "Standard Loyalty Card");
                 program.set("stamp_goal", 10);
                 program.set("status", "active");
+                program.set("is_active", true);
+                program.set("reward_name", "Free Reward");
+                program.set("reward_description", "Free reward upon completing stamp card");
                 $app.save(program);
                 console.log(`[WHATSAPP WEBHOOK] Auto-created default loyalty program for merchant ${merchantId}`);
               } catch (progErr) {
@@ -631,6 +726,8 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               // Build auto-reply message reflecting goal & reward state
               const customerName = customer.getString("name") || "there";
               const merchant = $app.findRecordById("merchants", merchantId);
+              const storeName = merchant.getString("name") || "our store";
+              const appUrl = $os.getenv("APP_URL") || "https://waly-five.vercel.app";
               const nameSlug = (merchant.getString("name") || "").toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
               const instanceName = body.instanceName || body.instance || `merchant-${merchantId}-${nameSlug}`;
               const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
@@ -638,9 +735,9 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
               let replyMsg = "";
               if (totalStamps >= goal) {
                 const remaining = totalStamps % goal;
-                replyMsg = `Hi ${customerName}! 🎉 You earned ${stampAmount} stamps and completed your card! A reward voucher has been added to your account. Your new balance: ${remaining} stamp(s). Thank you for visiting!`;
+                replyMsg = `Hi ${customerName}! 🎉 You earned ${stampAmount} stamp(s) at *${storeName}* and completed your card!\n\nA reward voucher has been added to your account. Your new balance: ${remaining}/${goal} stamp(s).\n\nView your card & rewards here:\n${appUrl}`;
               } else {
-                replyMsg = `Hi ${customerName}! ${stampAmount} stamp(s) added! You now have ${totalStamps} / ${goal} stamps. Thank you for visiting!`;
+                replyMsg = `Hi ${customerName}! ${stampAmount} stamp(s) added from *${storeName}*! 🎉\n\nYou now have *${totalStamps}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}`;
               }
 
               try {

@@ -134,7 +134,13 @@ function callEvo(method, path, body = null) {
     const newBody = {
       name: name,
       token: token,
-      qrcode: true
+      qrcode: true,
+      webhook: {
+        url: "http://pocketbase:8090/api/risev/whatsapp-webhook",
+        byEvents: false,
+        base64: false,
+        events: ["MESSAGES_UPSERT", "MESSAGE"]
+      }
     };
 
     try {

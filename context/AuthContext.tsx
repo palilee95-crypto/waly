@@ -48,6 +48,7 @@ interface AuthContextType {
   resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
   checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string }>;
   register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
+  quickRegister: (name: string, phone: string) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -208,6 +209,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     // Auto-login after registration
     await loginWithPassword(email, password);
+  };
+
+  const quickRegister = async (name: string, phone: string): Promise<void> => {
+    const res = await pb.send<{ success: boolean; token: string; user: any }>('/api/risev/qr/quick-register', {
+      method: 'POST',
+      body: { name, phone },
+      requestKey: null,
+    });
+    if (res.token && res.user) {
+      pb.authStore.save(res.token, res.user);
+      const merchantData = await ensureMerchantProfile(res.user);
+      setUser({
+        id: res.user.id,
+        phone: res.user.phone || phone,
+        name: res.user.name || name,
+        email: res.user.email || '',
+        avatar: res.user.avatar || undefined,
+        role: res.user.role || 'customer',
+        activeRole: 'customer',
+        merchant_id: merchantData.id,
+        merchant_status: merchantData.status,
+        merchant_created: merchantData.created,
+      });
+      setActiveRole('customer');
+      await storage.setItem('risev_active_role', 'customer');
+    }
   };
 
   const loginWithIdentifier = async (identifier: string, password: string) => {
@@ -372,6 +399,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       resetPassword,
       checkPhone,
       register,
+      quickRegister,
       logout,
       switchRole,
       setUserRole,

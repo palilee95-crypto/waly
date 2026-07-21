@@ -129,6 +129,10 @@ services:
       - WADEBUG=INFO
       - LOGTYPE=console
       - WEBHOOK_FILES=true
+      - WEBHOOK_GLOBAL_URL=http://pocketbase:8090/api/risev/whatsapp-webhook
+      - WEBHOOK_GLOBAL_ENABLED=true
+      - WEBHOOK_EVENTS_MESSAGES_UPSERT=true
+      - WEBHOOK_EVENTS_MESSAGE=true
     networks:
       - risev-network
 

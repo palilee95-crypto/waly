@@ -72,15 +72,16 @@ export default function LoginScreen() {
       const fullPhone = getFullPhone();
       const res = await checkPhone(fullPhone);
       if (res.exists) {
-        // Pre-fill user email/phone identifier for password login
-        if (res.email) {
+        // Check if user has completed profile setup (has email set)
+        if (res.email && res.email.trim() && !res.email.includes('@risev.app')) {
           setEmail(res.email);
+          setStep('password');
         } else {
-          setEmail(fullPhone);
+          // Quick-registered QR user returning to complete account setup!
+          setStep('register');
         }
-        setStep('password');
       } else {
-        // New user, show registration inputs
+        // New user
         setStep('register');
       }
     } catch (e: any) {
