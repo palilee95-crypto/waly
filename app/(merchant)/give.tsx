@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   RefreshControl,
-  Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,104 +18,98 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
-// QR code rendering — uses a clean high-contrast image generator
-function QRCodeImage({ url, size }: { url: string; size: number }) {
-  const encoded = encodeURIComponent(url);
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&bgcolor=FFFFFF&color=0F172A&qzone=1`;
-  if (Platform.OS === 'web') {
-    return (
-      // @ts-ignore
-      <img src={qrSrc} width={size} height={size} style={{ borderRadius: 16, display: 'block' }} alt="QR Code" />
-    );
-  }
-  return (
-    <Image source={{ uri: qrSrc }} style={{ width: size, height: size, borderRadius: 16 }} resizeMode="contain" />
-  );
-}
-
-export default function QRGenerationScreen() {
+export default function GiveStampsScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const [phoneInput, setPhoneInput] = useState('');
   const [billAmount, setBillAmount] = useState('');
   const [stampAmount, setStampAmount] = useState('1');
-  const [generating, setGenerating] = useState(false);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [txCode, setTxCode] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedNfcLink, setCopiedNfcLink] = useState(false);
 
+  const merchantId = user?.merchant_id;
+  const nfcUrl = merchantId ? `https://waly-five.vercel.app/nfc?m=${merchantId}` : '';
+
+  // 1. Fetch recent transactions for active merchant
   const fetchTransactions = useCallback(async () => {
-    if (!user) return;
+    if (!merchantId) return;
     try {
       setLoadingTxns(true);
-      const headers: Record<string, string> = {};
-      if (pb.authStore.token) {
-        headers['Authorization'] = pb.authStore.token;
-      }
-      const res = await pb.send<{ transactions: any[] }>('/api/risev/qr/list', {
-        method: 'GET',
-        headers,
-        requestKey: null,
+      const res = await pb.collection('transactions').getList(1, 10, {
+        filter: `merchant = '${merchantId}'`,
+        sort: '-created',
+        expand: 'customer',
       });
-      setTransactions(res.transactions || []);
+      setTransactions(res.items || []);
     } catch (err) {
-      console.warn('Failed to fetch QR transactions:', err);
+      console.warn('Failed to fetch recent transactions:', err);
     } finally {
       setLoadingTxns(false);
     }
-  }, [user]);
+  }, [merchantId]);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const handleGenerate = async () => {
+  // 2. Submit Manual Stamp Issuance
+  const handleManualIssue = async () => {
+    if (!phoneInput.trim()) {
+      Alert.alert('Validation Error', 'Please enter customer phone number.');
+      return;
+    }
+
     const bill = parseFloat(billAmount) || 0;
     const stamps = parseInt(stampAmount, 10) || 1;
+    if (stamps < 1) {
+      Alert.alert('Validation Error', 'Stamps to issue must be at least 1.');
+      return;
+    }
 
-    if (bill < 0 || stamps < 1) return;
-
-    setGenerating(true);
+    setIsSubmitting(true);
+    setSuccessMsg(null);
     try {
-      const headers: Record<string, string> = {};
-      if (pb.authStore.token) {
-        headers['Authorization'] = pb.authStore.token;
-      }
-      const res = await pb.send<{ qrUrl: string; txCode: string }>('/api/risev/qr/generate', {
-        method: 'POST',
-        headers,
-        body: { bill_amount: bill, stamp_amount: stamps },
-        requestKey: null,
-      });
-      setQrUrl(res.qrUrl);
-      setTxCode(res.txCode);
+      const res = await pb.send<{ success: boolean; message: string; customerName: string }>(
+        '/api/risev/merchant/give-manual',
+        {
+          method: 'POST',
+          body: {
+            phone: phoneInput.trim(),
+            bill_amount: bill,
+            stamp_amount: stamps,
+          },
+        }
+      );
+
+      setSuccessMsg(res.message || `${stamps} stamp(s) credited successfully!`);
+      setPhoneInput('');
+      setBillAmount('');
+      setStampAmount('1');
       fetchTransactions();
     } catch (err: any) {
-      console.warn('QR generation failed:', err);
+      const msg = err?.message || 'Failed to issue stamps manually.';
+      Alert.alert('Error', msg);
     } finally {
-      setGenerating(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleNewQR = () => {
-    setQrUrl(null);
-    setTxCode(null);
-    setBillAmount('');
-    setStampAmount('1');
-    setCopiedLink(false);
-  };
-
-  const handleCopyLink = () => {
-    if (!qrUrl) return;
+  const handleCopyNfcLink = () => {
+    if (!nfcUrl) return;
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(qrUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
+      navigator.clipboard.writeText(nfcUrl);
+      setCopiedNfcLink(true);
+      setTimeout(() => setCopiedNfcLink(false), 2500);
+    } else {
+      Alert.alert('NFC Store Link', nfcUrl);
     }
   };
 
@@ -125,19 +119,12 @@ export default function QRGenerationScreen() {
     setRefreshing(false);
   };
 
-  const statusConfig: Record<string, { label: string; bg: string; color: string; icon: any }> = {
-    pending: { label: 'PENDING SCAN', bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
-    sent: { label: 'WA OPENED', bg: '#E0F2FE', color: '#0284C7', icon: 'logo-whatsapp' },
-    completed: { label: 'STAMPS CREDITED', bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle' },
-    expired: { label: 'EXPIRED', bg: '#FEE2E2', color: '#DC2626', icon: 'alert-circle-outline' },
-  };
-
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Sleek Top Header Bar */}
+      {/* Top Header Bar */}
       <View style={[styles.headerRow, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.headerTitleGroup}>
-          <Ionicons name="qr-code-outline" size={22} color="#1E1B4B" />
+          <Ionicons name="card-outline" size={22} color="#1E1B4B" />
           <Text style={styles.headerTitle}>Issue Stamps</Text>
         </View>
         <TouchableOpacity style={styles.refreshIconBtn} onPress={fetchTransactions} activeOpacity={0.7}>
@@ -148,213 +135,159 @@ export default function QRGenerationScreen() {
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
       >
-        {/* Premium Hero Banner */}
+        {/* Banner */}
         <View style={styles.heroCard}>
           <View style={styles.heroBadge}>
-            <Ionicons name="flash-sharp" size={12} color="#F4A825" />
-            <Text style={styles.heroBadgeText}>INBOUND WHATSAPP STAMPS</Text>
+            <Ionicons name="hand-right-sharp" size={12} color="#F4A825" />
+            <Text style={styles.heroBadgeText}>MANUAL STAMP ISSUANCE</Text>
           </View>
-          <Text style={styles.heroTitle}>Generate Customer QR</Text>
+          <Text style={styles.heroTitle}>Issue Stamps directly to Customer</Text>
           <Text style={styles.heroSubtitle}>
-            Customer scans this QR to send a pre-filled WhatsApp message directly to your store line. Stamps are credited instantly!
+            Enter customer phone number to credit loyalty stamps manually if NFC card is unavailable.
           </Text>
         </View>
 
-        {/* QR Generator Main Card */}
+        {/* Success Alert */}
+        {successMsg ? (
+          <View style={styles.successBanner}>
+            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+            <Text style={styles.successText}>{successMsg}</Text>
+          </View>
+        ) : null}
+
+        {/* Manual Issue Form Card */}
         <View style={styles.card}>
-          {qrUrl ? (
-            // ── QR Code Display View ──────────────────────────────
-            <View style={styles.qrDisplaySection}>
-              <View style={styles.qrCardHeader}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.qrCardHeaderTitle}>QR Ready to Scan</Text>
+          {/* Customer Phone Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
+            <View style={styles.inputWrap}>
+              <View style={styles.prefixBox}>
+                <Text style={styles.flag}>🇲🇾</Text>
+                <Text style={styles.prefixCode}>+60</Text>
+                <View style={styles.prefixDivider} />
               </View>
-
-              <View style={styles.qrImageWrap}>
-                <QRCodeImage url={qrUrl} size={220} />
-              </View>
-
-              <View style={styles.qrInfoBadge}>
-                <View style={styles.qrInfoItem}>
-                  <Text style={styles.qrInfoLabel}>BILL AMOUNT</Text>
-                  <Text style={styles.qrInfoValue}>RM {parseFloat(billAmount || '0').toFixed(2)}</Text>
-                </View>
-                <View style={styles.qrInfoDivider} />
-                <View style={styles.qrInfoItem}>
-                  <Text style={styles.qrInfoLabel}>STAMPS</Text>
-                  <Text style={styles.qrInfoValue}>{stampAmount} 🎁</Text>
-                </View>
-                <View style={styles.qrInfoDivider} />
-                <View style={styles.qrInfoItem}>
-                  <Text style={styles.qrInfoLabel}>CODE</Text>
-                  <Text style={styles.qrInfoValueCode}>{txCode}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.qrHint}>
-                Present this QR code to the customer. When scanned, WhatsApp will open automatically to complete the transaction.
-              </Text>
-
-              <View style={styles.actionBtnRow}>
-                {Platform.OS === 'web' && (
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={handleCopyLink} activeOpacity={0.8}>
-                    <Ionicons name={copiedLink ? "checkmark" : "copy-outline"} size={16} color="#0F172A" />
-                    <Text style={styles.secondaryBtnText}>{copiedLink ? 'Copied!' : 'Copy Link'}</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleNewQR} activeOpacity={0.8}>
-                  <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.primaryBtnText}>Generate New QR</Text>
-                </TouchableOpacity>
-              </View>
+              <TextInput
+                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                placeholder="11 234 5678"
+                placeholderTextColor="#94A3B8"
+                value={phoneInput}
+                onChangeText={setPhoneInput}
+                keyboardType="phone-pad"
+              />
             </View>
-          ) : (
-            // ── Input Form View ──────────────────────────────
-            <>
-              {/* Bill Amount Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputPrefix}>RM</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : null
-                    ]}
-                    value={billAmount}
-                    onChangeText={(text) => setBillAmount(text.replace(/[^0-9.]/g, ''))}
-                    placeholder="0.00"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                {/* Preset Chips */}
-                <View style={styles.chipRow}>
-                  {['10', '20', '50', '100'].map((preset) => (
-                    <TouchableOpacity
-                      key={preset}
-                      style={[styles.presetChip, billAmount === preset && styles.presetChipActive]}
-                      onPress={() => setBillAmount(preset)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.presetChipText, billAmount === preset && styles.presetChipTextActive]}>
-                        RM {preset}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+          </View>
 
-              {/* Stamp Amount Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>STAMPS TO ISSUE</Text>
-                <View style={styles.inputGroup}>
-                  <Ionicons name="ribbon-outline" size={20} color="#0F172A" style={{ marginLeft: 14 }} />
-                  <TextInput
-                    style={[
-                      styles.input,
-                      Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : null
-                    ]}
-                    value={stampAmount}
-                    onChangeText={(text) => setStampAmount(text.replace(/[^0-9]/g, ''))}
-                    placeholder="1"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="number-pad"
-                  />
-                </View>
-                {/* Stamp Chips */}
-                <View style={styles.chipRow}>
-                  {['1', '2', '3', '5'].map((stamps) => (
-                    <TouchableOpacity
-                      key={stamps}
-                      style={[styles.presetChip, stampAmount === stamps && styles.presetChipActive]}
-                      onPress={() => setStampAmount(stamps)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.presetChipText, stampAmount === stamps && styles.presetChipTextActive]}>
-                        {stamps} {stamps === '1' ? 'Stamp' : 'Stamps'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+          {/* Bill Amount Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>BILL AMOUNT (RM)</Text>
+            <View style={styles.inputWrap}>
+              <Text style={styles.currencyPrefix}>RM</Text>
+              <TextInput
+                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                placeholder="0.00"
+                placeholderTextColor="#94A3B8"
+                value={billAmount}
+                onChangeText={setBillAmount}
+                keyboardType="decimal-pad"
+              />
+            </View>
 
-              {/* Generate Button */}
-              <TouchableOpacity
-                style={[styles.generateBtn, (!stampAmount || generating) && styles.generateBtnDisabled]}
-                onPress={handleGenerate}
-                disabled={!stampAmount || generating}
-                activeOpacity={0.85}
-              >
-                {generating ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="qr-code" size={18} color="#FFFFFF" />
-                    <Text style={styles.generateBtnText}>Generate Stamp QR</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
+            {/* Quick Bill Presets */}
+            <View style={styles.presetRow}>
+              {['10', '20', '50', '100'].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  style={[styles.presetPill, billAmount === amt && styles.presetPillActive]}
+                  onPress={() => setBillAmount(amt)}
+                >
+                  <Text style={[styles.presetText, billAmount === amt && styles.presetTextActive]}>RM {amt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Stamps to Issue Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>STAMPS TO ISSUE</Text>
+            <View style={styles.inputWrap}>
+              <Ionicons name="ribbon-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+              <TextInput
+                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                placeholder="1"
+                placeholderTextColor="#94A3B8"
+                value={stampAmount}
+                onChangeText={setStampAmount}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            {/* Quick Stamp Presets */}
+            <View style={styles.presetRow}>
+              {['1', '2', '3', '5'].map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
+                  onPress={() => setStampAmount(s)}
+                >
+                  <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
+                    {s} {parseInt(s) === 1 ? 'Stamp' : 'Stamps'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
+            onPress={handleManualIssue}
+            disabled={isSubmitting}
+            activeOpacity={0.8}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryBtnText}>Issue Stamps Directly</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Recent Transactions List */}
+        {/* Recent Manual & Activity Log */}
         <View style={styles.historySection}>
-          <View style={styles.historyHeader}>
-            <Text style={styles.historyTitle}>Recent QR Activity</Text>
-            <Text style={styles.historyCount}>{transactions.length} total</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity Log</Text>
+            <Text style={styles.sectionCount}>{transactions.length} total</Text>
           </View>
 
           {loadingTxns ? (
-            <ActivityIndicator size="small" color="#000000" style={{ marginVertical: 32 }} />
+            <ActivityIndicator style={{ marginVertical: 24 }} color="#000000" />
           ) : transactions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="qr-code-outline" size={32} color="#94A3B8" />
-              </View>
-              <Text style={styles.emptyTitle}>No QR Codes Generated</Text>
-              <Text style={styles.emptySub}>
-                Generated QR codes will show up here along with live customer scanning activity.
-              </Text>
+            <View style={styles.emptyCard}>
+              <Ionicons name="receipt-outline" size={36} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>No Recent Activity</Text>
+              <Text style={styles.emptySubtitle}>Issued stamps will appear here in real time.</Text>
             </View>
           ) : (
-            <View style={styles.txnList}>
-              {transactions.map((tx) => {
-                const conf = statusConfig[tx.status] || {
-                  label: tx.status.toUpperCase(),
-                  bg: '#F1F5F9',
-                  color: '#64748B',
-                  icon: 'help-circle-outline',
-                };
-                return (
-                  <View key={tx.id} style={styles.txnRow}>
-                    <View style={styles.txnIconCircle}>
-                      <Ionicons name="receipt-outline" size={18} color="#0F172A" />
-                    </View>
-                    <View style={styles.txnLeft}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.txnCode}>{tx.tx_code}</Text>
-                        <Text style={styles.txnAmount}>RM {parseFloat(tx.bill_amount || 0).toFixed(2)}</Text>
-                      </View>
-                      <Text style={styles.txnMeta}>
-                        {tx.stamp_amount} {tx.stamp_amount === 1 ? 'stamp' : 'stamps'}
-                        {tx.customer_phone ? ` · ${tx.customer_phone}` : ''}
-                      </Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: conf.bg }]}>
-                      <Ionicons name={conf.icon} size={11} color={conf.color} />
-                      <Text style={[styles.statusText, { color: conf.color }]}>{conf.label}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+            transactions.map((item) => (
+              <View key={item.id} style={styles.txnCard}>
+                <View style={styles.txnIconBg}>
+                  <Ionicons name="ribbon-outline" size={18} color="#4F46E5" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.txnName}>{item.expand?.customer?.name || item.expand?.customer?.phone || 'Customer'}</Text>
+                  <Text style={styles.txnDate}>{new Date(item.created).toLocaleString()}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.txnStamps}>+{item.stamps} Stamp(s)</Text>
+                  <Text style={styles.txnBill}>RM {parseFloat(item.bill_amount || 0).toFixed(2)}</Text>
+                </View>
+              </View>
+            ))
           )}
         </View>
       </ScrollView>
@@ -372,15 +305,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    height: 60,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
   },
   headerTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   headerTitle: {
     fontSize: 18,
@@ -388,364 +321,312 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   refreshIconBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
   },
-  // Hero Banner
   heroCard: {
-    backgroundColor: '#000000',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: '#0F172A',
+    borderRadius: 24,
+    padding: 24,
     marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 99,
-    marginBottom: 10,
+    borderRadius: 12,
+    marginBottom: 12,
   },
   heroBadgeText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#F4A825',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   heroTitle: {
     fontSize: 22,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#CBD5E1',
-    lineHeight: 19,
+    color: '#94A3B8',
+    lineHeight: 20,
   },
-  // Card Form
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#D1FAE5',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  successText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#065F46',
+    flex: 1,
+  },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+    marginBottom: 20,
   },
   inputContainer: {
     marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
-    letterSpacing: 0.6,
+  label: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
     marginBottom: 8,
   },
-  inputGroup: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 14,
     height: 52,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
   },
-  inputPrefix: {
+  prefixBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 14,
+    paddingRight: 8,
+  },
+  flag: {
     fontSize: 16,
+    marginRight: 6,
+  },
+  prefixCode: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
-    paddingHorizontal: 14,
+  },
+  prefixDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#CBD5E1',
+    marginLeft: 8,
+  },
+  currencyPrefix: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginLeft: 16,
+    marginRight: 8,
   },
   input: {
     flex: 1,
+    height: 52,
+    paddingHorizontal: 12,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
-    paddingHorizontal: 8,
   },
-  chipRow: {
+  presetRow: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 10,
   },
-  presetChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  presetChipActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  presetChipText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#475569',
-  },
-  presetChipTextActive: {
-    color: '#FFFFFF',
-  },
-  generateBtn: {
-    backgroundColor: '#000000',
-    height: 52,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  generateBtnDisabled: {
-    backgroundColor: '#CBD5E1',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  generateBtnText: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  // QR Display
-  qrDisplaySection: {
-    alignItems: 'center',
-  },
-  qrCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 16,
-  },
-  qrCardHeaderTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#10B981',
-  },
-  qrImageWrap: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  qrInfoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 14,
-    width: '100%',
-  },
-  qrInfoItem: {
-    alignItems: 'center',
+  presetPill: {
     flex: 1,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  qrInfoLabel: {
-    fontSize: 9,
+  presetPillActive: {
+    backgroundColor: '#0F172A',
+  },
+  presetText: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#64748B',
-    letterSpacing: 0.5,
-    marginBottom: 2,
   },
-  qrInfoValue: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  qrInfoValueCode: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  qrInfoDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: '#E2E8F0',
-  },
-  qrHint: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 18,
-  },
-  actionBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
+  presetTextActive: {
+    color: '#FFFFFF',
   },
   primaryBtn: {
-    flex: 1,
-    backgroundColor: '#000000',
-    height: 46,
-    borderRadius: 12,
+    height: 54,
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.5,
   },
   primaryBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  secondaryBtn: {
-    paddingHorizontal: 16,
-    backgroundColor: '#F1F5F9',
-    height: 46,
-    borderRadius: 12,
+  nfcCard: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    marginBottom: 24,
+  },
+  nfcHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  nfcIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
-    gap: 6,
+    alignItems: 'center',
+  },
+  nfcCardTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#312E81',
+  },
+  nfcCardSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#4338CA',
+  },
+  nfcLinkBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#C7D2FE',
+    marginBottom: 12,
   },
-  secondaryBtnText: {
-    fontSize: 14,
+  nfcLinkText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#3730A3',
+  },
+  nfcCopyBtn: {
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#4F46E5',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nfcCopyBtnText: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
-  // History Section
   historySection: {
     marginTop: 8,
   },
-  historyHeader: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  historyTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
   },
-  historyCount: {
+  sectionCount: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
   },
-  emptyState: {
-    alignItems: 'center',
+  emptyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 36,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
   },
   emptyTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 2,
   },
-  emptySub: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_400Regular',
+  emptySubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
   },
-  txnList: {
-    gap: 10,
-  },
-  txnRow: {
+  txnCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    gap: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 14,
-    padding: 14,
-    gap: 12,
   },
-  txnIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+  txnIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: '#EEF2FF',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  txnLeft: {
-    flex: 1,
-  },
-  txnCode: {
+  txnName: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  txnAmount: {
-    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
   },
-  txnMeta: {
-    fontSize: 12,
+  txnDate: {
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     marginTop: 2,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 10,
+  txnStamps: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.4,
+    color: '#4F46E5',
+  },
+  txnBill: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 2,
   },
 });
