@@ -567,9 +567,47 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
 
     // Ignore standard personal/group chat messages silently
     const hasTxId = /TxID:\s*[A-Z0-9]+/i.test(messageText);
+    const hasNfc = /NFC:\s*[A-Z0-9]+/i.test(messageText) || messageText.includes("NFC Claim") || textMsg.indexOf("NFC:") !== -1;
     const isStop = textMsg === "STOP";
-    if (!hasTxId && !isStop) {
+
+    if (!hasTxId && !hasNfc && !isStop) {
       return e.json(200, { success: true, message: "Ignored standard chat message" });
+    }
+
+    console.log(`[WHATSAPP WEBHOOK] Extracted messageText: "${messageText}" | Phone: ${cleanPhone}`);
+
+    // ── 0. Handle Inbound NFC Claim ──────────────────────────────────
+    if (hasNfc && cleanPhone) {
+      try {
+        const nfcMatch = messageText.match(/NFC:\s*([A-Z0-9]+)/i);
+        const sessionCode = nfcMatch ? nfcMatch[1].trim() : $security.randomString(8).toUpperCase();
+        const nameMatch = messageText.match(/Name:\s*([^\n|]+)/i);
+        const custName = nameMatch ? nameMatch[1].trim() : ("Customer " + cleanPhone.slice(-4));
+        const mIdMatch = messageText.match(/Merchant:\s*([A-Za-z0-9]+)/i);
+
+        let merchantId = mIdMatch ? mIdMatch[1].trim() : null;
+        const instName = body.instanceName || body.instance || "";
+        if (!merchantId && instName.startsWith("merchant-")) {
+          const parts = instName.split("-");
+          if (parts.length >= 2) merchantId = parts[1];
+        }
+
+        if (merchantId) {
+          const claimCol = $app.findCollectionByNameOrId("nfc_claims");
+          const claim = new Record(claimCol);
+          claim.set("id", $security.randomString(15).toLowerCase());
+          claim.set("merchant", merchantId);
+          claim.set("customer_phone", "+" + cleanPhone);
+          claim.set("customer_name", custName);
+          claim.set("session_code", sessionCode);
+          claim.set("status", "pending");
+          $app.save(claim);
+          console.log(`[WHATSAPP WEBHOOK] Realtime NFC Claim created for merchant ${merchantId}, customer ${custName} (${cleanPhone})`);
+          return e.json(200, { success: true, processed: "nfc_claim_pending" });
+        }
+      } catch (nfcErr) {
+        console.log("[WHATSAPP WEBHOOK] NFC Claim handling error:", nfcErr.message || nfcErr);
+      }
     }
 
     if (!messageText) {

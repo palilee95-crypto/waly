@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import NfcClaimModal from '@/components/NfcClaimModal';
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
@@ -1042,6 +1043,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="staff" options={{ href: null }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />
       </Tabs>
+      <NfcClaimModal />
     </View>
   );
 }
