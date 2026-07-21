@@ -65,6 +65,7 @@ export default function MerchantDashboard() {
   const [activePromos, setActivePromos] = useState<any[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 9 | 12>(1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activeSubscription, setActiveSubscription] = useState<any>(null);
 
   useEffect(() => {
     const loadPricing = async () => {
@@ -140,8 +141,32 @@ export default function MerchantDashboard() {
     setPromoError('');
   };
 
-  // Helper to determine trial status
+  // Helper to determine trial status from subscriptions table or signup date
   const getTrialStatus = () => {
+    if (activeSubscription) {
+      const subStatus = activeSubscription.status;
+      const periodEnd = activeSubscription.current_period_end;
+
+      if (subStatus === 'trialing' && periodEnd) {
+        const expiryTime = new Date(periodEnd.replace(' ', 'T')).getTime();
+        const now = Date.now();
+        const diffMs = expiryTime - now;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        const daysRemaining = Math.max(0, Math.ceil(diffDays));
+        return {
+          isInTrial: daysRemaining > 0,
+          daysRemaining: daysRemaining
+        };
+      }
+
+      if (subStatus === 'active') {
+        return {
+          isInTrial: false,
+          daysRemaining: 0
+        };
+      }
+    }
+
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
       const formattedDate = user.merchant_created.replace(' ', 'T');
       const createdTime = new Date(formattedDate).getTime();
@@ -185,6 +210,21 @@ export default function MerchantDashboard() {
       return;
     }
     try {
+      // 0. Fetch active/trialing subscription
+      try {
+        const subList = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = '${user.merchant_id}' && (status = 'active' || status = 'trialing')`,
+          sort: '-created',
+        });
+        if (subList.items.length > 0) {
+          setActiveSubscription(subList.items[0]);
+        } else {
+          setActiveSubscription(null);
+        }
+      } catch (subErr) {
+        setActiveSubscription(null);
+      }
+
       // 1. Fetch merchant details
       const mRec = await pb.collection('merchants').getOne(user.merchant_id);
       setMerchant(mRec);
@@ -206,9 +246,15 @@ export default function MerchantDashboard() {
   useEffect(() => {
     fetchMerchantData();
 
-    // Subscribe to new transactions
+    // Subscribe to new transactions & subscriptions
     if (user && user.merchant_id) {
       pb.collection('transactions').subscribe('*', () => {
+        fetchMerchantData();
+      }, {
+        filter: `merchant = '${user.merchant_id}'`
+      });
+
+      pb.collection('subscriptions').subscribe('*', () => {
         fetchMerchantData();
       }, {
         filter: `merchant = '${user.merchant_id}'`
@@ -217,6 +263,7 @@ export default function MerchantDashboard() {
 
     return () => {
       pb.collection('transactions').unsubscribe('*');
+      pb.collection('subscriptions').unsubscribe('*');
     };
   }, [user]);
 

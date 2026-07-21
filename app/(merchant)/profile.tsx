@@ -272,6 +272,28 @@ export default function ProfileScreen() {
 
   // Helper to determine trial status
   const getTrialStatus = () => {
+    if (subscription) {
+      const subStatus = subscription.status;
+      const periodEnd = subscription.current_period_end;
+
+      if (subStatus === 'trialing' && periodEnd) {
+        const expiryTime = new Date(periodEnd.replace(' ', 'T')).getTime();
+        const diffDays = (expiryTime - Date.now()) / (1000 * 60 * 60 * 24);
+        const daysRemaining = Math.max(0, Math.ceil(diffDays));
+        return {
+          isInTrial: daysRemaining > 0,
+          daysRemaining: daysRemaining
+        };
+      }
+
+      if (subStatus === 'active') {
+        return {
+          isInTrial: false,
+          daysRemaining: 0
+        };
+      }
+    }
+
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
       const formattedDate = user.merchant_created.replace(' ', 'T');
       const createdTime = new Date(formattedDate).getTime();

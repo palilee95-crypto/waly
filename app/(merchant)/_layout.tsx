@@ -260,8 +260,36 @@ export default function MerchantLayout() {
     setPromoError('');
   };
 
+  const [activeSub, setActiveSub] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    async function loadActiveSub() {
+      if (!user?.merchant_id) return;
+      try {
+        const subList = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = '${user.merchant_id}' && (status = 'active' || status = 'trialing')`,
+          sort: '-created',
+        });
+        if (subList.items.length > 0) setActiveSub(subList.items[0]);
+      } catch (e) {}
+    }
+    loadActiveSub();
+  }, [user]);
+
   // Helper to determine trial status
   const getTrialStatus = () => {
+    if (activeSub) {
+      const subStatus = activeSub.status;
+      const periodEnd = activeSub.current_period_end;
+      if (subStatus === 'trialing' && periodEnd) {
+        const expiryTime = new Date(periodEnd.replace(' ', 'T')).getTime();
+        const diffDays = (expiryTime - Date.now()) / (1000 * 60 * 60 * 24);
+        const daysRemaining = Math.max(0, Math.ceil(diffDays));
+        return { isInTrial: daysRemaining > 0, daysRemaining: daysRemaining };
+      }
+      if (subStatus === 'active') return { isInTrial: false, daysRemaining: 0 };
+    }
+
     if (user?.merchant_status === 'pending' && user?.merchant_created) {
       const formattedDate = user.merchant_created.replace(' ', 'T');
       const createdTime = new Date(formattedDate).getTime();
