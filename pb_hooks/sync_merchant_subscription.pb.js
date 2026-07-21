@@ -6,11 +6,11 @@ onRecordCreate((e) => {
   if (merchantId) {
     try {
       const merchant = $app.findRecordById('merchants', merchantId);
-      if (status === 'active' || status === 'trialing') {
+      if (status === 'active') {
         if (merchant.get('status') !== 'active') {
           merchant.set('status', 'active');
           $app.save(merchant);
-          console.log("Merchant status automatically activated for subscription: ", merchantId);
+          console.log("Merchant status automatically activated for paid subscription: ", merchantId);
         }
       }
     } catch (err) {
@@ -26,13 +26,13 @@ onRecordUpdate((e) => {
   if (merchantId) {
     try {
       const merchant = $app.findRecordById('merchants', merchantId);
-      if (status === 'active' || status === 'trialing') {
+      if (status === 'active') {
         if (merchant.get('status') !== 'active') {
           merchant.set('status', 'active');
           $app.save(merchant);
           console.log("Merchant status activated on subscription update: ", merchantId);
         }
-      } else {
+      } else if (status !== 'trialing') {
         if (merchant.get('status') === 'active') {
           merchant.set('status', 'pending');
           $app.save(merchant);
