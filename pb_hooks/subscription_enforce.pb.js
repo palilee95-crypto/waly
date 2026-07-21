@@ -11,7 +11,7 @@ onRecordCreate((e) => {
         throw new ForbiddenError('Your store account is suspended. Please contact support.');
       }
 
-      // 1. Check if merchant has an active or trialing subscription record
+      // Check if merchant has an active or trialing subscription record
       let hasValidSub = false;
       try {
         const subs = $app.findRecordsByFilter('subscriptions',
@@ -26,20 +26,8 @@ onRecordCreate((e) => {
         }
       } catch (subErr) { /* ignore lookup error */ }
 
-      if (hasValidSub || status === 'active') {
-        // Permitted under Active or Admin-granted Trial Subscription
-      } else {
-        // 2. Fall back to initial 7-day free trial for new pending merchants
-        const createdTime = new Date(merchant.getString('created'));
-        const now = new Date();
-        const diffMs = now.getTime() - createdTime.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        if (status === 'pending' && diffDays >= 0 && diffDays <= 7) {
-          // Permitted under initial signup free trial
-        } else {
-          throw new ForbiddenError('Your store subscription or trial has expired. Please upgrade your subscription to continue.');
-        }
+      if (!hasValidSub) {
+        throw new ForbiddenError('Your store subscription or trial has expired. Please upgrade your subscription to continue.');
       }
     } catch (err) {
       if (err.name === 'ForbiddenError') {
