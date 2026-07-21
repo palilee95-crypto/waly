@@ -124,7 +124,7 @@ export default function GiveStampsScreen() {
       {/* Top Header Bar */}
       <View style={[styles.headerRow, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.headerTitleGroup}>
-          <Ionicons name="card-outline" size={22} color="#1E1B4B" />
+          <Ionicons name="card-outline" size={22} color="#000000" />
           <Text style={styles.headerTitle}>Issue Stamps</Text>
         </View>
         <TouchableOpacity style={styles.refreshIconBtn} onPress={fetchTransactions} activeOpacity={0.7}>
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
+    color: '#000000',
   },
   refreshIconBtn: {
     width: 36,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   heroCard: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#000000',
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   prefixCode: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#000000',
   },
   prefixDivider: {
     width: 1,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   currencyPrefix: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
+    color: '#000000',
     marginLeft: 16,
     marginRight: 8,
   },
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#000000',
   },
   presetRow: {
     flexDirection: 'row',
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   presetPillActive: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#000000',
   },
   presetText: {
     fontSize: 12,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     height: 54,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#000000',
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
+    color: '#000000',
   },
   sectionCount: {
     fontSize: 12,
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#000000',
     marginTop: 8,
     marginBottom: 2,
   },
@@ -603,14 +603,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   txnName: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#000000',
   },
   txnDate: {
     fontSize: 11,
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
   txnStamps: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#4F46E5',
+    color: '#000000',
   },
   txnBill: {
     fontSize: 11,
