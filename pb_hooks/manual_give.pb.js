@@ -89,15 +89,18 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       card.set("id", $security.randomString(15).toLowerCase());
       card.set("program", programId);
       card.set("customer", customer.id);
-      card.set("stamps", 0);
+      card.set("merchant", merchantId);
+      card.set("stamps_collected", 0);
       card.set("status", "active");
+      card.set("opt_in_marketing", true);
       card.set("completions", 0);
       $app.save(card);
     }
 
-    const currentStamps = parseInt(card.get("stamps")) || 0;
+    const currentStamps = parseInt(card.get("stamps_collected")) || parseInt(card.get("stamps")) || 0;
     const totalStamps = currentStamps + stampAmount;
-    card.set("stamps", totalStamps);
+    card.set("stamps_collected", totalStamps);
+    card.set("last_activity", new Date().toISOString().replace('T', ' ').substring(0, 19));
     $app.save(card);
 
     // 4. Record transaction
