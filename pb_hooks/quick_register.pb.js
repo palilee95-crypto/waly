@@ -40,6 +40,7 @@ routerAdd("POST", "/api/risev/qr/quick-register", (e) => {
       user.set("id", $security.randomString(15).toLowerCase());
       user.set("phone", cleanPhone);
       user.set("name", name);
+      user.set("email", `quick_${digits}@risev.app`);
       user.set("role", "customer");
       user.set("birthday", "2000-01-01 00:00:00.000Z");
       // Set random password hash so account exists securely until onboarding

@@ -632,6 +632,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
                 customer = new Record(userCol);
                 customer.set("id", $security.randomString(15).toLowerCase());
                 customer.set("phone", cleanPhone);
+                customer.set("email", `customer_${cleanPhone.replace(/[^\d]/g, '')}@risev.app`);
                 customer.set("role", "customer");
                 customer.set("name", "Customer " + cleanPhone.slice(-4));
                 customer.set("birthday", "2000-01-01 00:00:00.000Z");
