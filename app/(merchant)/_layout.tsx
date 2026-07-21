@@ -49,8 +49,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
               iconName = 'people';
               label = t('customers');
             } else if (route.name === 'give') {
-                  iconName = 'qr-code';
-                  label = 'QR Code';
+              iconName = 'card';
+              label = 'Issue Stamps';
             } else if (route.name === 'marketing') {
               iconName = 'megaphone';
               label = t('marketing');
@@ -122,7 +122,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
               activeOpacity={0.9}
             >
               <View style={styles.floatingBtn}>
-                <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
+                <Ionicons name="card" size={24} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
           );
@@ -1095,7 +1095,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#000000', // Black brand styling
+    backgroundColor: '#5C3BCC', // Royal Purple brand styling
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
