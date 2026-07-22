@@ -24,19 +24,25 @@ export default function GiveStampsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const [activeTab, setActiveTab] = useState<'manual' | 'voucher'>('manual');
+  
+  // Manual Issuance States
   const [phoneInput, setPhoneInput] = useState('');
   const [billAmount, setBillAmount] = useState('');
   const [stampAmount, setStampAmount] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Voucher Scanner States
+  const [voucherCode, setVoucherCode] = useState('');
+  const [isRedeemingVoucher, setIsRedeemingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState('');
+
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [copiedNfcLink, setCopiedNfcLink] = useState(false);
 
   const merchantId = user?.merchant_id;
-  const nfcUrl = merchantId ? `https://waly-five.vercel.app/nfc?m=${merchantId}` : '';
 
   // 1. Fetch recent transactions for active merchant
   const fetchTransactions = useCallback(async () => {
@@ -102,14 +108,45 @@ export default function GiveStampsScreen() {
     }
   };
 
-  const handleCopyNfcLink = () => {
-    if (!nfcUrl) return;
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(nfcUrl);
-      setCopiedNfcLink(true);
-      setTimeout(() => setCopiedNfcLink(false), 2500);
-    } else {
-      Alert.alert('NFC Store Link', nfcUrl);
+  // 3. Submit Voucher Code Redemption
+  const handleRedeemVoucher = async () => {
+    if (!voucherCode.trim()) {
+      setVoucherError('Please enter or scan a voucher code.');
+      return;
+    }
+
+    setIsRedeemingVoucher(true);
+    setVoucherError('');
+    setSuccessMsg(null);
+
+    try {
+      const code = voucherCode.trim().toUpperCase();
+      const vouchers = await pb.collection('vouchers').getFullList({
+        filter: `code = "${code}" && status = "active"`,
+        expand: 'reward,customer',
+      });
+
+      if (vouchers.length === 0) {
+        setVoucherError('Invalid, expired, or already used voucher code.');
+        setIsRedeemingVoucher(false);
+        return;
+      }
+
+      const v = vouchers[0];
+      await pb.collection('vouchers').update(v.id, {
+        status: 'used',
+      });
+
+      const customerName = v.expand?.customer?.name || v.expand?.customer?.phone || 'Customer';
+      const rewardName = v.expand?.reward?.title || 'Reward';
+
+      setSuccessMsg(`Voucher ${code} redeemed for ${customerName} (${rewardName})!`);
+      setVoucherCode('');
+      fetchTransactions();
+    } catch (err: any) {
+      setVoucherError(err?.message || 'Failed to redeem voucher.');
+    } finally {
+      setIsRedeemingVoucher(false);
     }
   };
 
@@ -125,7 +162,7 @@ export default function GiveStampsScreen() {
       <View style={[styles.headerRow, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.headerTitleGroup}>
           <Ionicons name="card-outline" size={22} color="#000000" />
-          <Text style={styles.headerTitle}>Issue Stamps</Text>
+          <Text style={styles.headerTitle}>Issue & Redeem</Text>
         </View>
         <TouchableOpacity style={styles.refreshIconBtn} onPress={fetchTransactions} activeOpacity={0.7}>
           <Ionicons name="refresh" size={18} color="#64748B" />
@@ -137,16 +174,37 @@ export default function GiveStampsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
       >
-        {/* Banner */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroBadge}>
-            <Ionicons name="hand-right-sharp" size={12} color="#F4A825" />
-            <Text style={styles.heroBadgeText}>MANUAL STAMP ISSUANCE</Text>
-          </View>
-          <Text style={styles.heroTitle}>Issue Stamps directly to Customer</Text>
-          <Text style={styles.heroSubtitle}>
-            Enter customer phone number to credit loyalty stamps manually if NFC card is unavailable.
-          </Text>
+        {/* Segment Tab Selector (Replaces Big Black Box) */}
+        <View style={styles.tabBarWrap}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'manual' && styles.tabBtnActive]}
+            onPress={() => {
+              setActiveTab('manual');
+              setSuccessMsg(null);
+              setVoucherError('');
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'manual' && styles.tabBtnTextActive]}>
+              Manual Issuance
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'voucher' && styles.tabBtnActive]}
+            onPress={() => {
+              setActiveTab('voucher');
+              setSuccessMsg(null);
+              setVoucherError('');
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>
+              Scan Voucher QR
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Success Alert */}
@@ -157,107 +215,166 @@ export default function GiveStampsScreen() {
           </View>
         ) : null}
 
-        {/* Manual Issue Form Card */}
-        <View style={styles.card}>
-          {/* Customer Phone Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
-            <View style={styles.inputWrap}>
-              <View style={styles.prefixBox}>
-                <Text style={styles.flag}>🇲🇾</Text>
-                <Text style={styles.prefixCode}>+60</Text>
-                <View style={styles.prefixDivider} />
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 1: MANUAL ISSUANCE FORM */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'manual' && (
+          <View style={styles.card}>
+            {/* Customer Phone Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
+              <View style={styles.inputWrap}>
+                <View style={styles.prefixBox}>
+                  <Text style={styles.flag}>🇲🇾</Text>
+                  <Text style={styles.prefixCode}>+60</Text>
+                  <View style={styles.prefixDivider} />
+                </View>
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="11 234 5678"
+                  placeholderTextColor="#94A3B8"
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  keyboardType="phone-pad"
+                />
               </View>
-              <TextInput
-                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                placeholder="11 234 5678"
-                placeholderTextColor="#94A3B8"
-                value={phoneInput}
-                onChangeText={setPhoneInput}
-                keyboardType="phone-pad"
-              />
             </View>
+
+            {/* Bill Amount Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>BILL AMOUNT (RM)</Text>
+              <View style={styles.inputWrap}>
+                <Text style={styles.currencyPrefix}>RM</Text>
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  value={billAmount}
+                  onChangeText={setBillAmount}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              {/* Quick Bill Presets */}
+              <View style={styles.presetRow}>
+                {['10', '20', '50', '100'].map((amt) => (
+                  <TouchableOpacity
+                    key={amt}
+                    style={[styles.presetPill, billAmount === amt && styles.presetPillActive]}
+                    onPress={() => setBillAmount(amt)}
+                  >
+                    <Text style={[styles.presetText, billAmount === amt && styles.presetTextActive]}>RM {amt}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Stamps to Issue Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>STAMPS TO ISSUE</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="ribbon-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="1"
+                  placeholderTextColor="#94A3B8"
+                  value={stampAmount}
+                  onChangeText={setStampAmount}
+                  keyboardType="number-pad"
+                />
+              </View>
+
+              {/* Quick Stamp Presets */}
+              <View style={styles.presetRow}>
+                {['1', '2', '3', '5'].map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
+                    onPress={() => setStampAmount(s)}
+                  >
+                    <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
+                      {s} {parseInt(s, 10) === 1 ? 'Stamp' : 'Stamps'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
+              onPress={handleManualIssue}
+              disabled={isSubmitting}
+              activeOpacity={0.8}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Issue Stamps Directly</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
+        )}
 
-          {/* Bill Amount Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>BILL AMOUNT (RM)</Text>
-            <View style={styles.inputWrap}>
-              <Text style={styles.currencyPrefix}>RM</Text>
-              <TextInput
-                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                placeholder="0.00"
-                placeholderTextColor="#94A3B8"
-                value={billAmount}
-                onChangeText={setBillAmount}
-                keyboardType="decimal-pad"
-              />
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 2: VOUCHER SCANNER & REDEMPTION FORM */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'voucher' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Voucher Redemption Scanner</Text>
+            <Text style={styles.cardSubtitle}>
+              Scan customer QR code or enter voucher code (e.g. WV-XXXX-XXXX) to redeem rewards.
+            </Text>
+
+            {voucherError ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Text style={styles.errorBannerText}>{voucherError}</Text>
+              </View>
+            ) : null}
+
+            {/* Voucher Code Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>VOUCHER CODE</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="qr-code-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="e.g. WV-1234-5678"
+                  placeholderTextColor="#94A3B8"
+                  value={voucherCode}
+                  onChangeText={(text) => {
+                    setVoucherCode(text);
+                    setVoucherError('');
+                  }}
+                  autoCapitalize="characters"
+                />
+              </View>
             </View>
 
-            {/* Quick Bill Presets */}
-            <View style={styles.presetRow}>
-              {['10', '20', '50', '100'].map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[styles.presetPill, billAmount === amt && styles.presetPillActive]}
-                  onPress={() => setBillAmount(amt)}
-                >
-                  <Text style={[styles.presetText, billAmount === amt && styles.presetTextActive]}>RM {amt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Redeem Button */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: '#10B981' }, isRedeemingVoucher && styles.primaryBtnDisabled]}
+              onPress={handleRedeemVoucher}
+              disabled={isRedeemingVoucher}
+              activeOpacity={0.8}
+            >
+              {isRedeemingVoucher ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="gift-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Redeem Voucher Now</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
+        )}
 
-          {/* Stamps to Issue Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>STAMPS TO ISSUE</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="ribbon-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
-              <TextInput
-                style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                placeholder="1"
-                placeholderTextColor="#94A3B8"
-                value={stampAmount}
-                onChangeText={setStampAmount}
-                keyboardType="number-pad"
-              />
-            </View>
-
-            {/* Quick Stamp Presets */}
-            <View style={styles.presetRow}>
-              {['1', '2', '3', '5'].map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
-                  onPress={() => setStampAmount(s)}
-                >
-                  <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
-                    {s} {parseInt(s) === 1 ? 'Stamp' : 'Stamps'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
-            onPress={handleManualIssue}
-            disabled={isSubmitting}
-            activeOpacity={0.8}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryBtnText}>Issue Stamps Directly</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Manual & Activity Log */}
+        {/* Recent Activity Log */}
         <View style={styles.historySection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity Log</Text>
@@ -270,24 +387,37 @@ export default function GiveStampsScreen() {
             <View style={styles.emptyCard}>
               <Ionicons name="receipt-outline" size={36} color="#CBD5E1" />
               <Text style={styles.emptyTitle}>No Recent Activity</Text>
-              <Text style={styles.emptySubtitle}>Issued stamps will appear here in real time.</Text>
+              <Text style={styles.emptySubtitle}>Issued stamps & redeemed vouchers will appear here.</Text>
             </View>
           ) : (
-            transactions.map((item) => (
-              <View key={item.id} style={styles.txnCard}>
-                <View style={styles.txnIconBg}>
-                  <Ionicons name="ribbon-outline" size={18} color="#4F46E5" />
+            transactions.map((item) => {
+              const isRedeem = item.type === 'redeem';
+              return (
+                <View key={item.id} style={styles.txnCard}>
+                  <View style={[styles.txnIconBg, isRedeem && { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons
+                      name={isRedeem ? 'gift-outline' : 'ribbon-outline'}
+                      size={18}
+                      color={isRedeem ? '#EF4444' : '#4F46E5'}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.txnName}>
+                      {item.expand?.customer?.name || item.expand?.customer?.phone || 'Customer'}
+                    </Text>
+                    <Text style={styles.txnDate}>{new Date(item.created).toLocaleString()}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.txnStamps, isRedeem && { color: '#EF4444' }]}>
+                      {isRedeem ? 'Redeemed' : `+${item.stamps} Stamp(s)`}
+                    </Text>
+                    <Text style={styles.txnBill}>
+                      {isRedeem ? 'Voucher' : `RM ${parseFloat(item.bill_amount || 0).toFixed(2)}`}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.txnName}>{item.expand?.customer?.name || item.expand?.customer?.phone || 'Customer'}</Text>
-                  <Text style={styles.txnDate}>{new Date(item.created).toLocaleString()}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.txnStamps}>+{item.stamps} Stamp(s)</Text>
-                  <Text style={styles.txnBill}>RM {parseFloat(item.bill_amount || 0).toFixed(2)}</Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -333,41 +463,41 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
-  heroCard: {
-    backgroundColor: '#000000',
-    borderRadius: 24,
-    padding: 24,
+
+  // Segment Tab Selector (Clean & Sleek)
+  tabBarWrap: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 4,
     marginBottom: 20,
   },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  tabBtn: {
+    flex: 1,
+    height: 44,
     borderRadius: 12,
-    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
   },
-  heroBadgeText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#F4A825',
-    letterSpacing: 0.5,
+  tabBtnActive: {
+    backgroundColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  heroTitle: {
-    fontSize: 22,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  tabBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  tabBtnTextActive: {
     color: '#FFFFFF',
-    marginBottom: 8,
   },
-  heroSubtitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#94A3B8',
-    lineHeight: 20,
-  },
+
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,12 +515,40 @@ const styles = StyleSheet.create({
     color: '#065F46',
     flex: 1,
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  errorBannerText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#B91C1C',
+    flex: 1,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    color: '#64748B',
+    lineHeight: 18,
     marginBottom: 20,
   },
   inputContainer: {
@@ -487,65 +645,6 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  nfcCard: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    marginBottom: 24,
-  },
-  nfcHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  nfcIconBg: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nfcCardTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#312E81',
-  },
-  nfcCardSubtitle: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#4338CA',
-  },
-  nfcLinkBox: {
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    marginBottom: 12,
-  },
-  nfcLinkText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#3730A3',
-  },
-  nfcCopyBtn: {
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#4F46E5',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nfcCopyBtnText: {
-    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
