@@ -115,31 +115,14 @@ export default function CustomerDashboard() {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const fetchNotifications = async () => {
-    if (!user) return;
-    try {
-      setLoadingNotifications(true);
-      const records = await pb.collection('notifications').getFullList({
-        filter: `recipient = '${user.id}'`,
-        sort: '-created'
-      });
-      setNotificationsList(records);
-    } catch (err) {
-      console.warn('Failed to fetch notifications list:', err);
-    } finally {
-      setLoadingNotifications(false);
-    }
+    // Notifications collection was removed in backend cleanup migration
+    setNotificationsList([]);
+    setLoadingNotifications(false);
   };
 
   const handleCloseNotifications = async () => {
     setShowNotificationsModal(false);
-    const unread = notificationsList.filter(n => !n.is_read);
-    if (unread.length === 0) return;
-    try {
-      await Promise.all(unread.map(n => pb.collection('notifications').update(n.id, { is_read: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.warn('Failed to mark notifications as read:', err);
-    }
+    setUnreadCount(0);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -209,25 +192,7 @@ export default function CustomerDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch initial count of unread notifications (safely handled if collection removed)
-    pb.collection('notifications')
-      .getList(1, 1, {
-        filter: `recipient = '${user.id}' && is_read = false`,
-      })
-      .then((res) => {
-        setUnreadCount(res.totalItems);
-      })
-      .catch(() => {});
-
-    // Listen to real-time notification additions
-    pb.collection('notifications').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        setUnreadCount((prev) => prev + 1);
-        fetchNotifications();
-      }
-    }, {
-      filter: `recipient = '${user.id}'`,
-    }).catch(() => {});
+    setUnreadCount(0);
 
     fetchLoyaltyCards();
 
@@ -239,7 +204,6 @@ export default function CustomerDashboard() {
     });
 
     return () => {
-      pb.collection('notifications').unsubscribe('*').catch(() => {});
       pb.collection('loyalty_cards').unsubscribe('*');
     };
   }, [user]);

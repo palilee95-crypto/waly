@@ -39,26 +39,7 @@ function AppContent() {
   const [bannerBody, setBannerBody] = useState('');
   const [bannerType, setBannerType] = useState<'points' | 'reward' | 'campaign' | 'tier' | 'badge' | 'voucher' | 'system'>('system');
 
-  useEffect(() => {
-    if (!user) return;
 
-    // Subscribe to notification database events for this user (safely handled if collection removed)
-    pb.collection('notifications').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        const record = e.record;
-        setBannerTitle(record.title || 'Notification');
-        setBannerBody(record.body || '');
-        setBannerType(record.type || 'system');
-        setBannerVisible(true);
-      }
-    }, {
-      filter: `recipient = '${user.id}'`,
-    }).catch(() => {});
-
-    return () => {
-      pb.collection('notifications').unsubscribe('*').catch(() => {});
-    };
-  }, [user]);
 
   return (
     <>
