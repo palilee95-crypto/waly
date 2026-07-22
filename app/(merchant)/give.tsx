@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
@@ -24,18 +25,23 @@ export default function GiveStampsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'voucher'>('manual');
-  
-  // Manual Issuance States
-  const [phoneInput, setPhoneInput] = useState('');
-  const [billAmount, setBillAmount] = useState('');
-  const [stampAmount, setStampAmount] = useState('1');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Default to Scan Voucher QR tab first (per user request)
+  const [activeTab, setActiveTab] = useState<'voucher' | 'manual'>('voucher');
+
+  // Camera Scanner States
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
   // Voucher Scanner States
   const [voucherCode, setVoucherCode] = useState('');
   const [isRedeemingVoucher, setIsRedeemingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
+
+  // Manual Issuance States
+  const [phoneInput, setPhoneInput] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [stampAmount, setStampAmount] = useState('1');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -66,7 +72,59 @@ export default function GiveStampsScreen() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // 2. Submit Manual Stamp Issuance
+  // 2. Submit Voucher Code Redemption
+  const handleRedeemVoucher = async () => {
+    if (!voucherCode.trim()) {
+      setVoucherError('Please enter or scan a voucher code.');
+      return;
+    }
+
+    setIsRedeemingVoucher(true);
+    setVoucherError('');
+    setSuccessMsg(null);
+
+    try {
+      const code = voucherCode.trim().toUpperCase();
+      const vouchers = await pb.collection('vouchers').getFullList({
+        filter: `code = "${code}" && status = "active"`,
+        expand: 'reward,customer',
+      });
+
+      if (vouchers.length === 0) {
+        setVoucherError('Invalid, expired, or already used voucher code.');
+        setIsRedeemingVoucher(false);
+        return;
+      }
+
+      const v = vouchers[0];
+      await pb.collection('vouchers').update(v.id, {
+        status: 'used',
+      });
+
+      const customerName = v.expand?.customer?.name || v.expand?.customer?.phone || 'Customer';
+      const rewardName = v.expand?.reward?.title || 'Reward';
+
+      setSuccessMsg(`Voucher ${code} redeemed for ${customerName} (${rewardName})!`);
+      setVoucherCode('');
+      setIsCameraActive(false);
+      fetchTransactions();
+    } catch (err: any) {
+      setVoucherError(err?.message || 'Failed to redeem voucher.');
+    } finally {
+      setIsRedeemingVoucher(false);
+    }
+  };
+
+  // 3. Camera Scan Handler
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (data) {
+      setVoucherCode(data.trim());
+      setIsCameraActive(false);
+      setVoucherError('');
+    }
+  };
+
+  // 4. Submit Manual Stamp Issuance
   const handleManualIssue = async () => {
     if (!phoneInput.trim()) {
       Alert.alert('Validation Error', 'Please enter customer phone number.');
@@ -108,48 +166,6 @@ export default function GiveStampsScreen() {
     }
   };
 
-  // 3. Submit Voucher Code Redemption
-  const handleRedeemVoucher = async () => {
-    if (!voucherCode.trim()) {
-      setVoucherError('Please enter or scan a voucher code.');
-      return;
-    }
-
-    setIsRedeemingVoucher(true);
-    setVoucherError('');
-    setSuccessMsg(null);
-
-    try {
-      const code = voucherCode.trim().toUpperCase();
-      const vouchers = await pb.collection('vouchers').getFullList({
-        filter: `code = "${code}" && status = "active"`,
-        expand: 'reward,customer',
-      });
-
-      if (vouchers.length === 0) {
-        setVoucherError('Invalid, expired, or already used voucher code.');
-        setIsRedeemingVoucher(false);
-        return;
-      }
-
-      const v = vouchers[0];
-      await pb.collection('vouchers').update(v.id, {
-        status: 'used',
-      });
-
-      const customerName = v.expand?.customer?.name || v.expand?.customer?.phone || 'Customer';
-      const rewardName = v.expand?.reward?.title || 'Reward';
-
-      setSuccessMsg(`Voucher ${code} redeemed for ${customerName} (${rewardName})!`);
-      setVoucherCode('');
-      fetchTransactions();
-    } catch (err: any) {
-      setVoucherError(err?.message || 'Failed to redeem voucher.');
-    } finally {
-      setIsRedeemingVoucher(false);
-    }
-  };
-
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchTransactions();
@@ -174,23 +190,8 @@ export default function GiveStampsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
       >
-        {/* Segment Tab Selector (Replaces Big Black Box) */}
+        {/* Segment Tab Selector (Monochrome Black & White) */}
         <View style={styles.tabBarWrap}>
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'manual' && styles.tabBtnActive]}
-            onPress={() => {
-              setActiveTab('manual');
-              setSuccessMsg(null);
-              setVoucherError('');
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#FFFFFF' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'manual' && styles.tabBtnTextActive]}>
-              Manual Issuance
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'voucher' && styles.tabBtnActive]}
             onPress={() => {
@@ -205,6 +206,22 @@ export default function GiveStampsScreen() {
               Scan Voucher QR
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'manual' && styles.tabBtnActive]}
+            onPress={() => {
+              setActiveTab('manual');
+              setSuccessMsg(null);
+              setVoucherError('');
+              setIsCameraActive(false);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'manual' && styles.tabBtnTextActive]}>
+              Manual Issuance
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Success Alert */}
@@ -216,10 +233,124 @@ export default function GiveStampsScreen() {
         ) : null}
 
         {/* ───────────────────────────────────────────────────────────── */}
-        {/* TAB 1: MANUAL ISSUANCE FORM */}
+        {/* TAB 1: VOUCHER QR SCANNER & REDEMPTION FORM */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'voucher' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Voucher Redemption Scanner</Text>
+            <Text style={styles.cardSubtitle}>
+              Scan customer QR code or enter voucher code (e.g. WV-XXXX-XXXX) to redeem rewards.
+            </Text>
+
+            {/* Viewfinder & Camera Scanner Card */}
+            <View style={styles.viewfinderCard}>
+              {isCameraActive ? (
+                permission?.granted ? (
+                  <CameraView
+                    style={styles.cameraView}
+                    facing="back"
+                    onBarcodeScanned={handleBarCodeScanned}
+                  >
+                    <View style={styles.scannerOverlay}>
+                      <View style={styles.scanTargetBox}>
+                        <View style={[styles.cornerBracket, styles.topLeft]} />
+                        <View style={[styles.cornerBracket, styles.topRight]} />
+                        <View style={[styles.cornerBracket, styles.bottomLeft]} />
+                        <View style={[styles.cornerBracket, styles.bottomRight]} />
+                      </View>
+                    </View>
+                  </CameraView>
+                ) : (
+                  <View style={styles.cameraFallbackWrap}>
+                    <Text style={styles.cameraFallbackText}>Camera permission needed to scan QR codes</Text>
+                    <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+                      <Text style={styles.permissionBtnText}>Grant Camera Permission</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              ) : (
+                <View style={styles.viewfinderPlaceholder}>
+                  <View style={styles.scannerTargetGraphic}>
+                    <Ionicons name="qr-code" size={44} color="#FFFFFF" />
+                    <View style={[styles.cornerBracket, styles.topLeft]} />
+                    <View style={[styles.cornerBracket, styles.topRight]} />
+                    <View style={[styles.cornerBracket, styles.bottomLeft]} />
+                    <View style={[styles.cornerBracket, styles.bottomRight]} />
+                  </View>
+                  <Text style={styles.viewfinderHint}>Align QR code inside scanner frame</Text>
+                  <TouchableOpacity
+                    style={styles.activateCameraBtn}
+                    onPress={async () => {
+                      if (!permission?.granted) {
+                        const res = await requestPermission();
+                        if (res.granted) setIsCameraActive(true);
+                      } else {
+                        setIsCameraActive(true);
+                      }
+                    }}
+                  >
+                    <Ionicons name="camera-outline" size={18} color="#000000" />
+                    <Text style={styles.activateCameraBtnText}>Open Camera Scanner</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {voucherError ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Text style={styles.errorBannerText}>{voucherError}</Text>
+              </View>
+            ) : null}
+
+            {/* Voucher Code Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>VOUCHER CODE</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="qr-code-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder="e.g. WV-1234-5678"
+                  placeholderTextColor="#94A3B8"
+                  value={voucherCode}
+                  onChangeText={(text) => {
+                    setVoucherCode(text);
+                    setVoucherError('');
+                  }}
+                  autoCapitalize="characters"
+                />
+              </View>
+            </View>
+
+            {/* Redeem Button (Sleek Black & White) */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
+              onPress={handleRedeemVoucher}
+              disabled={isRedeemingVoucher}
+              activeOpacity={0.8}
+            >
+              {isRedeemingVoucher ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="gift-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Redeem Voucher Now</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 2: MANUAL ISSUANCE FORM */}
         {/* ───────────────────────────────────────────────────────────── */}
         {activeTab === 'manual' && (
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>Manual Stamp Issuance</Text>
+            <Text style={styles.cardSubtitle}>
+              Enter customer phone number to credit loyalty stamps directly if NFC card is unavailable.
+            </Text>
+
             {/* Customer Phone Input */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
@@ -319,61 +450,6 @@ export default function GiveStampsScreen() {
           </View>
         )}
 
-        {/* ───────────────────────────────────────────────────────────── */}
-        {/* TAB 2: VOUCHER SCANNER & REDEMPTION FORM */}
-        {/* ───────────────────────────────────────────────────────────── */}
-        {activeTab === 'voucher' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Voucher Redemption Scanner</Text>
-            <Text style={styles.cardSubtitle}>
-              Scan customer QR code or enter voucher code (e.g. WV-XXXX-XXXX) to redeem rewards.
-            </Text>
-
-            {voucherError ? (
-              <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle" size={18} color="#EF4444" />
-                <Text style={styles.errorBannerText}>{voucherError}</Text>
-              </View>
-            ) : null}
-
-            {/* Voucher Code Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>VOUCHER CODE</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="qr-code-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
-                <TextInput
-                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                  placeholder="e.g. WV-1234-5678"
-                  placeholderTextColor="#94A3B8"
-                  value={voucherCode}
-                  onChangeText={(text) => {
-                    setVoucherCode(text);
-                    setVoucherError('');
-                  }}
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
-
-            {/* Redeem Button */}
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: '#10B981' }, isRedeemingVoucher && styles.primaryBtnDisabled]}
-              onPress={handleRedeemVoucher}
-              disabled={isRedeemingVoucher}
-              activeOpacity={0.8}
-            >
-              {isRedeemingVoucher ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="gift-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>Redeem Voucher Now</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Recent Activity Log */}
         <View style={styles.historySection}>
           <View style={styles.sectionHeader}>
@@ -394,11 +470,11 @@ export default function GiveStampsScreen() {
               const isRedeem = item.type === 'redeem';
               return (
                 <View key={item.id} style={styles.txnCard}>
-                  <View style={[styles.txnIconBg, isRedeem && { backgroundColor: '#FEE2E2' }]}>
+                  <View style={[styles.txnIconBg, isRedeem && { backgroundColor: '#F8FAFC' }]}>
                     <Ionicons
                       name={isRedeem ? 'gift-outline' : 'ribbon-outline'}
                       size={18}
-                      color={isRedeem ? '#EF4444' : '#4F46E5'}
+                      color="#000000"
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -408,7 +484,7 @@ export default function GiveStampsScreen() {
                     <Text style={styles.txnDate}>{new Date(item.created).toLocaleString()}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.txnStamps, isRedeem && { color: '#EF4444' }]}>
+                    <Text style={styles.txnStamps}>
                       {isRedeem ? 'Redeemed' : `+${item.stamps} Stamp(s)`}
                     </Text>
                     <Text style={styles.txnBill}>
@@ -464,7 +540,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  // Segment Tab Selector (Clean & Sleek)
+  // Segment Tab Selector (Monochrome Black & White)
   tabBarWrap: {
     flexDirection: 'row',
     backgroundColor: '#E2E8F0',
@@ -551,6 +627,126 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 20,
   },
+
+  // Viewfinder & Camera Scanner Card
+  viewfinderCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 20,
+    minHeight: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraView: {
+    width: '100%',
+    height: 240,
+  },
+  scannerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  scanTargetBox: {
+    width: 180,
+    height: 180,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 16,
+  },
+  viewfinderPlaceholder: {
+    padding: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  scannerTargetGraphic: {
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: 14,
+  },
+  cornerBracket: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#FFFFFF',
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 6,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 6,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 6,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 6,
+  },
+  viewfinderHint: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  activateCameraBtn: {
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activateCameraBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  cameraFallbackWrap: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  cameraFallbackText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  permissionBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  permissionBtnText: {
+    color: '#000000',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
   inputContainer: {
     marginBottom: 20,
   },
