@@ -136,12 +136,14 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       const instanceName = `merchant-${merchantId}-${nameSlug}`;
       const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
 
+      const customerFirstName = customerName ? customerName.split(' ')[0] : 'there';
+      const warningText = "\n\n⚠️ *Peringatan*: Mohon jangan laporkan (report) mesej ini sebagai spam. Anda boleh mematikan notifikasi WhatsApp di Profil anda.";
       let replyMsg = "";
       if (totalStamps >= goal) {
         const remaining = totalStamps % goal;
-        replyMsg = `Hi ${customerName}! 🎉 You earned ${stampAmount} stamp(s) at *${storeName}* and completed your card!\n\nA reward voucher has been added to your account. Your new balance: ${remaining}/${goal} stamp(s).\n\nView your card & rewards here:\n${appUrl}`;
+        replyMsg = `Hi ${customerFirstName}! 🎉 You earned ${stampAmount} stamp(s) at *${storeName}* and completed your card!\n\nA reward voucher has been added to your account. Your new balance: *${remaining}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}${warningText}`;
       } else {
-        replyMsg = `Hi ${customerName}! ${stampAmount} stamp(s) added from *${storeName}*! 🎉\n\nYou now have *${totalStamps}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}`;
+        replyMsg = `Hi ${customerFirstName}! ${stampAmount} stamp(s) added from *${storeName}*! 🎉\n\nYou now have *${totalStamps}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}${warningText}`;
       }
 
       try {

@@ -1,9 +1,24 @@
 onRecordAfterCreateSuccess((e) => {
   if (e.record.get('type') !== 'earn') return e.next();
 
-  // Skip duplicate notification if transaction was created by inbound QR webhook (which sends its own auto-reply)
-  const metadata = e.record.get('metadata') || {};
-  if (metadata.source === 'qr_inbound') {
+  // Skip duplicate notification if transaction was created by manual_give, nfc_claim, or qr_inbound (which send their own auto-reply)
+  let source = "";
+  try {
+    const rawMeta = e.record.get('metadata');
+    if (typeof rawMeta === 'string' && rawMeta.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawMeta);
+        source = parsed.source || "";
+      } catch (pErr) {
+        source = rawMeta;
+      }
+    } else if (rawMeta && typeof rawMeta === 'object') {
+      source = rawMeta.source || "";
+    }
+  } catch (mErr) {}
+
+  if (source === 'qr_inbound' || source === 'manual_give' || source === 'nfc_claim') {
+    console.log(`[WHATSAPP HOOK] Skipping transaction notification for source: ${source}`);
     return e.next();
   }
 

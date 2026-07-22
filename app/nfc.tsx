@@ -15,9 +15,34 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
+
+const stampIcons = [
+  { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
+  { id: 'star', family: 'FontAwesome', name: 'star' },
+  { id: 'heart', family: 'Ionicons', name: 'heart' },
+  { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
+  { id: 'cake', family: 'MaterialIcons', name: 'cake' },
+  { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
+  { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
+  { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
+];
+
+const renderStampIcon = (iconId: string, size: number, color: string) => {
+  const icon = stampIcons.find(i => i.id === iconId) || stampIcons.find(i => i.id === 'coffee')!;
+  if (icon.family === 'Ionicons') {
+    return <Ionicons name={icon.name as any} size={size} color={color} />;
+  }
+  if (icon.family === 'FontAwesome') {
+    return <FontAwesome name={icon.name as any} size={size} color={color} />;
+  }
+  if (icon.family === 'MaterialIcons') {
+    return <MaterialIcons name={icon.name as any} size={size} color={color} />;
+  }
+  return <Ionicons name="cafe" size={size} color={color} />;
+};
 
 export default function NfcLandingScreen() {
   const router = useRouter();
@@ -445,20 +470,28 @@ export default function NfcLandingScreen() {
           )}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 3: DEDICATED 9:16 LOYALTY CARD VIEW (Images 2 & 3!) */}
+          {/* STEP 3: DEDICATED REAL MERCHANT LOYALTY CARD VIEW */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'card' && (
             <View style={styles.cardSectionWrap}>
               {/* STAMP GRID CARD */}
-              <View style={[styles.stampGridCard, { backgroundColor: primaryColor + '22', borderColor: primaryColor + '44' }]}>
+              <View style={[styles.stampGridCard, { backgroundColor: program?.card_color || primaryColor, borderColor: 'rgba(255,255,255,0.3)', overflow: 'hidden', position: 'relative' }]}>
+                {program?.card_background ? (
+                  <Image
+                    source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
                 {/* Stamp Counter Header */}
                 <View style={styles.stampCounterRow}>
                   <Text style={styles.stampFractionText}>
-                    <Text style={{ fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{currentStamps}</Text>
-                    <Text style={{ fontSize: 24, color: '#64748B' }}> /{stampGoal}</Text>
+                    <Text style={{ fontSize: 38, fontFamily: 'PlusJakartaSans_800ExtraBold', color: program?.font_color || '#FFFFFF' }}>{currentStamps}</Text>
+                    <Text style={{ fontSize: 24, color: (program?.font_color || '#FFFFFF') + 'AA' }}> /{stampGoal}</Text>
                   </Text>
 
-                  {/* Stamp Grid Pills (e.g. 1 2 3 4 5 🎁) */}
+                  {/* Stamp Grid Pills with Real Custom Stamp Icon */}
                   <View style={styles.pillsWrap}>
                     {Array.from({ length: stampGoal }).map((_, idx) => {
                       const num = idx + 1;
@@ -470,14 +503,15 @@ export default function NfcLandingScreen() {
                           key={num}
                           style={[
                             styles.stampPill,
-                            isFilled && { backgroundColor: primaryColor },
-                            isRewardPos && !isFilled && { backgroundColor: '#FEE2E2' }
+                            isFilled ? { backgroundColor: '#FFFFFF' } : { backgroundColor: 'rgba(255,255,255,0.25)' },
                           ]}
                         >
-                          {isRewardPos ? (
+                          {isFilled ? (
+                            renderStampIcon(program?.card_icon || 'coffee', 16, program?.stamp_color || '#3B82F6')
+                          ) : isRewardPos ? (
                             <Text style={{ fontSize: 13 }}>🎁</Text>
                           ) : (
-                            <Text style={[styles.stampPillText, isFilled && { color: '#FFFFFF' }]}>{num}</Text>
+                            <Text style={[styles.stampPillText, { color: program?.font_color || '#FFFFFF' }]}>{num}</Text>
                           )}
                         </View>
                       );
@@ -492,7 +526,7 @@ export default function NfcLandingScreen() {
                     <Text style={styles.rewardSubSubtitle}>
                       {stampGoal - currentStamps > 0
                         ? `${stampGoal - currentStamps} more stamps to:`
-                        : 'Stamp card completed!'}
+                        : 'Stamp card completed! 🎉'}
                     </Text>
                     <Text style={styles.rewardSubTitle} numberOfLines={2}>
                       {rewardTitle}
@@ -517,16 +551,11 @@ export default function NfcLandingScreen() {
                     styles.unlockBtn,
                     currentStamps >= stampGoal
                       ? { backgroundColor: '#10B981' }
-                      : { backgroundColor: primaryColor + '20' }
+                      : { backgroundColor: '#000000' }
                   ]}
                   activeOpacity={0.8}
                 >
-                  <Text
-                    style={[
-                      styles.unlockBtnText,
-                      currentStamps >= stampGoal ? { color: '#FFFFFF' } : { color: '#000000' }
-                    ]}
-                  >
+                  <Text style={[styles.unlockBtnText, { color: '#FFFFFF' }]}>
                     {currentStamps >= stampGoal
                       ? '🎉 Redeem Reward Now'
                       : `Collect ${stampGoal - currentStamps} stamps to unlock`}
