@@ -2170,7 +2170,25 @@ export default function ProfileScreen() {
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.inputLabel}>PRIMARY COLOR</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: brandingPrimaryColor, borderWidth: 1.5, borderColor: '#E2E8F0' }} />
+                  <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: brandingPrimaryColor, borderWidth: 1.5, borderColor: '#CBD5E1', overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center' }}>
+                    {Platform.OS === 'web' && (
+                      <input
+                        type="color"
+                        value={brandingPrimaryColor}
+                        onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
+                        style={{
+                          position: 'absolute',
+                          top: -10,
+                          left: -10,
+                          width: 64,
+                          height: 64,
+                          opacity: 0,
+                          cursor: 'pointer',
+                        }}
+                      />
+                    )}
+                    <Ionicons name="color-palette-outline" size={20} color={['#ffffff', '#fff'].includes(brandingPrimaryColor.toLowerCase()) ? '#000000' : '#FFFFFF'} />
+                  </View>
                   <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
                     <TextInput
                       style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
@@ -2182,8 +2200,8 @@ export default function ProfileScreen() {
                     />
                   </View>
                 </View>
-                {/* Preset Color Swatches */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                {/* Preset Color Swatches & Color Wheel Trigger */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   {['#000000', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
                     <TouchableOpacity
                       key={c}
@@ -2198,9 +2216,46 @@ export default function ProfileScreen() {
                       onPress={() => setBrandingPrimaryColor(c)}
                     />
                   ))}
+
+                  {/* Native Color Wheel Button */}
+                  {Platform.OS === 'web' && (
+                    <TouchableOpacity
+                      style={{
+                        height: 32,
+                        paddingHorizontal: 12,
+                        borderRadius: 16,
+                        backgroundColor: '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: '#CBD5E1',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Ionicons name="color-palette-outline" size={15} color="#000000" />
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>Color Wheel</Text>
+                      <input
+                        type="color"
+                        value={brandingPrimaryColor}
+                        onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          opacity: 0,
+                          cursor: 'pointer',
+                        }}
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 6 }}>
-                  Used for buttons and highlights on the customer onboarding page.
+                  Click color box or Color Wheel button to choose custom brand colors.
                 </Text>
               </View>
 
@@ -2298,9 +2353,19 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Save Button */}
+              {/* Save Button (Solid Black SAVE Button) */}
               <TouchableOpacity
-                style={[styles.updateBtn, isSavingBranding && { opacity: 0.6 }]}
+                style={[
+                  {
+                    height: 52,
+                    borderRadius: 14,
+                    backgroundColor: '#000000',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: 8,
+                  },
+                  isSavingBranding && { opacity: 0.6 }
+                ]}
                 onPress={handleSaveBranding}
                 disabled={isSavingBranding}
                 activeOpacity={0.8}
@@ -2308,7 +2373,7 @@ export default function ProfileScreen() {
                 {isSavingBranding ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.updateBtnText}>Save Branding</Text>
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, letterSpacing: 1 }}>SAVE</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
