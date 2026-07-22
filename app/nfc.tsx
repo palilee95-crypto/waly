@@ -539,37 +539,63 @@ export default function NfcLandingScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          isDesktop && { maxWidth: 440, alignSelf: 'center', width: '100%' }
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {merchantBgUrl ? (
-          <ImageBackground
-            source={{ uri: merchantBgUrl }}
-            resizeMode="cover"
-            style={styles.portrait916Card}
-          >
-            {renderCardContent()}
-          </ImageBackground>
-        ) : (
-          <View style={[styles.portrait916Card, { backgroundColor: primaryColor + '12' }]}>
-            {renderCardContent()}
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+    <View style={[styles.fullPageContainer, !merchantBgUrl && { backgroundColor: primaryColor + '20' }]}>
+      {merchantBgUrl ? (
+        <ImageBackground
+          source={{ uri: merchantBgUrl }}
+          resizeMode="cover"
+          style={styles.fullPageBackground}
+        >
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.scrollContent,
+                isDesktop && styles.desktopScrollContent
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.contentCard, isDesktop && styles.desktopCard]}>
+                {renderCardContent()}
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </ImageBackground>
+      ) : (
+        <View style={styles.fullPageBackground}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.scrollContent,
+                isDesktop && styles.desktopScrollContent
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.contentCard, isDesktop && styles.desktopCard]}>
+                {renderCardContent()}
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fullPageContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  fullPageBackground: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'transparent',
   },
   loadingWrap: {
     flex: 1,
@@ -611,11 +637,29 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   scrollContent: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    flexGrow: 1,
+    padding: 16,
   },
-
-  // 9:16 Portrait Mode Outer Container
+  desktopScrollContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  contentCard: {
+    width: '100%',
+  },
+  desktopCard: {
+    maxWidth: 440,
+    borderRadius: 32,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+  },
   portrait916Card: {
     borderRadius: 32,
     overflow: 'hidden',
