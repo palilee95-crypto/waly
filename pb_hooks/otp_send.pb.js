@@ -41,7 +41,7 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
 
   const user = lookupFn(phone);
   if (user) {
-    return e.json(200, { exists: true, email: user.getString("email") });
+    return e.json(200, { exists: true, name: user.getString("name"), email: user.getString("email") });
   } else {
     return e.json(200, { exists: false });
   }
@@ -79,24 +79,41 @@ routerAdd("POST", "/api/risev/register", (e) => {
 
   // Check phone uniqueness with normalized digits
   const existingUser = lookupFn(phone);
+  let isQuickUpgrade = false;
   if (existingUser) {
-    return e.json(400, { message: "Phone number is already registered" });
+    const existingEmail = existingUser.getString("email") || "";
+    if (existingEmail.endsWith("@risev.app") || existingEmail.includes("@risev.app")) {
+      isQuickUpgrade = true;
+    } else {
+      return e.json(400, { message: "Phone number is already registered" });
+    }
   }
 
   // Check email uniqueness
   try {
-    $app.findFirstRecordByData("users", "email", email);
-    return e.json(400, { message: "Email address is already registered" });
+    const emailUser = $app.findFirstRecordByData("users", "email", email);
+    if (!isQuickUpgrade || emailUser.id !== existingUser.id) {
+      return e.json(400, { message: "Email address is already registered" });
+    }
   } catch (err) { /* ok */ }
 
+  const formattedBirthday = (birthday && birthday.length === 10) ? `${birthday} 00:00:00.000Z` : birthday;
+
   try {
-    const collection = $app.findCollectionByNameOrId("users");
-    const user = new Record(collection);
-    user.set("phone", phone);
+    let user;
+    if (isQuickUpgrade) {
+      user = existingUser;
+    } else {
+      const collection = $app.findCollectionByNameOrId("users");
+      user = new Record(collection);
+      user.set("phone", phone);
+    }
     user.set("email", email);
     user.set("name", name || `User ${phone.slice(-4)}`);
     user.set("role", role);
-    user.set("birthday", birthday);
+    if (formattedBirthday) {
+      user.set("birthday", formattedBirthday);
+    }
     user.set("verified", true);
     user.setPassword(password);
     $app.save(user);
@@ -104,31 +121,34 @@ routerAdd("POST", "/api/risev/register", (e) => {
     // Auto-provision merchant if role is merchant or both
     if (role === 'merchant' || role === 'both') {
       try {
-        const mc = $app.findCollectionByNameOrId("merchants");
-        const merchant = new Record(mc);
-        merchant.set("name", `${user.getString("name")}'s Shop`);
-        merchant.set("owner", user.id);
-        merchant.set("category", "food");
-        merchant.set("status", "active");
-        $app.save(merchant);
-        user.set("merchant_id", merchant.id);
-        $app.save(user);
+        const merchantId = user.getString("merchant_id");
+        if (!merchantId) {
+          const mc = $app.findCollectionByNameOrId("merchants");
+          const merchant = new Record(mc);
+          merchant.set("name", `${user.getString("name")}'s Shop`);
+          merchant.set("owner", user.id);
+          merchant.set("category", "food");
+          merchant.set("status", "active");
+          $app.save(merchant);
+          user.set("merchant_id", merchant.id);
+          $app.save(user);
 
-        // Auto-provision initial 7-day free trial in subscriptions collection
-        try {
-          const sc = $app.findCollectionByNameOrId("subscriptions");
-          const sub = new Record(sc);
-          sub.set("merchant", merchant.id);
-          sub.set("plan", "pro");
-          sub.set("status", "trialing");
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 7);
-          sub.set("current_period_end", expiry.toISOString().replace('T', ' ').substring(0, 19));
-          sub.set("chipin_payment_id", `signup_free_trial_${Date.now()}`);
-          sub.set("chipin_customer_email", email || "signup_trial@risev.app");
-          $app.save(sub);
-        } catch (subErr) {
-          console.log("Subscription trial provisioning failed: " + (subErr.message || subErr));
+          // Auto-provision initial 7-day free trial in subscriptions collection
+          try {
+            const sc = $app.findCollectionByNameOrId("subscriptions");
+            const sub = new Record(sc);
+            sub.set("merchant", merchant.id);
+            sub.set("plan", "pro");
+            sub.set("status", "trialing");
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + 7);
+            sub.set("current_period_end", expiry.toISOString().replace('T', ' ').substring(0, 19));
+            sub.set("chipin_payment_id", `signup_free_trial_${Date.now()}`);
+            sub.set("chipin_customer_email", email || "signup_trial@risev.app");
+            $app.save(sub);
+          } catch (subErr) {
+            console.log("Subscription trial provisioning failed: " + (subErr.message || subErr));
+          }
         }
       } catch (mErr) {
         console.log("Merchant provisioning failed: " + (mErr.message || mErr));

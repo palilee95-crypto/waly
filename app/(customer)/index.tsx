@@ -209,7 +209,7 @@ export default function CustomerDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch initial count of unread notifications
+    // Fetch initial count of unread notifications (safely handled if collection removed)
     pb.collection('notifications')
       .getList(1, 1, {
         filter: `recipient = '${user.id}' && is_read = false`,
@@ -227,7 +227,7 @@ export default function CustomerDashboard() {
       }
     }, {
       filter: `recipient = '${user.id}'`,
-    });
+    }).catch(() => {});
 
     fetchLoyaltyCards();
 
@@ -239,7 +239,7 @@ export default function CustomerDashboard() {
     });
 
     return () => {
-      pb.collection('notifications').unsubscribe('*');
+      pb.collection('notifications').unsubscribe('*').catch(() => {});
       pb.collection('loyalty_cards').unsubscribe('*');
     };
   }, [user]);

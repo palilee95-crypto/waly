@@ -42,7 +42,7 @@ function AppContent() {
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to notification database events for this user
+    // Subscribe to notification database events for this user (safely handled if collection removed)
     pb.collection('notifications').subscribe('*', (e) => {
       if (e.action === 'create') {
         const record = e.record;
@@ -53,10 +53,10 @@ function AppContent() {
       }
     }, {
       filter: `recipient = '${user.id}'`,
-    });
+    }).catch(() => {});
 
     return () => {
-      pb.collection('notifications').unsubscribe('*');
+      pb.collection('notifications').unsubscribe('*').catch(() => {});
     };
   }, [user]);
 
