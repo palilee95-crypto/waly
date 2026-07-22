@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 
@@ -243,27 +243,40 @@ export default function MerchantDashboard() {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchMerchantData();
+    }, [user])
+  );
+
   useEffect(() => {
     fetchMerchantData();
 
-    // Subscribe to new transactions & subscriptions
+    // Subscribe to merchants, transactions & subscriptions
     if (user && user.merchant_id) {
+      pb.collection('merchants').subscribe(user.merchant_id, () => {
+        fetchMerchantData();
+      }).catch(() => {});
+
       pb.collection('transactions').subscribe('*', () => {
         fetchMerchantData();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      });
+      }).catch(() => {});
 
       pb.collection('subscriptions').subscribe('*', () => {
         fetchMerchantData();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      });
+      }).catch(() => {});
     }
 
     return () => {
-      pb.collection('transactions').unsubscribe('*');
-      pb.collection('subscriptions').unsubscribe('*');
+      if (user && user.merchant_id) {
+        pb.collection('merchants').unsubscribe(user.merchant_id).catch(() => {});
+      }
+      pb.collection('transactions').unsubscribe('*').catch(() => {});
+      pb.collection('subscriptions').unsubscribe('*').catch(() => {});
     };
   }, [user]);
 
