@@ -204,12 +204,93 @@ export default function MerchantDashboard() {
     }
   };
 
+  const [pendingClaims, setPendingClaims] = useState<any[]>([]);
+  const [processingClaimId, setProcessingClaimId] = useState<string | null>(null);
+  const [claimInputs, setClaimInputs] = useState<{ [claimId: string]: { billAmount: string; stampAmount: number } }>({});
+
+  const getTimeAgo = (date: Date) => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const fetchPendingClaims = async () => {
+    if (!user || !user.merchant_id) return;
+    try {
+      const records = await pb.collection('nfc_claims').getFullList({
+        filter: `merchant = '${user.merchant_id}' && status = 'pending'`,
+        sort: '-created',
+        requestKey: null,
+      });
+      setPendingClaims(records);
+
+      setClaimInputs((prev) => {
+        const next = { ...prev };
+        records.forEach((c) => {
+          if (!next[c.id]) {
+            next[c.id] = {
+              billAmount: c.bill_amount ? String(c.bill_amount) : '10',
+              stampAmount: c.stamp_amount ? Number(c.stamp_amount) : 1,
+            };
+          }
+        });
+        return next;
+      });
+    } catch (err) {
+      console.warn('Failed to fetch pending NFC claims:', err);
+    }
+  };
+
+  const handleApproveClaim = async (claimId: string) => {
+    const inputs = claimInputs[claimId] || { billAmount: '10', stampAmount: 1 };
+    const billAmt = parseFloat(inputs.billAmount) || 0;
+    const stampAmt = parseInt(String(inputs.stampAmount), 10) || 1;
+
+    setProcessingClaimId(claimId);
+    try {
+      const res = await pb.send('/api/risev/nfc/complete', {
+        method: 'POST',
+        body: JSON.stringify({
+          claim_id: claimId,
+          bill_amount: billAmt,
+          stamp_amount: stampAmt,
+        }),
+      });
+      if (res.success || res.message?.includes('completed')) {
+        setPendingClaims((prev) => prev.filter((c) => c.id !== claimId));
+        fetchMerchantData();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve claim');
+    } finally {
+      setProcessingClaimId(null);
+    }
+  };
+
+  const handleDeclineClaim = async (claimId: string) => {
+    setProcessingClaimId(claimId);
+    try {
+      await pb.collection('nfc_claims').update(claimId, { status: 'cancelled' });
+      setPendingClaims((prev) => prev.filter((c) => c.id !== claimId));
+    } catch (err: any) {
+      console.warn('Failed to decline claim:', err);
+    } finally {
+      setProcessingClaimId(null);
+    }
+  };
+
   const fetchMerchantData = async () => {
     if (!user || !user.merchant_id) {
       setLoading(false);
       return;
     }
     try {
+      fetchPendingClaims();
+
       // 0. Fetch active/trialing subscription
       try {
         const subList = await pb.collection('subscriptions').getList(1, 1, {
@@ -252,7 +333,7 @@ export default function MerchantDashboard() {
   useEffect(() => {
     fetchMerchantData();
 
-    // Subscribe to merchants, transactions & subscriptions
+    // Subscribe to merchants, transactions, subscriptions & nfc_claims
     if (user && user.merchant_id) {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
         fetchMerchantData();
@@ -269,6 +350,12 @@ export default function MerchantDashboard() {
       }, {
         filter: `merchant = '${user.merchant_id}'`
       }).catch(() => {});
+
+      pb.collection('nfc_claims').subscribe('*', () => {
+        fetchPendingClaims();
+      }, {
+        filter: `merchant = '${user.merchant_id}'`
+      }).catch(() => {});
     }
 
     return () => {
@@ -277,6 +364,7 @@ export default function MerchantDashboard() {
       }
       pb.collection('transactions').unsubscribe('*').catch(() => {});
       pb.collection('subscriptions').unsubscribe('*').catch(() => {});
+      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
     };
   }, [user]);
 
@@ -458,6 +546,167 @@ export default function MerchantDashboard() {
                 <Text style={styles.trialUpgradeBtnText}>Upgrade</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* ⚡ REAL-TIME DEDICATED PENDING STAMP REQUESTS SECTION */}
+        {pendingClaims.length > 0 && (
+          <View style={styles.pendingSectionContainer}>
+            <View style={styles.pendingHeaderRow}>
+              <View style={styles.livePulseBadge}>
+                <View style={styles.livePulseDot} />
+                <Text style={styles.livePulseText}>LIVE</Text>
+              </View>
+              <Text style={styles.pendingSectionTitle}>Pending Stamp Requests ({pendingClaims.length})</Text>
+            </View>
+
+            {pendingClaims.map((claim) => {
+              const cInput = claimInputs[claim.id] || { billAmount: '10', stampAmount: 1 };
+              const isProcessing = processingClaimId === claim.id;
+              const timeAgoStr = claim.created ? getTimeAgo(new Date(claim.created)) : 'Just now';
+
+              return (
+                <View key={claim.id} style={styles.pendingCard}>
+                  {/* Customer Info Header */}
+                  <View style={styles.pendingCustomerHeader}>
+                    <View style={styles.customerAvatarPlaceholder}>
+                      <Text style={styles.avatarLetter}>{(claim.customer_name || 'C')[0].toUpperCase()}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pendingCustomerName}>{claim.customer_name || 'Walk-in Customer'}</Text>
+                      <Text style={styles.pendingCustomerPhone}>{claim.customer_phone}</Text>
+                    </View>
+                    <View style={styles.timeBadge}>
+                      <Ionicons name="time-outline" size={12} color="#64748B" />
+                      <Text style={styles.timeBadgeText}>{timeAgoStr}</Text>
+                    </View>
+                  </View>
+
+                  {/* Input Controls: Bill Amount & Stamps Count */}
+                  <View style={styles.pendingInputRow}>
+                    {/* Bill Amount */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pendingInputLabel}>BILL AMOUNT (RM)</Text>
+                      <View style={styles.amountInputWrap}>
+                        <Text style={styles.currencySymbol}>RM</Text>
+                        <TextInput
+                          style={styles.amountInput}
+                          value={cInput.billAmount}
+                          onChangeText={(val) =>
+                            setClaimInputs((prev) => ({
+                              ...prev,
+                              [claim.id]: { ...cInput, billAmount: val },
+                            }))
+                          }
+                          keyboardType="decimal-pad"
+                          placeholder="0.00"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 4, marginTop: 6 }}>
+                        {['10', '20', '50'].map((amt) => (
+                          <TouchableOpacity
+                            key={amt}
+                            style={[
+                              styles.presetChip,
+                              cInput.billAmount === amt && styles.presetChipActive,
+                            ]}
+                            onPress={() =>
+                              setClaimInputs((prev) => ({
+                                ...prev,
+                                [claim.id]: { ...cInput, billAmount: amt },
+                              }))
+                            }
+                          >
+                            <Text style={[styles.presetChipText, cInput.billAmount === amt && styles.presetChipTextActive]}>
+                              RM{amt}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Stamp Count Stepper */}
+                    <View style={{ width: 110 }}>
+                      <Text style={styles.pendingInputLabel}>STAMPS</Text>
+                      <View style={styles.stepperContainer}>
+                        <TouchableOpacity
+                          style={styles.stepperBtn}
+                          onPress={() =>
+                            setClaimInputs((prev) => ({
+                              ...prev,
+                              [claim.id]: { ...cInput, stampAmount: Math.max(1, cInput.stampAmount - 1) },
+                            }))
+                          }
+                        >
+                          <Ionicons name="remove" size={14} color="#000000" />
+                        </TouchableOpacity>
+                        <Text style={styles.stepperValue}>{cInput.stampAmount}</Text>
+                        <TouchableOpacity
+                          style={styles.stepperBtn}
+                          onPress={() =>
+                            setClaimInputs((prev) => ({
+                              ...prev,
+                              [claim.id]: { ...cInput, stampAmount: cInput.stampAmount + 1 },
+                            }))
+                          }
+                        >
+                          <Ionicons name="add" size={14} color="#000000" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 4, marginTop: 6, justifyContent: 'center' }}>
+                        {[1, 2, 3].map((s) => (
+                          <TouchableOpacity
+                            key={s}
+                            style={[
+                              styles.presetChip,
+                              cInput.stampAmount === s && styles.presetChipActive,
+                            ]}
+                            onPress={() =>
+                              setClaimInputs((prev) => ({
+                                ...prev,
+                                [claim.id]: { ...cInput, stampAmount: s },
+                              }))
+                            }
+                          >
+                            <Text style={[styles.presetChipText, cInput.stampAmount === s && styles.presetChipTextActive]}>
+                              {s}★
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Actions Row */}
+                  <View style={styles.pendingActionsRow}>
+                    <TouchableOpacity
+                      style={styles.declineBtn}
+                      onPress={() => handleDeclineClaim(claim.id)}
+                      disabled={isProcessing}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#64748B" />
+                      <Text style={styles.declineBtnText}>Decline</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.approveBtn, isProcessing && { opacity: 0.6 }]}
+                      onPress={() => handleApproveClaim(claim.id)}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                          <Text style={styles.approveBtnText}>Approve & Credit Stamps</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -1442,5 +1691,217 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0040e0',
+  },
+  // Dedicated Pending Stamp Requests Styles
+  pendingSectionContainer: {
+    marginBottom: 20,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+  },
+  pendingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  livePulseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+    marginRight: 8,
+  },
+  livePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  livePulseText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  pendingSectionTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#1E3A8A',
+  },
+  pendingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  pendingCustomerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  customerAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  pendingCustomerName: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  pendingCustomerPhone: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  timeBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  pendingInputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  pendingInputLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  amountInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    height: 42,
+    paddingHorizontal: 10,
+  },
+  currencySymbol: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    marginRight: 6,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  presetChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  presetChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  presetChipText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  presetChipTextActive: {
+    color: '#FFFFFF',
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    height: 42,
+    paddingHorizontal: 6,
+  },
+  stepperBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  pendingActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  declineBtn: {
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  declineBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  approveBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  approveBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
 });
