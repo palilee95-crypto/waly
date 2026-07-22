@@ -28,9 +28,9 @@ routerAdd("POST", "/api/risev/qr/quick-register", (e) => {
 
     if (existingUsers.length > 0) {
       user = existingUsers[0];
-      // Update name if current name is placeholder or empty
+      // Update name if current name is placeholder or empty, and incoming name is a real name
       const currName = user.getString("name") || "";
-      if (!currName || currName.startsWith("Customer ")) {
+      if ((!currName || currName.startsWith("Customer ")) && name && !name.startsWith("Customer ")) {
         user.set("name", name);
         $app.save(user);
       }

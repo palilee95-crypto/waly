@@ -63,7 +63,7 @@ export default function NfcLandingScreen() {
   }, [params.m]);
 
   const merchantName = merchant?.name || 'Risev Merchant';
-  const merchantPhone = merchant?.phone || merchant?.expand?.owner?.phone || '';
+  const merchantPhone = merchant?.phone || merchant?.metadata?.phone || merchant?.expand?.owner?.phone || '';
 
   // 2. Submit NFC Notification & Open WhatsApp
   const handleNfcSubmit = async () => {
@@ -96,7 +96,7 @@ export default function NfcLandingScreen() {
         try {
           const res = await pb.send<{ exists: boolean; name?: string }>('/api/risev/check-phone', {
             method: 'GET',
-            query: { phone: cleanPhone },
+            params: { phone: cleanPhone },
             requestKey: null,
           });
 
@@ -110,7 +110,7 @@ export default function NfcLandingScreen() {
             return;
           }
         } catch (checkErr) {
-          /* proceed with flow */
+          console.warn('[NFC] check-phone error:', checkErr);
         } finally {
           setIsCheckingPhone(false);
         }
@@ -121,13 +121,19 @@ export default function NfcLandingScreen() {
       // Step B: Quick register or retrieve account in background
       await quickRegister(finalName, cleanPhone);
 
+      // Use user's real account name if available in authStore
+      const authRecord = pb.authStore.record;
+      const displayName = (authRecord?.name && !authRecord.name.startsWith('Customer '))
+        ? authRecord.name
+        : (finalName || ('Customer ' + digits.slice(-4)));
+
       // Step C: Generate random 6-char NFC session code
       const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
       // Step D: Build WhatsApp message
       const message =
         `Hi ${merchantName}! I scanned your NFC card to claim stamps.\n\n` +
-        `Name: ${finalName}\n` +
+        `Name: ${displayName}\n` +
         `Phone: ${cleanPhone}\n` +
         `Merchant: ${merchant.id}\n` +
         `NFC: ${sessionCode}`;
@@ -136,7 +142,9 @@ export default function NfcLandingScreen() {
       if (waPhone.startsWith('0')) waPhone = '6' + waPhone;
       if (!waPhone.startsWith('60') && waPhone.length >= 9) waPhone = '60' + waPhone;
 
-      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`;
+      const waUrl = waPhone
+        ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
 
       if (Platform.OS === 'web') {
         window.location.href = waUrl;
