@@ -549,18 +549,30 @@ export default function MerchantDashboard() {
           </View>
         )}
 
-        {/* ⚡ REAL-TIME DEDICATED PENDING STAMP REQUESTS SECTION */}
-        {pendingClaims.length > 0 && (
-          <View style={styles.pendingSectionContainer}>
-            <View style={styles.pendingHeaderRow}>
-              <View style={styles.livePulseBadge}>
-                <View style={styles.livePulseDot} />
-                <Text style={styles.livePulseText}>LIVE</Text>
-              </View>
-              <Text style={styles.pendingSectionTitle}>Pending Stamp Requests ({pendingClaims.length})</Text>
+        {/* ⚡ REAL-TIME DEDICATED PENDING STAMP REQUESTS SECTION (ALWAYS VISIBLE) */}
+        <View style={styles.pendingSectionContainer}>
+          <View style={styles.pendingHeaderRow}>
+            <View style={styles.livePulseBadge}>
+              <View style={styles.livePulseDot} />
+              <Text style={styles.livePulseText}>LIVE</Text>
             </View>
+            <Text style={styles.pendingSectionTitle}>Pending Stamp Requests ({pendingClaims.length})</Text>
+          </View>
 
-            {pendingClaims.map((claim) => {
+          {pendingClaims.length === 0 ? (
+            <View style={styles.pendingEmptyCard}>
+              <View style={styles.pendingEmptyIconWrap}>
+                <Ionicons name="radio-outline" size={22} color="#2563EB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pendingEmptyTitle}>Ready for Customer NFC Taps</Text>
+                <Text style={styles.pendingEmptyDesc}>
+                  Customer stamp claim requests will pop up here live in real-time.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            pendingClaims.map((claim) => {
               const cInput = claimInputs[claim.id] || { billAmount: '10', stampAmount: 1 };
               const isProcessing = processingClaimId === claim.id;
               const timeAgoStr = claim.created ? getTimeAgo(new Date(claim.created)) : 'Just now';
@@ -706,9 +718,9 @@ export default function MerchantDashboard() {
                   </View>
                 </View>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
 
         {/* Total Stamp Issued Metric Card */}
         <View style={styles.balanceCard}>
@@ -1732,6 +1744,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#1E3A8A',
+  },
+  pendingEmptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  pendingEmptyIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingEmptyTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1E3A8A',
+  },
+  pendingEmptyDesc: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
   },
   pendingCard: {
     backgroundColor: '#FFFFFF',
