@@ -10,6 +10,8 @@ import {
   Platform,
   Linking,
   useWindowDimensions,
+  Image,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,7 +27,10 @@ export default function NfcLandingScreen() {
   const isDesktop = windowWidth > 768;
 
   const [merchant, setMerchant] = useState<any>(null);
-  const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'invalid'>('loading');
+  const [program, setProgram] = useState<any>(null);
+  const [reward, setReward] = useState<any>(null);
+  const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
+  const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
 
   const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
@@ -36,7 +41,10 @@ export default function NfcLandingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 1. Fetch & Validate Merchant on Mount
+  // Realtime listening state
+  const [isWaitingConfirm, setIsWaitingConfirm] = useState(false);
+
+  // 1. Fetch Merchant, Program & Rewards on Mount
   useEffect(() => {
     (async () => {
       const merchantId = params.m;
@@ -54,18 +62,117 @@ export default function NfcLandingScreen() {
           return;
         }
         setMerchant(m);
+
+        // Fetch primary loyalty program for this merchant
+        try {
+          const progs = await pb.collection('loyalty_programs').getFullList({
+            filter: `merchant = "${merchantId}" && is_active = true`,
+            sort: '-created'
+          });
+          if (progs.length > 0) {
+            setProgram(progs[0]);
+            // Fetch rewards for this program
+            try {
+              const rws = await pb.collection('rewards').getFullList({
+                filter: `merchant = "${merchantId}"`,
+                sort: '-created'
+              });
+              if (rws.length > 0) setReward(rws[0]);
+            } catch (rErr) {}
+          }
+        } catch (pErr) {}
+
+        // If user is already logged in, check if they have an active card
+        if (user && user.id) {
+          fetchUserLoyaltyCard(merchantId, user.id);
+        }
+
         setStep('form');
       } catch (err) {
         setInvalidReason('Invalid or expired NFC merchant link.');
         setStep('invalid');
       }
     })();
-  }, [params.m]);
+  }, [params.m, user]);
 
+  const fetchUserLoyaltyCard = async (merchantId: string, customerId: string) => {
+    try {
+      const cards = await pb.collection('loyalty_cards').getFullList({
+        filter: `merchant = "${merchantId}" && customer = "${customerId}" && status = "active"`,
+        sort: '-updated'
+      });
+      if (cards.length > 0) {
+        setLoyaltyCard(cards[0]);
+      }
+    } catch (err) {}
+  };
+
+  // 2. Realtime SSE Subscriptions for Instant Merchant Confirmation Reveal
+  useEffect(() => {
+    if (!merchant || !user) return;
+
+    let isSubscribed = true;
+
+    // Subscribe to loyalty_cards updates for this user & merchant
+    pb.collection('loyalty_cards').subscribe('*', (e) => {
+      if (!isSubscribed) return;
+      if (e.action === 'update' || e.action === 'create') {
+        const cardRecord = e.record;
+        if (cardRecord.merchant === merchant.id && (cardRecord.customer === user.id || cardRecord.customer === pb.authStore.record?.id)) {
+          setLoyaltyCard(cardRecord);
+          setStep('card');
+          setIsWaitingConfirm(false);
+        }
+      }
+    }, {
+      filter: `merchant = "${merchant.id}"`
+    }).catch(() => {});
+
+    // Subscribe to transactions updates
+    pb.collection('transactions').subscribe('*', (e) => {
+      if (!isSubscribed) return;
+      if (e.action === 'create') {
+        const tx = e.record;
+        const currentCustId = user?.id || pb.authStore.record?.id;
+        if (tx.merchant === merchant.id && currentCustId && tx.customer === currentCustId) {
+          fetchUserLoyaltyCard(merchant.id, currentCustId);
+          setStep('card');
+          setIsWaitingConfirm(false);
+        }
+      }
+    }, {
+      filter: `merchant = "${merchant.id}"`
+    }).catch(() => {});
+
+    return () => {
+      isSubscribed = false;
+      pb.collection('loyalty_cards').unsubscribe('*').catch(() => {});
+      pb.collection('transactions').unsubscribe('*').catch(() => {});
+    };
+  }, [merchant, user]);
+
+  // Brand Tokens & Assets
   const merchantName = merchant?.name || 'Risev Merchant';
   const merchantPhone = merchant?.phone || merchant?.metadata?.phone || merchant?.expand?.owner?.phone || '';
+  
+  const merchantLogoUrl = merchant?.logo
+    ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
+    : (merchant?.onboarding_logo_url || null);
 
-  // 2. Submit NFC Notification & Open WhatsApp
+  const merchantBgUrl = merchant?.background_image
+    ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.background_image}`
+    : (merchant?.onboarding_bg_url || null);
+
+  const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#F97316';
+  const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
+  const stampGoal = program?.stamp_goal || 10;
+  const currentStamps = loyaltyCard?.stamps_collected || 0;
+  const rewardTitle = reward?.title || program?.reward_title || 'Free Special Reward';
+  const rewardImageUrl = reward?.image 
+    ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
+    : 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&q=80&w=300';
+
+  // 3. Submit NFC Notification & Open WhatsApp
   const handleNfcSubmit = async () => {
     if (!phoneInput.trim()) {
       setErrorMsg('Please enter your phone number.');
@@ -79,7 +186,6 @@ export default function NfcLandingScreen() {
 
     setErrorMsg('');
 
-    // If new user and name field is shown, validate name input
     if (showNameField && !nameInput.trim()) {
       setErrorMsg('Please enter your full name to complete your claim.');
       return;
@@ -90,7 +196,6 @@ export default function NfcLandingScreen() {
     try {
       let finalName = nameInput.trim();
 
-      // Step A: If name field is not yet shown, check if phone number exists in DB
       if (!showNameField && !user) {
         setIsCheckingPhone(true);
         try {
@@ -103,7 +208,6 @@ export default function NfcLandingScreen() {
           if (res.exists && res.name) {
             finalName = res.name;
           } else if (!res.exists) {
-            // New Customer -> Show Name Input Field
             setShowNameField(true);
             setIsLoading(false);
             setIsCheckingPhone(false);
@@ -118,19 +222,16 @@ export default function NfcLandingScreen() {
 
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
 
-      // Step B: Quick register or retrieve account in background
+      // Quick register or retrieve account
       await quickRegister(finalName, cleanPhone);
 
-      // Use user's real account name if available in authStore
       const authRecord = pb.authStore.record;
       const displayName = (authRecord?.name && !authRecord.name.startsWith('Customer '))
         ? authRecord.name
         : (finalName || ('Customer ' + digits.slice(-4)));
 
-      // Step C: Generate random 6-char NFC session code
       const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-      // Step D: Build WhatsApp message
       const message =
         `Hi ${merchantName}! I scanned your NFC card to claim stamps.\n\n` +
         `Name: ${displayName}\n` +
@@ -152,7 +253,13 @@ export default function NfcLandingScreen() {
         await Linking.openURL(waUrl);
       }
 
+      setIsWaitingConfirm(true);
       setStep('sent');
+
+      // Fetch user's loyalty card
+      if (authRecord?.id) {
+        fetchUserLoyaltyCard(merchant.id, authRecord.id);
+      }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to submit NFC claim.');
     } finally {
@@ -161,7 +268,7 @@ export default function NfcLandingScreen() {
   };
 
   // ══════════════════════════════════════════════════════════════════
-  // RENDER
+  // RENDER STATES
   // ══════════════════════════════════════════════════════════════════
 
   if (step === 'loading') {
@@ -184,130 +291,274 @@ export default function NfcLandingScreen() {
           </View>
           <Text style={styles.invalidTitle}>NFC Link Invalid</Text>
           <Text style={styles.invalidSubtitle}>{invalidReason}</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/')} activeOpacity={0.8}>
-            <Text style={styles.primaryBtnText}>Go Home</Text>
+          <TouchableOpacity style={[styles.primaryActionBtn, { backgroundColor: '#000000', paddingHorizontal: 24 }]} onPress={() => router.replace('/')} activeOpacity={0.8}>
+            <Text style={styles.primaryActionBtnText}>Go Home</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 520, alignSelf: 'center', width: '100%' }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/')}>
-          <Ionicons name="arrow-back" size={20} color="#000000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{merchantName}</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 520, alignSelf: 'center', width: '100%' }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Store Card Header */}
-        <View style={styles.merchantCard}>
-          <View style={styles.nfcBadge}>
-            <Ionicons name="wifi-outline" size={16} color="#0F172A" />
-            <Text style={styles.nfcBadgeText}>NFC CARD SCANNED</Text>
+  // ══════════════════════════════════════════════════════════════════
+  // 9:16 CUSTOMIZABLE CARD CONTAINER
+  // ══════════════════════════════════════════════════════════════════
+  const renderCardContent = () => (
+    <>
+      {/* Top Navigation & Action Bar */}
+          <View style={styles.cardHeaderRow}>
+            <TouchableOpacity style={styles.iconCircleBtn} onPress={() => router.replace('/')}>
+              <Ionicons name="chevron-back" size={20} color="#000000" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.iconCircleBtn, { backgroundColor: '#000000' }]} 
+              onPress={() => setStep(step === 'card' ? 'form' : 'card')}
+            >
+              <Ionicons name={step === 'card' ? 'qr-code-outline' : 'card-outline'} size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.merchantName}>{merchantName}</Text>
-          <Text style={styles.merchantSubtext}>Tap below to notify store & receive your stamps</Text>
-        </View>
 
-        {/* Step 1: Form */}
-        {step === 'form' && (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Claim Your Stamps</Text>
-            <Text style={styles.formSubtitle}>
-              {showNameField ? `Welcome! Please enter your full name to complete your claim.` : `Enter your phone number to notify ${merchantName}.`}
-            </Text>
-
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-            {/* Phone Number Input (Always visible first) */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>PHONE NUMBER</Text>
-              <View style={styles.inputGroup}>
-                <View style={styles.prefixBox}>
-                  <Text style={styles.flag}>🇲🇾</Text>
-                  <Text style={styles.prefixCode}>+60</Text>
-                  <View style={styles.prefixDivider} />
-                </View>
-                <TextInput
-                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                  placeholder="11 234 5678"
-                  placeholderTextColor="#94A3B8"
-                  value={phoneInput}
-                  onChangeText={(text) => {
-                    setPhoneInput(text);
-                    setErrorMsg('');
-                  }}
-                  keyboardType="phone-pad"
-                  autoFocus={!showNameField}
-                  editable={!showNameField} // Lock phone field if name step is active
-                />
+          {/* Merchant Brand Logo & Header */}
+          <View style={styles.brandHeaderSection}>
+            {merchantLogoUrl ? (
+              <Image source={{ uri: merchantLogoUrl }} style={styles.brandLogoImage} resizeMode="contain" />
+            ) : (
+              <View style={[styles.brandLogoFallback, { backgroundColor: primaryColor }]}>
+                <Ionicons name="storefront" size={32} color="#FFFFFF" />
               </View>
-            </View>
+            )}
+            <Text style={styles.brandNameText}>{merchantName}</Text>
+          </View>
 
-            {/* Conditional Full Name Input (Appears only for NEW customers) */}
-            {showNameField && (
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* STEP 1: Phone Input Form */}
+          {/* ───────────────────────────────────────────────────────── */}
+          {step === 'form' && (
+            <View style={styles.innerFormCard}>
+              <View style={styles.nfcBadgeRow}>
+                <Ionicons name="wifi-outline" size={14} color={primaryColor} />
+                <Text style={[styles.nfcBadgeTitle, { color: primaryColor }]}>NFC CARD SCANNED</Text>
+              </View>
+
+              <Text style={styles.formWelcomeTitle}>Claim Your Stamps</Text>
+              <Text style={styles.formWelcomeSubtitle}>{welcomeText}</Text>
+
+              {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+              {/* Phone Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>FULL NAME (NEW CUSTOMER)</Text>
+                <Text style={styles.inputLabel}>PHONE NUMBER</Text>
                 <View style={styles.inputGroup}>
-                  <Ionicons name="person-outline" size={20} color="#64748B" style={{ marginLeft: 12 }} />
+                  <View style={styles.prefixBox}>
+                    <Text style={styles.flag}>🇲🇾</Text>
+                    <Text style={styles.prefixCode}>+60</Text>
+                    <View style={styles.prefixDivider} />
+                  </View>
                   <TextInput
                     style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    placeholder="e.g. Fazli"
+                    placeholder="11 234 5678"
                     placeholderTextColor="#94A3B8"
-                    value={nameInput}
+                    value={phoneInput}
                     onChangeText={(text) => {
-                      setNameInput(text);
+                      setPhoneInput(text);
                       setErrorMsg('');
                     }}
-                    autoFocus
+                    keyboardType="phone-pad"
+                    autoFocus={!showNameField}
+                    editable={!showNameField}
                   />
                 </View>
               </View>
-            )}
 
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.primaryBtn, (isLoading || isCheckingPhone) && styles.primaryBtnDisabled]}
-              onPress={handleNfcSubmit}
-              disabled={isLoading || isCheckingPhone}
-              activeOpacity={0.8}
-            >
-              {isLoading || isCheckingPhone ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="card-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>
-                    {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
-                  </Text>
-                </>
+              {/* Full Name Input (New Customer) */}
+              {showNameField && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>FULL NAME (NEW CUSTOMER)</Text>
+                  <View style={styles.inputGroup}>
+                    <Ionicons name="person-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
+                    <TextInput
+                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      placeholder="e.g. Fazli"
+                      placeholderTextColor="#94A3B8"
+                      value={nameInput}
+                      onChangeText={(text) => {
+                        setNameInput(text);
+                        setErrorMsg('');
+                      }}
+                      autoFocus
+                    />
+                  </View>
+                </View>
               )}
-            </TouchableOpacity>
-          </View>
-        )}
 
-        {/* Step 2: Sent Confirmation View */}
-        {step === 'sent' && (
-          <View style={styles.formCard}>
-            <View style={styles.sentIconWrap}>
-              <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+              {/* Submit Button with Custom Primary Color */}
+              <TouchableOpacity
+                style={[
+                  styles.primaryActionBtn,
+                  { backgroundColor: primaryColor },
+                  (isLoading || isCheckingPhone) && { opacity: 0.5 }
+                ]}
+                onPress={handleNfcSubmit}
+                disabled={isLoading || isCheckingPhone}
+                activeOpacity={0.85}
+              >
+                {isLoading || isCheckingPhone ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.primaryActionBtnText}>
+                      {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.formTitle, { textAlign: 'center' }]}>Claim Submitted!</Text>
-            <Text style={styles.sentBody}>
-              Please tap <Text style={{ fontWeight: '800', color: '#000000' }}>Send</Text> to complete. The store live screen will pop up to credit your stamps immediately!
-            </Text>
+          )}
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/(customer)')} activeOpacity={0.8}>
-              <Text style={styles.primaryBtnText}>View My Stamp Card</Text>
-            </TouchableOpacity>
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* STEP 2: Sent & Waiting Confirmation View */}
+          {/* ───────────────────────────────────────────────────────── */}
+          {step === 'sent' && (
+            <View style={styles.innerFormCard}>
+              <View style={styles.sentIconWrap}>
+                <Ionicons name="paper-plane" size={48} color={primaryColor} />
+              </View>
+              <Text style={styles.sentHeaderTitle}>WhatsApp Opened!</Text>
+              <Text style={styles.sentHeaderDesc}>
+                Tap <Text style={{ fontWeight: '800', color: '#000000' }}>Send</Text> in WhatsApp. Once confirmed, your stamps card will appear automatically below!
+              </Text>
+
+              {/* Pulse / Loading Live Sync */}
+              <View style={styles.liveSyncBanner}>
+                <ActivityIndicator size="small" color={primaryColor} />
+                <Text style={styles.liveSyncText}>Listening for store confirmation...</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: primaryColor, marginTop: 16 }]}
+                onPress={() => setStep('card')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.primaryActionBtnText}>View My Stamp Card</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* STEP 3: DEDICATED 9:16 LOYALTY CARD VIEW (Images 2 & 3!) */}
+          {/* ───────────────────────────────────────────────────────── */}
+          {step === 'card' && (
+            <View style={styles.cardSectionWrap}>
+              {/* STAMP GRID CARD */}
+              <View style={[styles.stampGridCard, { backgroundColor: primaryColor + '22', borderColor: primaryColor + '44' }]}>
+                {/* Stamp Counter Header */}
+                <View style={styles.stampCounterRow}>
+                  <Text style={styles.stampFractionText}>
+                    <Text style={{ fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{currentStamps}</Text>
+                    <Text style={{ fontSize: 24, color: '#64748B' }}> /{stampGoal}</Text>
+                  </Text>
+
+                  {/* Stamp Grid Pills (e.g. 1 2 3 4 5 🎁) */}
+                  <View style={styles.pillsWrap}>
+                    {Array.from({ length: stampGoal }).map((_, idx) => {
+                      const num = idx + 1;
+                      const isFilled = num <= currentStamps;
+                      const isRewardPos = num === stampGoal || num === Math.floor(stampGoal / 2);
+
+                      return (
+                        <View
+                          key={num}
+                          style={[
+                            styles.stampPill,
+                            isFilled && { backgroundColor: primaryColor },
+                            isRewardPos && !isFilled && { backgroundColor: '#FEE2E2' }
+                          ]}
+                        >
+                          {isRewardPos ? (
+                            <Text style={{ fontSize: 13 }}>🎁</Text>
+                          ) : (
+                            <Text style={[styles.stampPillText, isFilled && { color: '#FFFFFF' }]}>{num}</Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Sub Card: Stamps Remaining to Reward */}
+                <View style={styles.stampSubRewardCard}>
+                  <Image source={{ uri: rewardImageUrl }} style={styles.rewardSubImage} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rewardSubSubtitle}>
+                      {stampGoal - currentStamps > 0
+                        ? `${stampGoal - currentStamps} more stamps to:`
+                        : 'Stamp card completed!'}
+                    </Text>
+                    <Text style={styles.rewardSubTitle} numberOfLines={2}>
+                      {rewardTitle}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* NEXT REWARD CARD */}
+              <View style={styles.nextRewardCard}>
+                <View style={styles.nextRewardHeader}>
+                  <Image source={{ uri: rewardImageUrl }} style={styles.nextRewardImage} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nextRewardSublabel}>Your Next Reward</Text>
+                    <Text style={styles.nextRewardMainTitle}>{rewardTitle}</Text>
+                  </View>
+                </View>
+
+                {/* Lock / Unlock Status Action Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.unlockBtn,
+                    currentStamps >= stampGoal
+                      ? { backgroundColor: '#10B981' }
+                      : { backgroundColor: primaryColor + '20' }
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.unlockBtnText,
+                      currentStamps >= stampGoal ? { color: '#FFFFFF' } : { color: '#000000' }
+                    ]}
+                  >
+                    {currentStamps >= stampGoal
+                      ? '🎉 Redeem Reward Now'
+                      : `Collect ${stampGoal - currentStamps} stamps to unlock`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+    </>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          isDesktop && { maxWidth: 440, alignSelf: 'center', width: '100%' }
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {merchantBgUrl ? (
+          <ImageBackground
+            source={{ uri: merchantBgUrl }}
+            resizeMode="cover"
+            style={styles.portrait916Card}
+          >
+            {renderCardContent()}
+          </ImageBackground>
+        ) : (
+          <View style={[styles.portrait916Card, { backgroundColor: primaryColor + '12' }]}>
+            {renderCardContent()}
           </View>
         )}
       </ScrollView>
@@ -318,7 +569,7 @@ export default function NfcLandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
   },
   loadingWrap: {
     flex: 1,
@@ -359,87 +610,103 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  headerRow: {
+  scrollContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+
+  // 9:16 Portrait Mode Outer Container
+  portrait916Card: {
+    borderRadius: 32,
+    overflow: 'hidden',
+    padding: 20,
+    minHeight: 680,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FAF9F6',
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    marginBottom: 16,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8FAFC',
+  iconCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  headerTitle: {
-    fontSize: 17,
+
+  // Brand Header
+  brandHeaderSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  brandLogoImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  brandLogoFallback: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  brandNameText: {
+    fontSize: 22,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  scrollContent: {
-    padding: 20,
-  },
-  merchantCard: {
+
+  // Form Container
+  innerFormCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  nfcBadge: {
+  nfcBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
     marginBottom: 10,
   },
-  nfcBadgeText: {
+  nfcBadgeTitle: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
     letterSpacing: 0.5,
   },
-  merchantName: {
+  formWelcomeTitle: {
     fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
-    marginBottom: 4,
-    textAlign: 'center',
+    marginBottom: 6,
   },
-  merchantSubtext: {
+  formWelcomeSubtitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_400Regular',
     color: '#64748B',
-    textAlign: 'center',
-  },
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  formTitle: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  formSubtitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#64748B',
+    lineHeight: 18,
     marginBottom: 20,
   },
   inputContainer: {
@@ -496,33 +763,169 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginBottom: 12,
   },
-  primaryBtn: {
+  primaryActionBtn: {
     height: 52,
-    backgroundColor: '#000000',
     borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
   },
-  primaryBtnDisabled: {
-    opacity: 0.5,
-  },
-  primaryBtnText: {
+  primaryActionBtnText: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
+
+  // Sent State
   sentIconWrap: {
     alignSelf: 'center',
     marginBottom: 12,
   },
-  sentBody: {
-    fontSize: 14,
+  sentHeaderTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  sentHeaderDesc: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_400Regular',
     color: '#475569',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  liveSyncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  liveSyncText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#334155',
+  },
+
+  // 9:16 Loyalty Card View (Images 2 & 3)
+  cardSectionWrap: {
+    gap: 16,
+  },
+  stampGridCard: {
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+  },
+  stampCounterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  stampFractionText: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  pillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    maxWidth: 160,
+    justifyContent: 'flex-end',
+  },
+  stampPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  stampPillText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  stampSubRewardCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+  },
+  rewardSubImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+  },
+  rewardSubSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  rewardSubTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+
+  // Next Reward Card
+  nextRewardCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  nextRewardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  nextRewardImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+  },
+  nextRewardSublabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  nextRewardMainTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  unlockBtn: {
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  unlockBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });

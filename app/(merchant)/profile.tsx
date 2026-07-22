@@ -105,6 +105,11 @@ export default function ProfileScreen() {
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#000000');
   const [brandingWelcomeText, setBrandingWelcomeText] = useState('');
   const [brandingLogoUrl, setBrandingLogoUrl] = useState('');
+  const [brandingBgUrl, setBrandingBgUrl] = useState('');
+  const [brandingBgFile, setBrandingBgFile] = useState<any>(null);
+  const [brandingBgPreview, setBrandingBgPreview] = useState<string | null>(null);
+  const [brandingLogoFile, setBrandingLogoFile] = useState<any>(null);
+  const [brandingLogoPreview, setBrandingLogoPreview] = useState<string | null>(null);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
 
   // Dedicated Operating Hours Modal States (Individual Days)
@@ -502,20 +507,79 @@ export default function ProfileScreen() {
     setBrandingPrimaryColor(merchant?.onboarding_primary_color || '#000000');
     setBrandingWelcomeText(merchant?.onboarding_welcome_text || '');
     setBrandingLogoUrl(merchant?.onboarding_logo_url || '');
+    setBrandingBgUrl(merchant?.onboarding_bg_url || '');
+    setBrandingBgFile(null);
+    const bgUrl = merchant?.background_image
+      ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.background_image}`
+      : null;
+    setBrandingBgPreview(bgUrl);
+    setBrandingLogoFile(null);
+    setBrandingLogoPreview(null);
     setBrandingModalVisible(true);
+  };
+
+  const handlePickBrandingBg = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            setBrandingBgFile(file);
+            setBrandingBgPreview(event.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert('Not Supported', 'Image upload is web-only in this version.');
+    }
+  };
+
+  const handlePickBrandingLogo = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            setBrandingLogoFile(file);
+            setBrandingLogoPreview(event.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert('Not Supported', 'Image upload is web-only in this version.');
+    }
   };
 
   const handleSaveBranding = async () => {
     if (!user?.merchant_id) return;
     setIsSavingBranding(true);
     try {
-      await pb.collection('merchants').update(user.merchant_id, {
-        onboarding_primary_color: brandingPrimaryColor,
-        onboarding_welcome_text: brandingWelcomeText,
-        onboarding_logo_url: brandingLogoUrl,
-      });
-      // Refresh merchant
-      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+      const formData = new FormData();
+      formData.append('onboarding_primary_color', brandingPrimaryColor);
+      formData.append('onboarding_welcome_text', brandingWelcomeText);
+      formData.append('onboarding_logo_url', brandingLogoUrl);
+      formData.append('onboarding_bg_url', brandingBgUrl);
+
+      if (brandingLogoFile) {
+        formData.append('logo', brandingLogoFile);
+      }
+      if (brandingBgFile) {
+        formData.append('background_image', brandingBgFile);
+      }
+
+      const mRec = await pb.collection('merchants').update(user.merchant_id, formData);
       setMerchant(mRec);
       setBrandingModalVisible(false);
       Alert.alert('Saved', 'Onboarding branding updated successfully.');
@@ -2118,6 +2182,23 @@ export default function ProfileScreen() {
                     />
                   </View>
                 </View>
+                {/* Preset Color Swatches */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  {['#000000', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: c,
+                        borderWidth: brandingPrimaryColor.toLowerCase() === c.toLowerCase() ? 2.5 : 0,
+                        borderColor: '#000000',
+                      }}
+                      onPress={() => setBrandingPrimaryColor(c)}
+                    />
+                  ))}
+                </View>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 6 }}>
                   Used for buttons and highlights on the customer onboarding page.
                 </Text>
@@ -2139,15 +2220,78 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Logo URL */}
+              {/* Logo Upload & URL */}
               <View style={{ marginBottom: 20 }}>
-                <Text style={styles.inputLabel}>LOGO URL (optional)</Text>
+                <Text style={styles.inputLabel}>STORE LOGO (RECOMMENDED)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 16,
+                      height: 48,
+                      borderRadius: 12,
+                      backgroundColor: '#000000',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      gap: 6
+                    }}
+                    onPress={handlePickBrandingLogo}
+                  >
+                    <Ionicons name="image-outline" size={18} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload Logo</Text>
+                  </TouchableOpacity>
+                  {(brandingLogoPreview || brandingLogoUrl) && (
+                    <Image
+                      source={{ uri: brandingLogoPreview || brandingLogoUrl }}
+                      style={{ width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}
+                    />
+                  )}
+                </View>
                 <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
                   <TextInput
-                    style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                    style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
                     value={brandingLogoUrl}
                     onChangeText={setBrandingLogoUrl}
-                    placeholder="https://example.com/logo.png"
+                    placeholder="or enter Logo Image URL (https://...)"
+                    placeholderTextColor="#BEC6E0"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* 9:16 Custom Background Image Upload & URL */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.inputLabel}>CUSTOM 9:16 BACKGROUND IMAGE</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 16,
+                      height: 48,
+                      borderRadius: 12,
+                      backgroundColor: '#000000',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      gap: 6
+                    }}
+                    onPress={handlePickBrandingBg}
+                  >
+                    <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload 9:16 Image</Text>
+                  </TouchableOpacity>
+                  {(brandingBgPreview || brandingBgUrl) && (
+                    <Image
+                      source={{ uri: brandingBgPreview || brandingBgUrl }}
+                      style={{ width: 36, height: 56, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}
+                    />
+                  )}
+                </View>
+                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                    value={brandingBgUrl}
+                    onChangeText={setBrandingBgUrl}
+                    placeholder="or enter Background Image URL (https://...)"
                     placeholderTextColor="#BEC6E0"
                     autoCapitalize="none"
                   />
