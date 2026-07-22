@@ -549,25 +549,21 @@ export default function MerchantDashboard() {
           </View>
         )}
 
-        {/* ⚡ REAL-TIME DEDICATED PENDING STAMP REQUESTS SECTION (ALWAYS VISIBLE) */}
+        {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>
           <View style={styles.pendingHeaderRow}>
-            <View style={styles.livePulseBadge}>
-              <View style={styles.livePulseDot} />
-              <Text style={styles.livePulseText}>LIVE</Text>
-            </View>
             <Text style={styles.pendingSectionTitle}>Pending Stamp Requests ({pendingClaims.length})</Text>
           </View>
 
           {pendingClaims.length === 0 ? (
             <View style={styles.pendingEmptyCard}>
               <View style={styles.pendingEmptyIconWrap}>
-                <Ionicons name="radio-outline" size={22} color="#2563EB" />
+                <Ionicons name="radio-outline" size={22} color="#000000" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pendingEmptyTitle}>Ready for Customer NFC Taps</Text>
                 <Text style={styles.pendingEmptyDesc}>
-                  Customer stamp claim requests will pop up here live in real-time.
+                  Customer stamp claim requests will pop up here in real-time.
                 </Text>
               </View>
             </View>
@@ -1704,46 +1700,24 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0040e0',
   },
-  // Dedicated Pending Stamp Requests Styles
+  // Dedicated Pending Stamp Requests Styles (Monochrome B&W)
   pendingSectionContainer: {
     marginBottom: 20,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F8FAFC',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
   },
   pendingHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  livePulseBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    gap: 4,
-    marginRight: 8,
-  },
-  livePulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-  },
-  livePulseText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
   pendingSectionTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1E3A8A',
+    color: '#000000',
   },
   pendingEmptyCard: {
     backgroundColor: '#FFFFFF',
@@ -1752,21 +1726,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
   },
   pendingEmptyIconWrap: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pendingEmptyTitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1E3A8A',
+    color: '#000000',
   },
   pendingEmptyDesc: {
     fontSize: 11,
@@ -1779,13 +1753,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    shadowColor: '#1E40AF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   pendingCustomerHeader: {
     flexDirection: 'row',
