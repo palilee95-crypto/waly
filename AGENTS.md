@@ -23,14 +23,16 @@ app/                      Expo Router routes (file-based routing)
   _layout.tsx             Root layout (providers, fonts, splash, notification banner)
   +html.tsx               Web HTML shell (PWA manifest, viewport, styles)
   index.tsx               Entry point — redirects based on auth state
+  join.tsx                Frictionless customer register-to-join page
+  nfc.tsx                 NFC stamp claim customer landing page
 context/                  AuthContext, LanguageContext (en + ms translations, 403 keys)
 lib/pocketbase.ts         PocketBase client singleton (PB_URL from EXPO_PUBLIC_PB_URL)
-components/               NotificationBanner (animated slide-down overlay)
+components/               NotificationBanner (animated overlay), NfcClaimModal (NFC tag claims)
 theme/                    Design tokens (colors, spacing, radii, shadows, layout)
 assets/                   App icons, splash, logo, mascot
 public/                   Web PWA manifest, favicon
-pb_hooks/                 PocketBase JS hooks (25 files — routes, automation, WhatsApp, payments, loyalty)
-pb_migrations/            PocketBase collection migrations (18 files, chronological)
+pb_hooks/                 PocketBase JS hooks (35 files — routes, automation, WhatsApp, payments, loyalty, agents, nfc)
+pb_migrations/            PocketBase collection migrations (32 files, chronological)
 pb_schema.json            Schema snapshot
 docker-compose.yml        Full VPS stack (caddy, pocketbase, evolution-db, evolution-go, redis, litestream, payment-bot, portainer)
 evolution_db_init/        Postgres init.sql (creates evogo_auth + evogo_users)
@@ -165,7 +167,7 @@ If you ever re-add a pooler, do NOT put evolution-go behind it.
 - **i18n**: Full English + Bahasa Malaysia via LanguageContext (403 translation keys).
 - **Responsive**: Desktop (>768px) shows sidebar navigation; mobile shows bottom tab bars. Content max-widths center on desktop.
 
-## PocketBase Hooks (25 files)
+## PocketBase Hooks (35 files)
 
 Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.js`:
 
@@ -188,14 +190,29 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 - `subscription_enforce.pb.js` — `onRecordCreate` hook: blocks transactions/programs/rewards for non-active merchants (allows 7-day trial)
 - `sync_merchant_subscription.pb.js` — Syncs merchant status from subscription changes
 
-### Loyalty & Points
+### Loyalty, Stamps & Points
 - `stamp_complete.pb.js` — `onRecordUpdate` on loyalty_cards: when stamps reach goal → reset stamps, increment completions, issue voucher (`WV-XXXX-XXXX`)
 - `voucher_redeem.pb.js` — `onRecordUpdate` on vouchers: when status → `used`, creates redemption transaction
 - `points_multiplier.pb.js` — Points calculation with tier multipliers
 - `redemption_points.pb.js` — Points deduction on redemption
 - `tier_recalculate.pb.js` — Recalculates customer tiers based on spending
-- `seed_tiers.pb.js` — Seeds default tier data (Bronze/Silver/Gold/Platinum)
-- `earn_points.pb.js` — Deprecated (points now handled in `points_multiplier.pb.js`)
+- `velocity_check.pb.js` — Rate limiting for stamp issuance
+- `manual_give.pb.js` — Route: `POST /api/risev/merchant/give-manual` (allows manual stamp/points issuance via customer phone number lookup)
+
+### Sales Agents & Prospects
+- `agent_click.pb.js` — Route: `GET /api/risev/agent/click` (tracks referral link click count)
+- `agent_whatsapp.pb.js` — Scoped WhatsApp pairing/status endpoints for sales agents (`GET /api/risev/agent/whatsapp/status`)
+- `create_prospect.pb.js` — Route: `POST /api/risev/agent/create-prospect` (registers new prospect and sends referral link)
+- `merchant_referral.pb.js` — Hook: `onRecordCreate` on `merchants` (links new merchant to its referring agent)
+- `sales_agent_signup.pb.js` — Hook: `onRecordCreate` on `sales_agents` (initializes defaults and referral code)
+
+### NFC & QR Scanning
+- `nfc_request.pb.js` — Route: `POST /api/risev/nfc/request` (submits customer NFC stamp request via web landing page)
+- `nfc_transaction.pb.js` — Route: `POST /api/risev/nfc/complete` (completes an NFC claim with merchant confirmation)
+- `quick_register.pb.js` — Route: `POST /api/risev/qr/quick-register` (frictionless Name + Phone registration for QR scanning)
+
+### Birthday Rewards
+- `birthday.pb.js` — Cron Route: `GET /api/risev/cron/birthdays` (runs daily birthday campaigns and auto-issues vouchers)
 
 ### Notifications
 - `notification_helper.js` — Creates notification records in `notifications` collection
@@ -206,7 +223,10 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 - `protect_loyalty_cards.pb.js` — Access control for loyalty cards
 - `stock_deduct.pb.js` — Deducts reward stock on redemption
 - `sync_program_reward.pb.js` — Syncs program-reward relationships
-- `velocity_check.pb.js` — Rate limiting for stamp issuance
+
+### Engine / Sequence Automation
+- `smart_follow_up.js` — Helper/runner: called by cron (every 5 minutes) to run automated multi-step follow-up message sequences
+- `cascade_delete_user.pb.js` — Hook: `onRecordDelete` on `users` (cleans up all merchant/customer relations to prevent schema violations)
 
 Hooks hot-reload when the files change on disk — no PocketBase restart needed. But if you change `docker-compose.yml`, run `docker compose up -d` (add `--force-recreate <service>` to recreate a specific container).
 
@@ -251,7 +271,7 @@ Defined in `theme/index.ts`:
 - **Shadows**: sm/md/lg/xl presets
 - **Layout**: Screen padding, header/tab bar/button/input heights, stamp card dimensions, avatar sizes
 
-## pb_migrations (18 files, chronological)
+## pb_migrations (32 files, chronological)
 
 1. `1782000000_collections_snapshot.js` — Initial schema snapshot
 2. `1782806195_updated_users.js` — User collection updates
@@ -271,6 +291,20 @@ Defined in `theme/index.ts`:
 16. `1782807015_simplify_transactions_api_rules.js` — Simplified transaction API rules
 17. `1782807016_add_merchant_banner.js` — Merchant banner image field
 18. `1782807017_add_transaction_bill_amount.js` — Bill amount field on transactions
+19. `1782807018_smart_follow_up.js` — Created follow_up_groups and follow_up_sequences collections
+20. `1782807019_update_follow_up_sequences_required.js` — Follow-up sequence schema adjustments
+21. `1782807020_create_prospects.js` — Created prospects collection for sales agent tracking
+22. `1782807020_sales_agent_referrals.js` — Sales agent system fields & relationships
+23. `1782807021_add_birthday_to_users.js` — Birthday and notification preferences fields on users
+24. `1782807021_allow_sales_agent_signup.js` — Sales agent authentication/creation API rule updates
+25. `1782807022_create_birthday_rewards.js` — Created birthday_rewards configuration collection
+26. `1782807023_create_birthday_logs.js` — Created birthday_logs execution history collection
+27. `1782807024_delete_dead_collections.js` — Cleaned up deprecated collections
+28. `1782807025_add_merchant_onboarding_fields.js` — Merchant profile onboarding fields
+29. `1782807026_create_qr_transactions.js` — Created qr_transactions tracking collection
+30. `1782807027_create_nfc_claims.js` — Created nfc_claims collection
+31. `1782807028_add_merchant_bg_image.js` — Card background image field configuration
+32. `1782807029_add_merchant_bg_image_v2.js` — Refinement of card background image configurations
 
 ## VPS Operations Cheat Sheet
 
