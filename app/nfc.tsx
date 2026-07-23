@@ -132,9 +132,11 @@ export default function NfcLandingScreen() {
     } catch (err) {}
   };
 
+  const [waUrl, setWaUrl] = useState('');
+
   // 2. Realtime SSE Subscriptions for Instant Merchant Confirmation Reveal
   useEffect(() => {
-    if (!merchant || !user) return;
+    if (!merchant) return;
 
     let isSubscribed = true;
 
@@ -143,7 +145,8 @@ export default function NfcLandingScreen() {
       if (!isSubscribed) return;
       if (e.action === 'update' || e.action === 'create') {
         const cardRecord = e.record;
-        if (cardRecord.merchant === merchant.id && (cardRecord.customer === user.id || cardRecord.customer === pb.authStore.record?.id)) {
+        const currentCustId = user?.id || pb.authStore.record?.id;
+        if (cardRecord.merchant === merchant.id && currentCustId && cardRecord.customer === currentCustId) {
           setLoyaltyCard(cardRecord);
           setStep('card');
           setIsWaitingConfirm(false);
@@ -169,10 +172,27 @@ export default function NfcLandingScreen() {
       filter: `merchant = "${merchant.id}"`
     }).catch(() => {});
 
+    // Subscribe to nfc_claims updates for instant auto-reveal when merchant approves
+    pb.collection('nfc_claims').subscribe('*', (e: any) => {
+      if (!isSubscribed) return;
+      const record = e.record;
+      if (record && record.merchant === merchant.id && record.status === 'completed') {
+        const currentCustId = user?.id || pb.authStore.record?.id;
+        if (currentCustId) {
+          fetchUserLoyaltyCard(merchant.id, currentCustId);
+        }
+        setStep('card');
+        setIsWaitingConfirm(false);
+      }
+    }, {
+      filter: `merchant = "${merchant.id}"`
+    }).catch(() => {});
+
     return () => {
       isSubscribed = false;
       pb.collection('loyalty_cards').unsubscribe('*').catch(() => {});
       pb.collection('transactions').unsubscribe('*').catch(() => {});
+      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
     };
   }, [merchant, user]);
 
@@ -197,7 +217,7 @@ export default function NfcLandingScreen() {
     ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
     : 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&q=80&w=300';
 
-  // 3. Submit NFC Notification & Open WhatsApp
+  // 3. Submit Direct NFC Claim & Setup Optional WhatsApp Redirect
   const handleNfcSubmit = async () => {
     if (!phoneInput.trim()) {
       setErrorMsg('Please enter your phone number.');
@@ -255,28 +275,38 @@ export default function NfcLandingScreen() {
         ? authRecord.name
         : (finalName || ('Customer ' + digits.slice(-4)));
 
-      const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // 1. Send Direct API Request to PocketBase (INSTANT & FAIL-SAFE)
+      let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      try {
+        const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string }>('/api/risev/nfc/request', {
+          method: 'POST',
+          body: {
+            merchant_id: merchant.id,
+            phone: cleanPhone,
+            name: displayName,
+          },
+        });
+        if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
+      } catch (apiErr) {
+        console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
+      }
 
+      // 2. Prepare Optional WhatsApp Message Link
       const message =
         `Hi ${merchantName}! I scanned your NFC card to claim stamps.\n\n` +
         `Name: ${displayName}\n` +
         `Phone: ${cleanPhone}\n` +
         `Merchant: ${merchant.id}\n` +
-        `NFC: ${sessionCode}`;
+        `NFC: ${claimSessionCode}`;
 
       let waPhone = merchantPhone.replace(/[^\d]/g, '');
       if (waPhone.startsWith('0')) waPhone = '6' + waPhone;
       if (!waPhone.startsWith('60') && waPhone.length >= 9) waPhone = '60' + waPhone;
 
-      const waUrl = waPhone
+      const generatedWaUrl = waPhone
         ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
         : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-      if (Platform.OS === 'web') {
-        window.location.href = waUrl;
-      } else {
-        await Linking.openURL(waUrl);
-      }
+      setWaUrl(generatedWaUrl);
 
       setIsWaitingConfirm(true);
       setStep('sent');
@@ -446,17 +476,17 @@ export default function NfcLandingScreen() {
           {step === 'sent' && (
             <View style={styles.innerFormCard}>
               <View style={styles.sentIconWrap}>
-                <Ionicons name="paper-plane" size={48} color={primaryColor} />
+                <Ionicons name="checkmark-circle" size={56} color="#10B981" />
               </View>
-              <Text style={styles.sentHeaderTitle}>WhatsApp Opened!</Text>
+              <Text style={styles.sentHeaderTitle}>Stamp Claim Requested! 🎉</Text>
               <Text style={styles.sentHeaderDesc}>
-                Tap <Text style={{ fontWeight: '800', color: '#000000' }}>Send</Text> in WhatsApp. Once confirmed, your stamps card will appear automatically below!
+                Your claim is live on <Text style={{ fontWeight: '800', color: '#000000' }}>{merchantName}</Text>'s terminal. Please tell the staff your phone number to approve your stamps.
               </Text>
 
               {/* Pulse / Loading Live Sync */}
               <View style={styles.liveSyncBanner}>
                 <ActivityIndicator size="small" color={primaryColor} />
-                <Text style={styles.liveSyncText}>Listening for store confirmation...</Text>
+                <Text style={styles.liveSyncText}>Waiting for store approval in real-time...</Text>
               </View>
 
               <TouchableOpacity
@@ -464,8 +494,26 @@ export default function NfcLandingScreen() {
                 onPress={() => setStep('card')}
                 activeOpacity={0.85}
               >
+                <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={styles.primaryActionBtnText}>View My Stamp Card</Text>
               </TouchableOpacity>
+
+              {waUrl ? (
+                <TouchableOpacity
+                  style={[styles.primaryActionBtn, { backgroundColor: '#25D366', marginTop: 10 }]}
+                  onPress={async () => {
+                    if (Platform.OS === 'web') {
+                      window.location.href = waUrl;
+                    } else {
+                      await Linking.openURL(waUrl);
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryActionBtnText}>Open WhatsApp Chat (Optional)</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           )}
 
