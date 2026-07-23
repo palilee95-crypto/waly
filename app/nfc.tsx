@@ -270,7 +270,7 @@ export default function NfcLandingScreen() {
           } catch (cErr) {}
         }
 
-        // 2. Check if customer's loyalty card stamps updated
+        // 2. Check if customer's loyalty card stamps updated (stamps increased)
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (currentCustId) {
           const cards = await pb.collection('loyalty_cards').getFullList({
@@ -279,7 +279,7 @@ export default function NfcLandingScreen() {
           });
           if (cards.length > 0 && isMounted) {
             const cardRec = cards[0];
-            if (!loyaltyCard || cardRec.stamps_collected !== loyaltyCard.stamps_collected) {
+            if (loyaltyCard && cardRec.stamps_collected > loyaltyCard.stamps_collected) {
               setLoyaltyCard(cardRec);
               setStep('card');
               setIsWaitingConfirm(false);
@@ -639,9 +639,10 @@ export default function NfcLandingScreen() {
                 >
                   {hasSentWhatsapp
                     ? 'Waiting for store approval in real-time...'
-                    : 'Tap WhatsApp button below to enable merchant approval.'}
                 </Text>
               </View>
+
+              {errorMsg ? <Text style={[styles.errorText, { textAlign: 'center', marginTop: 10 }]}>{errorMsg}</Text> : null}
 
               {/* Mandatory WhatsApp Action Button */}
               <TouchableOpacity
@@ -662,6 +663,7 @@ export default function NfcLandingScreen() {
               <TouchableOpacity
                 style={[styles.primaryActionBtn, { backgroundColor: '#000000', marginTop: 10 }]}
                 onPress={async () => {
+                  setErrorMsg('');
                   if (claimId) {
                     try {
                       const c = await pb.collection('nfc_claims').getOne(claimId, { requestKey: null });
@@ -673,14 +675,29 @@ export default function NfcLandingScreen() {
                         setStep('card');
                         setIsWaitingConfirm(false);
                         return;
+                      } else {
+                        setErrorMsg('Store staff has not approved your stamps yet. Please tell staff your phone number.');
+                        return;
                       }
                     } catch (e) {}
                   }
                   const currentCustId = user?.id || pb.authStore.record?.id;
                   if (currentCustId && merchant) {
-                    await fetchUserLoyaltyCard(merchant.id, currentCustId);
-                    setStep('card');
+                    const cards = await pb.collection('loyalty_cards').getFullList({
+                      filter: `merchant = "${merchant.id}" && customer = "${currentCustId}"`,
+                      requestKey: null,
+                    });
+                    if (cards.length > 0) {
+                      const c = cards[0];
+                      if (loyaltyCard && c.stamps_collected > loyaltyCard.stamps_collected) {
+                        setLoyaltyCard(c);
+                        setStep('card');
+                        setIsWaitingConfirm(false);
+                        return;
+                      }
+                    }
                   }
+                  setErrorMsg('Store staff has not approved your stamps yet. Please tell staff your phone number.');
                 }}
                 activeOpacity={0.85}
               >
@@ -718,7 +735,7 @@ export default function NfcLandingScreen() {
                 {program?.card_background ? (
                   <Image
                     source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
-                    style={StyleSheet.absoluteFill}
+                    style={[StyleSheet.absoluteFill, { opacity: 0.12 }]}
                     resizeMode="cover"
                   />
                 ) : null}
