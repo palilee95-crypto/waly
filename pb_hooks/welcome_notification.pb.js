@@ -5,20 +5,29 @@ onRecordAfterCreateSuccess((e) => {
   let source = "";
   try {
     const rawMeta = e.record.get('metadata');
-    if (typeof rawMeta === 'string' && rawMeta.trim().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(rawMeta);
-        source = parsed.source || "";
-      } catch (pErr) {
+    if (typeof rawMeta === 'string') {
+      if (rawMeta.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawMeta);
+          source = parsed.source || "";
+        } catch (pErr) {}
+      } else {
         source = rawMeta;
       }
     } else if (rawMeta && typeof rawMeta === 'object') {
-      source = rawMeta.source || "";
+      source = rawMeta.source || (rawMeta.get ? rawMeta.get('source') : "");
+    }
+    // Fallback: search stringified metadata if source is still empty
+    if (!source && rawMeta) {
+      const str = String(typeof rawMeta === 'object' ? JSON.stringify(rawMeta) : rawMeta);
+      if (str.includes('nfc_claim')) source = 'nfc_claim';
+      else if (str.includes('manual_give')) source = 'manual_give';
+      else if (str.includes('qr_inbound')) source = 'qr_inbound';
     }
   } catch (mErr) {}
 
   if (source === 'qr_inbound' || source === 'manual_give' || source === 'nfc_claim') {
-    console.log(`[WHATSAPP HOOK] Skipping transaction notification for source: ${source}`);
+    console.log(`[WHATSAPP HOOK] Skipping duplicate transaction notification for source: ${source}`);
     return e.next();
   }
 

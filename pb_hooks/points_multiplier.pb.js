@@ -136,8 +136,17 @@ onRecordCreate((e) => {
   }
 
   // Log calculation details in metadata JSON
-  const existingMetadata = e.record.get('metadata') || {};
-  e.record.set('metadata', Object.assign({}, existingMetadata, {
+  let existingMetadata = {};
+  try {
+    const rawMeta = e.record.get('metadata');
+    if (typeof rawMeta === 'string' && rawMeta.trim().startsWith('{')) {
+      existingMetadata = JSON.parse(rawMeta);
+    } else if (rawMeta && typeof rawMeta === 'object') {
+      existingMetadata = rawMeta;
+    }
+  } catch (mErr) {}
+
+  const mergedMetadata = Object.assign({}, existingMetadata, {
     base_points: basePoints,
     tier_multiplier: tierMult,
     campaign_multiplier: campaignMult,
@@ -145,7 +154,9 @@ onRecordCreate((e) => {
     bonus_stamps: bonusStamps,
     streak_multiplier: streakMult,
     calculated_at: now
-  }));
+  });
+
+  e.record.set('metadata', JSON.stringify(mergedMetadata));
 
   return e.next();
 }, 'transactions');
