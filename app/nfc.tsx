@@ -71,22 +71,27 @@ export default function NfcLandingScreen() {
 
   // 1. Fetch Merchant, Program & Rewards on Mount
   useEffect(() => {
+    let isMounted = true;
     (async () => {
       const merchantId = params.m;
       if (!merchantId) {
-        setInvalidReason('No merchant ID provided in NFC link.');
-        setStep('invalid');
+        if (isMounted) {
+          setInvalidReason('No merchant ID provided in NFC link.');
+          setStep('invalid');
+        }
         return;
       }
 
       try {
         const m = await pb.collection('merchants').getOne(merchantId, { expand: 'owner' });
         if (!m || m.status === 'suspended' || m.status === 'rejected') {
-          setInvalidReason('This store is currently not accepting stamps.');
-          setStep('invalid');
+          if (isMounted) {
+            setInvalidReason('This store is currently not accepting stamps.');
+            setStep('invalid');
+          }
           return;
         }
-        setMerchant(m);
+        if (isMounted) setMerchant(m);
 
         // Fetch primary loyalty program for this merchant
         try {
@@ -94,7 +99,7 @@ export default function NfcLandingScreen() {
             filter: `merchant = "${merchantId}" && is_active = true`,
             sort: '-created'
           });
-          if (progs.length > 0) {
+          if (progs.length > 0 && isMounted) {
             setProgram(progs[0]);
             // Fetch rewards for this program
             try {
@@ -102,23 +107,45 @@ export default function NfcLandingScreen() {
                 filter: `merchant = "${merchantId}"`,
                 sort: '-created'
               });
-              if (rws.length > 0) setReward(rws[0]);
+              if (rws.length > 0 && isMounted) setReward(rws[0]);
             } catch (rErr) {}
           }
         } catch (pErr) {}
 
-        // If user is already logged in, check if they have an active card
-        if (user && user.id) {
-          fetchUserLoyaltyCard(merchantId, user.id);
+        if (isMounted) {
+          setStep((prev) => (prev === 'loading' ? 'form' : prev));
         }
-
-        setStep('form');
       } catch (err) {
-        setInvalidReason('Invalid or expired NFC merchant link.');
-        setStep('invalid');
+        if (isMounted) {
+          setInvalidReason('Invalid or expired NFC merchant link.');
+          setStep('invalid');
+        }
       }
     })();
-  }, [params.m, user]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.m]);
+
+  // 2. Fetch User Loyalty Card when Merchant & User are available
+  useEffect(() => {
+    const merchantId = params.m;
+    const customerId = user?.id || pb.authStore.record?.id;
+    if (merchantId && customerId) {
+      fetchUserLoyaltyCard(merchantId, customerId);
+    }
+  }, [params.m, user?.id]);
+
+  // 3. Auto-populate phone/name input if user state updates
+  useEffect(() => {
+    if (user?.phone && !phoneInput) {
+      setPhoneInput(user.phone.replace('+60', '').replace('+', ''));
+    }
+    if (user?.name && !nameInput) {
+      setNameInput(user.name);
+    }
+  }, [user]);
 
   const fetchUserLoyaltyCard = async (merchantId: string, customerId: string) => {
     try {
