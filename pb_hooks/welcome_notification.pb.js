@@ -4,18 +4,24 @@ onRecordAfterCreateSuccess((e) => {
   // Skip duplicate notification if transaction was created by manual_give, nfc_claim, or qr_inbound (which send their own auto-reply)
   let source = "";
   try {
-    const rawMetaStr = e.record.getString('metadata') || "";
+    const rawMeta = e.record.get('metadata');
+    let rawMetaStr = "";
+    if (typeof rawMeta === 'string') {
+      rawMetaStr = rawMeta;
+    } else if (rawMeta) {
+      try {
+        rawMetaStr = $json.stringify(rawMeta);
+      } catch (jErr) {
+        rawMetaStr = String(rawMeta);
+      }
+    }
+
     if (rawMetaStr.includes('nfc_claim')) {
       source = 'nfc_claim';
     } else if (rawMetaStr.includes('manual_give')) {
       source = 'manual_give';
     } else if (rawMetaStr.includes('qr_inbound')) {
       source = 'qr_inbound';
-    } else if (rawMetaStr.trim().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(rawMetaStr);
-        source = parsed.source || "";
-      } catch (pErr) {}
     }
   } catch (mErr) {}
 
