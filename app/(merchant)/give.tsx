@@ -449,53 +449,6 @@ export default function GiveStampsScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Recent Activity Log */}
-        <View style={styles.historySection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity Log</Text>
-            <Text style={styles.sectionCount}>{transactions.length} total</Text>
-          </View>
-
-          {loadingTxns ? (
-            <ActivityIndicator style={{ marginVertical: 24 }} color="#000000" />
-          ) : transactions.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="receipt-outline" size={36} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No Recent Activity</Text>
-              <Text style={styles.emptySubtitle}>Issued stamps & redeemed vouchers will appear here.</Text>
-            </View>
-          ) : (
-            transactions.map((item) => {
-              const isRedeem = item.type === 'redeem';
-              return (
-                <View key={item.id} style={styles.txnCard}>
-                  <View style={[styles.txnIconBg, isRedeem && { backgroundColor: '#F8FAFC' }]}>
-                    <Ionicons
-                      name={isRedeem ? 'gift-outline' : 'ribbon-outline'}
-                      size={18}
-                      color="#000000"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.txnName}>
-                      {item.expand?.customer?.name || item.expand?.customer?.phone || 'Customer'}
-                    </Text>
-                    <Text style={styles.txnDate}>{new Date(item.created).toLocaleString()}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.txnStamps}>
-                      {isRedeem ? 'Redeemed' : `+${item.stamps} Stamp(s)`}
-                    </Text>
-                    <Text style={styles.txnBill}>
-                      {isRedeem ? 'Voucher' : `RM ${parseFloat(item.bill_amount || 0).toFixed(2)}`}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
