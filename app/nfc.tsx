@@ -246,6 +246,78 @@ export default function NfcLandingScreen() {
     };
   }, [merchant, user]);
 
+  // 3. Robust Polling & Tab Visibility Listener for Mobile Browsers (iOS Safari / Android Chrome)
+  useEffect(() => {
+    if (step !== 'sent' || !merchant) return;
+
+    let isMounted = true;
+
+    const checkApprovalStatus = async () => {
+      try {
+        // 1. Check direct claim record status
+        if (claimId) {
+          try {
+            const claimRecord = await pb.collection('nfc_claims').getOne(claimId, { requestKey: null });
+            if (claimRecord && claimRecord.status === 'completed' && isMounted) {
+              const currentCustId = user?.id || pb.authStore.record?.id;
+              if (currentCustId) {
+                await fetchUserLoyaltyCard(merchant.id, currentCustId);
+              }
+              setStep('card');
+              setIsWaitingConfirm(false);
+              return;
+            }
+          } catch (cErr) {}
+        }
+
+        // 2. Check if customer's loyalty card stamps updated
+        const currentCustId = user?.id || pb.authStore.record?.id;
+        if (currentCustId) {
+          const cards = await pb.collection('loyalty_cards').getFullList({
+            filter: `merchant = "${merchant.id}" && customer = "${currentCustId}"`,
+            requestKey: null,
+          });
+          if (cards.length > 0 && isMounted) {
+            const cardRec = cards[0];
+            if (!loyaltyCard || cardRec.stamps_collected !== loyaltyCard.stamps_collected) {
+              setLoyaltyCard(cardRec);
+              setStep('card');
+              setIsWaitingConfirm(false);
+            }
+          }
+        }
+      } catch (err) {}
+    };
+
+    // Active polling every 2 seconds while waiting for approval
+    const interval = setInterval(checkApprovalStatus, 2000);
+
+    // Immediately trigger check when returning from WhatsApp app to browser tab
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        checkApprovalStatus();
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('focus', checkApprovalStatus);
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
+    }
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('focus', checkApprovalStatus);
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
+      }
+    };
+  }, [step, merchant, claimId, user, loyaltyCard]);
+
   // Brand Tokens & Assets
   const merchantName = merchant?.name || 'Risev Merchant';
   const merchantPhone = merchant?.phone || merchant?.metadata?.phone || merchant?.expand?.owner?.phone || '';
@@ -584,6 +656,36 @@ export default function NfcLandingScreen() {
                 <Text style={styles.primaryActionBtnText}>
                   {hasSentWhatsapp ? 'Open WhatsApp Chat Again' : '💬 Send Claim via WhatsApp (Required)'}
                 </Text>
+              </TouchableOpacity>
+
+              {/* Check Approval Status Action */}
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: '#000000', marginTop: 10 }]}
+                onPress={async () => {
+                  if (claimId) {
+                    try {
+                      const c = await pb.collection('nfc_claims').getOne(claimId, { requestKey: null });
+                      if (c && c.status === 'completed') {
+                        const currentCustId = user?.id || pb.authStore.record?.id;
+                        if (currentCustId && merchant) {
+                          await fetchUserLoyaltyCard(merchant.id, currentCustId);
+                        }
+                        setStep('card');
+                        setIsWaitingConfirm(false);
+                        return;
+                      }
+                    } catch (e) {}
+                  }
+                  const currentCustId = user?.id || pb.authStore.record?.id;
+                  if (currentCustId && merchant) {
+                    await fetchUserLoyaltyCard(merchant.id, currentCustId);
+                    setStep('card');
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryActionBtnText}>Check Approval Status</Text>
               </TouchableOpacity>
 
               {/* Secondary Option: View My Stamp Card */}
