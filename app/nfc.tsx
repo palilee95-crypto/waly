@@ -547,43 +547,34 @@ export default function NfcLandingScreen() {
           )}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 3: DEDICATED REAL MERCHANT LOYALTY CARD VIEW */}
+          {/* STEP 3: 1:1 CUSTOMER VIEW LOYALTY CARD */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'card' && (
             <View style={styles.cardSectionWrap}>
-              {/* STAMP GRID CARD */}
+              {/* STAMP GRID CARD (1:1 with Customer View) */}
               <View
                 style={[
-                  styles.stampGridCard,
+                  styles.largeCardView,
                   {
                     backgroundColor: program?.card_color || primaryColor,
-                    borderColor: 'rgba(255,255,255,0.4)',
                     overflow: 'hidden',
-                    position: 'relative',
                   },
                 ]}
               >
                 {program?.card_background ? (
                   <Image
                     source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
-                    style={[StyleSheet.absoluteFill, { opacity: 0.15 }]}
+                    style={StyleSheet.absoluteFill}
                     resizeMode="cover"
                   />
                 ) : null}
 
-                {/* Card Top Row: Shop Logo, Name & Stamp Fraction */}
-                <View style={styles.cardInfoRow}>
-                  <View style={styles.shopLogoBg}>
-                    {merchantLogoUrl ? (
-                      <Image source={{ uri: merchantLogoUrl }} style={styles.shopLogo} />
-                    ) : (
-                      <Ionicons name="storefront" size={20} color="#0F172A" />
-                    )}
-                  </View>
-                  <View style={{ flex: 1 }}>
+                {/* Card Header: Shop Name, Category & Gold Badge */}
+                <View style={styles.largeCardHeader}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
                     <Text
                       style={[
-                        styles.shopNameText,
+                        styles.largeCardMerchant,
                         { color: program?.font_color || '#0F172A' },
                       ]}
                       numberOfLines={1}
@@ -596,30 +587,15 @@ export default function NfcLandingScreen() {
                         { color: (program?.font_color || '#0F172A') + 'B3' },
                       ]}
                     >
-                      LOYALTY CARD
+                      {(merchant?.category || 'store').toUpperCase()}
                     </Text>
                   </View>
-                  <View style={styles.ptsColumn}>
-                    <Text
-                      style={[
-                        styles.ptsValueText,
-                        { color: program?.font_color || '#0F172A' },
-                      ]}
-                    >
-                      {currentStamps}/{stampGoal}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.ptsLabelText,
-                        { color: (program?.font_color || '#0F172A') + '99' },
-                      ]}
-                    >
-                      STAMPS
-                    </Text>
+                  <View style={styles.goldBadge}>
+                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
                   </View>
                 </View>
 
-                {/* Card Mid Row: Chip & Contactless */}
+                {/* EMV Microchip & Contactless Wifi */}
                 <View style={styles.cardMidRow}>
                   <View style={styles.cardChip}>
                     <View style={styles.chipLineHoriz} />
@@ -628,53 +604,66 @@ export default function NfcLandingScreen() {
                   </View>
                   <Ionicons
                     name="wifi"
-                    size={16}
+                    size={18}
                     color={(program?.font_color || '#0F172A') + '66'}
+                    style={{ opacity: 0.5 }}
                   />
                 </View>
 
-                {/* Stamp Grid Pills */}
-                <View style={styles.stampGridWrap}>
+                {/* Stamps grid details (Exact 5-per-row grid matching customer view) */}
+                <View style={styles.largeStampsGrid}>
                   {Array.from({ length: stampGoal }).map((_, idx) => {
                     const num = idx + 1;
-                    const isFilled = num <= currentStamps;
-                    const isRewardPos = num === stampGoal || num === Math.floor(stampGoal / 2);
+                    const isEarned = num <= currentStamps;
+                    const isRewardPos = num === stampGoal;
+                    const fontC = program?.font_color || '#0F172A';
 
-                    return (
-                      <View
-                        key={num}
-                        style={[
-                          styles.stampPill,
-                          isFilled
-                            ? { backgroundColor: '#0F172A' }
-                            : { backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-                        ]}
-                      >
-                        {isFilled ? (
-                          renderStampIcon(program?.card_icon || 'coffee', 16, '#FFFFFF')
-                        ) : isRewardPos ? (
+                    if (isEarned) {
+                      return (
+                        <View
+                          key={num}
+                          style={[
+                            styles.largeStampEarned,
+                            { backgroundColor: program?.stamp_color || '#0F172A' },
+                          ]}
+                        >
+                          {renderStampIcon(program?.card_icon || 'coffee', 16, '#FFFFFF')}
+                        </View>
+                      );
+                    } else if (isRewardPos) {
+                      return (
+                        <View
+                          key={num}
+                          style={[
+                            styles.largeStampGift,
+                            { borderColor: fontC + '40' },
+                          ]}
+                        >
                           <Text style={{ fontSize: 13 }}>🎁</Text>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.stampPillText,
-                              { color: '#0F172A' },
-                            ]}
-                          >
-                            {num}
-                          </Text>
-                        )}
-                      </View>
-                    );
+                        </View>
+                      );
+                    } else {
+                      return (
+                        <View
+                          key={num}
+                          style={[
+                            styles.largeStampEmpty,
+                            { borderColor: fontC + '30' },
+                          ]}
+                        >
+                          {renderStampIcon(program?.card_icon || 'coffee', 14, fontC + '40')}
+                        </View>
+                      );
+                    }
                   })}
                 </View>
 
-                {/* Card Bottom Row: Card Holder & Mastercard Badge */}
-                <View style={styles.cardBottomRow}>
-                  <View style={styles.holderBlock}>
+                {/* Card Footer Row */}
+                <View style={styles.largeCardFooter}>
+                  <View style={styles.holderCol}>
                     <Text
                       style={[
-                        styles.cardLabelText,
+                        styles.holderLabel,
                         { color: (program?.font_color || '#0F172A') + '80' },
                       ]}
                     >
@@ -682,7 +671,7 @@ export default function NfcLandingScreen() {
                     </Text>
                     <Text
                       style={[
-                        styles.holderValueText,
+                        styles.holderValue,
                         { color: program?.font_color || '#0F172A' },
                       ]}
                       numberOfLines={1}
@@ -691,9 +680,57 @@ export default function NfcLandingScreen() {
                     </Text>
                   </View>
 
-                  <View style={styles.mastercardBadge}>
-                    <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                    <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                  <View style={{ width: 45 }}>
+                    <Text
+                      style={[
+                        styles.holderLabel,
+                        { color: (program?.font_color || '#0F172A') + '80' },
+                      ]}
+                    >
+                      VALID
+                    </Text>
+                    <Text
+                      style={[
+                        styles.holderValue,
+                        { color: program?.font_color || '#0F172A' },
+                      ]}
+                    >
+                      12/30
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 35 }}>
+                    <Text
+                      style={[
+                        styles.holderLabel,
+                        { color: (program?.font_color || '#0F172A') + '80' },
+                      ]}
+                    >
+                      CVV
+                    </Text>
+                    <Text
+                      style={[
+                        styles.holderValue,
+                        { color: program?.font_color || '#0F172A' },
+                      ]}
+                    >
+                      888
+                    </Text>
+                  </View>
+
+                  <View style={styles.brandBadge}>
+                    <View style={styles.mastercardBadge}>
+                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                    </View>
+                    <Text
+                      style={[
+                        styles.largeProgressPercentage,
+                        { color: (program?.font_color || '#0F172A') + 'CC' },
+                      ]}
+                    >
+                      {currentStamps}/{stampGoal} STAMPS
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1054,69 +1091,50 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
 
-  // 9:16 Loyalty Card View
+  // 1:1 Customer View Loyalty Card Styles
   cardSectionWrap: {
     gap: 16,
   },
-  stampGridCard: {
+  largeCardView: {
     borderRadius: 24,
     padding: 20,
-    borderWidth: 1,
+    gap: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
     shadowRadius: 16,
-    elevation: 4,
+    elevation: 6,
   },
-  cardInfoRow: {
+  largeCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
+    justifyContent: 'space-between',
   },
-  shopLogoBg: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-  },
-  shopLogo: {
-    width: 42,
-    height: 42,
-    resizeMode: 'contain',
-  },
-  shopNameText: {
-    fontSize: 16,
+  largeCardMerchant: {
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.2,
   },
   shopCategoryText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
     letterSpacing: 0.8,
   },
-  ptsColumn: {
-    alignItems: 'flex-end',
+  goldBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  ptsValueText: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  ptsLabelText: {
+  goldBadgeText: {
     fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.8,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   cardMidRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
   },
   cardChip: {
     width: 36,
@@ -1154,61 +1172,78 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#92400E',
   },
-  stampGridWrap: {
+  largeStampsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 2,
+    rowGap: 14,
+    width: '100%',
+    marginVertical: 4,
   },
-  stampPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+  largeStampEarned: {
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 99,
+    alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  largeStampGift: {
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 99,
+    borderWidth: 1.5,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  stampPillText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
+  largeStampEmpty: {
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardBottomRow: {
+  largeCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.08)',
+    paddingTop: 8,
   },
-  holderBlock: {
+  holderCol: {
+    flex: 1,
+    marginRight: 10,
     gap: 2,
   },
-  cardLabelText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.8,
-  },
-  holderValueText: {
-    fontSize: 13,
+  holderLabel: {
+    fontSize: 8,
     fontFamily: 'PlusJakartaSans_700Bold',
     letterSpacing: 0.5,
+  },
+  holderValue: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  brandBadge: {
+    alignItems: 'flex-end',
+    gap: 2,
   },
   mastercardBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 20,
   },
   badgeCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  largeProgressPercentage: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   // Next Reward Card
