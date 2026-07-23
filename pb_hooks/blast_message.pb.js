@@ -593,16 +593,38 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
         }
 
         if (merchantId) {
-          const claimCol = $app.findCollectionByNameOrId("nfc_claims");
-          const claim = new Record(claimCol);
-          claim.set("id", $security.randomString(15).toLowerCase());
-          claim.set("merchant", merchantId);
-          claim.set("customer_phone", "+" + cleanPhone);
-          claim.set("customer_name", custName);
-          claim.set("session_code", sessionCode);
-          claim.set("status", "pending");
-          $app.save(claim);
-          console.log(`[WHATSAPP WEBHOOK] Realtime NFC Claim created for merchant ${merchantId}, customer ${custName} (${cleanPhone})`);
+          let claim = null;
+          try {
+            const existing = $app.findRecordsByFilter(
+              "nfc_claims",
+              `merchant = '${merchantId}' && (session_code = '${sessionCode}' || customer_phone ~ '${cleanPhone.slice(-8)}') && (status = 'pending_whatsapp' || status = 'pending')`,
+              "-created",
+              1,
+              0
+            );
+            if (existing.length > 0) {
+              claim = existing[0];
+              claim.set("status", "pending");
+              if (custName && !custName.startsWith("Customer ")) {
+                claim.set("customer_name", custName);
+              }
+              $app.save(claim);
+              console.log(`[WHATSAPP WEBHOOK] Updated existing NFC Claim ${claim.id} to pending for merchant ${merchantId}, customer ${custName}`);
+            }
+          } catch (eErr) {}
+
+          if (!claim) {
+            const claimCol = $app.findCollectionByNameOrId("nfc_claims");
+            claim = new Record(claimCol);
+            claim.set("id", $security.randomString(15).toLowerCase());
+            claim.set("merchant", merchantId);
+            claim.set("customer_phone", "+" + cleanPhone);
+            claim.set("customer_name", custName);
+            claim.set("session_code", sessionCode);
+            claim.set("status", "pending");
+            $app.save(claim);
+            console.log(`[WHATSAPP WEBHOOK] Realtime NFC Claim created for merchant ${merchantId}, customer ${custName} (${cleanPhone})`);
+          }
           return e.json(200, { success: true, processed: "nfc_claim_pending" });
         }
       } catch (nfcErr) {
