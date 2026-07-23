@@ -4,25 +4,18 @@ onRecordAfterCreateSuccess((e) => {
   // Skip duplicate notification if transaction was created by manual_give, nfc_claim, or qr_inbound (which send their own auto-reply)
   let source = "";
   try {
-    const rawMeta = e.record.get('metadata');
-    if (typeof rawMeta === 'string') {
-      if (rawMeta.trim().startsWith('{')) {
-        try {
-          const parsed = JSON.parse(rawMeta);
-          source = parsed.source || "";
-        } catch (pErr) {}
-      } else {
-        source = rawMeta;
-      }
-    } else if (rawMeta && typeof rawMeta === 'object') {
-      source = rawMeta.source || (rawMeta.get ? rawMeta.get('source') : "");
-    }
-    // Fallback: search stringified metadata if source is still empty
-    if (!source && rawMeta) {
-      const str = String(typeof rawMeta === 'object' ? JSON.stringify(rawMeta) : rawMeta);
-      if (str.includes('nfc_claim')) source = 'nfc_claim';
-      else if (str.includes('manual_give')) source = 'manual_give';
-      else if (str.includes('qr_inbound')) source = 'qr_inbound';
+    const rawMetaStr = e.record.getString('metadata') || "";
+    if (rawMetaStr.includes('nfc_claim')) {
+      source = 'nfc_claim';
+    } else if (rawMetaStr.includes('manual_give')) {
+      source = 'manual_give';
+    } else if (rawMetaStr.includes('qr_inbound')) {
+      source = 'qr_inbound';
+    } else if (rawMetaStr.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawMetaStr);
+        source = parsed.source || "";
+      } catch (pErr) {}
     }
   } catch (mErr) {}
 
