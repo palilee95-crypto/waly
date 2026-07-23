@@ -135,14 +135,18 @@ onRecordCreate((e) => {
     console.log("[MULTIPLIER HOOK] Card save failed:", saveErr.message || saveErr);
   }
 
-  // Log calculation details in metadata JSON
+  // Log calculation details in metadata JSON while preserving existing source tags
   let existingMetadata = {};
   try {
     const rawMeta = e.record.get('metadata');
     if (typeof rawMeta === 'string' && rawMeta.trim().startsWith('{')) {
       existingMetadata = JSON.parse(rawMeta);
-    } else if (rawMeta && typeof rawMeta === 'object') {
-      existingMetadata = rawMeta;
+    } else if (rawMeta) {
+      try {
+        existingMetadata = JSON.parse($json.stringify(rawMeta));
+      } catch (pErr) {
+        existingMetadata = {};
+      }
     }
   } catch (mErr) {}
 
