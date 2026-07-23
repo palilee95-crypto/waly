@@ -66,8 +66,31 @@ export default function NfcLandingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Realtime listening state
+  // Realtime listening & WhatsApp state
   const [isWaitingConfirm, setIsWaitingConfirm] = useState(false);
+  const [claimId, setClaimId] = useState<string>('');
+  const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
+
+  const handleSendWhatsapp = async () => {
+    if (claimId) {
+      try {
+        await pb.send('/api/risev/nfc/whatsapp-sent', {
+          method: 'POST',
+          body: { claim_id: claimId },
+        });
+      } catch (err) {
+        console.warn('[NFC] whatsapp-sent endpoint error:', err);
+      }
+    }
+    setHasSentWhatsapp(true);
+    if (waUrl) {
+      if (Platform.OS === 'web') {
+        window.location.href = waUrl;
+      } else {
+        await Linking.openURL(waUrl);
+      }
+    }
+  };
 
   // 1. Fetch Merchant, Program & Rewards on Mount
   useEffect(() => {
@@ -313,12 +336,13 @@ export default function NfcLandingScreen() {
             name: displayName,
           },
         });
+        if (reqRes?.claim_id) setClaimId(reqRes.claim_id);
         if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
       } catch (apiErr) {
         console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
       }
 
-      // 2. Prepare Optional WhatsApp Message Link
+      // 2. Prepare Mandatory WhatsApp Message Link
       const message =
         `Hi ${merchantName}! I scanned your NFC card to claim stamps.\n\n` +
         `Name: ${displayName}\n` +
@@ -336,6 +360,7 @@ export default function NfcLandingScreen() {
       setWaUrl(generatedWaUrl);
 
       setIsWaitingConfirm(true);
+      setHasSentWhatsapp(false);
       setStep('sent');
 
       // Fetch user's loyalty card
@@ -500,49 +525,76 @@ export default function NfcLandingScreen() {
           )}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 2: Sent & Waiting Confirmation View */}
+          {/* STEP 2: Mandatory WhatsApp & Store Approval View */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={styles.innerFormCard}>
               <View style={styles.sentIconWrap}>
-                <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+                <Ionicons
+                  name={hasSentWhatsapp ? "checkmark-circle" : "logo-whatsapp"}
+                  size={56}
+                  color={hasSentWhatsapp ? "#10B981" : "#25D366"}
+                />
               </View>
-              <Text style={styles.sentHeaderTitle}>Stamp Claim Requested! 🎉</Text>
+              <Text style={styles.sentHeaderTitle}>
+                {hasSentWhatsapp ? 'WhatsApp Sent! Waiting for Approval 🎉' : 'Step 2: Send WhatsApp to Store 💬'}
+              </Text>
               <Text style={styles.sentHeaderDesc}>
-                Your claim is live on <Text style={{ fontWeight: '800', color: '#000000' }}>{merchantName}</Text>'s terminal. Please tell the staff your phone number to approve your stamps.
+                {hasSentWhatsapp
+                  ? `Your claim is now active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`
+                  : `WhatsApp is required to activate your claim on ${merchantName}'s terminal. Tap the green button below to notify store staff.`}
               </Text>
 
-              {/* Pulse / Loading Live Sync */}
-              <View style={styles.liveSyncBanner}>
-                <ActivityIndicator size="small" color={primaryColor} />
-                <Text style={styles.liveSyncText}>Waiting for store approval in real-time...</Text>
+              {/* Status Indicator Banner */}
+              <View
+                style={[
+                  styles.liveSyncBanner,
+                  hasSentWhatsapp
+                    ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
+                    : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
+                ]}
+              >
+                {hasSentWhatsapp ? (
+                  <ActivityIndicator size="small" color="#10B981" />
+                ) : (
+                  <Ionicons name="alert-circle-outline" size={18} color="#D97706" />
+                )}
+                <Text
+                  style={[
+                    styles.liveSyncText,
+                    hasSentWhatsapp ? { color: '#065F46' } : { color: '#92400E' },
+                  ]}
+                >
+                  {hasSentWhatsapp
+                    ? 'Waiting for store approval in real-time...'
+                    : 'Tap WhatsApp button below to enable merchant approval.'}
+                </Text>
               </View>
 
+              {/* Mandatory WhatsApp Action Button */}
               <TouchableOpacity
-                style={[styles.primaryActionBtn, { backgroundColor: primaryColor, marginTop: 16 }]}
+                style={[
+                  styles.primaryActionBtn,
+                  { backgroundColor: '#25D366', marginTop: 14 },
+                ]}
+                onPress={handleSendWhatsapp}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryActionBtnText}>
+                  {hasSentWhatsapp ? 'Open WhatsApp Chat Again' : '💬 Send Claim via WhatsApp (Required)'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Secondary Option: View My Stamp Card */}
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: primaryColor, marginTop: 10 }]}
                 onPress={() => setStep('card')}
                 activeOpacity={0.85}
               >
                 <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={styles.primaryActionBtnText}>View My Stamp Card</Text>
               </TouchableOpacity>
-
-              {waUrl ? (
-                <TouchableOpacity
-                  style={[styles.primaryActionBtn, { backgroundColor: '#25D366', marginTop: 10 }]}
-                  onPress={async () => {
-                    if (Platform.OS === 'web') {
-                      window.location.href = waUrl;
-                    } else {
-                      await Linking.openURL(waUrl);
-                    }
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryActionBtnText}>Open WhatsApp Chat (Optional)</Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
           )}
 

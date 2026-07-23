@@ -51,7 +51,7 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     try {
       const existingClaims = $app.findRecordsByFilter(
         "nfc_claims",
-        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && status = 'pending'`,
+        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && (status = 'pending_whatsapp' || status = 'pending')`,
         "-created",
         1,
         0
@@ -61,9 +61,10 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         // Reuse existing claim record, update name and session_code
         claim.set("customer_name", name);
         claim.set("session_code", sessionCode);
+        claim.set("status", "pending_whatsapp");
         if (customerUser) claim.set("customer", customerUser.id);
         $app.save(claim);
-        console.log(`[NFC REQUEST] Updated existing pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
       }
     } catch (err) { /* create new below */ }
 
@@ -75,21 +76,43 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       claim.set("customer_phone", cleanPhone);
       claim.set("customer_name", name);
       claim.set("session_code", sessionCode);
-      claim.set("status", "pending");
+      claim.set("status", "pending_whatsapp");
       if (customerUser) claim.set("customer", customerUser.id);
       $app.save(claim);
-      console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+      console.log(`[NFC REQUEST] Created new pending_whatsapp claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
     }
 
     return e.json(200, {
       success: true,
       claim_id: claim.id,
       session_code: sessionCode,
-      status: "pending",
+      status: "pending_whatsapp",
       merchant_name: merchant.getString("name") || "Merchant"
     });
   } catch (err) {
     console.log("[NFC REQUEST ERROR]", err.message || err);
     return e.json(500, { message: "Failed to submit NFC claim request: " + (err.message || err) });
+  }
+});
+
+// Endpoint called when customer clicks/opens WhatsApp to activate claim for merchant terminal
+routerAdd("POST", "/api/risev/nfc/whatsapp-sent", (e) => {
+  try {
+    const body = e.requestInfo().body || {};
+    const claimId = (body.claim_id || body.id || "").trim();
+
+    if (!claimId) {
+      return e.json(400, { message: "claim_id is required" });
+    }
+
+    const claim = $app.findRecordById("nfc_claims", claimId);
+    claim.set("status", "pending"); // Now ready for merchant terminal approval!
+    $app.save(claim);
+
+    console.log(`[NFC WHATSAPP SENT] Claim ${claimId} marked as pending (ready for merchant approval).`);
+    return e.json(200, { success: true, status: "pending", claim_id: claimId });
+  } catch (err) {
+    console.log("[NFC WHATSAPP SENT ERROR]", err.message || err);
+    return e.json(500, { message: err.message || "Failed to update claim" });
   }
 });
