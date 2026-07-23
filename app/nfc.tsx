@@ -639,6 +639,7 @@ export default function NfcLandingScreen() {
                 >
                   {hasSentWhatsapp
                     ? 'Waiting for store approval in real-time...'
+                    : 'Tap WhatsApp button below to enable merchant approval.'}
                 </Text>
               </View>
 
