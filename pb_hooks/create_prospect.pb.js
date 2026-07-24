@@ -100,8 +100,10 @@ routerAdd("POST", "/api/risev/agent/create-prospect", (e) => {
       $app.save(prospect);
     }
 
-    // 4. Send WhatsApp message with referral link
-    const messageText = `Hey! I'm ${agentName} from RISEV. Deploy Loyalty Stamps for your shop to boost your repeat customer rates. Register here: ${referralLink}`;
+    // 4. Send WhatsApp message with referral link (use custom message from request if provided)
+    const customMessage = (body.message || "").trim();
+    const defaultMessage = `Hey! I'm ${agentName} from RISEV. Deploy Loyalty Stamps for your shop to boost your repeat customer rates. Register here: ${referralLink}`;
+    const messageText = customMessage || defaultMessage;
 
     const sendResult = sendTextMessage(instanceName, normalizedPhone, messageText, instanceToken);
 
