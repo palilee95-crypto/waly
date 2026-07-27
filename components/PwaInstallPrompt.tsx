@@ -81,15 +81,15 @@ export default function PwaInstallPrompt() {
       <View style={styles.bannerCard}>
         {/* Close Button */}
         <TouchableOpacity style={styles.closeBtn} onPress={handleDismiss} activeOpacity={0.7}>
-          <Ionicons name="close" size={20} color="#94A3B8" />
+          <Ionicons name="close" size={20} color="#64748B" />
         </TouchableOpacity>
 
         <View style={styles.headerRow}>
           <View style={styles.iconContainer}>
-            <Ionicons name="phone-portrait-outline" size={26} color="#F4A825" />
+            <Ionicons name="phone-portrait-outline" size={26} color="#0F172A" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Install WALY Mobile App</Text>
+            <Text style={styles.bannerTitle}>Install RISEV Mobile App</Text>
             <Text style={styles.bannerSubtitle}>Get instant stamp notifications & 1-tap card access</Text>
           </View>
         </View>
@@ -101,7 +101,7 @@ export default function PwaInstallPrompt() {
             <View style={styles.iosStepRow}>
               <Text style={styles.iosStepNum}>1</Text>
               <Text style={styles.iosStepText}>
-                Tap the <Text style={{ fontWeight: '700' }}>Share</Text> button <Ionicons name="share-outline" size={14} color="#3B82F6" /> at bottom of Safari
+                Tap the <Text style={{ fontWeight: '700' }}>Share</Text> button <Ionicons name="share-outline" size={14} color="#0F172A" /> at bottom of Safari
               </Text>
             </View>
             <View style={styles.iosStepRow}>
@@ -135,16 +135,16 @@ const styles = StyleSheet.create({
   bannerCard: {
     width: '100%',
     maxWidth: 480,
-    backgroundColor: '#1E1442',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(244, 168, 37, 0.4)',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
     position: 'relative',
   },
   closeBtn: {
@@ -165,25 +165,27 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(244, 168, 37, 0.15)',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   bannerTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#0F172A',
     marginBottom: 2,
   },
   bannerSubtitle: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#CBD5E1',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
   installBtn: {
-    backgroundColor: '#5C3BCC',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: '#000000',
+    borderRadius: 14,
+    paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,15 +196,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   iosBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
     padding: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   iosInstructionTitle: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#F4A825',
+    color: '#0F172A',
   },
   iosStepRow: {
     flexDirection: 'row',
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#5C3BCC',
+    backgroundColor: '#000000',
     color: '#FFFFFF',
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -223,7 +227,7 @@ const styles = StyleSheet.create({
   iosStepText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#E2E8F0',
+    color: '#334155',
     flex: 1,
   },
 });
