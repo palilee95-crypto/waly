@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NotificationBanner from '@/components/NotificationBanner';
+import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 import { LogBox, Platform } from 'react-native';
 
@@ -39,8 +40,6 @@ function AppContent() {
   const [bannerBody, setBannerBody] = useState('');
   const [bannerType, setBannerType] = useState<'points' | 'reward' | 'campaign' | 'tier' | 'badge' | 'voucher' | 'system'>('system');
 
-
-
   return (
     <>
       <NotificationBanner
@@ -50,6 +49,7 @@ function AppContent() {
         type={bannerType}
         onDismiss={() => setBannerVisible(false)}
       />
+      <PwaInstallPrompt />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />

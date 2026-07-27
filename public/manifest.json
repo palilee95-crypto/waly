@@ -1,12 +1,13 @@
 {
-  "short_name": "RISEV",
-  "name": "RISEV Loyalty System",
-  "description": "Premium Branded Loyalty Card & Rewards System",
+  "short_name": "WALY",
+  "name": "WALY Mobile Loyalty",
+  "description": "Premium Merchant Loyalty & Customer Stamp Card System",
   "icons": [
     {
       "src": "/favicon.png",
       "sizes": "192x192 512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",

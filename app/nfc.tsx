@@ -82,7 +82,7 @@ export default function NfcLandingScreen() {
     } else {
       // Guest or quick-register user -> proceed to onboarding/registration to complete password & profile
       router.push({
-        pathname: '/join',
+        pathname: '/join' as any,
         params: {
           m: merchant?.id || (params.m as string) || '',
           phone: phoneInput || user?.phone || '',
