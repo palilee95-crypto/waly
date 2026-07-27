@@ -446,6 +446,7 @@ export default function NfcLandingScreen() {
 
       // 1. Send Direct API Request to PocketBase (INSTANT & FAIL-SAFE)
       let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      let createdClaimId = '';
       try {
         const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string }>('/api/risev/nfc/request', {
           method: 'POST',
@@ -455,7 +456,10 @@ export default function NfcLandingScreen() {
             name: displayName,
           },
         });
-        if (reqRes?.claim_id) setClaimId(reqRes.claim_id);
+        if (reqRes?.claim_id) {
+          setClaimId(reqRes.claim_id);
+          createdClaimId = reqRes.claim_id;
+        }
         if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
       } catch (apiErr) {
         console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
@@ -479,12 +483,29 @@ export default function NfcLandingScreen() {
       setWaUrl(generatedWaUrl);
 
       setIsWaitingConfirm(true);
-      setHasSentWhatsapp(false);
+      setHasSentWhatsapp(true);
       setStep('sent');
+
+      const activeClaimId = createdClaimId || claimId;
+      if (activeClaimId) {
+        pb.send('/api/risev/nfc/whatsapp-sent', {
+          method: 'POST',
+          body: { claim_id: activeClaimId },
+        }).catch(() => {});
+      }
 
       // Fetch user's loyalty card
       if (authRecord?.id) {
         fetchUserLoyaltyCard(merchant.id, authRecord.id);
+      }
+
+      // IMMEDIATELY OPEN WHATSAPP (skipping manual Step 2 button)
+      if (generatedWaUrl) {
+        if (Platform.OS === 'web') {
+          window.location.href = generatedWaUrl;
+        } else {
+          await Linking.openURL(generatedWaUrl);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to submit NFC claim.');
