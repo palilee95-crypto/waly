@@ -45,6 +45,21 @@ function generateRandomToken() {
   return token;
 }
 
+function safeJsonParse(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') {
+    return null;
+  }
+  const trimmed = rawStr.trim();
+  if (trimmed.length === 0 || trimmed === '<nil>') {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch (e) {
+    return { raw: rawStr };
+  }
+}
+
 function getInstances() {
   const options = {
     url: `${evolutionUrl}/instance/all`,
@@ -57,9 +72,9 @@ function getInstances() {
   try {
     const res = $http.send(options);
     if (res.statusCode === 200 && res.raw) {
-      const parsed = JSON.parse(res.raw);
+      const parsed = safeJsonParse(res.raw);
       // Evolution Go returns an object containing a "data" array
-      return parsed.data || [];
+      return parsed?.data || [];
     } else {
       console.log(`Failed to fetch instances. Status: ${res.statusCode}. Body: ${res.raw}`);
     }
@@ -339,12 +354,49 @@ function callEvo(method, path, body = null) {
     }
   }
 
+  // 5. Intercept /webhook/set/:instanceName (POST)
+  const webhookSetMatch = path.match(/^\/webhook\/set\/([^/]+)$/);
+  if (webhookSetMatch && method === 'POST') {
+    const instanceName = webhookSetMatch[1];
+    const token = getInstanceToken(instanceName) || evolutionKey;
+    try {
+      const res = $http.send({
+        url: `${evolutionUrl}/webhook/set/${instanceName}`,
+        method: 'POST',
+        headers: {
+          "apikey": token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body || {})
+      });
+      return {
+        status: res.statusCode,
+        data: safeJsonParse(res.raw)
+      };
+    } catch (err) {
+      console.log(`Failed to set webhook for ${instanceName}:`, err.message || err);
+      return {
+        status: 500,
+        data: { error: err.message || err }
+      };
+    }
+  }
+
   // Default fallback for other endpoints
+  let apiKeyHeader = evolutionKey;
+  const pathParts = path.split('/');
+  if (pathParts.length > 1) {
+    const potentialInst = pathParts[pathParts.length - 1];
+    if (potentialInst && potentialInst.startsWith('merchant-')) {
+      apiKeyHeader = getInstanceToken(potentialInst) || evolutionKey;
+    }
+  }
+
   const options = {
     url: `${evolutionUrl}${path}`,
     method: method,
     headers: {
-      "apikey": evolutionKey,
+      "apikey": apiKeyHeader,
       "Content-Type": "application/json"
     }
   };
@@ -356,7 +408,7 @@ function callEvo(method, path, body = null) {
     const res = $http.send(options);
     return {
       status: res.statusCode,
-      data: res.raw ? JSON.parse(res.raw) : null
+      data: safeJsonParse(res.raw)
     };
   } catch (err) {
     console.log(`Evolution API call failed [${method} ${path}]:`, err.message || err);
@@ -430,7 +482,7 @@ function sendTextMessage(instanceName, number, text, options = {}) {
     if (res.statusCode !== 200 && res.statusCode !== 201) {
       throw new Error(`Failed to send WhatsApp message. Status: ${res.statusCode}. Response: ${res.raw}`);
     }
-    return res.raw ? JSON.parse(res.raw) : null;
+    return safeJsonParse(res.raw);
   } catch (err) {
     // Record failure for circuit breaker
     sendFailureCache[instanceName] = { lastFailureTs: Date.now() };
@@ -469,7 +521,7 @@ function pairInstance(instanceName, phone) {
     throw new Error(`Failed to request pairing code. Status: ${res.statusCode}. Response: ${res.raw}`);
   }
 
-  const data = res.raw ? JSON.parse(res.raw) : null;
+  const data = safeJsonParse(res.raw);
   // Evolution Go returns { pairingCode: "XXXX-XXXX" } or similar
   return data;
 }

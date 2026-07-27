@@ -70,6 +70,27 @@ export default function NfcLandingScreen() {
   const [isWaitingConfirm, setIsWaitingConfirm] = useState(false);
   const [claimId, setClaimId] = useState<string>('');
   const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
+  const [isApproved, setIsApproved] = useState<boolean>(false);
+
+  const handleViewStampCard = () => {
+    const authRecord = pb.authStore.record;
+    const isFullyRegistered = user?.email && !user.email.startsWith('customer_') && !user.email.endsWith('@risev.app');
+
+    if (isFullyRegistered || (authRecord?.email && !authRecord.email.startsWith('customer_') && !authRecord.email.endsWith('@risev.app'))) {
+      // Fully registered customer -> view live stamp card
+      setStep('card');
+    } else {
+      // Guest or quick-register user -> proceed to onboarding/registration to complete password & profile
+      router.push({
+        pathname: '/join',
+        params: {
+          m: merchant?.id || (params.m as string) || '',
+          phone: phoneInput || user?.phone || '',
+          name: nameInput || user?.name || '',
+        },
+      });
+    }
+  };
 
   const handleSendWhatsapp = async () => {
     if (claimId) {
@@ -198,7 +219,7 @@ export default function NfcLandingScreen() {
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (cardRecord.merchant === merchant.id && currentCustId && cardRecord.customer === currentCustId) {
           setLoyaltyCard(cardRecord);
-          setStep('card');
+          setIsApproved(true);
           setIsWaitingConfirm(false);
         }
       }
@@ -214,7 +235,7 @@ export default function NfcLandingScreen() {
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (tx.merchant === merchant.id && currentCustId && tx.customer === currentCustId) {
           fetchUserLoyaltyCard(merchant.id, currentCustId);
-          setStep('card');
+          setIsApproved(true);
           setIsWaitingConfirm(false);
         }
       }
@@ -226,12 +247,12 @@ export default function NfcLandingScreen() {
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
       if (!isSubscribed) return;
       const record = e.record;
-      if (record && record.merchant === merchant.id && record.status === 'completed') {
+      if (record && (record.id === claimId || record.merchant === merchant.id) && record.status === 'completed') {
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (currentCustId) {
           fetchUserLoyaltyCard(merchant.id, currentCustId);
         }
-        setStep('card');
+        setIsApproved(true);
         setIsWaitingConfirm(false);
       }
     }, {
@@ -244,7 +265,7 @@ export default function NfcLandingScreen() {
       pb.collection('transactions').unsubscribe('*').catch(() => {});
       pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
     };
-  }, [merchant, user]);
+  }, [merchant, user, claimId]);
 
   // 3. Robust Polling & Tab Visibility Listener for Mobile Browsers (iOS Safari / Android Chrome)
   useEffect(() => {
@@ -263,7 +284,7 @@ export default function NfcLandingScreen() {
               if (currentCustId) {
                 await fetchUserLoyaltyCard(merchant.id, currentCustId);
               }
-              setStep('card');
+              setIsApproved(true);
               setIsWaitingConfirm(false);
               return;
             }
@@ -281,7 +302,7 @@ export default function NfcLandingScreen() {
             const cardRec = cards[0];
             if (loyaltyCard && cardRec.stamps_collected > loyaltyCard.stamps_collected) {
               setLoyaltyCard(cardRec);
-              setStep('card');
+              setIsApproved(true);
               setIsWaitingConfirm(false);
             }
           }
@@ -597,124 +618,96 @@ export default function NfcLandingScreen() {
           )}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 2: Mandatory WhatsApp & Store Approval View */}
+          {/* STEP 2: Mandatory WhatsApp & Real-Time Store Approval View */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={styles.innerFormCard}>
               <View style={styles.sentIconWrap}>
                 <Ionicons
-                  name={hasSentWhatsapp ? "checkmark-circle" : "logo-whatsapp"}
+                  name={isApproved ? "checkmark-circle" : (hasSentWhatsapp ? "time-outline" : "logo-whatsapp")}
                   size={56}
-                  color={hasSentWhatsapp ? "#10B981" : "#25D366"}
+                  color={isApproved ? "#10B981" : (hasSentWhatsapp ? "#F59E0B" : "#25D366")}
                 />
               </View>
               <Text style={styles.sentHeaderTitle}>
-                {hasSentWhatsapp ? 'WhatsApp Sent! Waiting for Approval 🎉' : 'Step 2: Send WhatsApp to Store 💬'}
+                {isApproved
+                  ? '🎉 Claim Approved by Store!'
+                  : (hasSentWhatsapp ? 'WhatsApp Sent! Waiting for Approval 🎉' : 'Step 2: Send WhatsApp to Store 💬')}
               </Text>
               <Text style={styles.sentHeaderDesc}>
-                {hasSentWhatsapp
-                  ? `Your claim is now active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`
-                  : `WhatsApp is required to activate your claim on ${merchantName}'s terminal. Tap the green button below to notify store staff.`}
+                {isApproved
+                  ? `Your stamps have been credited to your account by ${merchantName} staff!`
+                  : (hasSentWhatsapp
+                    ? `Your claim is active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`
+                    : `WhatsApp is required to activate your claim on ${merchantName}'s terminal. Tap the green button below to notify store staff.`)}
               </Text>
 
               {/* Status Indicator Banner */}
               <View
                 style={[
                   styles.liveSyncBanner,
-                  hasSentWhatsapp
+                  isApproved
                     ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
-                    : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
+                    : (hasSentWhatsapp
+                      ? { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }
+                      : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }),
                 ]}
               >
-                {hasSentWhatsapp ? (
-                  <ActivityIndicator size="small" color="#10B981" />
+                {isApproved ? (
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
+                ) : hasSentWhatsapp ? (
+                  <ActivityIndicator size="small" color="#D97706" />
                 ) : (
                   <Ionicons name="alert-circle-outline" size={18} color="#D97706" />
                 )}
                 <Text
                   style={[
                     styles.liveSyncText,
-                    hasSentWhatsapp ? { color: '#065F46' } : { color: '#92400E' },
+                    isApproved
+                      ? { color: '#065F46' }
+                      : (hasSentWhatsapp ? { color: '#92400E' } : { color: '#92400E' }),
                   ]}
                 >
-                  {hasSentWhatsapp
-                    ? 'Waiting for store approval in real-time...'
-                    : 'Tap WhatsApp button below to enable merchant approval.'}
+                  {isApproved
+                    ? '✅ Real-time approval received! Stamps credited.'
+                    : (hasSentWhatsapp
+                      ? 'Waiting for store approval in real-time...'
+                      : 'Tap WhatsApp button below to enable merchant approval.')}
                 </Text>
               </View>
 
               {errorMsg ? <Text style={[styles.errorText, { textAlign: 'center', marginTop: 10 }]}>{errorMsg}</Text> : null}
 
-              {/* Mandatory WhatsApp Action Button */}
-              <TouchableOpacity
-                style={[
-                  styles.primaryActionBtn,
-                  { backgroundColor: '#25D366', marginTop: 14 },
-                ]}
-                onPress={handleSendWhatsapp}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryActionBtnText}>
-                  {hasSentWhatsapp ? 'Open WhatsApp Chat Again' : '💬 Send Claim via WhatsApp (Required)'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Check Approval Status Action */}
-              <TouchableOpacity
-                style={[styles.primaryActionBtn, { backgroundColor: '#000000', marginTop: 10 }]}
-                onPress={async () => {
-                  setErrorMsg('');
-                  if (claimId) {
-                    try {
-                      const c = await pb.collection('nfc_claims').getOne(claimId, { requestKey: null });
-                      if (c && c.status === 'completed') {
-                        const currentCustId = user?.id || pb.authStore.record?.id;
-                        if (currentCustId && merchant) {
-                          await fetchUserLoyaltyCard(merchant.id, currentCustId);
-                        }
-                        setStep('card');
-                        setIsWaitingConfirm(false);
-                        return;
-                      } else {
-                        setErrorMsg('Store staff has not approved your stamps yet. Please tell staff your phone number.');
-                        return;
-                      }
-                    } catch (e) {}
-                  }
-                  const currentCustId = user?.id || pb.authStore.record?.id;
-                  if (currentCustId && merchant) {
-                    const cards = await pb.collection('loyalty_cards').getFullList({
-                      filter: `merchant = "${merchant.id}" && customer = "${currentCustId}"`,
-                      requestKey: null,
-                    });
-                    if (cards.length > 0) {
-                      const c = cards[0];
-                      if (loyaltyCard && c.stamps_collected > loyaltyCard.stamps_collected) {
-                        setLoyaltyCard(c);
-                        setStep('card');
-                        setIsWaitingConfirm(false);
-                        return;
-                      }
-                    }
-                  }
-                  setErrorMsg('Store staff has not approved your stamps yet. Please tell staff your phone number.');
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryActionBtnText}>Check Approval Status</Text>
-              </TouchableOpacity>
-
-              {/* Secondary Option: View My Stamp Card */}
-              <TouchableOpacity
-                style={[styles.primaryActionBtn, { backgroundColor: primaryColor, marginTop: 10 }]}
-                onPress={() => setStep('card')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryActionBtnText}>View My Stamp Card</Text>
-              </TouchableOpacity>
+              {/* ACTION BUTTONS (Single Primary Action) */}
+              {!isApproved ? (
+                /* Pending State: ONLY Mandatory WhatsApp Button */
+                <TouchableOpacity
+                  style={[
+                    styles.primaryActionBtn,
+                    { backgroundColor: '#25D366', marginTop: 14 },
+                  ]}
+                  onPress={handleSendWhatsapp}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryActionBtnText}>
+                    {hasSentWhatsapp ? 'Open WhatsApp Chat Again' : '💬 Send Claim via WhatsApp (Required)'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                /* Approved State: ONLY 1 Button -> View My Stamp Card (with Onboarding check) */
+                <TouchableOpacity
+                  style={[
+                    styles.primaryActionBtn,
+                    { backgroundColor: primaryColor || '#10B981', marginTop: 14 },
+                  ]}
+                  onPress={handleViewStampCard}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="card-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryActionBtnText}>💳 View My Stamp Card</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 

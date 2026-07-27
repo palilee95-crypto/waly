@@ -115,36 +115,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("metadata", JSON.stringify({ source: "manual_give" }));
     $app.save(txn);
 
-    // 5. Send automated WhatsApp receipt to customer
-    const merchant = $app.findRecordById("merchants", merchantId);
-    const storeName = merchant.getString("name") || "our store";
-    const appUrl = $os.getenv("APP_URL") || "https://waly-five.vercel.app";
-    const customerName = customer.getString("name") || "there";
-    const nameSlug = (storeName || "").toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
-    const instanceName = `merchant-${merchantId}-${nameSlug}`;
-    const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
-
-    const customerFirstName = customerName ? customerName.split(' ')[0] : 'there';
-    const warningText = "\n\n⚠️ *Peringatan*: Mohon jangan laporkan (report) mesej ini sebagai spam. Anda boleh mematikan notifikasi WhatsApp di Profil anda.";
-    let replyMsg = "";
-    if (totalStamps >= goal) {
-      const remaining = totalStamps % goal;
-      replyMsg = `Hi ${customerFirstName}! 🎉 You earned ${stampAmount} stamp(s) at *${storeName}* and completed your card!\n\nA reward voucher has been added to your account. Your new balance: *${remaining}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}${warningText}`;
-    } else {
-      replyMsg = `Hi ${customerFirstName}! ${stampAmount} stamp(s) added from *${storeName}*! 🎉\n\nYou now have *${totalStamps}/${goal} stamps*.\n\nCheck your card & rewards balance here:\n${appUrl}${warningText}`;
-    }
-
-    try {
-      sendTextMessage(instanceName, cleanPhone.replace('+', ''), replyMsg, { delay: 1000, presence: 'composing' });
-      console.log(`[MANUAL GIVE] WhatsApp receipt sent to ${cleanPhone}: "${replyMsg}"`);
-    } catch (replyErr) {
-      console.log("[MANUAL GIVE] Auto-reply failed:", replyErr.message || replyErr);
-    }
+    // 6. Transaction completed - welcome_notification.pb.js handles sending the WhatsApp receipt
+    console.log(`[MANUAL GIVE] Issued ${stampAmount} stamp(s) to ${customer.getString("name") || "customer"} (${cleanPhone}), total stamps: ${totalStamps}/${goal}`);
 
     return e.json(200, {
       success: true,
-      message: `${stampAmount} stamp(s) issued to ${customerName}`,
-      customerName: customerName,
+      message: `${stampAmount} stamp(s) issued to ${customerNameInput}`,
+      customerName: customerNameInput,
       phone: cleanPhone,
       totalStamps: totalStamps,
       goal: goal
