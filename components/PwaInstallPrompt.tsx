@@ -90,7 +90,6 @@ export default function PwaInstallPrompt() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerTitle}>Install RISEV Mobile App</Text>
-            <Text style={styles.bannerSubtitle}>Get instant stamp notifications & 1-tap card access</Text>
           </View>
         </View>
 
