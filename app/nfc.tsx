@@ -137,11 +137,12 @@ export default function NfcLandingScreen() {
         }
         if (isMounted) setMerchant(m);
 
-        // Fetch primary loyalty program for this merchant
+        // Fetch primary loyalty program for this merchant (with linked_reward expansion)
         try {
           const progs = await pb.collection('loyalty_programs').getFullList({
             filter: `merchant = "${merchantId}" && is_active = true`,
-            sort: '-created'
+            sort: '-created',
+            expand: 'linked_reward',
           });
           if (progs.length > 0 && isMounted) {
             setProgram(progs[0]);
@@ -351,14 +352,39 @@ export default function NfcLandingScreen() {
     ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.background_image}`
     : (merchant?.onboarding_bg_url || null);
 
-  const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#F97316';
+  const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#5C3BCC';
+  
+  // Distinct Loyalty Card Background & Font Colors
+  // If program has a custom card_color (e.g. #5C3BCC or #1E293B), use it. Default to #5C3BCC (Royal Purple) if unconfigured or default.
+  const rawCardBg = program?.card_color || merchant?.onboarding_primary_color || '#5C3BCC';
+  const isTooLight = ['#ffffff', '#fff', '#fafaf5', '#fffdf6', '#fffde7', '#fef3c7'].includes(rawCardBg.toLowerCase().trim());
+  const cardBgColor = isTooLight ? '#5C3BCC' : rawCardBg;
+  const cardFontColor = program?.font_color || '#FFFFFF';
+
   const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
   const stampGoal = program?.stamp_goal || 10;
   const currentStamps = loyaltyCard?.stamps_collected || 0;
-  const rewardTitle = reward?.title || program?.reward_title || 'Free Special Reward';
-  const rewardImageUrl = reward?.image 
-    ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
-    : 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&q=80&w=300';
+
+  // Real Merchant Reward Title & Image Resolution
+  const linkedReward = program?.expand?.linked_reward;
+  const rewardTitle =
+    reward?.title ||
+    reward?.name ||
+    reward?.reward_name ||
+    linkedReward?.title ||
+    linkedReward?.name ||
+    program?.reward_name ||
+    program?.reward_description ||
+    'Free Reward';
+
+  let rewardImageUrl = '';
+  if (reward?.image) {
+    rewardImageUrl = `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`;
+  } else if (linkedReward?.image) {
+    rewardImageUrl = `${pb.baseUrl}/api/files/rewards/${linkedReward.id}/${linkedReward.image}`;
+  } else if (merchantLogoUrl) {
+    rewardImageUrl = merchantLogoUrl;
+  }
 
   // 3. Submit Direct NFC Claim & Setup Optional WhatsApp Redirect
   const handleNfcSubmit = async () => {
@@ -721,8 +747,10 @@ export default function NfcLandingScreen() {
                 style={[
                   styles.largeCardView,
                   {
-                    backgroundColor: program?.card_color || primaryColor,
+                    backgroundColor: cardBgColor,
                     overflow: 'hidden',
+                    borderWidth: isTooLight ? 1.5 : 0,
+                    borderColor: 'rgba(0, 0, 0, 0.12)',
                   },
                 ]}
               >
@@ -740,7 +768,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.largeCardMerchant,
-                        { color: program?.font_color || '#0F172A' },
+                        { color: cardFontColor },
                       ]}
                       numberOfLines={1}
                     >
@@ -749,7 +777,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.shopCategoryText,
-                        { color: (program?.font_color || '#0F172A') + 'B3' },
+                        { color: cardFontColor + 'B3' },
                       ]}
                     >
                       {(merchant?.category || 'store').toUpperCase()}
@@ -770,7 +798,7 @@ export default function NfcLandingScreen() {
                   <Ionicons
                     name="wifi"
                     size={18}
-                    color={(program?.font_color || '#0F172A') + '66'}
+                    color={cardFontColor + '66'}
                     style={{ opacity: 0.5 }}
                   />
                 </View>
@@ -781,7 +809,7 @@ export default function NfcLandingScreen() {
                     const num = idx + 1;
                     const isEarned = num <= currentStamps;
                     const isRewardPos = num === stampGoal;
-                    const fontC = program?.font_color || '#0F172A';
+                    const fontC = cardFontColor;
 
                     if (isEarned) {
                       return (
@@ -789,10 +817,10 @@ export default function NfcLandingScreen() {
                           key={num}
                           style={[
                             styles.largeStampEarned,
-                            { backgroundColor: program?.stamp_color || '#0F172A' },
+                            { backgroundColor: isTooLight ? '#000000' : (program?.stamp_color || '#FFFFFF') },
                           ]}
                         >
-                          {renderStampIcon(program?.card_icon || 'coffee', 16, '#FFFFFF')}
+                          {renderStampIcon(program?.card_icon || 'coffee', 16, isTooLight ? '#FFFFFF' : '#000000')}
                         </View>
                       );
                     } else if (isRewardPos) {
@@ -829,7 +857,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderLabel,
-                        { color: (program?.font_color || '#0F172A') + '80' },
+                        { color: cardFontColor + '80' },
                       ]}
                     >
                       CARD HOLDER
@@ -837,7 +865,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderValue,
-                        { color: program?.font_color || '#0F172A' },
+                        { color: cardFontColor },
                       ]}
                       numberOfLines={1}
                     >
@@ -849,7 +877,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderLabel,
-                        { color: (program?.font_color || '#0F172A') + '80' },
+                        { color: cardFontColor + '80' },
                       ]}
                     >
                       VALID
@@ -857,7 +885,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderValue,
-                        { color: program?.font_color || '#0F172A' },
+                        { color: cardFontColor },
                       ]}
                     >
                       12/30
@@ -868,7 +896,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderLabel,
-                        { color: (program?.font_color || '#0F172A') + '80' },
+                        { color: cardFontColor + '80' },
                       ]}
                     >
                       CVV
@@ -876,7 +904,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.holderValue,
-                        { color: program?.font_color || '#0F172A' },
+                        { color: cardFontColor },
                       ]}
                     >
                       888
@@ -891,7 +919,7 @@ export default function NfcLandingScreen() {
                     <Text
                       style={[
                         styles.largeProgressPercentage,
-                        { color: (program?.font_color || '#0F172A') + 'CC' },
+                        { color: cardFontColor + 'CC' },
                       ]}
                     >
                       {currentStamps}/{stampGoal} STAMPS
@@ -903,7 +931,13 @@ export default function NfcLandingScreen() {
               {/* NEXT REWARD CARD */}
               <View style={styles.nextRewardCard}>
                 <View style={styles.nextRewardHeader}>
-                  <Image source={{ uri: rewardImageUrl }} style={styles.nextRewardImage} />
+                  {rewardImageUrl ? (
+                    <Image source={{ uri: rewardImageUrl }} style={styles.nextRewardImage} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.nextRewardIconBadge, { backgroundColor: primaryColor + '20' }]}>
+                      <Ionicons name="gift" size={24} color={primaryColor} />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.nextRewardSublabel}>
                       {stampGoal - currentStamps > 0
@@ -1434,6 +1468,13 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 16,
+  },
+  nextRewardIconBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   nextRewardSublabel: {
     fontSize: 12,
