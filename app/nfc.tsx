@@ -354,12 +354,11 @@ export default function NfcLandingScreen() {
 
   const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#5C3BCC';
   
-  // Distinct Loyalty Card Background & Font Colors
-  // If program has a custom card_color (e.g. #5C3BCC or #1E293B), use it. Default to #5C3BCC (Royal Purple) if unconfigured or default.
-  const rawCardBg = program?.card_color || merchant?.onboarding_primary_color || '#5C3BCC';
-  const isTooLight = ['#ffffff', '#fff', '#fafaf5', '#fffdf6', '#fffde7', '#fef3c7'].includes(rawCardBg.toLowerCase().trim());
-  const cardBgColor = isTooLight ? '#5C3BCC' : rawCardBg;
+  // Exact Loyalty Card Tokens configured by Merchant
+  const cardBgColor = program?.card_color || merchant?.onboarding_primary_color || '#5C3BCC';
   const cardFontColor = program?.font_color || '#FFFFFF';
+  const stampColor = program?.stamp_color || '#000000';
+  const cardIcon = program?.card_icon || 'coffee';
 
   const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
   const stampGoal = program?.stamp_goal || 10;
@@ -770,15 +769,13 @@ export default function NfcLandingScreen() {
                   {
                     backgroundColor: cardBgColor,
                     overflow: 'hidden',
-                    borderWidth: isTooLight ? 1.5 : 0,
-                    borderColor: 'rgba(0, 0, 0, 0.12)',
                   },
                 ]}
               >
                 {program?.card_background ? (
                   <Image
                     source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
-                    style={[StyleSheet.absoluteFill, { opacity: 0.12 }]}
+                    style={StyleSheet.absoluteFill}
                     resizeMode="cover"
                   />
                 ) : null}
@@ -838,10 +835,10 @@ export default function NfcLandingScreen() {
                           key={num}
                           style={[
                             styles.largeStampEarned,
-                            { backgroundColor: isTooLight ? '#000000' : (program?.stamp_color || '#FFFFFF') },
+                            { backgroundColor: stampColor },
                           ]}
                         >
-                          {renderStampIcon(program?.card_icon || 'coffee', 16, isTooLight ? '#FFFFFF' : '#000000')}
+                          {renderStampIcon(cardIcon, 16, '#FFFFFF')}
                         </View>
                       );
                     } else if (isRewardPos) {
@@ -865,7 +862,7 @@ export default function NfcLandingScreen() {
                             { borderColor: fontC + '30' },
                           ]}
                         >
-                          {renderStampIcon(program?.card_icon || 'coffee', 14, fontC + '40')}
+                          {renderStampIcon(cardIcon, 14, fontC + '40')}
                         </View>
                       );
                     }
