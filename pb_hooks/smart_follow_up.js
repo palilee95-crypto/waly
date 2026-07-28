@@ -38,6 +38,28 @@ function runSmartFollowUp() {
     );
     if (sequences.length === 0) continue;
 
+    // Auto-enroll any active loyalty card customers for this merchant into this group if not already enrolled
+    try {
+      const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = "${merchantId}" && status = 'active'`, "-created", 1000, 0);
+      const memCol = $app.findCollectionByNameOrId("follow_up_members");
+      for (const c of cards) {
+        const custId = c.getString("customer");
+        if (!custId) continue;
+        const existing = $app.findRecordsByFilter("follow_up_members", `group = "${groupId}" && customer = "${custId}"`, "-created", 1, 0);
+        if (existing.length === 0) {
+          const newMem = new Record(memCol);
+          newMem.set("group", groupId);
+          newMem.set("customer", custId);
+          newMem.set("status", "enrolled");
+          newMem.set("sequence_completed", 0);
+          $app.save(newMem);
+          console.log(`[Smart Follow Up] Auto-enrolled customer ${custId} into group ${groupId}`);
+        }
+      }
+    } catch (autoErr) {
+      console.log(`[Smart Follow Up] Auto-enrollment error for group ${groupId}:`, autoErr.message || autoErr);
+    }
+
     // Get all enrolled/in_progress members
     const members = $app.findRecordsByFilter(
       "follow_up_members",
