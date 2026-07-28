@@ -46,12 +46,12 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     // Generate random 6-character uppercase session code
     const sessionCode = $security.randomString(6).toUpperCase();
 
-    // Check for any existing pending claim from this phone & merchant
+    // Check for any existing draft/pending claim from this phone & merchant
     let claim = null;
     try {
       const existingClaims = $app.findRecordsByFilter(
         "nfc_claims",
-        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && status = 'pending'`,
+        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && (status = 'draft' || status = 'pending')`,
         "-created",
         1,
         0
@@ -61,10 +61,10 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         // Reuse existing claim record, update name and session_code
         claim.set("customer_name", name);
         claim.set("session_code", sessionCode);
-        claim.set("status", "pending");
+        claim.set("status", "draft");
         if (customerUser) claim.set("customer", customerUser.id);
         $app.save(claim);
-        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to draft for merchant ${merchantId}, phone ${cleanPhone}`);
       }
     } catch (err) { /* create new below */ }
 
@@ -76,17 +76,17 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       claim.set("customer_phone", cleanPhone);
       claim.set("customer_name", name);
       claim.set("session_code", sessionCode);
-      claim.set("status", "pending");
+      claim.set("status", "draft");
       if (customerUser) claim.set("customer", customerUser.id);
       $app.save(claim);
-      console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+      console.log(`[NFC REQUEST] Created new draft claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
     }
 
     return e.json(200, {
       success: true,
       claim_id: claim.id,
       session_code: sessionCode,
-      status: "pending",
+      status: "draft",
       merchant_name: merchant.getString("name") || "Merchant"
     });
   } catch (err) {

@@ -597,7 +597,7 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
           try {
             const existing = $app.findRecordsByFilter(
               "nfc_claims",
-              `merchant = '${merchantId}' && (session_code = '${sessionCode}' || customer_phone ~ '${cleanPhone.slice(-8)}') && (status = 'pending_whatsapp' || status = 'pending')`,
+              `merchant = '${merchantId}' && (session_code = '${sessionCode}' || customer_phone ~ '${cleanPhone.slice(-8)}') && (status = 'draft' || status = 'pending_whatsapp' || status = 'pending')`,
               "-created",
               1,
               0

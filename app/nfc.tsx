@@ -244,17 +244,22 @@ export default function NfcLandingScreen() {
       filter: `merchant = "${merchant.id}"`
     }).catch(() => {});
 
-    // Subscribe to nfc_claims updates for instant auto-reveal when merchant approves
+    // Subscribe to nfc_claims updates for instant auto-reveal when WhatsApp is verified or merchant approves
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
       if (!isSubscribed) return;
       const record = e.record;
-      if (record && (record.id === claimId || record.merchant === merchant.id) && record.status === 'completed') {
-        const currentCustId = user?.id || pb.authStore.record?.id;
-        if (currentCustId) {
-          fetchUserLoyaltyCard(merchant.id, currentCustId);
+      if (record && (record.id === claimId || record.merchant === merchant.id)) {
+        if (record.status === 'pending') {
+          setHasSentWhatsapp(true);
         }
-        setIsApproved(true);
-        setIsWaitingConfirm(false);
+        if (record.status === 'completed') {
+          const currentCustId = user?.id || pb.authStore.record?.id;
+          if (currentCustId) {
+            fetchUserLoyaltyCard(merchant.id, currentCustId);
+          }
+          setIsApproved(true);
+          setIsWaitingConfirm(false);
+        }
       }
     }, {
       filter: `merchant = "${merchant.id}"`

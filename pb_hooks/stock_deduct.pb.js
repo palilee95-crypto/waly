@@ -1,4 +1,4 @@
-onRecordAfterCreateSuccess((e) => {
+onRecordCreate((e) => {
   const rewardId = e.record.get('reward');
   const reward = $app.findRecordById('rewards', rewardId);
 

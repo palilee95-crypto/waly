@@ -23,7 +23,12 @@ function runSmartFollowUp() {
     const archiveAfterSend = !!group.get("archive_after_send");
 
     // Get merchant info for WhatsApp instance
-    const merchant = $app.findRecordById("merchants", merchantId);
+    let merchant = null;
+    try {
+      if (merchantId) merchant = $app.findRecordById("merchants", merchantId);
+    } catch (_) { /* record deleted or invalid */ }
+    if (!merchant) continue;
+
     const merchantName = merchant.getString("name");
     const nameSlug = merchantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const instanceName = `merchant-${merchantId}-${nameSlug}`;

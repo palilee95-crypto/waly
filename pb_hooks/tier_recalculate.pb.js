@@ -1,6 +1,6 @@
 const { createNotification } = require(`${__hooks}/notification_helper.js`);
 
-onRecordAfterCreateSuccess((e) => {
+onRecordCreate((e) => {
   if (e.record.get('type') !== 'earn') return e.next();
 
   const customerId = e.record.get('customer');
@@ -17,12 +17,12 @@ onRecordAfterCreateSuccess((e) => {
   try {
     const result = new DynamicModel({ total: 0 });
     $app.db()
-      .newQuery("SELECT SUM(points) as total FROM transactions WHERE customer = {:cid} AND merchant = {:mid} AND type = 'earn' AND created >= {:since}")
+      .newQuery("SELECT COALESCE(SUM(points), 0) as total FROM transactions WHERE customer = {:cid} AND merchant = {:mid} AND type = 'earn' AND created >= {:since}")
       .bind({ cid: customerId, mid: merchantId, since: twelveMonthsAgo })
       .one(result);
     pointsSum = result.total || 0;
   } catch (err) {
-    console.log("Tier calculation points sum query failed:", err);
+    console.log("Tier calculation points sum query failed:", err.message || err);
   }
 
   // Determine new tier (Shop-specific thresholds based on RM spending)
@@ -47,6 +47,7 @@ onRecordAfterCreateSuccess((e) => {
       // Write tier_history log
       const histCol = $app.findCollectionByNameOrId('tier_history');
       const hist = new Record(histCol);
+      hist.set('id', $security.randomString(15).toLowerCase());
       hist.set('user', customerId);
       hist.set('old_tier', oldTier);
       hist.set('new_tier', newTier);

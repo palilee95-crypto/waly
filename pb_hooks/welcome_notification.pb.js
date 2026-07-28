@@ -1,4 +1,4 @@
-onRecordAfterCreateSuccess((e) => {
+onRecordCreate((e) => {
   if (e.record.get('type') !== 'earn') return;
 
   const customerId = e.record.get('customer');
