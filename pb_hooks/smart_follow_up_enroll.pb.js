@@ -1,7 +1,7 @@
 // pb_hooks/smart_follow_up_enroll.pb.js
 // Auto-enroll new loyalty card customers into active follow_up_groups for the merchant
 
-onRecordAfterCreateRequest((e) => {
+onRecordCreate((e) => {
   try {
     const card = e.record;
     if (!card) return;
@@ -18,6 +18,7 @@ onRecordAfterCreateRequest((e) => {
       const existing = $app.findRecordsByFilter("follow_up_members", `group = "${group.id}" && customer = "${customerId}"`, "-created", 1, 0);
       if (existing.length === 0) {
         const newMem = new Record(memCol);
+        newMem.set("id", $security.randomString(15).toLowerCase());
         newMem.set("group", group.id);
         newMem.set("customer", customerId);
         newMem.set("status", "enrolled");

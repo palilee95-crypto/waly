@@ -48,6 +48,7 @@ function runSmartFollowUp() {
         const existing = $app.findRecordsByFilter("follow_up_members", `group = "${groupId}" && customer = "${custId}"`, "-created", 1, 0);
         if (existing.length === 0) {
           const newMem = new Record(memCol);
+          newMem.set("id", $security.randomString(15).toLowerCase());
           newMem.set("group", groupId);
           newMem.set("customer", custId);
           newMem.set("status", "enrolled");
