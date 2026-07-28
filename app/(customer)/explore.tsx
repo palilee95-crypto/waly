@@ -32,11 +32,39 @@ type MerchantItem = {
   logo: string;
   coverImage: string;
   distance: string;
+  distanceKm: number;
+  lat?: number;
+  lng?: number;
+  city?: string;
+  address?: string;
   stampsRule: string;
   collectedStamps: number;
   totalStamps: number;
   featuredTag?: string;
 };
+
+// Haversine formula to compute exact real-time distance in kilometers between 2 GPS points
+function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function formatDistanceLabel(km: number): string {
+  if (km < 1) {
+    const meters = Math.round(km * 1000);
+    return `${meters} m away`;
+  }
+  return `${km.toFixed(1)} km away`;
+}
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -45,6 +73,38 @@ export default function ExploreScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [merchants, setMerchants] = useState<MerchantItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Real-time GPS Location & Radius States
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'loading' | 'granted' | 'denied' | 'disabled'>('loading');
+  const [selectedRadius, setSelectedRadius] = useState<number>(10); // Default 10km radius
+
+  // Request customer real-time GPS location
+  const requestGpsLocation = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && navigator.geolocation) {
+      setLocationStatus('loading');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+          setLocationStatus('granted');
+        },
+        (err) => {
+          console.warn('[Explore] Geolocation position error:', err);
+          setLocationStatus('denied');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    } else {
+      setLocationStatus('disabled');
+    }
+  };
+
+  useEffect(() => {
+    requestGpsLocation();
+  }, []);
 
   // States for Merchant Info Modal
   const [selectedMerchant, setSelectedMerchant] = useState<MerchantItem | null>(null);
@@ -81,6 +141,7 @@ export default function ExploreScreen() {
       const cardList = user 
         ? await pb.collection('loyalty_cards').getFullList({ filter: `customer = '${user.id}'` })
         : [];
+      const storeLocations = await pb.collection('store_locations').getFullList({ requestKey: null }).catch(() => []);
 
       const mapped = merchantList
         .map((m: any) => {
@@ -88,6 +149,7 @@ export default function ExploreScreen() {
           if (!program) return null;
 
           const card = cardList.find((c: any) => c.merchant === m.id);
+          const loc = storeLocations.find((l: any) => l.merchant === m.id);
 
           let resolvedCover = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=600';
           if (m.banner) {
@@ -104,6 +166,22 @@ export default function ExploreScreen() {
             entertainment: 'Entertainment',
             other: 'Services / Other'
           };
+
+          let distanceKm = 9999;
+          let distanceStr = 'Location unavailable';
+
+          const storeLat = loc?.lat ? parseFloat(String(loc.lat)) : null;
+          const storeLng = loc?.lng ? parseFloat(String(loc.lng)) : null;
+
+          if (storeLat !== null && storeLng !== null && !isNaN(storeLat) && !isNaN(storeLng)) {
+            if (userCoords) {
+              distanceKm = getHaversineDistanceKm(userCoords.lat, userCoords.lng, storeLat, storeLng);
+              distanceStr = formatDistanceLabel(distanceKm);
+            } else {
+              distanceStr = loc?.city ? `In ${loc.city}` : 'Malaysia';
+            }
+          }
+
           return {
             id: m.id,
             name: m.name,
@@ -113,7 +191,12 @@ export default function ExploreScreen() {
               ? `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`
               : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=120',
             coverImage: resolvedCover,
-            distance: '0.5 km away',
+            distance: distanceStr,
+            distanceKm,
+            lat: storeLat || undefined,
+            lng: storeLng || undefined,
+            city: loc?.city || undefined,
+            address: loc?.address || undefined,
             stampsRule: `Complete ${program.stamp_goal} stamps for ${program.reward_description}`,
             collectedStamps: card ? card.stamps_collected : 0,
             totalStamps: program.stamp_goal,
@@ -132,26 +215,37 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     fetchExploreData();
-  }, [user]);
+  }, [user, userCoords]);
 
   const categories = ['All', 'Cafes', 'Food', 'Fashion', 'Beauty', 'Bakery'];
 
-  const filteredMerchants = merchants.filter((m) => {
-    // Filter by search name
-    if (searchQuery.trim().length > 0 && !m.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    // Filter by Category
-    if (activeCategory !== 'All') {
-      const cat = m.rawCategory;
-      if (activeCategory === 'Cafes' && cat !== 'food') return false;
-      if (activeCategory === 'Food' && cat !== 'food') return false;
-      if (activeCategory === 'Fashion' && cat !== 'retail') return false;
-      if (activeCategory === 'Beauty' && cat !== 'beauty') return false;
-      if (activeCategory === 'Bakery' && cat !== 'food') return false;
-    }
-    return true;
-  });
+  const filteredMerchants = merchants
+    .filter((m) => {
+      // Filter by search name
+      if (searchQuery.trim().length > 0 && !m.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      // Filter by Category
+      if (activeCategory !== 'All') {
+        const cat = m.rawCategory;
+        if (activeCategory === 'Cafes' && cat !== 'food') return false;
+        if (activeCategory === 'Food' && cat !== 'food') return false;
+        if (activeCategory === 'Fashion' && cat !== 'retail') return false;
+        if (activeCategory === 'Beauty' && cat !== 'beauty') return false;
+        if (activeCategory === 'Bakery' && cat !== 'food') return false;
+      }
+      // Filter by Distance Radius (if radius > 0 and userCoords are active)
+      if (selectedRadius > 0 && userCoords && m.distanceKm > selectedRadius) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (userCoords) {
+        return a.distanceKm - b.distanceKm;
+      }
+      return 0;
+    });
 
   const renderOperatingHours = () => {
     if (fetchingLocation) {
@@ -269,6 +363,69 @@ export default function ExploreScreen() {
                   ]}
                 >
                   {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Real-Time Location & Radius Filter Bar */}
+        <View style={styles.locationFilterCard}>
+          <View style={styles.locationHeaderRow}>
+            <View style={styles.locationHeaderLeft}>
+              <Ionicons
+                name={userCoords ? "location-sharp" : "location-outline"}
+                size={16}
+                color={userCoords ? "#10B981" : "#64748B"}
+              />
+              <Text style={styles.locationStatusTitle}>
+                {userCoords
+                  ? `GPS Active (${userCoords.lat.toFixed(3)}, ${userCoords.lng.toFixed(3)})`
+                  : locationStatus === 'loading'
+                  ? 'Acquiring GPS coordinates...'
+                  : 'Location access off — Showing all stores'}
+              </Text>
+            </View>
+
+            {locationStatus !== 'granted' && (
+              <TouchableOpacity
+                onPress={requestGpsLocation}
+                style={styles.gpsEnableBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="navigate" size={13} color="#000000" style={{ marginRight: 4 }} />
+                <Text style={styles.gpsEnableBtnText}>
+                  {locationStatus === 'loading' ? 'Locating...' : 'Enable GPS'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Distance Radius Pills */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radiusScroll}>
+            {[
+              { label: '📍 3 km', value: 3 },
+              { label: '📍 5 km', value: 5 },
+              { label: '📍 10 km', value: 10 },
+              { label: '📍 25 km', value: 25 },
+              { label: '🌏 All Stores', value: 0 },
+            ].map((r) => (
+              <TouchableOpacity
+                key={r.value}
+                style={[
+                  styles.radiusPill,
+                  selectedRadius === r.value && styles.radiusPillActive,
+                ]}
+                onPress={() => setSelectedRadius(r.value)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.radiusPillText,
+                    selectedRadius === r.value && styles.radiusPillTextActive,
+                  ]}
+                >
+                  {r.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -974,5 +1131,71 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
+  },
+  locationFilterCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  locationHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  locationStatusTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#334155',
+    marginLeft: 6,
+  },
+  gpsEnableBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  gpsEnableBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  radiusScroll: {
+    gap: 6,
+  },
+  radiusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  radiusPillActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  radiusPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  radiusPillTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
