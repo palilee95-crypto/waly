@@ -52,9 +52,10 @@ routerAdd("GET", "/api/risev/test/run-smart-follow-up", (e) => {
       stats: stats
     });
   } catch (err) {
+    console.log("[Smart Follow Up Trigger Error]:", err.message || err, err.stack || "");
     return e.json(500, {
       success: false,
-      message: "Failed to run smart follow up: " + err.message
+      message: "Failed to run smart follow up: " + (err.message || err)
     });
   }
 });

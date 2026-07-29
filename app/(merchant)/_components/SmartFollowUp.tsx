@@ -208,7 +208,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
   const saveMessage = () => {
     if (!msgBody.trim()) return;
-    const msg = { message_body: msgBody.trim(), action_buttons: msgButtons };
+    const msg = { message_body: msgBody.trim(), action_buttons: [] };
     if (editingMsgIndex !== null) {
       const updated = [...seqMessages];
       updated[editingMsgIndex] = msg;
@@ -1537,48 +1537,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     />
                   </View>
                   
-                  <View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={inputStyles.label}>Interactive Action Buttons ({msgButtons.length}/3)</Text>
-                      {msgButtons.length < 3 && (
-                        <TouchableOpacity onPress={addActionButton}>
-                          <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Button</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    
-                    {msgButtons.map((btn, i) => (
-                      <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, gap: 8, position: 'relative' }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>Button Label</Text>
-                          <TextInput 
-                            style={inputStyles.input} 
-                            value={btn.label} 
-                            onChangeText={(v) => updateActionButton(i, 'label', v)} 
-                            placeholder="Button label" 
-                            placeholderTextColor="#BEC6E0" 
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>URL (optional)</Text>
-                          <TextInput 
-                            style={inputStyles.input} 
-                            value={btn.url} 
-                            onChangeText={(v) => updateActionButton(i, 'url', v)} 
-                            placeholder="URL (optional)" 
-                            placeholderTextColor="#BEC6E0" 
-                          />
-                        </View>
-                        <TouchableOpacity 
-                          style={{ position: 'absolute', top: 12, right: 12, padding: 4 }} 
-                          onPress={() => removeActionButton(i)} 
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
+
 
                   {/* On Mobile: Render Preview Inline at the bottom of the form */}
                   {!isDesktop && (
@@ -1752,24 +1711,7 @@ const WhatsAppPreview = ({ title, body, buttons, merchantName }: { title: string
                 </View>
               </View>
               
-              {/* WhatsApp Interactive Action Buttons */}
-              {buttons && buttons.length > 0 && (
-                <View style={previewStyles.buttonsContainer}>
-                  {buttons.map((btn, idx) => (
-                    <View key={idx} style={previewStyles.templateButton}>
-                      <Ionicons 
-                        name={btn.url ? "link-outline" : "chatbubble-ellipses-outline"} 
-                        size={13} 
-                        color="#0066CC" 
-                        style={{ marginRight: 5 }} 
-                      />
-                      <Text style={previewStyles.templateButtonText} numberOfLines={1}>
-                        {btn.label || `Button ${idx + 1}`}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+
             </View>
           </ScrollView>
         </View>
