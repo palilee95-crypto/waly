@@ -469,47 +469,13 @@ export default function NfcLandingScreen() {
         console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
       }
 
-      // 2. Prepare Mandatory WhatsApp Message Link
-      const message =
-        `Hi ${merchantName}! I scanned your NFC card to claim stamps.\n\n` +
-        `Name: ${displayName}\n` +
-        `Phone: ${cleanPhone}\n` +
-        `Merchant: ${merchant.id}\n` +
-        `NFC: ${claimSessionCode}`;
-
-      let waPhone = merchantPhone.replace(/[^\d]/g, '');
-      if (waPhone.startsWith('0')) waPhone = '6' + waPhone;
-      if (!waPhone.startsWith('60') && waPhone.length >= 9) waPhone = '60' + waPhone;
-
-      const generatedWaUrl = waPhone
-        ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`
-        : `https://wa.me/?text=${encodeURIComponent(message)}`;
-      setWaUrl(generatedWaUrl);
-
       setIsWaitingConfirm(true);
       setHasSentWhatsapp(true);
       setStep('sent');
 
-      const activeClaimId = createdClaimId || claimId;
-      if (activeClaimId) {
-        pb.send('/api/risev/nfc/whatsapp-sent', {
-          method: 'POST',
-          body: { claim_id: activeClaimId },
-        }).catch(() => {});
-      }
-
       // Fetch user's loyalty card
       if (authRecord?.id) {
         fetchUserLoyaltyCard(merchant.id, authRecord.id);
-      }
-
-      // IMMEDIATELY OPEN WHATSAPP (skipping manual Step 2 button)
-      if (generatedWaUrl) {
-        if (Platform.OS === 'web') {
-          window.location.href = generatedWaUrl;
-        } else {
-          await Linking.openURL(generatedWaUrl);
-        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to submit NFC claim.');
@@ -669,28 +635,26 @@ export default function NfcLandingScreen() {
           )}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 2: Mandatory WhatsApp & Real-Time Store Approval View */}
+          {/* STEP 2: Real-Time Store Approval View */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={styles.innerFormCard}>
               <View style={styles.sentIconWrap}>
                 <Ionicons
-                  name={isApproved ? "checkmark-circle" : (hasSentWhatsapp ? "time-outline" : "logo-whatsapp")}
+                  name={isApproved ? "checkmark-circle" : "time-outline"}
                   size={56}
-                  color={isApproved ? "#10B981" : (hasSentWhatsapp ? "#F59E0B" : "#25D366")}
+                  color={isApproved ? "#10B981" : "#F59E0B"}
                 />
               </View>
               <Text style={styles.sentHeaderTitle}>
                 {isApproved
                   ? '🎉 Claim Approved by Store!'
-                  : (hasSentWhatsapp ? 'WhatsApp Sent! Waiting for Approval 🎉' : 'Step 2: Send WhatsApp to Store 💬')}
+                  : 'Stamp Request Sent! 🎉'}
               </Text>
               <Text style={styles.sentHeaderDesc}>
                 {isApproved
                   ? `Your stamps have been credited to your account by ${merchantName} staff!`
-                  : (hasSentWhatsapp
-                    ? `Your claim is active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`
-                    : `WhatsApp is required to activate your claim on ${merchantName}'s terminal. Tap the green button below to notify store staff.`)}
+                  : `Your claim is active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`}
               </Text>
 
               {/* Status Indicator Banner */}
@@ -699,31 +663,25 @@ export default function NfcLandingScreen() {
                   styles.liveSyncBanner,
                   isApproved
                     ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
-                    : (hasSentWhatsapp
-                      ? { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }
-                      : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }),
+                    : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
                 ]}
               >
                 {isApproved ? (
                   <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
-                ) : hasSentWhatsapp ? (
-                  <ActivityIndicator size="small" color="#D97706" />
                 ) : (
-                  <Ionicons name="alert-circle-outline" size={18} color="#D97706" />
+                  <ActivityIndicator size="small" color="#D97706" />
                 )}
                 <Text
                   style={[
                     styles.liveSyncText,
                     isApproved
                       ? { color: '#065F46' }
-                      : (hasSentWhatsapp ? { color: '#92400E' } : { color: '#92400E' }),
+                      : { color: '#92400E' },
                   ]}
                 >
                   {isApproved
                     ? '✅ Real-time approval received! Stamps credited.'
-                    : (hasSentWhatsapp
-                      ? 'Waiting for store approval in real-time...'
-                      : 'Tap WhatsApp button below to enable merchant approval.')}
+                    : 'Waiting for store approval in real-time...'}
                 </Text>
               </View>
 
@@ -731,20 +689,15 @@ export default function NfcLandingScreen() {
 
               {/* ACTION BUTTONS (Single Primary Action) */}
               {!isApproved ? (
-                /* Pending State: ONLY Mandatory WhatsApp Button */
-                <TouchableOpacity
-                  style={[
-                    styles.primaryActionBtn,
-                    { backgroundColor: '#25D366', marginTop: 14 },
-                  ]}
-                  onPress={handleSendWhatsapp}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryActionBtnText}>
-                    {hasSentWhatsapp ? 'Open WhatsApp Chat Again' : '💬 Send Claim via WhatsApp (Required)'}
+                /* Pending State: Spinner and Info note */
+                <View style={{ alignItems: 'center', marginTop: 24, paddingVertical: 12 }}>
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginBottom: 6 }}>
+                    Show Cashier/Staff
                   </Text>
-                </TouchableOpacity>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 }}>
+                    Please ask store staff to approve your pending stamp request on their Risev dashboard.
+                  </Text>
+                </View>
               ) : (
                 /* Approved State: ONLY 1 Button -> View My Stamp Card (with Onboarding check) */
                 <TouchableOpacity

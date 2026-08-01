@@ -61,10 +61,10 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         // Reuse existing claim record, update name and session_code
         claim.set("customer_name", name);
         claim.set("session_code", sessionCode);
-        claim.set("status", "draft");
+        claim.set("status", "pending");
         if (customerUser) claim.set("customer", customerUser.id);
         $app.save(claim);
-        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to draft for merchant ${merchantId}, phone ${cleanPhone}`);
+        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to pending for merchant ${merchantId}, phone ${cleanPhone}`);
       }
     } catch (err) { /* create new below */ }
 
@@ -76,17 +76,17 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       claim.set("customer_phone", cleanPhone);
       claim.set("customer_name", name);
       claim.set("session_code", sessionCode);
-      claim.set("status", "draft");
+      claim.set("status", "pending");
       if (customerUser) claim.set("customer", customerUser.id);
       $app.save(claim);
-      console.log(`[NFC REQUEST] Created new draft claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+      console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
     }
 
     return e.json(200, {
       success: true,
       claim_id: claim.id,
       session_code: sessionCode,
-      status: "draft",
+      status: "pending",
       merchant_name: merchant.getString("name") || "Merchant"
     });
   } catch (err) {

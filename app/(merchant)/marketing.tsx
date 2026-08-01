@@ -131,7 +131,7 @@ export default function MarketingScreen() {
   const [bCampaignId, setBCampaignId] = useState('');
   const [bTitle, setBTitle] = useState('Exclusive Promotion! 🎁');
   const [bMessage, setBMessage] = useState('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
-  const [bSendWhatsApp, setBSendWhatsApp] = useState(true);
+  const [bSendWhatsApp, setBSendWhatsApp] = useState(false);
   const [isSendingBlast, setIsSendingBlast] = useState(false);
   const [audienceEstimate, setAudienceEstimate] = useState(0);
 
@@ -144,7 +144,7 @@ export default function MarketingScreen() {
   const [arTriggerDays, setArTriggerDays] = useState<string>('7');
   const [arTitle, setArTitle] = useState('We Miss You! ❤️');
   const [arMessage, setArMessage] = useState('Hi {{name}}! 👋\n\nIt\'s been a while since your last visit. Come back soon to collect your next stamp! ✨');
-  const [arSendWhatsApp, setArSendWhatsApp] = useState(true);
+  const [arSendWhatsApp, setArSendWhatsApp] = useState(false);
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [activeFollowUpParent, setActiveFollowUpParent] = useState<any | null>(null);
 
@@ -985,34 +985,7 @@ export default function MarketingScreen() {
 
         {subTab === 'broadcast' && (
           <View style={styles.broadcastContent}>
-            {/* WhatsApp Status Alert (GUIDES TO PROFILE) */}
-            {whatsappStatus !== 'connected' && (
-              <View style={{
-                flexDirection: 'row',
-                backgroundColor: '#FFFBEB',
-                borderColor: '#FDE68A',
-                borderWidth: 1,
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 20,
-                alignItems: 'center',
-                gap: 12
-              }}>
-                <Ionicons name="warning" size={20} color="#D97706" />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                    {t('whatsapp_disconnected')}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#D97706', marginTop: 2 }}>
-                    {locale === 'en' ? 'Please link your store WhatsApp in your ' : 'Sila pautkan WhatsApp kedai anda di '}
-                    <Text style={{ textDecorationLine: 'underline', fontFamily: 'PlusJakartaSans_700Bold' }} onPress={() => router.push('/(merchant)/profile' as any)}>
-                      {t('profile_settings')}
-                    </Text>
-                    {locale === 'en' ? ' to send promotions.' : ' untuk menghantar promosi.'}
-                  </Text>
-                </View>
-              </View>
-            )}
+
 
             {/* Mode Switch Segment */}
             <View style={styles.modeSegmentContainer}>
@@ -1235,19 +1208,7 @@ export default function MarketingScreen() {
                     {t('template_helper_desc')}
                   </Text>
 
-                  {/* Toggle WhatsApp Blast */}
-                  <View style={styles.switchRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchLabel}>{t('send_via_whatsapp')}</Text>
-                      <Text style={styles.switchDesc}>{t('whatsapp_automation_desc')}</Text>
-                    </View>
-                    <Switch
-                      value={arSendWhatsApp}
-                      onValueChange={setArSendWhatsApp}
-                      trackColor={{ false: '#E2E8F0', true: '#000000' }}
-                      thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : arSendWhatsApp ? '#000000' : '#F4F3F4'}
-                    />
-                  </View>
+
 
                   <TouchableOpacity
                     style={styles.saveBtn}

@@ -336,10 +336,10 @@ export default function ProfileScreen() {
         const mRec = await pb.collection('merchants').getOne(user.merchant_id);
         setMerchant(mRec);
 
-        // Fetch WhatsApp status only if user is owner
-        if (mRec.owner === user.id) {
-          fetchWhatsappStatus();
-        }
+        // Fetch WhatsApp status only if user is owner (Disabled - WhatsApp service decommissioned)
+        // if (mRec.owner === user.id) {
+        //   fetchWhatsappStatus();
+        // }
 
         // Fetch subscription record
         try {
@@ -1083,20 +1083,7 @@ export default function ProfileScreen() {
                 iconColor="#000000"
                 onPress={() => router.push('/(merchant)/staff' as any)}
               />
-              <SettingItem
-                iconName="logo-whatsapp"
-                title={t('link_whatsapp')}
-                subtitle={
-                  whatsappStatus === 'connected'
-                    ? `${locale === 'en' ? 'Connected' : 'Disambung'}: ${whatsappPhone || ''} (${locale === 'en' ? 'Tap to manage' : 'Ketik untuk urus'})`
-                    : whatsappStatus === 'checking'
-                      ? t('whatsapp_checking')
-                      : t('link_whatsapp_desc')
-                }
-                iconBgColor="#E8F5E9"
-                iconColor="#25D366"
-                onPress={handleWhatsappPress}
-              />
+
               <SettingItem
                 iconName="gift-outline"
                 title={t('manage_rewards')}

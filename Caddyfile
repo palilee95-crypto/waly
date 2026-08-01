@@ -9,9 +9,4 @@
     }
 }
 
-# Evolution API Reverse Proxy
-{$DOMAIN_EVO} {
-    reverse_proxy evolution-go:8080
-}
-
 

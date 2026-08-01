@@ -151,7 +151,7 @@ function runSmartFollowUp() {
             .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
             .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
 
-          const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n⚠️ *Peringatan:* Mohon jangan laporkan mesej ini sebagai spam.\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
+          const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
 
           // Create log record
           const logsCol = $app.findCollectionByNameOrId("follow_up_logs");

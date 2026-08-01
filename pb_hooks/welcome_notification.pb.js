@@ -36,7 +36,7 @@ onRecordCreate((e) => {
     if (diffMs < 15000) {
       // BRAND NEW USER: Send welcome message via merchant WhatsApp instance
       console.log(`[WHATSAPP HOOK] New customer welcome notification to: ${phone} (via ${instanceName})`);
-      messageText = `🎁 *Selamat Datang ke ${merchantName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam. Anda boleh mematikan notifikasi WhatsApp di Profil anda.`;
+      messageText = `🎁 *Selamat Datang ke ${merchantName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!`;
     } else if (stampsEarned > 0) {
       // EXISTING USER: Send stamp update notification via merchant WhatsApp instance
       console.log(`[WHATSAPP HOOK] Stamp earned notification to: ${phone} (via ${instanceName})`);
@@ -71,9 +71,9 @@ onRecordCreate((e) => {
       const isCompleted = (currentStamps >= goal) || (currentStamps === 0 && completions > 0 && stampsEarned > 0);
 
       if (isCompleted) {
-        messageText = `🎉 *Tahniah! Anda Telah Melengkapkan Kad Cop!* 🎉\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja menerima *${stampsEarned}* Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\n🎁 Ganjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n🔗 ${appUrl}\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam. Anda boleh mematikan notifikasi WhatsApp di Profil anda.`;
+        messageText = `🎉 *Tahniah! Anda Telah Melengkapkan Kad Cop!* 🎉\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja menerima *${stampsEarned}* Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\n🎁 Ganjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n🔗 ${appUrl}`;
       } else {
-        messageText = `✨ *Cop Baharu Diterima!* ✨\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja mendapat *${stampsEarned}* Cop (Stamp).\n\n📊 *Status Kad Cop Anda:*\n*${currentStamps} / ${goal}* Cop dipenuhi.\n\nKumpulkan *${Math.max(0, goal - currentStamps)}* cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat kad ganjaran anda, layari:\n🔗 ${appUrl}\n───────────────────\n⚠️ *Peringatan:* Mohon jangan laporkan (report) mesej ini sebagai spam. Anda boleh mematikan notifikasi WhatsApp di Profil anda.`;
+        messageText = `✨ *Cop Baharu Diterima!* ✨\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja mendapat *${stampsEarned}* Cop (Stamp).\n\n📊 *Status Kad Cop Anda:*\n*${currentStamps} / ${goal}* Cop dipenuhi.\n\nKumpulkan *${Math.max(0, goal - currentStamps)}* cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat kad ganjaran anda, layari:\n🔗 ${appUrl}`;
       }
     }
 

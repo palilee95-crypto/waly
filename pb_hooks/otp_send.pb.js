@@ -358,17 +358,4 @@ onMailerRecordOTPSend((e) => {
   console.log("🔑 [PASSWORD RESET OTP] Sent to: " + cleanPhone);
   console.log("👉 OTP Code: " + otp);
   console.log("========================================\n");
-
-  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
-
-  try {
-    sendTextMessage(
-      'risev-instance',
-      cleanPhone,
-      `Your RISEV password reset code is: *${otp}*\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
-      { delay: 2000, presence: 'composing' }
-    );
-  } catch (err) {
-    // Ignore — OTP is also logged to console
-  }
 });

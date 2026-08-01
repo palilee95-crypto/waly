@@ -51,36 +51,9 @@ routerAdd("POST", "/api/risev/agent/create-prospect", (e) => {
       // Collection might not exist yet — skip
     }
 
-    // 2. Check agent's WhatsApp instance is connected
-    let isConnected = false;
+    // 2. Check agent's WhatsApp instance is connected (Bypassed - WhatsApp service decommissioned)
+    let isConnected = true;
     let instanceToken = "";
-
-    const fetchRes = callEvo("GET", `/instance/fetchInstances`);
-    if (fetchRes.status === 200 && Array.isArray(fetchRes.data)) {
-      const inst = fetchRes.data.find(i => i.name === instanceName);
-      if (inst && (inst.connectionStatus === "open" || inst.connectionStatus === "connected")) {
-        isConnected = true;
-        // Try to get the instance token
-        try {
-          const tokenRes = callEvo("GET", `/instance/fetchInstances`);
-          if (tokenRes.status === 200 && Array.isArray(tokenRes.data)) {
-            const tokenInst = tokenRes.data.find(i => i.name === instanceName);
-            if (tokenInst && tokenInst.token) {
-              instanceToken = tokenInst.token;
-            }
-          }
-        } catch (tokenErr) {
-          // Token fetch failed — try to proceed anyway
-        }
-      }
-    }
-
-    if (!isConnected) {
-      return e.json(400, {
-        success: false,
-        message: "WhatsApp not connected. Please connect your WhatsApp account first from the Sales Dashboard."
-      });
-    }
 
     // 3. Create or update prospect record
     const now = new Date().toISOString().replace("T", " ").substring(0, 19);
