@@ -47,7 +47,7 @@ const renderStampIcon = (iconId: string, size: number, color: string) => {
 export default function NfcLandingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ m: string }>();
-  const { user, quickRegister } = useAuth();
+  const { user, quickRegister, logout } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
 
@@ -440,8 +440,10 @@ export default function NfcLandingScreen() {
 
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
 
-      // Quick register or retrieve account
-      await quickRegister(finalName, cleanPhone);
+      // Quick register or retrieve account (only if not already logged in)
+      if (!pb.authStore.isValid || !pb.authStore.record) {
+        await quickRegister(finalName, cleanPhone);
+      }
 
       const authRecord = pb.authStore.record;
       const displayName = (authRecord?.name && !authRecord.name.startsWith('Customer '))
@@ -582,10 +584,22 @@ export default function NfcLandingScreen() {
                       setErrorMsg('');
                     }}
                     keyboardType="phone-pad"
-                    autoFocus={!showNameField}
-                    editable={!showNameField}
                   />
                 </View>
+                {user && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await logout();
+                      setPhoneInput('');
+                      setNameInput('');
+                    }}
+                    style={{ marginTop: 6, alignSelf: 'flex-end', paddingVertical: 4 }}
+                  >
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
+                      Not {user.name || 'you'}? Log out
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Full Name Input (New Customer) */}

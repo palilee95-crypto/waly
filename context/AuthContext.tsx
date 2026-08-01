@@ -292,6 +292,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    try {
+      await pb.realtime.unsubscribe().catch(() => {});
+    } catch (_) {}
     pb.authStore.clear();
     await storage.deleteItem('risev_active_role');
     setUser(null);
@@ -300,6 +303,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const switchRole = async (role: UserRole) => {
     if (!user) return;
+    try {
+      await pb.realtime.unsubscribe().catch(() => {});
+    } catch (_) {}
     await storage.setItem('risev_active_role', role || 'customer');
     setActiveRole(role);
     setUser(prev => prev ? { ...prev, activeRole: role } : null);
