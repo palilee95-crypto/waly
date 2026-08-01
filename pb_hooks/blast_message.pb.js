@@ -105,6 +105,161 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
   }
 }, $apis.requireAuth("users"));
 
+// 2c. GET Meta OAuth Callback Endpoint
+routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
+  try {
+    const code = e.request.queryParam("code");
+    const stateStr = e.request.queryParam("state");
+
+    if (!code || !stateStr) {
+      return e.string(400, "Missing OAuth code or state parameter.");
+    }
+
+    // 1. Decode state JSON
+    let merchantId = "";
+    let redirectHost = "https://waly-five.vercel.app"; // default fallback
+    try {
+      const decodedState = JSON.parse(decodeURIComponent(stateStr));
+      merchantId = decodedState.merchantId;
+      if (decodedState.redirectHost) {
+        redirectHost = decodedState.redirectHost;
+      }
+    } catch (err) {
+      // Fallback if state is raw merchantId string
+      merchantId = stateStr;
+    }
+
+    if (!merchantId) {
+      return e.string(400, "Invalid state (missing merchantId).");
+    }
+
+    // 2. Fetch Meta Developer App Secrets
+    const fbAppId = $os.getenv("META_APP_ID") || "YOUR_META_APP_ID"; 
+    const fbAppSecret = $os.getenv("META_APP_SECRET") || "YOUR_META_APP_SECRET";
+    const callbackUrl = `${redirectHost}/api/risev/merchant/whatsapp/callback`; // must match OAuth settings
+
+    if (fbAppId === "YOUR_META_APP_ID" || fbAppSecret === "YOUR_META_APP_SECRET") {
+      console.log("[META OAUTH] WARNING: App ID or Secret is not configured in environment variables!");
+    }
+
+    // 3. Exchange code for User Access Token
+    console.log(`[META OAUTH] Exchanging code for token. Redirect URI: ${callbackUrl}`);
+    const tokenRes = $http.send({
+      url: "https://graph.facebook.com/v20.0/oauth/access_token",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        client_id: fbAppId,
+        client_secret: fbAppSecret,
+        redirect_uri: callbackUrl,
+        code: code
+      })
+    });
+
+    if (tokenRes.statusCode < 200 || tokenRes.statusCode >= 300) {
+      console.log(`[META OAUTH ERROR] Code exchange failed: ${tokenRes.statusCode} | ${tokenRes.raw}`);
+      return e.string(tokenRes.statusCode, `Failed to exchange token with Meta: ${tokenRes.raw}`);
+    }
+
+    const tokenData = JSON.parse(tokenRes.raw);
+    const userAccessToken = tokenData.access_token;
+
+    // 4. Fetch WhatsApp Business Account (WABA) details
+    // We fetch the accounts linked to this login token
+    const accountsRes = $http.send({
+      url: `https://graph.facebook.com/v20.0/me/whatsapp_business_accounts`,
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${userAccessToken}`
+      }
+    });
+
+    if (accountsRes.statusCode < 200 || accountsRes.statusCode >= 300) {
+      console.log(`[META OAUTH ERROR] Failed to fetch accounts: ${accountsRes.raw}`);
+      return e.string(accountsRes.statusCode, `Failed to fetch accounts from Meta: ${accountsRes.raw}`);
+    }
+
+    const accountsData = JSON.parse(accountsRes.raw);
+    const accounts = accountsData.data || [];
+    if (accounts.length === 0) {
+      return e.string(400, "No WhatsApp Business Accounts found linked to your Facebook account.");
+    }
+
+    // Use the first active WABA
+    const activeWaba = accounts[0];
+    const wabaId = activeWaba.id;
+
+    // 5. Fetch Phone Numbers inside this WABA
+    const numbersRes = $http.send({
+      url: `https://graph.facebook.com/v20.0/${wabaId}/phone_numbers`,
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${userAccessToken}`
+      }
+    });
+
+    if (numbersRes.statusCode < 200 || numbersRes.statusCode >= 300) {
+      console.log(`[META OAUTH ERROR] Failed to fetch phone numbers: ${numbersRes.raw}`);
+      return e.string(numbersRes.statusCode, `Failed to fetch phone numbers from Meta: ${numbersRes.raw}`);
+    }
+
+    const numbersData = JSON.parse(numbersRes.raw);
+    const numbers = numbersData.data || [];
+    if (numbers.length === 0) {
+      return e.string(400, "No verified phone numbers found inside your WhatsApp Business Account.");
+    }
+
+    const activeNum = numbers[0];
+    const phoneNumberId = activeNum.id;
+    const verifiedPhone = activeNum.display_phone_number || "";
+
+    // 6. Save or Update in whatsapp_configurations collection
+    let configRecord = null;
+    try {
+      const records = $app.findRecordsByFilter(
+        "whatsapp_configurations",
+        `merchant = '${merchantId}'`,
+        "-created",
+        1,
+        0
+      );
+      if (records.length > 0) {
+        configRecord = records[0];
+      }
+    } catch (err) {}
+
+    if (configRecord) {
+      configRecord.set("waba_id", wabaId);
+      configRecord.set("phone_number_id", phoneNumberId);
+      configRecord.set("access_token", userAccessToken);
+      configRecord.set("phone_number", verifiedPhone);
+      configRecord.set("status", "connected");
+      $app.save(configRecord);
+    } else {
+      const collection = $app.findCollectionByNameOrId("whatsapp_configurations");
+      const record = new Record(collection);
+      record.set("merchant", merchantId);
+      record.set("waba_id", wabaId);
+      record.set("phone_number_id", phoneNumberId);
+      record.set("access_token", userAccessToken);
+      record.set("phone_number", verifiedPhone);
+      record.set("status", "connected");
+      $app.save(record);
+    }
+
+    console.log(`[META OAUTH SUCCESS] Successfully configured WhatsApp for merchant ${merchantId}. Phone: ${verifiedPhone}`);
+
+    // 7. Redirect back to frontend
+    e.response.header().set("Location", `${redirectHost}/(merchant)/profile?whatsapp=success`);
+    return e.string(302, "Redirecting...");
+  } catch (err) {
+    console.log("[META OAUTH EXCEPTION]", err.message || err);
+    return e.string(500, `Internal Server Error: ${err.message || err}`);
+  }
+});
+
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);

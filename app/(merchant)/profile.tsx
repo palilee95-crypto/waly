@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Switch,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -78,6 +79,9 @@ export default function ProfileScreen() {
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [isDisconnectingMeta, setIsDisconnectingMeta] = useState(false);
   const [metaConfigId, setMetaConfigId] = useState<string | null>(null);
+
+  const [showMetaHelp, setShowMetaHelp] = useState(false);
+  const [showManualSetup, setShowManualSetup] = useState(false);
 
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
@@ -209,6 +213,29 @@ export default function ProfileScreen() {
   const handleOpenMetaSetup = () => {
     fetchMetaConfig();
     setMetaModalVisible(true);
+  };
+
+  const handleQuickConnectMeta = () => {
+    if (!user || !user.merchant_id) return;
+    
+    const stateObj = {
+      merchantId: user.merchant_id,
+      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app'
+    };
+    
+    const encodedState = encodeURIComponent(JSON.stringify(stateObj));
+    const redirectUri = encodeURIComponent(
+      (Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app') + 
+      '/api/risev/merchant/whatsapp/callback'
+    );
+    
+    // Facebook Developer App ID (Platform central App)
+    const fbAppId = '1587394029481029'; 
+    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging,business_management&response_type=code`;
+    
+    Linking.openURL(oauthUrl).catch(() => {
+      Alert.alert('Error', 'Unable to open Meta Embedded Signup portal.');
+    });
   };
 
   const fetchMetaConfig = async () => {
@@ -2167,94 +2194,203 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 20 }}>
+            <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 16 }}>
               Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
             </Text>
 
-            {/* Verified Phone Number */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>VERIFIED WHATSAPP NUMBER</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="+60123456789"
-                placeholderTextColor="#94A3B8"
-                value={metaPhone}
-                onChangeText={setMetaPhone}
-                keyboardType="phone-pad"
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
+            {/* Quick Connect Button */}
+            <TouchableOpacity 
+              onPress={handleQuickConnectMeta}
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                backgroundColor: '#1877F2',
+                paddingVertical: 14,
+                borderRadius: 12,
+                marginBottom: 20,
+                width: '100%',
+                shadowColor: '#1877F2',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+                elevation: 4
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
+                Quick Connect via Meta
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, width: '100%' }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', paddingHorizontal: 12 }}>
+                OR CONFIGURE MANUALLY
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
             </View>
 
-            {/* WABA ID */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>WHATSAPP BUSINESS ACCOUNT ID (WABA ID)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. 10984758392019"
-                placeholderTextColor="#94A3B8"
-                value={metaWabaId}
-                onChangeText={setMetaWabaId}
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
-            </View>
+            {/* Manual Setup Toggle */}
+            <TouchableOpacity 
+              onPress={() => setShowManualSetup(!showManualSetup)}
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                backgroundColor: '#F8FAFC',
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                width: '100%',
+                marginBottom: 16
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                Advanced Manual Setup
+              </Text>
+              <Ionicons name={showManualSetup ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
+            </TouchableOpacity>
 
-            {/* Phone Number ID */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>PHONE NUMBER ID</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. 1048574839201"
-                placeholderTextColor="#94A3B8"
-                value={metaPhoneId}
-                onChangeText={setMetaPhoneId}
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
-            </View>
+            {showManualSetup && (
+              <View style={{ width: '100%', gap: 16 }}>
+                {/* Need Help Toggle */}
+                <TouchableOpacity 
+                  onPress={() => setShowMetaHelp(!showMetaHelp)} 
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    backgroundColor: '#EEF2F6',
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    alignSelf: 'stretch'
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="help-circle-outline" size={18} color="#4F46E5" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#4F46E5' }}>
+                    {showMetaHelp ? 'Hide Setup Instructions' : 'Need help getting these?'}
+                  </Text>
+                </TouchableOpacity>
 
-            {/* System Access Token */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>SYSTEM ACCESS TOKEN</Text>
-              <TextInput
-                style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
-                placeholder="EAAG..."
-                placeholderTextColor="#94A3B8"
-                value={metaToken}
-                onChangeText={setMetaToken}
-                multiline
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
-            </View>
+                {showMetaHelp && (
+                  <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 12 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      Meta Cloud API Setup Steps:
+                    </Text>
+                    
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
+                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>1. Developer Console:</Text> Go to the developers portal at <Text style={{ color: '#4F46E5', textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://developers.facebook.com')}>developers.facebook.com</Text> and create a Business App.
+                    </Text>
 
-            {/* Actions */}
-            <View style={{ gap: 10, marginTop: 24, width: '100%' }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#4CAF50',
-                  paddingVertical: 12,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  opacity: isSavingMeta ? 0.7 : 1
-                }}
-                onPress={handleSaveMeta}
-                disabled={isSavingMeta}
-                activeOpacity={0.8}
-              >
-                {isSavingMeta ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Save Configuration</Text>
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
+                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>2. Enable WhatsApp:</Text> In your App dashboard, add the "WhatsApp" product. Go to WhatsApp → API Setup to find your <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Phone Number ID</Text> and <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>WABA ID</Text>.
+                    </Text>
+
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
+                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>3. Permanent Token:</Text> Go to Business Settings → System Users. Create a user, assign your app assets to it, and click "Generate New Token" (check both whatsapp_business_messaging permissions).
+                    </Text>
+                  </View>
                 )}
-              </TouchableOpacity>
+
+                {/* Verified Phone Number */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>VERIFIED WHATSAPP NUMBER</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="+60123456789"
+                    placeholderTextColor="#94A3B8"
+                    value={metaPhone}
+                    onChangeText={setMetaPhone}
+                    keyboardType="phone-pad"
+                    {...Platform.select({
+                      web: { outlineStyle: 'none' } as any,
+                    })}
+                  />
+                </View>
+
+                {/* WABA ID */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>WHATSAPP BUSINESS ACCOUNT ID (WABA ID)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 10984758392019"
+                    placeholderTextColor="#94A3B8"
+                    value={metaWabaId}
+                    onChangeText={setMetaWabaId}
+                    {...Platform.select({
+                      web: { outlineStyle: 'none' } as any,
+                    })}
+                  />
+                </View>
+
+                {/* Phone Number ID */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>PHONE NUMBER ID</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 1048574839201"
+                    placeholderTextColor="#94A3B8"
+                    value={metaPhoneId}
+                    onChangeText={setMetaPhoneId}
+                    {...Platform.select({
+                      web: { outlineStyle: 'none' } as any,
+                    })}
+                  />
+                </View>
+
+                {/* System Access Token */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>SYSTEM ACCESS TOKEN</Text>
+                  <TextInput
+                    style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+                    placeholder="EAAG..."
+                    placeholderTextColor="#94A3B8"
+                    value={metaToken}
+                    onChangeText={setMetaToken}
+                    multiline
+                    {...Platform.select({
+                      web: { outlineStyle: 'none' } as any,
+                    })}
+                  />
+                </View>
+
+                {/* Save Button */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#4CAF50',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    opacity: isSavingMeta ? 0.7 : 1,
+                    marginTop: 8
+                  }}
+                  onPress={handleSaveMeta}
+                  disabled={isSavingMeta}
+                  activeOpacity={0.8}
+                >
+                  {isSavingMeta ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Save Configuration</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Actions (Disconnect / Request Help) */}
+            <View style={{ gap: 10, marginTop: 24, width: '100%' }}>
 
               {metaConfigId && (
                 <TouchableOpacity
@@ -2278,6 +2414,33 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: '#4CAF50',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  marginTop: 4
+                }}
+                onPress={() => {
+                  Linking.openURL('https://wa.me/601153300472?text=Hello%20Risev%20Support!%20I%20need%20assistance%20setting%20up%20my%20WhatsApp%20Cloud%20API%20credentials%20for%20my%20merchant%20account.').catch(() => {
+                    Alert.alert('Error', 'Unable to open WhatsApp.');
+                  });
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#4CAF50" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#4CAF50', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                    Request Free Setup Help
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
