@@ -70,6 +70,15 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
+  const [metaModalVisible, setMetaModalVisible] = useState(false);
+  const [metaWabaId, setMetaWabaId] = useState('');
+  const [metaPhoneId, setMetaPhoneId] = useState('');
+  const [metaToken, setMetaToken] = useState('');
+  const [metaPhone, setMetaPhone] = useState('');
+  const [isSavingMeta, setIsSavingMeta] = useState(false);
+  const [isDisconnectingMeta, setIsDisconnectingMeta] = useState(false);
+  const [metaConfigId, setMetaConfigId] = useState<string | null>(null);
+
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [whatsappQr, setWhatsappQr] = useState<string>('');
@@ -194,6 +203,90 @@ export default function ProfileScreen() {
     } else {
       setShowQrModal(true);
       fetchWhatsappStatus(true);
+    }
+  };
+
+  const handleOpenMetaSetup = () => {
+    fetchMetaConfig();
+    setMetaModalVisible(true);
+  };
+
+  const fetchMetaConfig = async () => {
+    if (!user || !user.merchant_id) return;
+    try {
+      const records = await pb.collection('whatsapp_configurations').getFullList({
+        filter: `merchant = '${user.merchant_id}'`,
+      });
+      if (records.length > 0) {
+        const rec = records[0];
+        setMetaConfigId(rec.id);
+        setMetaWabaId(rec.waba_id || '');
+        setMetaPhoneId(rec.phone_number_id || '');
+        setMetaToken(rec.access_token || '');
+        setMetaPhone(rec.phone_number || '');
+      } else {
+        setMetaConfigId(null);
+        setMetaWabaId('');
+        setMetaPhoneId('');
+        setMetaToken('');
+        setMetaPhone('');
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Meta configuration:', err);
+    }
+  };
+
+  const handleSaveMeta = async () => {
+    if (!user || !user.merchant_id) return;
+    if (!metaWabaId.trim() || !metaPhoneId.trim() || !metaToken.trim() || !metaPhone.trim()) {
+      Alert.alert('Error', 'All fields are required.');
+      return;
+    }
+    
+    setIsSavingMeta(true);
+    try {
+      const payload = {
+        merchant: user.merchant_id,
+        waba_id: metaWabaId.trim(),
+        phone_number_id: metaPhoneId.trim(),
+        access_token: metaToken.trim(),
+        phone_number: metaPhone.trim(),
+        status: 'connected'
+      };
+      
+      if (metaConfigId) {
+        await pb.collection('whatsapp_configurations').update(metaConfigId, payload);
+      } else {
+        const rec = await pb.collection('whatsapp_configurations').create(payload);
+        setMetaConfigId(rec.id);
+      }
+      
+      Alert.alert('Success', 'WhatsApp Cloud API credentials saved successfully!');
+      setMetaModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to save configuration: ' + (err.message || err));
+    } finally {
+      setIsSavingMeta(false);
+    }
+  };
+
+  const handleDisconnectMeta = async () => {
+    if (!metaConfigId) return;
+    
+    setIsDisconnectingMeta(true);
+    try {
+      await pb.collection('whatsapp_configurations').delete(metaConfigId);
+      setMetaConfigId(null);
+      setMetaWabaId('');
+      setMetaPhoneId('');
+      setMetaToken('');
+      setMetaPhone('');
+      Alert.alert('Success', 'WhatsApp account disconnected and credentials removed.');
+      setMetaModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to disconnect: ' + (err.message || err));
+    } finally {
+      setIsDisconnectingMeta(false);
     }
   };
 
@@ -1091,6 +1184,14 @@ export default function ProfileScreen() {
                 iconBgColor="#FFF3E0"
                 iconColor="#FF9800"
                 onPress={() => router.push('/(merchant)/rewards' as any)}
+              />
+              <SettingItem
+                iconName="logo-whatsapp"
+                title="WhatsApp Cloud API"
+                subtitle="Link your Meta WABA to run auto-campaigns"
+                iconBgColor="#E8F5E9"
+                iconColor="#4CAF50"
+                onPress={handleOpenMetaSetup}
               />
             </>
           )}
@@ -2043,6 +2144,142 @@ export default function ProfileScreen() {
               {locale === 'ms' && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Meta WhatsApp Cloud API Configuration Modal */}
+      <Modal
+        visible={metaModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMetaModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView 
+            style={[styles.modalCard, styles.editModalCard, { maxHeight: '90%' }]}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>WhatsApp Cloud API</Text>
+              <TouchableOpacity onPress={() => setMetaModalVisible(false)} activeOpacity={0.7} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 20 }}>
+              Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
+            </Text>
+
+            {/* Verified Phone Number */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>VERIFIED WHATSAPP NUMBER</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="+60123456789"
+                placeholderTextColor="#94A3B8"
+                value={metaPhone}
+                onChangeText={setMetaPhone}
+                keyboardType="phone-pad"
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+
+            {/* WABA ID */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>WHATSAPP BUSINESS ACCOUNT ID (WABA ID)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. 10984758392019"
+                placeholderTextColor="#94A3B8"
+                value={metaWabaId}
+                onChangeText={setMetaWabaId}
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+
+            {/* Phone Number ID */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>PHONE NUMBER ID</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. 1048574839201"
+                placeholderTextColor="#94A3B8"
+                value={metaPhoneId}
+                onChangeText={setMetaPhoneId}
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+
+            {/* System Access Token */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>SYSTEM ACCESS TOKEN</Text>
+              <TextInput
+                style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="EAAG..."
+                placeholderTextColor="#94A3B8"
+                value={metaToken}
+                onChangeText={setMetaToken}
+                multiline
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+
+            {/* Actions */}
+            <View style={{ gap: 10, marginTop: 24, width: '100%' }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#4CAF50',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  opacity: isSavingMeta ? 0.7 : 1
+                }}
+                onPress={handleSaveMeta}
+                disabled={isSavingMeta}
+                activeOpacity={0.8}
+              >
+                {isSavingMeta ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Save Configuration</Text>
+                )}
+              </TouchableOpacity>
+
+              {metaConfigId && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#EF4444',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    opacity: isDisconnectingMeta ? 0.7 : 1
+                  }}
+                  onPress={handleDisconnectMeta}
+                  disabled={isDisconnectingMeta}
+                  activeOpacity={0.8}
+                >
+                  {isDisconnectingMeta ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Disconnect & Delete WABA</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 
