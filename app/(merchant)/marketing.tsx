@@ -1311,18 +1311,7 @@ export default function MarketingScreen() {
 
             {broadcastMode === 'smart' && (
               <View style={{ width: '100%' }}>
-                {/* Migration Lock Screen */}
-                <View style={[styles.campEmptyState, { paddingVertical: 56, backgroundColor: '#FFFFFF', borderStyle: 'solid', borderColor: '#E5E7EB', marginBottom: 20 }]}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                    <Ionicons name="logo-whatsapp" size={30} color="#3B82F6" />
-                  </View>
-                  <Text style={[styles.campEmptyTitle, { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }]}>
-                    Meta API Migration
-                  </Text>
-                  <Text style={[styles.campEmptySub, { textAlign: 'center', maxWidth: 320, color: '#64748B', lineHeight: 20, marginTop: 4 }]}>
-                    We are migrating our smart follow-up campaigns to the official Meta WhatsApp Business API for improved stability and security. Stay tuned!
-                  </Text>
-                </View>
+                <SmartFollowUp styles={styles} Alert={Alert} />
               </View>
             )}
           </View>

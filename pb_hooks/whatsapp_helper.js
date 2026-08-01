@@ -1,5 +1,5 @@
 // pb_hooks/whatsapp_helper.js
-// Mock/Stub version of WhatsApp helper — Evolution Go is decommissioned.
+// Official Meta Cloud API helper and Evolution Go mock fallback.
 
 const evolutionUrl = 'http://localhost:8080';
 const evolutionKey = 'waly_dev_api_key';
@@ -20,7 +20,106 @@ function fetchAllRecords(collectionName, filter, sort) {
   return all;
 }
 
-// Mock WhatsApp functions
+// Meta WhatsApp Business Cloud API sendTemplateMessage function
+function sendTemplateMessage(merchantId, recipientPhone, templateName, languageCode, parameters) {
+  // Support developer testing: redirect all messages to test number if specified in environment
+  const testNumber = $os.getenv("WHATSAPP_TEST_NUMBER");
+  let finalRecipient = recipientPhone.replace(/[^\d]/g, '');
+  if (testNumber) {
+    const cleanTest = testNumber.replace(/[^\d]/g, '');
+    if (cleanTest) {
+      console.log(`[META API TEST FALLBACK] Redirecting message from ${finalRecipient} to sandbox test number ${cleanTest}`);
+      finalRecipient = cleanTest;
+    }
+  }
+
+  // Normalize phone number to include country code (defaulting to +60 if Malaysian number without code)
+  if (finalRecipient.indexOf("0") === 0) {
+    finalRecipient = "60" + finalRecipient.slice(1);
+  }
+  if (finalRecipient.indexOf("60") !== 0 && finalRecipient.length >= 9) {
+    finalRecipient = "60" + finalRecipient;
+  }
+
+  // 1. Check if the merchant has an active official Meta configuration
+  let config = null;
+  try {
+    const configs = $app.findRecordsByFilter(
+      "whatsapp_configurations",
+      `merchant = '${merchantId}' && status = 'connected'`,
+      "-created",
+      1,
+      0
+    );
+    if (configs.length > 0) {
+      config = configs[0];
+    }
+  } catch (err) {
+    // Collection or records not found
+  }
+
+  // 2. If no configuration found, run in sandbox/mock mode
+  if (!config) {
+    console.log(`[MOCK META API] sendTemplateMessage: No active credentials found for merchant ${merchantId}.`);
+    console.log(`[MOCK META API] Recipient: ${finalRecipient} | Template: "${templateName}" | Language: "${languageCode || 'en_US'}"`);
+    console.log(`[MOCK META API] Parameters: ${JSON.stringify(parameters || [])}`);
+    return { success: true, mock: true, messageId: "mock-" + Math.random().toString(36).substring(2, 10) };
+  }
+
+  // 3. Official Meta Cloud API dispatch
+  const wabaId = config.getString("waba_id");
+  const phoneNumberId = config.getString("phone_number_id");
+  const accessToken = config.getString("access_token");
+
+  const templateObj = {
+    "name": templateName,
+    "language": {
+      "code": languageCode || "en_US"
+    }
+  };
+
+  if (Array.isArray(parameters) && parameters.length > 0) {
+    templateObj.components = [
+      {
+        "type": "body",
+        "parameters": parameters.map(p => ({ "type": "text", "text": String(p) }))
+      }
+    ];
+  }
+
+  try {
+    const res = $http.send({
+      url: `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": finalRecipient,
+        "type": "template",
+        "template": templateObj
+      })
+    });
+
+    console.log(`[META API] API request to ${phoneNumberId} completed with status ${res.statusCode}`);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const resData = JSON.parse(res.raw);
+      const msgId = resData?.messages?.[0]?.id || "";
+      return { success: true, messageId: msgId, raw: resData };
+    } else {
+      console.log(`[META API ERROR STATUS] Status: ${res.statusCode} | Raw: ${res.raw}`);
+      return { success: false, error: res.raw };
+    }
+  } catch (err) {
+    console.log(`[META API EXCEPTION] Failed to execute HTTP send:`, err.message || err);
+    return { success: false, error: err.message || err };
+  }
+}
+
+// Mock WhatsApp functions for Evolution Go backwards compatibility
 function callEvo(method, path, body) {
   console.log(`[MOCK WHATSAPP] callEvo: ${method} ${path} (skipped)`);
   return { status: 404, data: null, message: "Evolution Go disabled" };
@@ -51,6 +150,7 @@ module.exports = {
   getInstances,
   getInstanceToken,
   sendTextMessage,
+  sendTemplateMessage,
   fetchAllRecords,
   pairInstance
 };

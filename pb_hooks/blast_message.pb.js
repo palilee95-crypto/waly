@@ -15,6 +15,96 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
   return e.json(200, { success: true });
 }, $apis.requireAuth("users"));
 
+// 2b. GET WhatsApp Business Message Templates (from Meta Cloud API)
+routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    // 1. Fetch credentials
+    let config = null;
+    try {
+      const configs = $app.findRecordsByFilter(
+        "whatsapp_configurations",
+        `merchant = '${merchantId}' && status = 'connected'`,
+        "-created",
+        1,
+        0
+      );
+      if (configs.length > 0) {
+        config = configs[0];
+      }
+    } catch (err) {}
+
+    // 2. If no config, return dummy templates for testing/onboarding
+    if (!config) {
+      return e.json(200, {
+        templates: [
+          {
+            name: "winback_7day_mock",
+            status: "APPROVED",
+            category: "MARKETING",
+            language: "en_US",
+            components: [
+              { type: "BODY", text: "We miss you, {{1}}! Come back to {{2}} to collect more stamps." }
+            ]
+          },
+          {
+            name: "visit_thank_you_mock",
+            status: "APPROVED",
+            category: "UTILITY",
+            language: "en_US",
+            components: [
+              { type: "BODY", text: "Hi {{1}}, thanks for visiting {{2}}! You collected {{3}} stamps today." }
+            ]
+          }
+        ],
+        sandbox: true
+      });
+    }
+
+    const wabaId = config.getString("waba_id");
+    const accessToken = config.getString("access_token");
+
+    // 3. Request templates from Meta
+    const res = $http.send({
+      url: `https://graph.facebook.com/v20.0/${wabaId}/message_templates?limit=100`,
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`
+      }
+    });
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const resData = JSON.parse(res.raw);
+      // Filter out templates that are not APPROVED or are rejected
+      const templates = (resData.data || [])
+        .filter(t => t.status === "APPROVED")
+        .map(t => ({
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          components: t.components
+        }));
+
+      return e.json(200, { templates, sandbox: false });
+    } else {
+      console.log(`[META TEMPLATE ERROR] Status: ${res.statusCode} | Raw: ${res.raw}`);
+      return e.json(res.statusCode, { message: "Failed to fetch templates from Meta", error: res.raw });
+    }
+  } catch (err) {
+    console.log(`[META TEMPLATE EXCEPTION]`, err.message || err);
+    return e.json(500, { message: err.message || err });
+  }
+}, $apis.requireAuth("users"));
+
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);

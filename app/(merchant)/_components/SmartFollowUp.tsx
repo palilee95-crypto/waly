@@ -51,6 +51,10 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   const [isSavingSmart, setIsSavingSmart] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [validationError, setValidationError] = useState('');
+  const [metaTemplates, setMetaTemplates] = useState<any[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [mappedParams, setMappedParams] = useState<string[]>([]);
 
   const [activeSmartTab, setActiveSmartTab] = useState<'campaigns' | 'analytics'>('campaigns');
   const [activeAnalyticsSubTab, setActiveAnalyticsSubTab] = useState<'queue' | 'logs'>('queue');
@@ -68,6 +72,49 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
         .catch(err => console.warn('Failed to load merchant name for preview:', err));
     }
   }, [user]);
+
+  const fetchTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const res = await pb.send<{ templates: any[], sandbox: boolean }>('/api/risev/merchant/whatsapp/templates', {
+        method: 'GET'
+      });
+      setMetaTemplates(res.templates || []);
+    } catch (err) {
+      console.warn('Failed to fetch Meta templates:', err);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && user.merchant_id) {
+      fetchTemplates();
+    }
+  }, [user]);
+
+  const renderPreviewBody = (rawBody: string) => {
+    if (!rawBody) return '';
+    if (rawBody.startsWith('{') && rawBody.endsWith('}')) {
+      try {
+        const config = JSON.parse(rawBody);
+        let text = config.templateText || '';
+        if (Array.isArray(config.parameters)) {
+          config.parameters.forEach((param: string, index: number) => {
+            let displayVal = `[Param ${index + 1}]`;
+            if (param === '{{name}}') displayVal = 'Hashiff';
+            if (param === '{{stamps}}') displayVal = '5';
+            if (param === '{{store}}') displayVal = merchantName;
+            text = text.replace(new RegExp(`\\{\\{${index + 1}\\}\\}`, 'g'), displayVal);
+          });
+        }
+        return text;
+      } catch (_) {
+        return rawBody;
+      }
+    }
+    return rawBody;
+  };
 
   useEffect(() => {
     if (user) {
@@ -193,12 +240,43 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   };
 
   const openMsgModal = (index: number | null) => {
+    if (metaTemplates.length === 0) {
+      fetchTemplates();
+    }
+
     if (index !== null) {
       const msg = seqMessages[index];
-      setMsgBody(msg.message_body);
+      const rawBody = msg.message_body || '';
+      
+      if (rawBody.startsWith('{') && rawBody.endsWith('}')) {
+        try {
+          const config = JSON.parse(rawBody);
+          const found = metaTemplates.find(t => t.name === config.templateName);
+          if (found) {
+            setSelectedTemplate(found);
+            setMappedParams(config.parameters || []);
+          } else {
+            const skeleton = {
+              name: config.templateName,
+              components: [{ type: 'BODY', text: config.templateText || 'Meta Template (Selected)' }]
+            };
+            setSelectedTemplate(skeleton);
+            setMappedParams(config.parameters || []);
+          }
+        } catch (_) {
+          setSelectedTemplate(null);
+          setMappedParams([]);
+        }
+      } else {
+        setSelectedTemplate(null);
+        setMappedParams([]);
+      }
+      setMsgBody(rawBody);
       setMsgButtons(msg.action_buttons || []);
       setEditingMsgIndex(index);
     } else {
+      setSelectedTemplate(null);
+      setMappedParams([]);
       setMsgBody('');
       setMsgButtons([]);
       setEditingMsgIndex(null);
@@ -207,8 +285,26 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
   };
 
   const saveMessage = () => {
-    if (!msgBody.trim()) return;
-    const msg = { message_body: msgBody.trim(), action_buttons: [] };
+    if (!selectedTemplate) {
+      RNAlert.alert('Required', 'Please select a Meta Message Template.');
+      return;
+    }
+    
+    const bodyComp = selectedTemplate.components?.find((c: any) => c.type === 'BODY');
+    const templateText = bodyComp?.text || '';
+
+    const configObj = {
+      templateName: selectedTemplate.name,
+      languageCode: selectedTemplate.language || 'en_US',
+      parameters: mappedParams,
+      templateText: templateText
+    };
+    
+    const msg = { 
+      message_body: JSON.stringify(configObj), 
+      action_buttons: [] 
+    };
+
     if (editingMsgIndex !== null) {
       const updated = [...seqMessages];
       updated[editingMsgIndex] = msg;
@@ -1343,7 +1439,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                         {seqMessages.map((msg, i) => (
                           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                             <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
-                              {msg.message_body}
+                              {renderPreviewBody(msg.message_body)}
                             </Text>
                             <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
                               <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
@@ -1421,7 +1517,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
                       <WhatsAppPreview 
                         title={seqTitle}
-                        body={seqMessages[0]?.message_body || ''}
+                        body={renderPreviewBody(seqMessages[0]?.message_body || '')}
                         buttons={seqMessages[0]?.buttons || []}
                         merchantName={merchantName}
                       />
@@ -1436,7 +1532,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview (First Message)</Text>
                   <WhatsAppPreview 
                     title={seqTitle}
-                    body={seqMessages[0]?.message_body || ''}
+                    body={renderPreviewBody(seqMessages[0]?.message_body || '')}
                     buttons={seqMessages[0]?.buttons || []}
                     merchantName={merchantName}
                   />
@@ -1474,70 +1570,117 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                 contentContainerStyle={{ paddingRight: 16, paddingBottom: 16 }}
               >
                 <View style={{ gap: 16 }}>
-                  {/* Premium Presets Switcher */}
+                  {/* Meta Template Selector */}
                   <View>
-                    <Text style={inputStyles.label}>Use Copywriter Templates</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                      {PRESETS.map((p, idx) => (
-                        <TouchableOpacity
-                          key={idx}
-                          style={{
-                            backgroundColor: '#EEF2FF',
-                            borderColor: '#C7D2FE',
-                            borderWidth: 1,
-                            borderRadius: 20,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                          }}
-                          onPress={() => {
-                            setMsgBody(p.body);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#4F46E5' }}>
-                            {p.title}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                    <Text style={inputStyles.label}>Select Meta WhatsApp Template <Text style={{ color: '#EF4444' }}>*</Text></Text>
+                    {loadingTemplates ? (
+                      <ActivityIndicator size="small" color="#4F46E5" style={{ marginVertical: 12 }} />
+                    ) : metaTemplates.length === 0 ? (
+                      <Text style={{ color: '#64748B', fontStyle: 'italic', fontSize: 13, marginTop: 4 }}>
+                        No approved Meta templates found. Using developer sandbox templates.
+                      </Text>
+                    ) : null}
+                    
+                    {!loadingTemplates && metaTemplates.length > 0 && (
+                      <View style={{ gap: 8, marginTop: 6 }}>
+                        {metaTemplates.map((t) => {
+                          const isSelected = selectedTemplate?.name === t.name;
+                          const bodyText = t.components?.find((c: any) => c.type === 'BODY')?.text || '';
+                          return (
+                            <TouchableOpacity
+                              key={t.name}
+                              style={{
+                                backgroundColor: isSelected ? '#EEF2FF' : '#FFFFFF',
+                                borderColor: isSelected ? '#4F46E5' : '#E2E8F0',
+                                borderWidth: isSelected ? 2 : 1,
+                                borderRadius: 12,
+                                padding: 12,
+                              }}
+                              onPress={() => {
+                                setSelectedTemplate(t);
+                                const placeholders = bodyText.match(/\{\{\d+\}\}/g) || [];
+                                const defaultParams = placeholders.map((_: string, idx: number) => {
+                                  if (idx === 0) return '{{name}}';
+                                  if (idx === 1) return '{{stamps}}';
+                                  return '{{store}}';
+                                });
+                                setMappedParams(defaultParams);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#0F172A' }}>
+                                  {t.name}
+                                </Text>
+                                <View style={{
+                                  backgroundColor: t.category === 'MARKETING' ? '#FFFBEB' : '#EFF6FF',
+                                  borderRadius: 6,
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 2
+                                }}>
+                                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: t.category === 'MARKETING' ? '#D97706' : '#2563EB' }}>
+                                    {t.category}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={{ fontSize: 11, color: '#64748B', marginTop: 4, lineHeight: 16 }} numberOfLines={2}>
+                                {bodyText}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
 
-                  <View>
-                    <Text style={inputStyles.label}>Insert Variables</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {['name', 'stamps', 'points', 'points_expiry', 'login_link'].map((v) => (
-                        <TouchableOpacity 
-                          key={v} 
-                          style={{ 
-                            backgroundColor: '#F1F5F9', 
-                            borderRadius: 8, 
-                            paddingHorizontal: 10, 
-                            paddingVertical: 5,
-                            borderWidth: 1,
-                            borderColor: '#E2E8F0'
-                          }} 
-                          onPress={() => insertVariable(v)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{`{{${v}}}`}</Text>
-                        </TouchableOpacity>
-                      ))}
+                  {/* Template Parameter Mapping */}
+                  {selectedTemplate && mappedParams.length > 0 && (
+                    <View style={{ gap: 10, marginTop: 4 }}>
+                      <Text style={inputStyles.label}>Configure Template Parameters</Text>
+                      {mappedParams.map((param, idx) => {
+                        const placeholderNum = idx + 1;
+                        return (
+                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#334155' }}>
+                              Parameter {`{{${placeholderNum}}}`}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                              {[
+                                { label: 'Name', value: '{{name}}' },
+                                { label: 'Stamps', value: '{{stamps}}' },
+                                { label: 'Store', value: '{{store}}' }
+                              ].map((choice) => {
+                                const isActive = param === choice.value;
+                                return (
+                                  <TouchableOpacity
+                                    key={choice.value}
+                                    style={{
+                                      backgroundColor: isActive ? '#4F46E5' : '#FFFFFF',
+                                      borderColor: isActive ? '#4F46E5' : '#CBD5E1',
+                                      borderWidth: 1,
+                                      borderRadius: 6,
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 4,
+                                    }}
+                                    onPress={() => {
+                                      const updated = [...mappedParams];
+                                      updated[idx] = choice.value;
+                                      setMappedParams(updated);
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
+                                      {choice.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
-                  </View>
-                  
-                  <View>
-                    <Text style={inputStyles.label}>Message Template Body <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                    <TextInput 
-                      style={[inputStyles.input, { height: 110, textAlignVertical: 'top' }]} 
-                      multiline 
-                      value={msgBody} 
-                      onChangeText={setMsgBody} 
-                      placeholder="Type your message body here..." 
-                      placeholderTextColor="#BEC6E0" 
-                    />
-                  </View>
-                  
-
+                  )}
 
                   {/* On Mobile: Render Preview Inline at the bottom of the form */}
                   {!isDesktop && (
@@ -1545,8 +1688,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
                       <WhatsAppPreview 
                         title=""
-                        body={msgBody}
-                        buttons={msgButtons}
+                        body={renderPreviewBody(selectedTemplate ? JSON.stringify({ templateName: selectedTemplate.name, templateText: selectedTemplate.components?.find((c: any) => c.type === 'BODY')?.text || '', parameters: mappedParams }) : '')}
+                        buttons={[]}
                         merchantName={merchantName}
                       />
                     </View>
@@ -1560,8 +1703,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview</Text>
                   <WhatsAppPreview 
                     title=""
-                    body={msgBody}
-                    buttons={msgButtons}
+                    body={renderPreviewBody(selectedTemplate ? JSON.stringify({ templateName: selectedTemplate.name, templateText: selectedTemplate.components?.find((c: any) => c.type === 'BODY')?.text || '', parameters: mappedParams }) : '')}
+                    buttons={[]}
                     merchantName={merchantName}
                   />
                 </View>

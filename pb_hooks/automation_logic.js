@@ -5,7 +5,7 @@ function runAutomations() {
   const rules = $app.findRecordsByFilter("automation_rules", "is_active = true", "-created", 100, 0);
   if (rules.length === 0) return stats;
 
-  const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTemplateMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
 
@@ -121,11 +121,32 @@ function runAutomations() {
         const cleanPhone = phone.replace(/[^\d]/g, '');
         if (cleanPhone) {
           try {
-            const randomDelay = Math.floor(Math.random() * 4000) + 5000; // 5s to 9s
-            sendTextMessage(instanceName, cleanPhone, formattedWhatsAppMsg, {
-              delay: randomDelay,
-              presence: 'composing'
-            });
+            // Retrieve template name from the automation rule's message field.
+            // If the message field is a JSON string containing template configurations, parse it.
+            // Otherwise, fallback to a default template name.
+            let templateName = "winback_inactive_customer";
+            let languageCode = "en_US";
+            let templateParams = [customerName, String(stampsCount), merchantName];
+
+            try {
+              if (messageTemplate && messageTemplate.startsWith("{")) {
+                const config = JSON.parse(messageTemplate);
+                templateName = config.templateName || templateName;
+                languageCode = config.languageCode || languageCode;
+                if (Array.isArray(config.parameters)) {
+                  templateParams = config.parameters.map(p => {
+                    if (p === "{{name}}") return customerName;
+                    if (p === "{{stamps}}") return String(stampsCount);
+                    if (p === "{{store}}") return merchantName;
+                    return p;
+                  });
+                }
+              } else if (messageTemplate.trim()) {
+                templateName = messageTemplate.trim();
+              }
+            } catch (_) {}
+
+            sendTemplateMessage(merchantId, cleanPhone, templateName, languageCode, templateParams);
           } catch (whatsappErr) {
             console.log(`Automated WhatsApp error for ${cleanPhone}:`, whatsappErr.message || whatsappErr);
           }
