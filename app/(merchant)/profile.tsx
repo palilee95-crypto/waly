@@ -230,7 +230,10 @@ export default function ProfileScreen() {
     );
     
     // Facebook Developer App ID (Platform central App)
-    const fbAppId = '1587394029481029'; 
+    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1587394029481029'; 
+    if (fbAppId === '1587394029481029') {
+      console.warn('Using fallback Meta App ID. Please set EXPO_PUBLIC_META_APP_ID in your env configurations.');
+    }
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging,business_management&response_type=code`;
     
     Linking.openURL(oauthUrl).catch(() => {
