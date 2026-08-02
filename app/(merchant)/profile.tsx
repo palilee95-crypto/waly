@@ -2210,41 +2210,74 @@ export default function ProfileScreen() {
             </Text>
 
              {metaConfigId ? (
-              <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 16, marginBottom: 20, width: '100%', gap: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857' }}>
-                    Connected to WhatsApp
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 13, color: '#065F46', lineHeight: 18, marginTop: 4 }}>
-                  Your business account is linked and ready to run automated campaigns.
-                </Text>
-                <Text style={{ fontSize: 13, color: '#065F46', fontFamily: 'PlusJakartaSans_700Bold', marginTop: 4 }}>
-                  Verified Number: {metaPhone}
-                </Text>
-                
-                {metaWabaId ? (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: '#10B981',
-                      paddingVertical: 10,
-                      borderRadius: 8,
-                      marginTop: 10,
-                      width: '100%',
-                    }}
-                    onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                      Link Payment Card on Meta
+              <View style={{ width: '100%', gap: 16 }}>
+                {/* Connected status badge card */}
+                <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 16, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857' }}>
+                      Connected to WhatsApp
                     </Text>
-                  </TouchableOpacity>
-                ) : null}
+                  </View>
+                  <Text style={{ fontSize: 13, color: '#065F46', lineHeight: 18, marginTop: 4 }}>
+                    Your business account is linked and ready to run automated campaigns.
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#065F46', fontFamily: 'PlusJakartaSans_700Bold', marginTop: 4 }}>
+                    Verified Number: {metaPhone}
+                  </Text>
+                  
+                  {metaWabaId ? (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#10B981',
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        marginTop: 10,
+                        width: '100%',
+                      }}
+                      onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                        Link Payment Card on Meta
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Facebook Business Details Card */}
+                <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, gap: 12 }}>
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 8 }}>
+                    Facebook Business Information
+                  </Text>
+
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>WhatsApp Business Account (WABA) ID</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaWabaId}</Text>
+                  </View>
+
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Phone Number ID</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaPhoneId}</Text>
+                  </View>
+
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Verified Phone Number</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaPhone}</Text>
+                  </View>
+
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Status</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#047857' }}>Active & Synced</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             ) : (
               <>
@@ -2273,177 +2306,11 @@ export default function ProfileScreen() {
                     Quick Connect via Meta
                   </Text>
                 </TouchableOpacity>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, width: '100%' }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', paddingHorizontal: 12 }}>
-                    OR CONFIGURE MANUALLY
-                  </Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-                </View>
               </>
             )}
 
-            {/* Manual Setup Toggle */}
-            <TouchableOpacity 
-              onPress={() => setShowManualSetup(!showManualSetup)}
-              style={{ 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                backgroundColor: '#F8FAFC',
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                width: '100%',
-                marginBottom: 16
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
-                Advanced Manual Setup
-              </Text>
-              <Ionicons name={showManualSetup ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-            </TouchableOpacity>
-
-            {showManualSetup && (
-              <View style={{ width: '100%', gap: 16 }}>
-                {/* Need Help Toggle */}
-                <TouchableOpacity 
-                  onPress={() => setShowMetaHelp(!showMetaHelp)} 
-                  style={{ 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    backgroundColor: '#EEF2F6',
-                    paddingVertical: 10,
-                    paddingHorizontal: 12,
-                    borderRadius: 10,
-                    marginBottom: 16,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    alignSelf: 'stretch'
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="help-circle-outline" size={18} color="#4F46E5" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#4F46E5' }}>
-                    {showMetaHelp ? 'Hide Setup Instructions' : 'Need help getting these?'}
-                  </Text>
-                </TouchableOpacity>
-
-                {showMetaHelp && (
-                  <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 12 }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      Meta Cloud API Setup Steps:
-                    </Text>
-                    
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
-                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>1. Developer Console:</Text> Go to the developers portal at <Text style={{ color: '#4F46E5', textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://developers.facebook.com')}>developers.facebook.com</Text> and create a Business App.
-                    </Text>
-
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
-                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>2. Enable WhatsApp:</Text> In your App dashboard, add the "WhatsApp" product. Go to WhatsApp → API Setup to find your <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Phone Number ID</Text> and <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>WABA ID</Text>.
-                    </Text>
-
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
-                      <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>3. Permanent Token:</Text> Go to Business Settings → System Users. Create a user, assign your app assets to it, and click "Generate New Token" (check both whatsapp_business_messaging permissions).
-                    </Text>
-                  </View>
-                )}
-
-                {/* Verified Phone Number */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>VERIFIED WHATSAPP NUMBER</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="+60123456789"
-                    placeholderTextColor="#94A3B8"
-                    value={metaPhone}
-                    onChangeText={setMetaPhone}
-                    keyboardType="phone-pad"
-                    {...Platform.select({
-                      web: { outlineStyle: 'none' } as any,
-                    })}
-                  />
-                </View>
-
-                {/* WABA ID */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>WHATSAPP BUSINESS ACCOUNT ID (WABA ID)</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. 10984758392019"
-                    placeholderTextColor="#94A3B8"
-                    value={metaWabaId}
-                    onChangeText={setMetaWabaId}
-                    {...Platform.select({
-                      web: { outlineStyle: 'none' } as any,
-                    })}
-                  />
-                </View>
-
-                {/* Phone Number ID */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>PHONE NUMBER ID</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. 1048574839201"
-                    placeholderTextColor="#94A3B8"
-                    value={metaPhoneId}
-                    onChangeText={setMetaPhoneId}
-                    {...Platform.select({
-                      web: { outlineStyle: 'none' } as any,
-                    })}
-                  />
-                </View>
-
-                {/* System Access Token */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>SYSTEM ACCESS TOKEN</Text>
-                  <TextInput
-                    style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
-                    placeholder="EAAG..."
-                    placeholderTextColor="#94A3B8"
-                    value={metaToken}
-                    onChangeText={setMetaToken}
-                    multiline
-                    {...Platform.select({
-                      web: { outlineStyle: 'none' } as any,
-                    })}
-                  />
-                </View>
-
-                {/* Save Button */}
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: '#4CAF50',
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '100%',
-                    opacity: isSavingMeta ? 0.7 : 1,
-                    marginTop: 8
-                  }}
-                  onPress={handleSaveMeta}
-                  disabled={isSavingMeta}
-                  activeOpacity={0.8}
-                >
-                  {isSavingMeta ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Save Configuration</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Actions (Disconnect / Request Help) */}
+            {/* Actions (Disconnect) */}
             <View style={{ gap: 10, marginTop: 24, width: '100%' }}>
-
               {metaConfigId && (
                 <TouchableOpacity
                   style={{
@@ -2466,33 +2333,6 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               )}
-
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: '#4CAF50',
-                  paddingVertical: 12,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  marginTop: 4
-                }}
-                onPress={() => {
-                  Linking.openURL('https://wa.me/601153300472?text=Hello%20Risev%20Support!%20I%20need%20assistance%20setting%20up%20my%20WhatsApp%20Cloud%20API%20credentials%20for%20my%20merchant%20account.').catch(() => {
-                    Alert.alert('Error', 'Unable to open WhatsApp.');
-                  });
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="logo-whatsapp" size={18} color="#4CAF50" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#4CAF50', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                    Request Free Setup Help
-                  </Text>
-                </View>
-              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
