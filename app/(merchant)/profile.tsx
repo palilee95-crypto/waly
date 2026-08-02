@@ -2209,7 +2209,7 @@ export default function ProfileScreen() {
               Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
             </Text>
 
-            {metaConfigId ? (
+             {metaConfigId ? (
               <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 16, marginBottom: 20, width: '100%', gap: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Ionicons name="checkmark-circle" size={20} color="#10B981" />
@@ -2223,6 +2223,28 @@ export default function ProfileScreen() {
                 <Text style={{ fontSize: 13, color: '#065F46', fontFamily: 'PlusJakartaSans_700Bold', marginTop: 4 }}>
                   Verified Number: {metaPhone}
                 </Text>
+                
+                {metaWabaId ? (
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#10B981',
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      marginTop: 10,
+                      width: '100%',
+                    }}
+                    onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/billing/?waba_id=${metaWabaId}`)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                      Link Payment Card on Meta
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ) : (
               <>
