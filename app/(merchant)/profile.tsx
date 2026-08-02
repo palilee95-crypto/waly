@@ -2236,7 +2236,7 @@ export default function ProfileScreen() {
                       marginTop: 10,
                       width: '100%',
                     }}
-                    onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/billing/?waba_id=${metaWabaId}`)}
+                    onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
