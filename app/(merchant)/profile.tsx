@@ -232,10 +232,16 @@ export default function ProfileScreen() {
     
     // Facebook Developer App ID (Platform central App)
     const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
+    const fbConfigId = process.env.EXPO_PUBLIC_META_CONFIG_ID || '';
     if (fbAppId === '1040853298682209') {
       console.log('Using default fallback Meta App ID.');
     }
-    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
+    let oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&response_type=code`;
+    if (fbConfigId) {
+      oauthUrl += `&config_id=${fbConfigId}&override_default_response_type=true`;
+    } else {
+      oauthUrl += `&scope=whatsapp_business_management,whatsapp_business_messaging`;
+    }
     
     Linking.openURL(oauthUrl).catch(() => {
       Alert.alert('Error', 'Unable to open Meta Embedded Signup portal.');
