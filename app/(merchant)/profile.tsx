@@ -1226,7 +1226,7 @@ export default function ProfileScreen() {
               <SettingItem
                 iconName="logo-whatsapp"
                 title="WhatsApp Cloud API"
-                subtitle="Link your Meta WABA to run auto-campaigns"
+                subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
                 iconBgColor="#E8F5E9"
                 iconColor="#4CAF50"
                 onPress={handleOpenMetaSetup}
@@ -2209,39 +2209,58 @@ export default function ProfileScreen() {
               Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
             </Text>
 
-            {/* Quick Connect Button */}
-            <TouchableOpacity 
-              onPress={handleQuickConnectMeta}
-              style={{ 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                backgroundColor: '#1877F2',
-                paddingVertical: 14,
-                borderRadius: 12,
-                marginBottom: 20,
-                width: '100%',
-                shadowColor: '#1877F2',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 4
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
-                Quick Connect via Meta
-              </Text>
-            </TouchableOpacity>
+            {metaConfigId ? (
+              <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 16, marginBottom: 20, width: '100%', gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857' }}>
+                    Connected to WhatsApp
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, color: '#065F46', lineHeight: 18, marginTop: 4 }}>
+                  Your business account is linked and ready to run automated campaigns.
+                </Text>
+                <Text style={{ fontSize: 13, color: '#065F46', fontFamily: 'PlusJakartaSans_700Bold', marginTop: 4 }}>
+                  Verified Number: {metaPhone}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* Quick Connect Button */}
+                <TouchableOpacity 
+                  onPress={handleQuickConnectMeta}
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    backgroundColor: '#1877F2',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    marginBottom: 20,
+                    width: '100%',
+                    shadowColor: '#1877F2',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
+                    Quick Connect via Meta
+                  </Text>
+                </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, width: '100%' }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', paddingHorizontal: 12 }}>
-                OR CONFIGURE MANUALLY
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, width: '100%' }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', paddingHorizontal: 12 }}>
+                    OR CONFIGURE MANUALLY
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+                </View>
+              </>
+            )}
 
             {/* Manual Setup Toggle */}
             <TouchableOpacity 
