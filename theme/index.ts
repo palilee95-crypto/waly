@@ -1,6 +1,6 @@
 // ============================================
-// WALY Mobile — Design Tokens
-// Copy from walyapp/src/theme (shared tokens)
+// RISEV Mobile — Design Tokens
+// Copy from risevapp/src/theme (shared tokens)
 // ============================================
 
 export const colors = {

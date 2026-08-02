@@ -224,9 +224,9 @@ export default function ProfileScreen() {
     };
     
     const encodedState = encodeURIComponent(JSON.stringify(stateObj));
+    const pbBaseUrl = pb.baseUrl.replace(/\/$/, '');
     const redirectUri = encodeURIComponent(
-      (Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app') + 
-      '/api/risev/merchant/whatsapp/callback'
+      pbBaseUrl + '/api/risev/merchant/whatsapp/callback'
     );
     
     // Facebook Developer App ID (Platform central App)
