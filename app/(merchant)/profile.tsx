@@ -218,16 +218,17 @@ export default function ProfileScreen() {
   const handleQuickConnectMeta = () => {
     if (!user || !user.merchant_id) return;
     
+    const pbBaseUrl = pb.baseUrl.replace(/\/$/, '');
+    const redirectUriRaw = pbBaseUrl + '/api/risev/merchant/whatsapp/callback';
+
     const stateObj = {
       merchantId: user.merchant_id,
-      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app'
+      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app',
+      callbackUrl: redirectUriRaw
     };
     
     const encodedState = encodeURIComponent(JSON.stringify(stateObj));
-    const pbBaseUrl = pb.baseUrl.replace(/\/$/, '');
-    const redirectUri = encodeURIComponent(
-      pbBaseUrl + '/api/risev/merchant/whatsapp/callback'
-    );
+    const redirectUri = encodeURIComponent(redirectUriRaw);
     
     // Facebook Developer App ID (Platform central App)
     const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298622209'; 
