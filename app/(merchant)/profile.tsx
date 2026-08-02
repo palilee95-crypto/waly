@@ -231,8 +231,8 @@ export default function ProfileScreen() {
     const redirectUri = encodeURIComponent(redirectUriRaw);
     
     // Facebook Developer App ID (Platform central App)
-    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298622209'; 
-    if (fbAppId === '1040853298622209') {
+    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
+    if (fbAppId === '1040853298682209') {
       console.log('Using default fallback Meta App ID.');
     }
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;

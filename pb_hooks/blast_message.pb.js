@@ -108,8 +108,9 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
 // 2c. GET Meta OAuth Callback Endpoint
 routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
   try {
-    const code = e.request.queryParam("code");
-    const stateStr = e.request.queryParam("state");
+    const query = e.requestInfo().query;
+    const code = query.code;
+    const stateStr = query.state;
 
     if (!code || !stateStr) {
       return e.string(400, "Missing OAuth code or state parameter.");
@@ -118,11 +119,15 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     // 1. Decode state JSON
     let merchantId = "";
     let redirectHost = "https://waly-five.vercel.app"; // default fallback
+    let callbackUrl = "";
     try {
       const decodedState = JSON.parse(decodeURIComponent(stateStr));
       merchantId = decodedState.merchantId;
       if (decodedState.redirectHost) {
         redirectHost = decodedState.redirectHost;
+      }
+      if (decodedState.callbackUrl) {
+        callbackUrl = decodedState.callbackUrl;
       }
     } catch (err) {
       // Fallback if state is raw merchantId string
@@ -136,7 +141,10 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     // 2. Fetch Meta Developer App Secrets
     const fbAppId = $os.getenv("META_APP_ID") || "YOUR_META_APP_ID"; 
     const fbAppSecret = $os.getenv("META_APP_SECRET") || "YOUR_META_APP_SECRET";
-    const callbackUrl = `${redirectHost}/api/risev/merchant/whatsapp/callback`; // must match OAuth settings
+    
+    if (!callbackUrl) {
+      callbackUrl = `${redirectHost}/api/risev/merchant/whatsapp/callback`; // must match OAuth settings
+    }
 
     if (fbAppId === "YOUR_META_APP_ID" || fbAppSecret === "YOUR_META_APP_SECRET") {
       console.log("[META OAUTH] WARNING: App ID or Secret is not configured in environment variables!");
@@ -166,30 +174,80 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     const tokenData = JSON.parse(tokenRes.raw);
     const userAccessToken = tokenData.access_token;
 
+    let wabaId = "";
+
     // 4. Fetch WhatsApp Business Account (WABA) details
-    // We fetch the accounts linked to this login token
-    const accountsRes = $http.send({
-      url: `https://graph.facebook.com/v20.0/me/whatsapp_business_accounts`,
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${userAccessToken}`
+    // First, try using the debug_token endpoint (standard for Embedded Signup)
+    try {
+      console.log("[META OAUTH] Attempting debug_token to find WABA ID");
+      const debugRes = $http.send({
+        url: `https://graph.facebook.com/v20.0/debug_token?input_token=${userAccessToken}&access_token=${fbAppId}|${fbAppSecret}`,
+        method: "GET"
+      });
+
+      if (debugRes.statusCode >= 200 && debugRes.statusCode < 300) {
+        const debugData = JSON.parse(debugRes.raw);
+        const granularScopes = (debugData.data && debugData.data.granular_scopes) || [];
+        for (let i = 0; i < granularScopes.length; i++) {
+          const s = granularScopes[i];
+          if (s.scope === "whatsapp_business_management") {
+            if (s.target_ids && s.target_ids.length > 0) {
+              wabaId = s.target_ids[0];
+              console.log(`[META OAUTH] Found WABA ID from debug_token: ${wabaId}`);
+              break;
+            }
+          }
+        }
+      } else {
+        console.log(`[META OAUTH ERROR] debug_token failed: ${debugRes.raw}`);
       }
-    });
-
-    if (accountsRes.statusCode < 200 || accountsRes.statusCode >= 300) {
-      console.log(`[META OAUTH ERROR] Failed to fetch accounts: ${accountsRes.raw}`);
-      return e.string(accountsRes.statusCode, `Failed to fetch accounts from Meta: ${accountsRes.raw}`);
+    } catch (err) {
+      console.log(`[META OAUTH EXCEPTION] debug_token failed:`, err.message || err);
     }
 
-    const accountsData = JSON.parse(accountsRes.raw);
-    const accounts = accountsData.data || [];
-    if (accounts.length === 0) {
-      return e.string(400, "No WhatsApp Business Accounts found linked to your Facebook account.");
+    // Second, if debug_token failed to find it, try listing businesses as fallback
+    if (!wabaId) {
+      try {
+        console.log("[META OAUTH] Fallback: listing businesses to find WABA ID");
+        const businessesRes = $http.send({
+          url: `https://graph.facebook.com/v20.0/me/businesses`,
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${userAccessToken}`
+          }
+        });
+
+        if (businessesRes.statusCode >= 200 && businessesRes.statusCode < 300) {
+          const businessesData = JSON.parse(businessesRes.raw);
+          const businesses = businessesData.data || [];
+          for (let i = 0; i < businesses.length; i++) {
+            const biz = businesses[i];
+            const bizWabaRes = $http.send({
+              url: `https://graph.facebook.com/v20.0/${biz.id}/owned_whatsapp_business_accounts`,
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${userAccessToken}`
+              }
+            });
+            if (bizWabaRes.statusCode >= 200 && bizWabaRes.statusCode < 300) {
+              const bizWabaData = JSON.parse(bizWabaRes.raw);
+              const bizWabas = bizWabaData.data || [];
+              if (bizWabas.length > 0) {
+                wabaId = bizWabas[0].id;
+                console.log(`[META OAUTH] Found WABA ID from business ${biz.id}: ${wabaId}`);
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.log(`[META OAUTH EXCEPTION] business fallback failed:`, err.message || err);
+      }
     }
 
-    // Use the first active WABA
-    const activeWaba = accounts[0];
-    const wabaId = activeWaba.id;
+    if (!wabaId) {
+      return e.string(400, "Could not retrieve your WhatsApp Business Account (WABA) ID. Please make sure the app permissions are configured correctly.");
+    }
 
     // 5. Fetch Phone Numbers inside this WABA
     const numbersRes = $http.send({
