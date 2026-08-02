@@ -238,7 +238,8 @@ export default function ProfileScreen() {
     }
     let oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&response_type=code`;
     if (fbConfigId) {
-      oauthUrl += `&config_id=${fbConfigId}&override_default_response_type=true`;
+      const extrasObj = { setup: {} };
+      oauthUrl += `&config_id=${fbConfigId}&override_default_response_type=true&extras=${encodeURIComponent(JSON.stringify(extrasObj))}`;
     } else {
       oauthUrl += `&scope=whatsapp_business_management,whatsapp_business_messaging`;
     }
