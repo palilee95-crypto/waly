@@ -234,7 +234,7 @@ export default function ProfileScreen() {
     if (fbAppId === '1040853298622209') {
       console.log('Using default fallback Meta App ID.');
     }
-    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging,business_management&response_type=code`;
+    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
     
     Linking.openURL(oauthUrl).catch(() => {
       Alert.alert('Error', 'Unable to open Meta Embedded Signup portal.');
