@@ -11,7 +11,7 @@ function runSmartFollowUp() {
   const activeGroups = $app.findRecordsByFilter("follow_up_groups", "status = 'active'", "-created", 100, 0);
   if (activeGroups.length === 0) return stats;
 
-  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
   const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
@@ -151,7 +151,7 @@ function runSmartFollowUp() {
             .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
             .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
 
-          const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi WALY._`;
+          const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV._`;
 
           // Create log record
           const logsCol = $app.findCollectionByNameOrId("follow_up_logs");
@@ -187,16 +187,18 @@ function runSmartFollowUp() {
             automated: "true",
           });
 
-          // WhatsApp
+          // WhatsApp (Meta Cloud API using risev_notification template)
           if (phone) {
             const cleanPhone = phone.replace(/[^\d]/g, '');
             if (cleanPhone) {
               try {
-                const randomDelay = Math.floor(Math.random() * 4000) + 5000 + staggerMs;
-                sendTextMessage(instanceName, cleanPhone, formattedMsg, {
-                  delay: randomDelay,
-                  presence: 'composing',
-                });
+                sendTemplateMessage(
+                  merchantId,
+                  cleanPhone,
+                  "risev_notification",
+                  "en_US",
+                  [merchantName, nextSeq.getString("title"), body]
+                );
               } catch (err) {
                 console.log(`Smart Follow Up WhatsApp error for ${cleanPhone}:`, err.message || err);
               }

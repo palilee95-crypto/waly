@@ -143,6 +143,61 @@ function pairInstance(instanceName, phone) {
   return { pairingCode: "DISABLED", pairing_code: "DISABLED", code: "DISABLED" };
 }
 
+function registerAppTemplates(wabaId, accessToken) {
+  const templates = [
+    {
+      "name": "risev_notification",
+      "category": "UTILITY",
+      "language": "en_US",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Message from {{1}}\n\n*{{2}}*\n\n{{3}}",
+          "example": {
+            "body_text": [
+              ["Store Name", "Notification", "This is a test notification message."]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "risev_campaign",
+      "category": "MARKETING",
+      "language": "en_US",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Exclusive update from {{1}}\n\n*{{2}}*\n\n{{3}}",
+          "example": {
+            "body_text": [
+              ["Store Name", "Promotion", "This is a test marketing message."]
+            ]
+          }
+        }
+      ]
+    }
+  ];
+
+  for (let i = 0; i < templates.length; i++) {
+    const tmpl = templates[i];
+    try {
+      const res = $http.send({
+        url: `https://graph.facebook.com/v20.0/${wabaId}/message_templates`,
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(tmpl)
+      });
+      console.log(`[META TEMPLATE] Created template ${tmpl.name} on ${wabaId}. Status: ${res.statusCode}. Response: ${res.raw}`);
+    } catch (err) {
+      console.log(`[META TEMPLATE EXCEPTION] Failed to create template ${tmpl.name}:`, err.message || err);
+    }
+  }
+}
+
 module.exports = {
   evolutionUrl,
   evolutionKey,
@@ -152,5 +207,6 @@ module.exports = {
   sendTextMessage,
   sendTemplateMessage,
   fetchAllRecords,
-  pairInstance
+  pairInstance,
+  registerAppTemplates
 };

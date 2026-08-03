@@ -2209,6 +2209,32 @@ export default function ProfileScreen() {
               Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
             </Text>
 
+            {/* Meta API Pricing & Billing Info Card */}
+            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 6, width: '100%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="card" size={16} color="#475569" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                  Meta WhatsApp API Pricing (Malaysia)
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 17 }}>
+                Meta charges directly to your linked card per message sent:
+              </Text>
+              <View style={{ gap: 4, marginTop: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>• Utility/Notifications (Follow-ups):</Text>
+                  <Text style={{ fontSize: 12, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold' }}>~RM 0.06 /msg</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>• Marketing / Broadcast Blasts:</Text>
+                  <Text style={{ fontSize: 12, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold' }}>~RM 0.35 /msg</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 15, marginTop: 4 }}>
+                *Note: You must link a debit/credit card to your WhatsApp Business Account (WABA) in Meta Business Suite to allow message delivery.
+              </Text>
+            </View>
+
              {metaConfigId ? (
               <View style={{ width: '100%', gap: 16 }}>
                 {/* Connected status badge card */}

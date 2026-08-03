@@ -2,7 +2,41 @@
 
 // 1. GET WhatsApp Connection Status & Pairing QR Code
 routerAdd("GET", "/api/risev/merchant/whatsapp/status", (e) => {
-  return e.json(200, { status: "disconnected" });
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    let config = null;
+    try {
+      const configs = $app.findRecordsByFilter(
+        "whatsapp_configurations",
+        `merchant = '${merchantId}' && status = 'connected'`,
+        "-created",
+        1,
+        0
+      );
+      if (configs.length > 0) {
+        config = configs[0];
+      }
+    } catch (err) {}
+
+    if (config) {
+      return e.json(200, {
+        status: "connected",
+        phone: config.getString("phone_number")
+      });
+    }
+
+    return e.json(200, { status: "disconnected" });
+  } catch (err) {
+    return e.json(500, { message: err.message || err });
+  }
 }, $apis.requireAuth("users"));
 
 // 1b. POST Pair WhatsApp with phone number (pairing code — no QR needed)
@@ -12,7 +46,33 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/pair", (e) => {
 
 // 2. POST Disconnect & Delete WhatsApp Instance
 routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
-  return e.json(200, { success: true });
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    try {
+      const configs = $app.findRecordsByFilter(
+        "whatsapp_configurations",
+        `merchant = '${merchantId}'`,
+        "-created",
+        10,
+        0
+      );
+      for (let i = 0; i < configs.length; i++) {
+        $app.delete(configs[i]);
+      }
+    } catch (err) {}
+
+    return e.json(200, { success: true });
+  } catch (err) {
+    return e.json(500, { message: err.message || err });
+  }
 }, $apis.requireAuth("users"));
 
 // 2b. GET WhatsApp Business Message Templates (from Meta Cloud API)
@@ -175,6 +235,10 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     const userAccessToken = tokenData.access_token;
 
     let wabaId = "";
+    let debugError = "";
+    let debugRaw = "";
+    let businessesError = "";
+    let businessesRaw = "";
 
     // 4. Fetch WhatsApp Business Account (WABA) details
     // First, try using the debug_token endpoint (standard for Embedded Signup)
@@ -185,6 +249,7 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
         method: "GET"
       });
 
+      debugRaw = debugRes.raw;
       if (debugRes.statusCode >= 200 && debugRes.statusCode < 300) {
         const debugData = JSON.parse(debugRes.raw);
         const granularScopes = (debugData.data && debugData.data.granular_scopes) || [];
@@ -200,9 +265,11 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
         }
       } else {
         console.log(`[META OAUTH ERROR] debug_token failed: ${debugRes.raw}`);
+        debugError = `Status ${debugRes.statusCode}: ${debugRes.raw}`;
       }
     } catch (err) {
       console.log(`[META OAUTH EXCEPTION] debug_token failed:`, err.message || err);
+      debugError = `Exception: ${err.message || err}`;
     }
 
     // Second, if debug_token failed to find it, try listing businesses as fallback
@@ -217,6 +284,7 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
           }
         });
 
+        businessesRaw = businessesRes.raw;
         if (businessesRes.statusCode >= 200 && businessesRes.statusCode < 300) {
           const businessesData = JSON.parse(businessesRes.raw);
           const businesses = businessesData.data || [];
@@ -237,16 +305,28 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
                 console.log(`[META OAUTH] Found WABA ID from business ${biz.id}: ${wabaId}`);
                 break;
               }
+            } else {
+              businessesError += `[Biz ${biz.id} WABA Error status ${bizWabaRes.statusCode}: ${bizWabaRes.raw}] `;
             }
           }
+        } else {
+          businessesError = `Businesses status ${businessesRes.statusCode}: ${businessesRes.raw}`;
         }
       } catch (err) {
         console.log(`[META OAUTH EXCEPTION] business fallback failed:`, err.message || err);
+        businessesError = `Exception: ${err.message || err}`;
       }
     }
 
     if (!wabaId) {
-      return e.string(400, "Could not retrieve your WhatsApp Business Account (WABA) ID. Please make sure the app permissions are configured correctly.");
+      const errorMsg = {
+        message: "Could not retrieve your WhatsApp Business Account (WABA) ID. Please make sure the app permissions are configured correctly.",
+        meta_app_id: fbAppId,
+        meta_app_secret_length: fbAppSecret ? fbAppSecret.length : 0,
+        debug_token_response: debugRaw || debugError,
+        businesses_response: businessesRaw || businessesError
+      };
+      return e.string(400, JSON.stringify(errorMsg, null, 2));
     }
 
     // 5. Fetch Phone Numbers inside this WABA
@@ -298,6 +378,7 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     } else {
       const collection = $app.findCollectionByNameOrId("whatsapp_configurations");
       const record = new Record(collection);
+      record.set("id", $security.randomString(15).toLowerCase());
       record.set("merchant", merchantId);
       record.set("waba_id", wabaId);
       record.set("phone_number_id", phoneNumberId);
@@ -305,6 +386,14 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
       record.set("phone_number", verifiedPhone);
       record.set("status", "connected");
       $app.save(record);
+    }
+
+    // 7. Auto-register default templates on the WABA
+    try {
+      const { registerAppTemplates } = require(`${__hooks}/whatsapp_helper.js`);
+      registerAppTemplates(wabaId, userAccessToken);
+    } catch (tmplErr) {
+      console.log(`[META OAUTH TEMPLATE ERROR] Failed to auto-register WABA templates:`, tmplErr.message || tmplErr);
     }
 
     console.log(`[META OAUTH SUCCESS] Successfully configured WhatsApp for merchant ${merchantId}. Phone: ${verifiedPhone}`);
@@ -320,7 +409,7 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
 
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
-  const { sendTextMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTemplateMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -339,7 +428,8 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const title = body.title || "";
     const messageTemplate = body.message || "";
     const campaignId = body.campaignId || "";
-    const sendWhatsApp = false; // WhatsApp service decommissioned
+    const hasMetaConfig = $app.findRecordsByFilter("whatsapp_configurations", `merchant = "${merchantId}" && status = "connected"`).length > 0;
+    const sendWhatsApp = hasMetaConfig;
 
     if (!title.trim() || !messageTemplate.trim()) {
       return e.json(400, { message: "Title and Message fields are required" });
@@ -459,35 +549,24 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
         campaignId: campaignId
       });
 
-      // C. Send WhatsApp Message
+      // C. Send WhatsApp Message (Meta Cloud API using risev_campaign template)
       if (sendWhatsApp && phone) {
         const cleanPhone = phone.replace(/[^\d]/g, '');
         if (cleanPhone) {
           try {
-            // 1. Spaced out delay: 20 seconds base interval, plus 0 to 10 seconds random variance
-            const baseInterval = 20000; // 20 seconds
-            const randomVariance = Math.floor(Math.random() * 10000); // 0-10 seconds
-            const typingDelay = 5000; // 5 seconds typing status
-
-            // 2. Sleep Time: Add 10 minutes of pause after every 50 messages
-            const batchSize = 50;
-            const sleepDuration = 10 * 60 * 1000; // 10 minutes in milliseconds
-            const batchCount = Math.floor(i / batchSize);
-            const totalSleepTime = batchCount * sleepDuration;
-
-            // 3. Final calculated queue delay
-            const queueDelay = (i * baseInterval) + randomVariance + typingDelay + totalSleepTime;
-
-            sendTextMessage(instanceName, cleanPhone, formattedWhatsAppMsg, {
-              delay: queueDelay,
-              presence: 'composing'
-            });
+            sendTemplateMessage(
+              merchantId,
+              cleanPhone,
+              "risev_campaign",
+              "en_US",
+              [merchantName, title, personalizedMsg]
+            );
           } catch (whatsappErr) {
             console.log(`WhatsApp blast error for ${cleanPhone}:`, whatsappErr.message || whatsappErr);
           }
         }
       }
-
+ 
       sentCount++;
     }
 
@@ -516,7 +595,55 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   }
 }, $apis.requireAuth("users"));
 
-// 4. POST WhatsApp Webhook Listener (captures STOP opt-outs & inbound QR stamps) - STUBBED
+// 4. GET WhatsApp Webhook Challenge Verification
+routerAdd("GET", "/api/risev/whatsapp-webhook", (e) => {
+  const query = e.requestInfo().query || {};
+  const mode = query["hub.mode"] || "";
+  const token = query["hub.verify_token"] || "";
+  const challenge = query["hub.challenge"] || "";
+
+  const expectedVerifyToken = $os.getenv("META_WEBHOOK_VERIFY_TOKEN") || "risev_webhook_secret_2026";
+
+  if (mode === "subscribe" && token === expectedVerifyToken) {
+    console.log("[WEBHOOK VERIFICATION] Successfully verified Meta webhook subscription.");
+    // Return the challenge as raw text to pass Meta verification
+    return e.string(200, challenge);
+  }
+
+  console.log(`[WEBHOOK VERIFICATION FAILED] Mode: ${mode} | Token: ${token}`);
+  return e.string(403, "Verification failed");
+});
+
+// 5. POST WhatsApp Webhook Listener (captures STOP opt-outs & inbound QR stamps) - STUBBED
 routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
   return e.json(200, { success: true, message: "Webhook decommissioned" });
+});
+
+// 5. GET Test WhatsApp Send (Temporary Route)
+routerAdd("GET", "/api/risev/test/send-whatsapp", (e) => {
+  const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const phone = e.requestInfo().query.phone;
+    if (!phone) {
+      return e.string(400, "Missing phone parameter. Usage: ?phone=+60123456789");
+    }
+
+    const configs = $app.findRecordsByFilter(
+      "whatsapp_configurations",
+      "status = 'connected'",
+      "-created",
+      1,
+      0
+    );
+    if (configs.length === 0) {
+      return e.string(404, "No connected WhatsApp configuration found");
+    }
+
+    const merchantId = configs[0].get("merchant");
+    const result = sendTemplateMessage(merchantId, phone, "hello_world", "en_US", []);
+
+    return e.json(200, JSON.stringify(result, null, 2));
+  } catch (err) {
+    return e.json(500, { error: err.message || err });
+  }
 });

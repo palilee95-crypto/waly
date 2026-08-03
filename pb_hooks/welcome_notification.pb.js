@@ -6,24 +6,12 @@ onRecordCreate((e) => {
   const stampsEarned = e.record.get('stamps') || 0;
 
   try {
-    // 1. Fetch customer user details
     const customer = $app.findRecordById('users', customerId);
-    const phone = customer.get('phone') || "";
-    if (!phone) return;
-
-    // Clean the phone number (strip non-digits for API)
-    const cleanPhone = phone.replace(/[^\d]/g, '');
-    if (!cleanPhone) return;
-
     const merchant = $app.findRecordById('merchants', merchantId);
     const merchantName = merchant.get('name') || "our shop";
     
-    // Resolve merchant-specific WhatsApp instance name using slug logic
-    const nameSlug = merchantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const instanceName = `merchant-${merchantId}-${nameSlug}`;
-
-    // Load environment settings
-    const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+    const { createNotification } = require(`${__hooks}/notification_helper.js`);
+    const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
     const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
 
     // 2. Determine if customer is a brand new account (created in last 15 seconds)
@@ -31,16 +19,15 @@ onRecordCreate((e) => {
     const now = new Date();
     const diffMs = now.getTime() - createdTime.getTime();
 
-    let messageText = "";
+    let messageTitle = "";
+    let messageBody = "";
 
     if (diffMs < 15000) {
-      // BRAND NEW USER: Send welcome message via merchant WhatsApp instance
-      console.log(`[WHATSAPP HOOK] New customer welcome notification to: ${phone} (via ${instanceName})`);
-      messageText = `🎁 *Selamat Datang ke ${merchantName}!* 🎁\n\nAkaun kad ganjaran digital anda telah diaktifkan untuk nombor: *${phone}*\n\nTahniah! Anda baru mendapat *${stampsEarned}* Cop (Stamp) di *${merchantName}*! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n🔗 ${appUrl}\n\n💬 Sila balas *OK* untuk mengesahkan penerimaan dan mengaktifkan notifikasi ganjaran anda!`;
+      // BRAND NEW USER: Send welcome notification
+      messageTitle = `Selamat Datang ke ${merchantName}! 🎁`;
+      messageBody = `Akaun kad ganjaran digital anda telah diaktifkan! Tahniah! Anda baru mendapat ${stampsEarned} Cop (Stamp) di ${merchantName}! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n${appUrl}`;
     } else if (stampsEarned > 0) {
-      // EXISTING USER: Send stamp update notification via merchant WhatsApp instance
-      console.log(`[WHATSAPP HOOK] Stamp earned notification to: ${phone} (via ${instanceName})`);
-      
+      // EXISTING USER: Send stamp update notification
       let currentStamps = 0;
       let goal = 10;
       let completions = 0;
@@ -64,27 +51,33 @@ onRecordCreate((e) => {
           goal = program.get('stamp_goal') || 10;
         }
       } catch (cardErr) {
-        console.log("[WHATSAPP HOOK] Error fetching card details:", cardErr.message || cardErr);
+        console.log("[NOTIFICATION HOOK] Error fetching card details:", cardErr.message || cardErr);
       }
 
       // Check if card was completed (stamps_collected reset to 0 with completions > 0, OR currentStamps >= goal)
       const isCompleted = (currentStamps >= goal) || (currentStamps === 0 && completions > 0 && stampsEarned > 0);
 
       if (isCompleted) {
-        messageText = `🎉 *Tahniah! Anda Telah Melengkapkan Kad Cop!* 🎉\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja menerima *${stampsEarned}* Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\n🎁 Ganjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n🔗 ${appUrl}`;
+        messageTitle = `Tahniah! Anda Telah Melengkapkan Kad Cop! 🎉`;
+        messageBody = `Terima kasih kerana mengunjungi ${merchantName}! Anda baru sahaja menerima ${stampsEarned} Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\nGanjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n${appUrl}`;
       } else {
-        messageText = `✨ *Cop Baharu Diterima!* ✨\n\nTerima kasih kerana mengunjungi *${merchantName}*! Anda baru sahaja mendapat *${stampsEarned}* Cop (Stamp).\n\n📊 *Status Kad Cop Anda:*\n*${currentStamps} / ${goal}* Cop dipenuhi.\n\nKumpulkan *${Math.max(0, goal - currentStamps)}* cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat kad ganjaran anda, layari:\n🔗 ${appUrl}`;
+        messageTitle = `Cop Baharu Diterima! ✨`;
+        messageBody = `Terima kasih kerana mengunjungi ${merchantName}! Anda baru sahaja mendapat ${stampsEarned} Cop (Stamp).\n\n📊 Status Kad Cop Anda:\n${currentStamps} / ${goal} Cop dipenuhi.\n\nKumpulkan ${Math.max(0, goal - currentStamps)} cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat baki cop anda, layari:\n${appUrl}`;
       }
     }
 
-    if (messageText) {
-      sendTextMessage(instanceName, cleanPhone, messageText, {
-        delay: 2000,
-        presence: 'composing'
+    if (messageTitle && messageBody) {
+      // 1. Create In-App Notification
+      createNotification(customerId, messageTitle, messageBody, "stamp_update", { merchant_id: merchantId });
+      
+      // 2. Send Push Notification
+      sendPushNotification(customerId, messageTitle, messageBody, {
+        type: "stamp_update",
+        merchantId: merchantId
       });
-      console.log(`[WHATSAPP HOOK] Dispatched WhatsApp to ${cleanPhone} via ${instanceName}`);
+      console.log(`[NOTIFICATION HOOK] Sent Push & In-App stamp/welcome notification to customer ${customerId}`);
     }
   } catch (err) {
-    console.log("[WHATSAPP HOOK] WhatsApp notification error:", err.message || err);
+    console.log("[NOTIFICATION HOOK] Stamp notification error:", err.message || err);
   }
 }, 'transactions');

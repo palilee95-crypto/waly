@@ -41,7 +41,7 @@ function getAbGroup(customerId) {
 }
 
 routerAdd("GET", "/api/risev/cron/birthdays", (e) => {
-  const { sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
 
   const secret = e.requestInfo().query.secret || "";
   if (CRON_SECRET && secret !== CRON_SECRET) {
@@ -167,7 +167,7 @@ routerAdd("GET", "/api/risev/cron/birthdays", (e) => {
       });
 
       try {
-        sendTextMessage(instanceName, customerPhone, message);
+        sendTemplateMessage(merchantId, customerPhone, "risev_notification", "en_US", [merchantName, "Selamat Hari Lahir! 🎂", message]);
         log.set("status", "sent");
         sent++;
       } catch (err) {

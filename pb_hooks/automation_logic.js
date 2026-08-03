@@ -17,7 +17,7 @@ function runAutomations() {
     const triggerDays = rule.get("trigger_days");
     const title = rule.get("title");
     const messageTemplate = rule.get("message");
-    const sendWhatsApp = !!rule.get("send_whatsapp");
+    const sendWhatsApp = false; // Disabled — replaced by Smart Follow Up sequences
 
     // Calculate target date strings for inactivity
     const targetStart = new Date();
