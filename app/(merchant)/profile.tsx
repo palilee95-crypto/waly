@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   Switch,
   Linking,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -2656,6 +2657,45 @@ export default function ProfileScreen() {
                     autoCapitalize="none"
                   />
                 </View>
+              </View>
+
+              {/* NFC Setup Link */}
+              <View style={{ marginBottom: 24, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 6, width: '100%' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="wifi-outline" size={16} color="#475569" style={{ transform: [{ rotate: '90deg' }] }} />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                    Merchant NFC Claim Link
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 17 }}>
+                  Use this link to write to your custom NFC tag stickers:
+                </Text>
+                <Text style={{ fontSize: 13, color: '#0F172A', fontFamily: 'PlusJakartaSans_700Bold', backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginTop: 4, textAlign: 'center' }} selectable>
+                  https://risev.app/nfc?m={user?.merchant_id}
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#1E293B',
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    width: '100%',
+                    marginTop: 4,
+                  }}
+                  onPress={() => {
+                    const url = `https://risev.app/nfc?m=${user?.merchant_id}`;
+                    Clipboard.setString(url);
+                    Alert.alert('Copied', 'NFC Claim URL copied to clipboard!');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="copy-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                    Copy NFC Link
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Save Button (Solid Black SAVE Button) */}
