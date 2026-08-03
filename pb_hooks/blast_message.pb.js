@@ -178,7 +178,7 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
 
     // 1. Decode state JSON
     let merchantId = "";
-    let redirectHost = "https://waly-five.vercel.app"; // default fallback
+    let redirectHost = "https://risev.app"; // default fallback
     let callbackUrl = "";
     try {
       const decodedState = JSON.parse(decodeURIComponent(stateStr));

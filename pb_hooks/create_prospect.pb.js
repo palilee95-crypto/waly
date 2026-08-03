@@ -31,7 +31,7 @@ routerAdd("POST", "/api/risev/agent/create-prospect", (e) => {
     const nameSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const instanceName = nameSlug ? `agent-${nameSlug}-${agentId}` : `agent-${agentId}`;
     const referralCode = authRecord.get("referral_code") || "";
-    const merchantAppUrl = $os.getenv("MERCHANT_APP_URL") || "https://waly-five.vercel.app";
+    const merchantAppUrl = $os.getenv("MERCHANT_APP_URL") || "https://risev.app";
     const referralLink = `${merchantAppUrl}/?ref=${referralCode}`;
 
     // 1. Check if prospect already exists for this agent (by phone)

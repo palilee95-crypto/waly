@@ -223,7 +223,7 @@ export default function ProfileScreen() {
 
     const stateObj = {
       merchantId: user.merchant_id,
-      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://waly-five.vercel.app',
+      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://risev.app',
       callbackUrl: redirectUriRaw
     };
     

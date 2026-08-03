@@ -12,7 +12,7 @@ onRecordCreate((e) => {
     
     const { createNotification } = require(`${__hooks}/notification_helper.js`);
     const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
-    const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
+    const appUrl = $os.getenv('APP_URL') || 'https://risev.app/';
 
     // 2. Determine if customer is a brand new account (created in last 15 seconds)
     const createdTime = new Date(customer.getString('created'));

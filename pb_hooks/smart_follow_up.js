@@ -14,7 +14,7 @@ function runSmartFollowUp() {
   const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
   const { createNotification } = require(`${__hooks}/notification_helper.js`);
   const { sendPushNotification } = require(`${__hooks}/push_notify.js`);
-  const appUrl = $os.getenv('APP_URL') || 'https://waly-five.vercel.app/';
+  const appUrl = $os.getenv('APP_URL') || 'https://risev.app/';
 
   for (const group of activeGroups) {
     const groupId = group.id;
