@@ -819,7 +819,7 @@ export default function MarketingScreen() {
             </View>
           </View>
           <Image
-            source={require('../../theme/rise_officiallogo.png')}
+            source={require('../../assets/risev logo.png')}
             style={{ width: 110, height: 38, resizeMode: 'contain' }}
           />
         </View>

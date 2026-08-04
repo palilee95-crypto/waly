@@ -1089,7 +1089,7 @@ export default function ProfileScreen() {
           <Text style={styles.headerLogoText}>{t('merchant_portal')}</Text>
         </View>
         <Image
-          source={require('../../theme/rise_officiallogo.png')}
+          source={require('../../assets/risev logo.png')}
           style={{ width: 110, height: 38, resizeMode: 'contain' }}
         />
       </View>
@@ -2601,7 +2601,7 @@ export default function ProfileScreen() {
                     <Ionicons name="image-outline" size={18} color="#FFFFFF" />
                     <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload Logo</Text>
                   </TouchableOpacity>
-                  {(brandingLogoPreview || brandingLogoUrl) && (
+                  {!!(brandingLogoPreview || brandingLogoUrl) && (
                     <Image
                       source={{ uri: brandingLogoPreview || brandingLogoUrl }}
                       style={{ width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}
@@ -2640,10 +2640,10 @@ export default function ProfileScreen() {
                     <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
                     <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload 9:16 Image</Text>
                   </TouchableOpacity>
-                  {(brandingBgPreview || brandingBgUrl) && (
+                  {!!(brandingBgPreview || brandingBgUrl) && (
                     <Image
                       source={{ uri: brandingBgPreview || brandingBgUrl }}
-                      style={{ width: 36, height: 56, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      style={{ width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}
                     />
                   )}
                 </View>

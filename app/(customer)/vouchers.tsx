@@ -35,6 +35,19 @@ type VoucherItem = {
   merchantId?: string;
 };
 
+// Helper to determine if a hex color is light or dark
+const isLightColor = (color: string) => {
+  const hex = color.replace('#', '');
+  // Default to a dark color if invalid
+  if (hex.length !== 6 && hex.length !== 3) return false;
+  const r = parseInt(hex.length === 3 ? hex.charAt(0) + hex.charAt(0) : hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.length === 3 ? hex.charAt(1) + hex.charAt(1) : hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.length === 3 ? hex.charAt(2) + hex.charAt(2) : hex.substring(4, 6), 16) || 0;
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.65; // Threshold for bright colors
+};
+
 export default function VouchersScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -84,7 +97,7 @@ export default function VouchersScreen() {
             : 'No expiry',
           status: (rec.status === 'used' || rec.status === 'expired' ? 'used' : 'active') as 'used' | 'active',
           rawStatus: rec.status as 'active' | 'used' | 'expired',
-          color: reward?.type === 'discount' ? '#7C3AED' : '#004ac6'
+          color: merchant?.onboarding_primary_color || (reward?.type === 'discount' ? '#7C3AED' : '#004ac6')
         };
       });
       setVouchers(mapped);
@@ -110,7 +123,7 @@ export default function VouchersScreen() {
               : 'No expiry',
             status: 'active' as const,
             rawStatus: voucher.status as 'active' | 'used' | 'expired',
-            color: '#000000',
+            color: merchant?.onboarding_primary_color || '#0F172A',
             isBirthday: true,
             merchantId: merchant?.id,
           };
@@ -154,30 +167,32 @@ export default function VouchersScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-          <Image
-            source={{ uri: avatarUrl }}
-            style={styles.avatar}
-          />
-          
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
-          />
+        {/* ── Yellow S-Curve Header (Idea 1) ── */}
+        <View style={{ backgroundColor: '#FFFFFF' }}>
+          {/* Yellow Block */}
+          <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 32 }}>
+            <View style={[{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+              {/* Logo row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
+                <Image source={require('../../assets/risev logo.png')} style={{ width: 110, height: 38, resizeMode: 'contain' }} />
+              </View>
+              {/* Title */}
+              <Text style={{ fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1, marginBottom: 4 }}>My Vouchers</Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', lineHeight: 18 }}>
+                Redeem and present rewards vouchers at partner stores to enjoy discounts.
+              </Text>
+            </View>
+          </View>
+          {/* S-Curve: white strip with concave top-left arc */}
+          <View style={{ height: 28, backgroundColor: '#FFC700' }}>
+            <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
+          </View>
         </View>
 
         <ScrollView
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Intro Heading Section */}
-          <View style={styles.introSection}>
-            <Text style={styles.title}>My Vouchers</Text>
-            <Text style={styles.subtitle}>
-              Redeem and present rewards vouchers at partner stores to enjoy discounts.
-            </Text>
-          </View>
 
           {/* Simple Tab Filters (Matches new payment/topup mockup styling) */}
           <View style={styles.tabsRow}>
@@ -260,46 +275,57 @@ export default function VouchersScreen() {
                 </Text>
               </View>
             ) : (
-              filteredVouchers.map((item) => (
-                <View key={item.id} style={styles.ticketCard}>
-                  {/* Left side: Merchant details */}
-                  <View style={styles.ticketLeft}>
-                    <Image source={{ uri: item.logo }} style={styles.merchantLogo} />
-                    <Text style={styles.merchantName} numberOfLines={2}>{item.merchantName}</Text>
-                    <Text style={styles.merchantCategory} numberOfLines={1}>{item.category}</Text>
-                  </View>
-
-                  {/* Dotted separator divider line */}
-                  <View style={styles.dottedDivider}>
-                    <View style={styles.topNotch} />
-                    <View style={styles.dottedLine} />
-                    <View style={styles.bottomNotch} />
-                  </View>
-
-                  {/* Right side: Reward details and Claim button */}
-                  <View style={styles.ticketRight}>
-                    <View style={styles.rewardTextColumn}>
-                      <Text style={styles.rewardTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.rewardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
-                      <Text style={[styles.expiryText, item.status === 'used' && { color: '#64748B' }]}>{item.expiry}</Text>
+              filteredVouchers.map((item) => {
+                const isLight = isLightColor(item.color || '#0F172A');
+                
+                return (
+                  <View key={item.id} style={[styles.ticketCard, { backgroundColor: item.color || '#0F172A' }]}>
+                    {/* Left side: Merchant details with barcode and serial number */}
+                    <View style={styles.ticketLeft}>
+                      <View style={styles.stubBarcodeContainer}>
+                        <View style={[styles.barcodeLineWide, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                        <View style={[styles.barcodeLineThin, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                        <View style={[styles.barcodeLineMedium, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                        <View style={[styles.barcodeLineThin, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                        <View style={[styles.barcodeLineWide, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                      </View>
+                      <Image source={{ uri: item.logo }} style={styles.merchantLogo} />
+                      <Text style={[styles.merchantName, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={2}>{item.merchantName}</Text>
+                      <Text style={[styles.serialNumber, { color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)' }]}>NO. {Math.floor(Math.random() * 90000) + 10000}</Text>
                     </View>
 
-                    {item.status === 'active' ? (
-                      <TouchableOpacity
-                        style={styles.useBtn}
-                        onPress={() => handleUseVoucher(item)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.useBtnText}>Use Now</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.usedBadge}>
-                        <Text style={styles.usedBadgeText}>USED / EXPIRED</Text>
+                    {/* Dotted separator divider line */}
+                    <View style={styles.dottedDivider}>
+                      <View style={[styles.topNotch, { backgroundColor: '#FFFFFF' }]} />
+                      <View style={[styles.dottedLine, { borderColor: isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.4)' }]} />
+                      <View style={[styles.bottomNotch, { backgroundColor: '#FFFFFF' }]} />
+                    </View>
+
+                    {/* Right side: Reward details and Claim button */}
+                    <View style={styles.ticketRight}>
+                      <View style={styles.rewardTextColumn}>
+                        <Text style={[styles.rewardTitleLight, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{item.title}</Text>
+                        <Text style={[styles.rewardSubtitleLight, { color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>{item.subtitle}</Text>
+                        <Text style={[styles.expiryTextLight, { color: isLight ? '#EF4444' : '#FFC700' }, item.status === 'used' && { color: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)' }]}>{item.expiry}</Text>
                       </View>
-                    )}
+
+                      {item.status === 'active' ? (
+                        <TouchableOpacity
+                          style={[styles.useBtn, { backgroundColor: isLight ? '#000000' : '#FFFFFF', shadowColor: isLight ? 'transparent' : 'rgba(255,255,255,0.4)' }]}
+                          onPress={() => handleUseVoucher(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.useBtnText, { color: isLight ? '#FFFFFF' : '#000000' }]}>Use Now</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.usedBadge, { borderColor: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
+                          <Text style={[styles.usedBadgeText, { color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)' }]}>USED / EXPIRED</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -313,39 +339,55 @@ export default function VouchersScreen() {
         onRequestClose={() => setUseModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          {selectedVoucher && (
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Redeem Reward</Text>
-                <TouchableOpacity onPress={() => setUseModalVisible(false)} style={styles.closeBtn}>
-                  <Ionicons name="close" size={24} color="#000000" />
-                </TouchableOpacity>
-              </View>
+          {selectedVoucher && (() => {
+            const isModalLight = isLightColor(selectedVoucher.color || '#FFC700');
+            return (
+              <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', borderWidth: 0 }]}>
+                {/* Top Block: Dynamic Merchant Header */}
+                <View style={{ backgroundColor: selectedVoucher.color || '#FFC700', padding: 24, paddingBottom: 32, width: '100%' }}>
+                  <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: isModalLight ? '#000000' : '#FFFFFF' }]}>Redeem Reward</Text>
+                    <TouchableOpacity onPress={() => setUseModalVisible(false)} style={styles.closeBtn}>
+                      <Ionicons name="close" size={24} color={isModalLight ? '#000000' : '#FFFFFF'} />
+                    </TouchableOpacity>
+                  </View>
 
-              <View style={styles.modalLogoRow}>
-                <Image source={{ uri: selectedVoucher.logo }} style={styles.modalMerchantLogo} />
-                <View>
-                  <Text style={styles.modalMerchantName}>{selectedVoucher.merchantName}</Text>
-                  <Text style={styles.modalRewardTitle}>{selectedVoucher.title}</Text>
+                  <View style={[styles.modalLogoRow, { marginBottom: 0 }]}>
+                    <Image source={{ uri: selectedVoucher.logo }} style={[styles.modalMerchantLogo, { borderColor: isModalLight ? '#FFFFFF' : 'transparent', borderWidth: 2 }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modalMerchantName, { color: isModalLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)' }]}>{selectedVoucher.merchantName}</Text>
+                      <Text style={[styles.modalRewardTitle, { color: isModalLight ? '#000000' : '#FFFFFF' }]}>{selectedVoucher.title}</Text>
+                    </View>
+                  </View>
                 </View>
+
+              {/* Perforated Divider with Cutouts */}
+              <View style={{ width: '100%', height: 1, flexDirection: 'row', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', position: 'absolute', left: -12 }} />
+                <View style={{ flex: 1, height: 1, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', opacity: 0.5 }} />
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', position: 'absolute', right: -12 }} />
               </View>
 
-              <View style={styles.qrWrapper}>
-                <Image
-                  source={{
-                    uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${selectedVoucher.code}`,
-                  }}
-                  style={styles.qrCodeImage}
-                />
-              </View>
+              {/* Bottom Block: White QR Area */}
+              <View style={{ backgroundColor: '#FFFFFF', padding: 24, width: '100%', alignItems: 'center' }}>
+                <View style={[styles.qrWrapper, { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 24, shadowColor: '#1A1400', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5, marginBottom: 24 }]}>
+                  <Image
+                    source={{
+                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${selectedVoucher.code}`,
+                    }}
+                    style={[styles.qrCodeImage, { width: 180, height: 180 }]}
+                  />
+                </View>
 
-              <Text style={styles.codeLabel}>VOUCHER CODE</Text>
-              <Text style={styles.codeValue}>{selectedVoucher.code}</Text>
-              <Text style={styles.scanNotice}>
-                Present this voucher code to the store staff to apply your discount reward.
-              </Text>
+                <Text style={[styles.codeLabel, { color: '#64748B', marginBottom: 4 }]}>VOUCHER CODE</Text>
+                <Text style={[styles.codeValue, { color: '#1A1400', fontSize: 22, letterSpacing: 2, fontFamily: 'PlusJakartaSans_800ExtraBold', marginBottom: 12 }]}>{selectedVoucher.code}</Text>
+                <Text style={[styles.scanNotice, { color: '#94A3B8', textAlign: 'center' }]}>
+                  Present this voucher code to the store staff to apply your discount reward.
+                </Text>
+              </View>
             </View>
-          )}
+            );
+          })()}
         </View>
       </Modal>
     </View>
@@ -428,8 +470,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 110, // Safe clearance padding for bottom navbar
+    paddingTop: 16,
+    paddingBottom: 110, // Safe padding to clear bottom tab bar
     gap: 20,
   },
   introSection: {
@@ -576,78 +618,99 @@ const styles = StyleSheet.create({
   },
   ticketCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    height: 148,
+    borderRadius: 12, // Smoother corners for concert ticket
+    height: 140,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   ticketLeft: {
     width: 110,
-    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 12,
     gap: 4,
+    position: 'relative',
+    overflow: 'hidden',
   },
+  stubBarcodeContainer: {
+    position: 'absolute',
+    left: -10,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.35, // Increased visibility
+    transform: [{ rotate: '90deg' }],
+  },
+  barcodeLineWide: { width: 4, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 2 },
+  barcodeLineMedium: { width: 2, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 2 },
+  barcodeLineThin: { width: 1, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 1 },
   merchantLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    width: 48,
+    height: 48,
+    borderRadius: 24, // Round logo for concert ticket
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    marginBottom: 4,
   },
   merchantName: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    marginTop: 4,
+    color: '#FFFFFF',
+    marginTop: 2,
     textAlign: 'center',
   },
-  merchantCategory: {
+  serialNumber: {
     fontSize: 9,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    textAlign: 'center',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 1,
+    marginTop: 2,
   },
   // Ticket notch cut divider
   dottedDivider: {
-    width: 24,
+    width: 20,
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     position: 'relative',
   },
   topNotch: {
-    width: 24,
-    height: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    width: 20, 
+    height: 10,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
     backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    borderWidth: 1.5,
     position: 'absolute',
-    top: -1.5,
+    top: 0,
     zIndex: 2,
   },
   bottomNotch: {
-    width: 24,
-    height: 12,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    width: 20, 
+    height: 10,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    borderWidth: 1.5,
     position: 'absolute',
-    bottom: -1.5,
+    bottom: 0,
     zIndex: 2,
   },
   dottedLine: {
     width: 1,
     height: '100%',
-    borderColor: '#E2E8F0',
-    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)', // White dotted line for dark background
+    borderWidth: 1.5,
     borderStyle: 'dashed',
   },
   ticketRight: {
@@ -658,36 +721,42 @@ const styles = StyleSheet.create({
   rewardTextColumn: {
     gap: 2,
   },
-  rewardTitle: {
+  rewardTitleLight: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#FFFFFF',
   },
-  rewardSubtitle: {
+  rewardSubtitleLight: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    color: 'rgba(255,255,255,0.8)',
     lineHeight: 15,
   },
-  expiryText: {
+  expiryTextLight: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#EF4444', // Red warning color expiry
+    color: '#FFC700', // Yellow text for expiry on dark bg
     marginTop: 4,
   },
   useBtn: {
-    backgroundColor: '#000000', // Solid black button matching the home design
+    backgroundColor: '#FFFFFF', // White button pops against dark ticket
     height: 32,
-    borderRadius: 8,
+    borderRadius: 16, // Pill shape
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   useBtnText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
   usedBadge: {
     backgroundColor: '#F1F5F9',

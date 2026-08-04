@@ -435,26 +435,88 @@ export default function MerchantDashboard() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Merchant Profile Header */}
-        <View style={styles.profileHeader}>
+        {/* Dark Wave Background */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0 }}>
+          <View style={{ flex: 1, backgroundColor: '#1A1400' }} />
+          {/* Main White Cutout */}
+          <View style={{ position: 'absolute', top: -5, right: -5, width: 150, height: 80, backgroundColor: '#FFFFFF' }} />
+          {/* Top White Filler */}
+          <View style={{ position: 'absolute', top: -5, right: 145, width: 40, height: 40, backgroundColor: '#FFFFFF' }} />
+          {/* Bottom Curve (Convex part) */}
+          <View style={{ position: 'absolute', top: 35, right: 145, width: 40, height: 40, backgroundColor: '#1A1400' }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 40 }} />
+          </View>
+          {/* Top Curve (Concave part) */}
+          <View style={{ position: 'absolute', top: -5, right: 185, width: 40, height: 40, backgroundColor: '#FFFFFF' }}>
+            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 40 }} />
+          </View>
+          {/* Outer Corner Curve */}
+          <View style={{ position: 'absolute', top: 75, right: -5, width: 32, height: 32, backgroundColor: '#FFFFFF' }}>
+            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 32 }} />
+          </View>
+        </View>
+
+        {/* Header Content */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', zIndex: 10, marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Image
-              source={{ 
-                uri: merchant?.logo 
-                  ? pb.files.getURL(merchant, merchant.logo)
-                  : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' 
-              }}
-              style={styles.merchantAvatar}
+              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+              style={[styles.merchantAvatar, { borderColor: '#1A1400', borderWidth: 2 }]}
             />
             <View style={styles.profileTextWrap}>
-              <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
-              <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+              <Text style={[styles.welcomeSub, { color: 'rgba(255,255,255,0.7)' }]}>{t('welcome_back')}</Text>
+              <Text style={[styles.merchantName, { color: '#FFFFFF' }]}>{merchant?.name || 'Boutique Royal'}</Text>
             </View>
           </View>
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
-          />
+          <View style={{ position: 'absolute', top: -5, right: 0, width: 120, alignItems: 'center' }}>
+            <Image
+              source={require('../../assets/risev logo.png')}
+              style={{ width: 110, height: 38, resizeMode: 'contain' }}
+            />
+          </View>
+        </View>
+
+        {/* Unified Floating Analytics Card */}
+        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#1A1400', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
+            {/* Stamps Awarded */}
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Ionicons name="wallet-outline" size={14} color="#1A1400" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>{t('total_stamps_awarded')}</Text>
+              </View>
+              <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>
+                {loading ? '...' : totalStampsAwarded.toLocaleString()}
+              </Text>
+            </View>
+
+            {/* Scan QR Button */}
+            <TouchableOpacity 
+              style={{ backgroundColor: '#1A1400', borderRadius: 16, width: 64, height: 64, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+              onPress={() => router.push('/(merchant)/give')}
+            >
+              <Ionicons name="qr-code" size={28} color="#FFC700" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Sales Progress */}
+          <View style={{ backgroundColor: '#1A1400', borderRadius: 16, padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="trending-up" size={14} color="#FFC700" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>{t('this_months_sales')}</Text>
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(255,255,255,0.7)' }}>
+                Goal: RM{monthlySalesGoal.toLocaleString()}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 12 }}>
+              {loading ? '...' : `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            </Text>
+            <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{ height: '100%', width: `${salesProgressPercentage}%`, backgroundColor: '#FFC700', borderRadius: 3 }} />
+            </View>
+          </View>
         </View>
 
         {isInTrial && (
@@ -718,58 +780,7 @@ export default function MerchantDashboard() {
           )}
         </View>
 
-        {/* Total Stamp Issued Metric Card */}
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceRow}>
-            <View style={styles.balanceTextWrap}>
-              <Text style={styles.balanceLabel}>{t('total_stamps_awarded')}</Text>
-              <Text style={styles.balanceValue}>
-                {loading ? '...' : totalStampsAwarded.toLocaleString()}
-              </Text>
-            </View>
-            <View style={styles.walletIconWrap}>
-              <Ionicons name="wallet-outline" size={24} color="#FFFFFF" />
-            </View>
-          </View>
 
-          {/* Connect/Scan Quick Action Button inside card */}
-          <TouchableOpacity
-            style={styles.scanBtn}
-            onPress={() => router.push('/(merchant)/give')}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="qr-code-outline" size={16} color="#000000" />
-            <Text style={styles.scanBtnText}>{t('scan_customer_qr')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Goal Progress Card (Matches the goal/rewards limit progress card) */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>{t('this_months_sales')}</Text>
-            <Ionicons name="trending-up" size={18} color="#000000" />
-          </View>
-
-          <Text style={styles.progressStats}>
-            {loading ? (
-              '...'
-            ) : (
-              `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            )}{' '}
-            <Text style={styles.progressStatsMax}>/ RM {monthlySalesGoal.toLocaleString()} {t('goal')}</Text>
-          </Text>
-
-          {/* Sleek Progress Fill Bar */}
-          <View style={styles.barContainer}>
-            <View style={[styles.barFill, { width: `${salesProgressPercentage}%` }]} />
-          </View>
-
-          <Text style={styles.remainingText}>
-            {loading
-              ? '...'
-              : `RM ${remainingSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('to_go')}`}
-          </Text>
-        </View>
 
       </ScrollView>
 
@@ -1621,12 +1632,7 @@ const styles = StyleSheet.create({
   },
   // Dedicated Pending Stamp Requests Styles (Monochrome B&W)
   pendingSectionContainer: {
-    marginBottom: 20,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    marginBottom: 40,
   },
   pendingHeaderRow: {
     flexDirection: 'row',
@@ -1640,13 +1646,16 @@ const styles = StyleSheet.create({
   },
   pendingEmptyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    gap: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   pendingEmptyIconWrap: {
     width: 38,
@@ -1669,16 +1678,14 @@ const styles = StyleSheet.create({
   },
   pendingCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 4,
   },
   pendingCustomerHeader: {
     flexDirection: 'row',
@@ -1769,8 +1776,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   presetChipActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
+    backgroundColor: '#1A1400',
+    borderColor: '#1A1400',
   },
   presetChipText: {
     fontSize: 10,
@@ -1827,7 +1834,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1400',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

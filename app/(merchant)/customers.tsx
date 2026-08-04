@@ -473,29 +473,41 @@ export default function CustomersScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Top Header Row */}
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-        <View style={styles.headerTitleWrap}>
-          <Image
-            source={{ 
-              uri: merchant?.logo 
-                ? pb.files.getURL(merchant, merchant.logo)
-                : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' 
-            }}
-            style={styles.merchantAvatar}
-          />
-          <Text style={styles.headerTitle}>{t('transaction_history')}</Text>
-        </View>
-        <Image
-          source={require('../../theme/rise_officiallogo.png')}
-          style={{ width: 110, height: 38, resizeMode: 'contain' }}
-        />
-      </View>
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Dark Wave Background */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 200, zIndex: 0 }}>
+          <View style={{ flex: 1, backgroundColor: '#1A1400' }} />
+          {/* Main White Cutout */}
+          <View style={{ position: 'absolute', top: 0, right: -20, width: 165, height: 120, backgroundColor: '#FFFFFF' }} />
+          {/* Top White Filler */}
+          <View style={{ position: 'absolute', top: 0, right: 145, width: 60, height: 60, backgroundColor: '#FFFFFF' }} />
+          {/* Bottom Curve (Convex part) */}
+          <View style={{ position: 'absolute', top: 60, right: 145, width: 60, height: 60, backgroundColor: '#1A1400' }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 60 }} />
+          </View>
+          {/* Top Curve (Concave part) */}
+          <View style={{ position: 'absolute', top: 0, right: 205, width: 60, height: 60, backgroundColor: '#FFFFFF' }}>
+            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 60 }} />
+          </View>
+        </View>
+
+        {/* Top Header Row (Now floating over wave) */}
+        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { zIndex: 10, marginBottom: 20 }]}>
+          <View style={styles.headerTitleWrap}>
+            <Image
+              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+              style={[styles.merchantAvatar, { borderColor: '#1A1400', borderWidth: 2 }]}
+            />
+            <Text style={[styles.headerTitle, { color: '#FFFFFF' }]}>{t('transaction_history')}</Text>
+          </View>
+          <Image
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 110, height: 38, resizeMode: 'contain' }}
+          />
+        </View>
         {/* Metric Cards Section */}
         {/* Card 1: Blue Points Collected Card */}
         <View style={[styles.metricCard, styles.blueCard]}>
@@ -504,7 +516,7 @@ export default function CustomersScreen() {
             {loading ? '...' : totalStampsDistributed.toLocaleString()}
           </Text>
           <View style={styles.trendRow}>
-            <Feather name={trendIcon} size={14} color="#FFFFFF" />
+            <Feather name={trendIcon} size={14} color="#1A1400" />
             <Text style={styles.trendText}>{percentText} {t('from_last_month')}</Text>
           </View>
         </View>
@@ -1071,11 +1083,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     height: 60,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
   },
   headerTitleWrap: {
     flexDirection: 'row',
@@ -1117,23 +1128,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   blueCard: {
-    backgroundColor: '#000000', // Black Card style
+    backgroundColor: '#FFC700', // RISEV Yellow
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 4,
   },
   metricLabelBlue: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: 'rgba(26, 20, 0, 0.75)',
     letterSpacing: 0.8,
   },
   metricValueBlue: {
     fontSize: 32,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#1A1400',
     letterSpacing: -0.5,
   },
   trendRow: {
@@ -1143,33 +1154,41 @@ const styles = StyleSheet.create({
   },
   trendText: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1A1400',
   },
   greyCard: {
-    backgroundColor: '#F1F5F9', // Gray Card style
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   metricLabelGrey: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#565e74',
+    color: '#475569',
     letterSpacing: 0.8,
   },
   metricValueGrey: {
     fontSize: 32,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0b1c30',
+    color: '#000000',
     letterSpacing: -0.5,
   },
   subtextGrey: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#565e74',
+    color: '#475569',
   },
   lightCard: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   metricLabelLight: {
     fontSize: 10,
@@ -1302,18 +1321,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   gridContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    backgroundColor: 'transparent',
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   tableHeader: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    marginBottom: 8,
   },
   headerCol: {
     fontSize: 10,
@@ -1334,11 +1349,17 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 16,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   rowCol: {
     fontSize: 12,

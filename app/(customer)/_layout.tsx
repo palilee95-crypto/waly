@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Alert, LayoutAnimation, UIManager, Animated } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +19,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const { t } = useLanguage();
   const isDesktop = width >= 768;
 
+  useEffect(() => {
+    // A bouncy spring animation gives a nice "bubble" effect when switching tabs
+    LayoutAnimation.configureNext({
+      duration: 350,
+      create: { type: 'linear', property: 'opacity' },
+      update: { type: 'spring', springDamping: 0.7 },
+      delete: { type: 'linear', property: 'opacity' }
+    });
+  }, [state.index]);
+
   if (isDesktop) {
     return (
       <View style={styles.desktopSidebar}>
@@ -27,7 +41,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         {/* Navigation Links */}
         <View style={styles.sidebarLinks}>
           {state.routes.map((route: any, index: number) => {
-            if (route.name === 'my-cards' || route.name === 'history') return null;
+            const ALLOWED_TABS = ['index', 'explore', 'vouchers', 'profile'];
+            if (!ALLOWED_TABS.includes(route.name)) return null;
             
             const isFocused = state.index === index;
 
@@ -69,7 +84,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 <Ionicons
                   name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
                   size={18}
-                  color={isFocused ? '#FFFFFF' : '#0F172A'}
+                  color={isFocused ? '#1A1400' : '#0F172A'}
                 />
                 <Text style={[styles.sidebarBtnText, isFocused && styles.sidebarBtnTextActive]}>
                   {label}
@@ -98,7 +113,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     <View style={[styles.tabBarContainer, { bottom: Platform.OS === 'ios' ? 24 : 16 }]}>
       <View style={styles.tabBarInner}>
         {state.routes.map((route: any, index: number) => {
-          if (route.name === 'my-cards' || route.name === 'history') return null; // Skip rendering in tab bar
+          const ALLOWED_TABS = ['index', 'explore', 'vouchers', 'profile'];
+          if (!ALLOWED_TABS.includes(route.name)) return null; // Only show the 4 known tabs
           
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
@@ -129,36 +145,83 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
 
           return (
-            <React.Fragment key={route.key}>
-              <TouchableOpacity
-                onPress={onPress}
-                activeOpacity={0.8}
-                style={[
-                  styles.tabButton,
-                  isFocused ? styles.tabButtonActive : styles.tabButtonInactive
-                ]}
-              >
-                {isFocused ? (
-                  <View style={styles.activePill}>
-                    <Ionicons name={iconName as any} size={16} color="#FFFFFF" />
-                    <Text style={styles.activePillText} numberOfLines={1}>{label}</Text>
-                  </View>
-                ) : (
-                  <Ionicons name={`${iconName}-outline` as any} size={22} color="#0F172A" />
-                )}
-              </TouchableOpacity>
-
-              {/* Vertical divider line next to active tab */}
-              {isFocused && (
-                <View style={styles.verticalDivider} />
-              )}
-            </React.Fragment>
+            <AnimatedTabButton 
+              key={route.key}
+              isFocused={isFocused}
+              onPress={onPress}
+              iconName={iconName}
+              label={label}
+            />
           );
         })}
       </View>
     </View>
   );
 }
+
+const AnimatedTabButton = ({ isFocused, onPress, iconName, label }: any) => {
+  const [anim] = React.useState(new Animated.Value(isFocused ? 1 : 0));
+
+  React.useEffect(() => {
+    Animated.spring(anim, {
+      toValue: isFocused ? 1 : 0,
+      useNativeDriver: false,
+      friction: 7,
+      tension: 60
+    }).start();
+  }, [isFocused]);
+
+  const width = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [40, 95]
+  });
+
+  const backgroundColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 199, 0, 0)', 'rgba(255, 199, 0, 1)']
+  });
+  
+  const labelOpacity = anim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0, 1]
+  });
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+    >
+      <Animated.View style={[
+        { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          height: 40, 
+          borderRadius: 20, 
+          width,
+          backgroundColor 
+        }
+      ]}>
+        <Ionicons name={isFocused ? iconName : `${iconName}-outline` as any} size={isFocused ? 18 : 22} color={isFocused ? '#1A1400' : '#0F172A'} />
+        {isFocused && (
+          <Animated.Text 
+            style={{ 
+              marginLeft: 6, 
+              fontSize: 13, 
+              fontFamily: 'PlusJakartaSans_700Bold', 
+              color: '#1A1400',
+              opacity: labelOpacity
+            }} 
+            numberOfLines={1}
+          >
+            {label}
+          </Animated.Text>
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; refreshSession: () => Promise<void>; logout: () => Promise<void> }) {
   // Pre-fill the name if it is not the placeholder User XXXX format
@@ -343,6 +406,7 @@ export default function CustomerLayout() {
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          animation: 'fade', // Add smooth fade transition
         }}
       >
         <Tabs.Screen name="index" />
@@ -398,7 +462,7 @@ const styles = StyleSheet.create({
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000000', // Solid black active pill matching image
+    backgroundColor: '#FFC700', // Solid yellow active pill matching image
     borderRadius: 24,
     paddingHorizontal: 16,
     height: 40,
@@ -408,7 +472,7 @@ const styles = StyleSheet.create({
   activePillText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#1A1400',
   },
   verticalDivider: {
     width: 1,
@@ -462,7 +526,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   sidebarBtnActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#FFC700',
   },
   sidebarBtnText: {
     fontSize: 14,
@@ -470,7 +534,7 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   sidebarBtnTextActive: {
-    color: '#FFFFFF',
+    color: '#1A1400',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   sidebarFooter: {

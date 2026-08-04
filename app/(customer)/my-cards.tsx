@@ -12,12 +12,16 @@ import {
   useWindowDimensions,
   Alert,
   Platform,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
+import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +45,136 @@ type LoyaltyCardItem = {
   linkedRewardId?: string;
 };
 
+// --- Sub-component for Hoverable Wallet Card ---
+const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: any) => {
+  const pullAnim = React.useRef(new Animated.Value(isPulledOut ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    Animated.spring(pullAnim, {
+      toValue: isPulledOut ? 1 : 0,
+      friction: 7,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  }, [isPulledOut]);
+
+  const translateY = pullAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -110], // Pulls the card up significantly to reveal it
+  });
+
+  return (
+    <Animated.View style={{ zIndex: index, marginTop: index > 0 ? -160 : 0, transform: [{ translateY }] }}>
+      <Pressable
+        onPress={onTap}
+        style={[
+          styles.loyaltyCard, 
+          { backgroundColor: (item.gradientColors ?? ['#EC4899', '#8B5CF6'])[0] }
+        ]}
+      >
+        {/* Clipping Layer for Background & Gloss */}
+        <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 24, overflow: 'hidden' }}>
+          {item.cardBackground ? (
+            <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : null}
+          
+          {/* Realistic Gloss Reflection */}
+          <View style={{
+            position: 'absolute',
+            top: -100,
+            right: -100,
+            width: 400,
+            height: 400,
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            transform: [{ rotate: '35deg' }],
+            pointerEvents: 'none',
+          }} />
+        </View>
+
+        <View style={styles.cardHeader}>
+          <View style={styles.shopLogoBg}>
+            <Image source={{ uri: item.logo }} style={styles.shopLogo} />
+          </View>
+          <View style={styles.shopTextColumn}>
+            <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
+              {item.merchantName}
+            </Text>
+            <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]} numberOfLines={1}>
+              {item.category.toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.ptsColumn}>
+            <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
+              {item.collectedStamps}/{item.totalStamps}
+            </Text>
+            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>STAMPS</Text>
+          </View>
+        </View>
+
+        {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
+        <View style={styles.cardMidRow}>
+          <View style={styles.cardChip}>
+            <View style={styles.chipLineHoriz} />
+            <View style={styles.chipLineVert} />
+            <View style={styles.chipCenterPin} />
+          </View>
+          <Ionicons 
+            name="wifi" 
+            size={16} 
+            color="#E2E8F0" 
+            style={{ opacity: 0.9 }} 
+          />
+        </View>
+
+        {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
+        <View style={styles.cardBottomRow}>
+          <View style={styles.holderBlock}>
+            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+              CARD HOLDER
+            </Text>
+            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]} numberOfLines={1}>
+              {(user?.name || 'Ahmad Fazli').toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={styles.validBlock}>
+            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+              VALID
+            </Text>
+            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
+              12/30
+            </Text>
+          </View>
+
+          <View style={styles.cvvBlock}>
+            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+              CVV
+            </Text>
+            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
+              888
+            </Text>
+          </View>
+
+          {/* Mastercard-style overlapping circles */}
+          <View style={styles.mastercardBadge}>
+            <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+            <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+          </View>
+        </View>
+
+        {/* Tap Again Hint */}
+        {isPulledOut && (
+          <Animated.View style={{ position: 'absolute', bottom: 70, left: 0, right: 0, alignItems: 'center' }}>
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+              <Text style={{ color: '#FFF', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold' }}>Tap again to view details</Text>
+            </View>
+          </Animated.View>
+        )}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 export default function MyCardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -49,6 +183,49 @@ export default function MyCardsScreen() {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [loyaltyCards, setLoyaltyCards] = useState<LoyaltyCardItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pulledOutCardId, setPulledOutCardId] = useState<string | null>(null);
+  const [pinnedCards, setPinnedCards] = useState<string[]>([]);
+
+  const loadPinnedCards = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@pinned_cards');
+      if (stored) {
+        setPinnedCards(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn("Failed to load pinned cards", e);
+    }
+  };
+
+  const togglePinCard = async (cardId: string) => {
+    try {
+      let newPinned = [...pinnedCards];
+      if (newPinned.includes(cardId)) {
+        newPinned = newPinned.filter(id => id !== cardId);
+      } else {
+        if (newPinned.length >= 3) {
+          Alert.alert("Limit Reached", "You can only pin up to 3 cards to your home dashboard. Please unpin another card first.");
+          return;
+        }
+        newPinned.push(cardId);
+      }
+      setPinnedCards(newPinned);
+      await AsyncStorage.setItem('@pinned_cards', JSON.stringify(newPinned));
+    } catch (e) {
+      console.warn("Failed to save pinned cards", e);
+    }
+  };
+
+  const handleCardTap = (item: LoyaltyCardItem) => {
+    if (pulledOutCardId === item.id) {
+      // Second tap: open details
+      openCardDetails(item);
+      setPulledOutCardId(null);
+    } else {
+      // First tap: pull out
+      setPulledOutCardId(item.id);
+    }
+  };
 
   const fetchLoyaltyCards = async () => {
     if (!user) return;
@@ -95,6 +272,7 @@ export default function MyCardsScreen() {
 
   useEffect(() => {
     fetchLoyaltyCards();
+    loadPinnedCards();
 
     if (user) {
       pb.collection('loyalty_cards').subscribe('*', () => {
@@ -281,29 +459,44 @@ export default function MyCardsScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-          <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={18} color="#000000" />
-          </TouchableOpacity>
-          
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
-          />
+        {/* Unified Yellow Header Block */}
+        <View style={{ backgroundColor: '#FFFFFF', zIndex: 10 }}>
+          {/* Yellow Block with rounded bottom-right corner = the outer convex part */}
+          <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 28 }}>
+            <View style={[{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+              {/* Top Header Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#B38B00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 3 }} onPress={() => router.back()}>
+                  <Ionicons name="arrow-back" size={18} color="#1A1400" />
+                </TouchableOpacity>
+                
+                <Image
+                  source={require('../../assets/risev logo.png')}
+                  style={{ width: 110, height: 38, resizeMode: 'contain' }}
+                />
+              </View>
+              
+              {/* Page Titles inside the Yellow Header */}
+              <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>All Stamp Cards</Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', marginTop: 6, lineHeight: 18 }}>
+                Here is the complete wallet list of all merchant partners you have collected stamps from.
+              </Text>
+            </View>
+          </View>
+          {/* White overlay with rounded top-left = the inner concave swoop that completes the S */}
+          <View style={{ height: 28, backgroundColor: '#FFC700' }}>
+            <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
+          </View>
         </View>
 
         <ScrollView
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
+          onScroll={() => {
+            if (pulledOutCardId) setPulledOutCardId(null);
+          }}
+          scrollEventThrottle={16}
         >
-          {/* Page Titles */}
-          <View style={styles.introSection}>
-            <Text style={styles.title}>All Stamp Cards</Text>
-            <Text style={styles.subtitle}>
-              Here is the complete wallet list of all merchant partners you have collected stamps from.
-            </Text>
-          </View>
 
           {/* Cards Wallet List */}
           <View style={styles.walletList}>
@@ -324,90 +517,16 @@ export default function MyCardsScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              loyaltyCards.map((item) => (
-                <TouchableOpacity
+              loyaltyCards.map((item, index) => (
+                <StackedWalletCard
                   key={item.id}
-                  style={[styles.loyaltyCard, { backgroundColor: item.gradientColors[0], overflow: 'hidden' }]}
-                  onPress={() => openCardDetails(item)}
-                  activeOpacity={0.9}
-                >
-                  {item.cardBackground ? (
-                    <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : null}
-
-
-                  <View style={styles.cardHeader}>
-                    <View style={styles.shopLogoBg}>
-                      <Image source={{ uri: item.logo }} style={styles.shopLogo} />
-                    </View>
-                    <View style={styles.shopTextColumn}>
-                      <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
-                        {item.merchantName}
-                      </Text>
-                      <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]} numberOfLines={1}>
-                        {item.category.toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.ptsColumn}>
-                      <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
-                        {item.collectedStamps}/{item.totalStamps}
-                      </Text>
-                      <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>STAMPS</Text>
-                    </View>
-                  </View>
-
-                  {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
-                  <View style={styles.cardMidRow}>
-                    <View style={styles.cardChip}>
-                      <View style={styles.chipLineHoriz} />
-                      <View style={styles.chipLineVert} />
-                      <View style={styles.chipCenterPin} />
-                    </View>
-                    <Ionicons 
-                      name="wifi" 
-                      size={16} 
-                      color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                      style={{ opacity: 0.35 }} 
-                    />
-                  </View>
-
-
-                  {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
-                  <View style={styles.cardBottomRow}>
-                    <View style={styles.holderBlock}>
-                      <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                        CARD HOLDER
-                      </Text>
-                      <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
-                        {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={styles.validBlock}>
-                      <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                        VALID
-                      </Text>
-                      <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
-                        12/30
-                      </Text>
-                    </View>
-
-                    <View style={styles.cvvBlock}>
-                      <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                        CVV
-                      </Text>
-                      <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
-                        888
-                      </Text>
-                    </View>
-
-                    {/* Mastercard-style overlapping circles */}
-                    <View style={styles.mastercardBadge}>
-                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  item={item}
+                  index={index}
+                  isPulledOut={pulledOutCardId === item.id}
+                  onTap={() => handleCardTap(item)}
+                  user={user}
+                  styles={styles}
+                />
               ))
             )}
           </View>
@@ -432,73 +551,16 @@ export default function MyCardsScreen() {
               </View>
 
               <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-                {/* Large credit-card style loyalty details card */}
-                <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
-                  {selectedCard.cardBackground ? (
-                    <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : null}
-
-                  <View style={styles.largeCardHeader}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                        {selectedCard.merchantName}
-                      </Text>
-                      <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
-                        {selectedCard.category.toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.goldBadge}>
-                      <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
-                    </View>
-                  </View>
-
-                  {/* EMV Microchip */}
-                  <View style={styles.cardMidRow}>
-                    <View style={styles.cardChip}>
-                      <View style={styles.chipLineHoriz} />
-                      <View style={styles.chipLineVert} />
-                      <View style={styles.chipCenterPin} />
-                    </View>
-                    <Ionicons 
-                      name="wifi" 
-                      size={18} 
-                      color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                      style={{ opacity: 0.35 }} 
-                    />
-                  </View>
-
-                  {/* Stamps grid details */}
-                  <View style={styles.largeStampsGrid}>
-                    {renderDetailStampSlots(selectedCard)}
-                  </View>
-
-                  <View style={styles.largeCardFooter}>
-                    <View style={styles.holderCol}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                        {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={{ width: 45 }}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
-                    </View>
-
-                    <View style={{ width: 35 }}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
-                    </View>
-
-                    <View style={styles.brandBadge}>
-                      <View style={styles.mastercardBadge}>
-                        <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                        <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
-                      </View>
-                      <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
-                        {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
-                      </Text>
-                    </View>
+                {/* 3D Flippable Loyalty Card & Hint */}
+                <View>
+                  <FlippableLoyaltyCard 
+                    card={selectedCard} 
+                    user={user} 
+                    autoFlipDelay={500}
+                  />
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6, opacity: 0.8 }}>
+                    <Ionicons name="swap-horizontal" size={14} color="#6B7280" />
+                    <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>Tap card to flip</Text>
                   </View>
                 </View>
 
@@ -513,6 +575,34 @@ export default function MyCardsScreen() {
                     <Text style={styles.tierBadgeText}>{(selectedCard.tier || 'bronze').toUpperCase()}</Text>
                   </View>
                 </View>
+
+                {/* Pin to Home Button */}
+                <TouchableOpacity 
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: pinnedCards.includes(selectedCard.id) ? '#F1F5F9' : '#000000',
+                    padding: 16,
+                    borderRadius: 16,
+                    gap: 8,
+                  }}
+                  onPress={() => togglePinCard(selectedCard.id)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name={pinnedCards.includes(selectedCard.id) ? "pin" : "pin-outline"} 
+                    size={20} 
+                    color={pinnedCards.includes(selectedCard.id) ? "#0F172A" : "#FFFFFF"} 
+                  />
+                  <Text style={{
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    fontSize: 14,
+                    color: pinnedCards.includes(selectedCard.id) ? "#0F172A" : "#FFFFFF"
+                  }}>
+                    {pinnedCards.includes(selectedCard.id) ? "Unpin from Home" : "Pin to Home Dashboard"}
+                  </Text>
+                </TouchableOpacity>
 
                 {/* Stamp Completion Reward panel */}
                 <View style={styles.rewardDetailPanel}>
@@ -792,12 +882,15 @@ const styles = StyleSheet.create({
   loyaltyCard: {
     borderRadius: 24,
     padding: 20,
-    gap: 14,
+    justifyContent: 'space-between',
+    aspectRatio: 1.586, // Standard credit card aspect ratio
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1274,9 +1367,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   holderValueText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#E2E8F0',
+    letterSpacing: 0.5,
   },
   validBlock: {
     width: 45,

@@ -301,31 +301,32 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Top Header */}
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-        <Image
-          source={{ uri: avatarUrl }}
-          style={styles.avatar}
-        />
-        
-        <Image
-          source={require('../../theme/rise_officiallogo.png')}
-          style={{ width: 110, height: 38, resizeMode: 'contain' }}
-        />
+      {/* ── Yellow S-Curve Header (Idea 1) ── */}
+      <View style={{ backgroundColor: '#FFFFFF' }}>
+        {/* Yellow Block */}
+        <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 32 }}>
+          <View style={[{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+            {/* Logo row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
+              <Image source={require('../../assets/risev logo.png')} style={{ width: 110, height: 38, resizeMode: 'contain' }} />
+            </View>
+            {/* Title */}
+            <Text style={{ fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1, marginBottom: 4 }}>Discover Merchants</Text>
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', lineHeight: 18 }}>
+              Explore top local merchants near you and collect loyalty stamps.
+            </Text>
+          </View>
+        </View>
+        {/* S-Curve: white strip with concave top-left arc */}
+        <View style={{ height: 28, backgroundColor: '#FFC700' }}>
+          <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
+        </View>
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Intro Section */}
-        <View style={styles.introSection}>
-          <Text style={styles.title}>Discover Merchants</Text>
-          <Text style={styles.subtitle}>
-            Explore top local merchants near you and collect loyalty rewards stamps.
-          </Text>
-        </View>
-
         {/* Search Row */}
         <View style={styles.searchRow}>
           <View style={styles.searchField}>
@@ -373,18 +374,25 @@ export default function ExploreScreen() {
         <View style={styles.locationFilterCard}>
           <View style={styles.locationHeaderRow}>
             <View style={styles.locationHeaderLeft}>
-              <Ionicons
-                name={userCoords ? "location-sharp" : "location-outline"}
-                size={16}
-                color={userCoords ? "#10B981" : "#64748B"}
-              />
-              <Text style={styles.locationStatusTitle}>
-                {userCoords
-                  ? `GPS Active (${userCoords.lat.toFixed(3)}, ${userCoords.lng.toFixed(3)})`
-                  : locationStatus === 'loading'
-                  ? 'Acquiring GPS coordinates...'
-                  : 'Location access off — Showing all stores'}
-              </Text>
+              <View style={[styles.locationIconWrap, userCoords && { backgroundColor: '#E0F2FE' }]}>
+                <Ionicons
+                  name={userCoords ? "location-sharp" : "location-outline"}
+                  size={16}
+                  color={userCoords ? "#0284C7" : "#64748B"}
+                />
+              </View>
+              <View style={styles.locationTextWrap}>
+                <Text style={styles.locationStatusTitle}>
+                  {userCoords ? 'GPS Active' : 'Location Access Off'}
+                </Text>
+                <Text style={styles.locationStatusSub}>
+                  {userCoords
+                    ? `${userCoords.lat.toFixed(3)}, ${userCoords.lng.toFixed(3)}`
+                    : locationStatus === 'loading'
+                    ? 'Acquiring GPS coordinates...'
+                    : 'Showing all stores'}
+                </Text>
+              </View>
             </View>
 
             {locationStatus !== 'granted' && (
@@ -393,7 +401,7 @@ export default function ExploreScreen() {
                 style={styles.gpsEnableBtn}
                 activeOpacity={0.8}
               >
-                <Ionicons name="navigate" size={13} color="#000000" style={{ marginRight: 4 }} />
+                <Ionicons name="navigate" size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.gpsEnableBtnText}>
                   {locationStatus === 'loading' ? 'Locating...' : 'Enable GPS'}
                 </Text>
@@ -432,10 +440,64 @@ export default function ExploreScreen() {
           </ScrollView>
         </View>
 
-        {/* Merchant Cards list */}
+        {/* ── Featured Merchants Spotlight (Idea 3) ── */}
+        {!loading && filteredMerchants.length > 0 && (
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', letterSpacing: -0.3 }}>⭐ Featured</Text>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>Swipe →</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}>
+              {filteredMerchants.slice(0, 5).map((item) => (
+                <TouchableOpacity
+                  key={`featured-${item.id}`}
+                  onPress={() => handleOpenMerchantDetails(item)}
+                  activeOpacity={0.9}
+                  style={{
+                    width: 200,
+                    borderRadius: 20,
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 16,
+                    elevation: 4,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Cover Image */}
+                  <View style={{ width: '100%', height: 120, position: 'relative' }}>
+                    <Image source={{ uri: item.coverImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.25)' }} />
+                    {/* Distance badge */}
+                    <View style={{ position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, gap: 3 }}>
+                      <Ionicons name="location-sharp" size={10} color="#FFFFFF" />
+                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FFFFFF' }}>{item.distance}</Text>
+                    </View>
+                  </View>
+                  {/* Card bottom info */}
+                  <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Image source={{ uri: item.logo }} style={{ width: 36, height: 36, borderRadius: 10, borderWidth: 1.5, borderColor: '#F1F5F9' }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>{item.category}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── All Merchants List ── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+          <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', letterSpacing: -0.3 }}>All Merchants</Text>
+          {!loading && <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8' }}>{filteredMerchants.length} found</Text>}
+        </View>
+
         <View style={styles.merchantsList}>
           {loading ? (
-            <ActivityIndicator size="large" color="#004ac6" style={{ marginVertical: 40 }} />
+            <ActivityIndicator size="large" color="#FFC700" style={{ marginVertical: 40 }} />
           ) : filteredMerchants.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <Ionicons name="search-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
@@ -517,18 +579,17 @@ export default function ExploreScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, isDesktop && { maxWidth: 500, width: '90%', borderRadius: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Merchant Info</Text>
-              <TouchableOpacity onPress={() => setMerchantModalVisible(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#000000" />
-              </TouchableOpacity>
-            </View>
-
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               {/* Cover Banner */}
               {selectedMerchant && (
                 <View style={styles.modalCoverContainer}>
                   <Image source={{ uri: selectedMerchant.coverImage }} style={styles.modalCoverImage} />
+                  
+                  {/* Floating Close Button */}
+                  <TouchableOpacity onPress={() => setMerchantModalVisible(false)} style={styles.floatingCloseBtn}>
+                    <Ionicons name="close" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+
                   <View style={styles.modalLogoContainer}>
                     <Image source={{ uri: selectedMerchant.logo }} style={styles.modalLogo} />
                   </View>
@@ -544,59 +605,10 @@ export default function ExploreScreen() {
                 </View>
               )}
 
-              <View style={styles.modalDivider} />
-
-              {/* Operating Hours Card */}
-              <View style={styles.detailCard}>
-                <View style={styles.detailCardHeader}>
-                  <Ionicons name="time-outline" size={20} color="#000000" />
-                  <Text style={styles.detailCardTitle}>Operating Hours</Text>
-                </View>
-                {renderOperatingHours()}
-              </View>
-
-              {/* Location Card */}
-              <View style={styles.detailCard}>
-                <View style={styles.detailCardHeader}>
-                  <Ionicons name="location-outline" size={20} color="#000000" />
-                  <Text style={styles.detailCardTitle}>Location & Address</Text>
-                </View>
-                <Text style={styles.detailCardText}>
-                  {fetchingLocation 
-                    ? 'Loading address...' 
-                    : (merchantLocation?.address 
-                        ? `${merchantLocation.address}, ${merchantLocation.city || ''}, ${merchantLocation.country || ''}`.trim()
-                        : 'No specific address details listed.')
-                  }
-                </Text>
-                {!fetchingLocation && (merchantLocation?.address || selectedMerchant?.name) && (
-                  <TouchableOpacity 
-                    style={styles.modalActionBtn} 
-                    onPress={() => {
-                      const lat = merchantLocation?.lat;
-                      const lng = merchantLocation?.lng;
-                      const address = merchantLocation?.address || selectedMerchant?.name || '';
-                      const url = Platform.select({
-                        ios: lat && lng ? `maps:0,0?q=${lat},${lng}` : `maps:0,0?q=${encodeURIComponent(address)}`,
-                        android: lat && lng ? `geo:${lat},${lng}?q=${lat},${lng}` : `geo:0,0?q=${encodeURIComponent(address)}`,
-                        web: lat && lng ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-                      });
-                      if (url) {
-                        Linking.openURL(url).catch(() => {
-                          Alert.alert('Error', 'Could not open map directions.');
-                        });
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="map-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.modalActionBtnText}>Get Directions</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <View style={[styles.modalDivider, { marginHorizontal: 24 }]} />
 
               {/* Contact Card */}
-              <View style={styles.detailCard}>
+              <View style={[styles.detailCard, { marginHorizontal: 24 }]}>
                 <View style={styles.detailCardHeader}>
                   <Ionicons name="call-outline" size={20} color="#000000" />
                   <Text style={styles.detailCardTitle}>Contact Info</Text>
@@ -651,6 +663,55 @@ export default function ExploreScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+              </View>
+
+              {/* Location Card */}
+              <View style={[styles.detailCard, { marginHorizontal: 24 }]}>
+                <View style={styles.detailCardHeader}>
+                  <Ionicons name="location-outline" size={20} color="#000000" />
+                  <Text style={styles.detailCardTitle}>Location & Address</Text>
+                </View>
+                <Text style={styles.detailCardText}>
+                  {fetchingLocation 
+                    ? 'Loading address...' 
+                    : (merchantLocation?.address 
+                        ? `${merchantLocation.address}, ${merchantLocation.city || ''}, ${merchantLocation.country || ''}`.trim()
+                        : 'No specific address details listed.')
+                  }
+                </Text>
+                {!fetchingLocation && (merchantLocation?.address || selectedMerchant?.name) && (
+                  <TouchableOpacity 
+                    style={styles.modalActionBtn} 
+                    onPress={() => {
+                      const lat = merchantLocation?.lat;
+                      const lng = merchantLocation?.lng;
+                      const address = merchantLocation?.address || selectedMerchant?.name || '';
+                      const url = Platform.select({
+                        ios: lat && lng ? `maps:0,0?q=${lat},${lng}` : `maps:0,0?q=${encodeURIComponent(address)}`,
+                        android: lat && lng ? `geo:${lat},${lng}?q=${lat},${lng}` : `geo:0,0?q=${encodeURIComponent(address)}`,
+                        web: lat && lng ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+                      });
+                      if (url) {
+                        Linking.openURL(url).catch(() => {
+                          Alert.alert('Error', 'Could not open map directions.');
+                        });
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="map-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.modalActionBtnText}>Get Directions</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Operating Hours Card */}
+              <View style={[styles.detailCard, { marginHorizontal: 24 }]}>
+                <View style={styles.detailCardHeader}>
+                  <Ionicons name="time-outline" size={20} color="#000000" />
+                  <Text style={styles.detailCardTitle}>Operating Hours</Text>
+                </View>
+                {renderOperatingHours()}
               </View>
             </ScrollView>
           </View>
@@ -729,8 +790,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 110, // Safe padding to clear bottom tab bar
+    paddingTop: 16,
+    paddingBottom: 110,
     gap: 20,
   },
   introSection: {
@@ -976,76 +1037,72 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     width: '100%',
-    maxHeight: '85%',
-    padding: 24,
+    maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 20,
+    overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  floatingCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  closeBtn: {
-    padding: 4,
+    justifyContent: 'center',
+    zIndex: 10,
   },
   modalScrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
   modalCoverContainer: {
     width: '100%',
-    height: 140,
-    borderRadius: 16,
-    overflow: 'visible',
+    height: 180,
     position: 'relative',
-    marginTop: 16,
     backgroundColor: '#F1F5F9',
   },
   modalCoverImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
     resizeMode: 'cover',
   },
   modalLogoContainer: {
     position: 'absolute',
-    bottom: -30,
-    alignSelf: 'center',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    bottom: -35,
+    left: 24,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#FFFFFF',
-    padding: 3,
+    padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
   },
   modalLogo: {
     width: '100%',
     height: '100%',
-    borderRadius: 32,
+    borderRadius: 36,
     resizeMode: 'cover',
   },
   merchantMetaSection: {
-    alignItems: 'center',
-    marginTop: 38,
-    gap: 6,
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: 46,
+    paddingBottom: 16,
   },
   modalMerchantName: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+    marginBottom: 6,
   },
   categoryBadge: {
     paddingHorizontal: 10,
@@ -1133,56 +1190,80 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   locationFilterCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
     padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   locationHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   locationHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
+  },
+  locationIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  locationTextWrap: {
+    flex: 1,
+    justifyContent: 'center',
   },
   locationStatusTitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#334155',
-    marginLeft: 6,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    marginBottom: 1,
+  },
+  locationStatusSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
   gpsEnableBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: '#1A1400',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   gpsEnableBtnText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
   radiusScroll: {
-    gap: 6,
+    gap: 8,
   },
   radiusPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   radiusPillActive: {
@@ -1190,9 +1271,9 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   radiusPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#475569',
+    color: '#64748B',
   },
   radiusPillTextActive: {
     color: '#FFFFFF',

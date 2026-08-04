@@ -18,9 +18,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pb } from '@/lib/pocketbase';
+import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 
 const { width } = Dimensions.get('window');
 
@@ -172,7 +174,7 @@ export default function CustomerDashboard() {
           tier: rec.tier || 'bronze',
           merchantId: merchant?.id,
           linkedRewardId: program?.linked_reward,
-          gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+          gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'] as string[],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
           fontColor: program?.font_color || '#FFFFFF',
@@ -181,6 +183,26 @@ export default function CustomerDashboard() {
             : undefined,
         };
       });
+
+      // Fetch pinned cards and sort them to the top
+      let pinnedIds: string[] = [];
+      try {
+        const storedPinned = await AsyncStorage.getItem('@pinned_cards');
+        if (storedPinned) {
+          pinnedIds = JSON.parse(storedPinned);
+        }
+      } catch (err) {
+        console.warn('Failed to read pinned cards:', err);
+      }
+
+      mapped.sort((a: any, b: any) => {
+        const aPinned = pinnedIds.includes(a.id);
+        const bPinned = pinnedIds.includes(b.id);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return 0; // fallback to the default -updated sort
+      });
+
       setLoyaltyCards(mapped);
     } catch (err) {
       console.warn('Failed to fetch loyalty cards:', err);
@@ -207,6 +229,15 @@ export default function CustomerDashboard() {
       pb.collection('loyalty_cards').unsubscribe('*');
     };
   }, [user]);
+
+  // Refresh pinned cards whenever the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        fetchLoyaltyCards();
+      }
+    }, [user])
+  );
 
   const [merchantRewards, setMerchantRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(false);
@@ -419,97 +450,147 @@ export default function CustomerDashboard() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning! 👋';
+    if (hour < 18) return 'Good afternoon! 👋';
+    return 'Good evening! 👋';
+  };
+
+  const highestCard = loyaltyCards.length > 0 ? loyaltyCards.reduce((prev, current) => (prev.collectedStamps > current.collectedStamps) ? prev : current) : null;
+  const currentStamps = highestCard ? highestCard.collectedStamps : 8;
+  const maxStamps = highestCard ? highestCard.totalStamps : 10;
+  const progressArray = Array.from({ length: 10 }, (_, i) => i < Math.round((currentStamps / maxStamps) * 10));
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-          <Image
-            source={{ uri: avatarUrl }}
-            style={styles.avatar}
-          />
-          
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
-          />
-        </View>
+        {/* Main Content Wrapper for white center on dark background */}
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF', maxWidth: 800, alignSelf: 'center', width: '100%' }}>
 
         <ScrollView
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Welcome Points Summary Card */}
-          <View style={styles.welcomeCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.welcomeTextWrap}>
-                <Text style={styles.welcomeSubtitle}>{t('welcome_back')},</Text>
-                <Text style={styles.welcomeName}>{user?.name || 'Ahmad Fazli'}</Text>
+          {/* 🌟 SUPERCARD V2 🌟 */}
+          <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 20 }}>
+            
+            {/* Absolute Folder Tab Background Layer */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderRadius: 32 }}>
+              {/* Base Yellow */}
+              <View style={{ flex: 1, backgroundColor: '#FFC700' }} />
+              
+              {/* 1. Main White Cutout (lowered right area) */}
+              <View style={{ position: 'absolute', top: -5, right: -5, width: 150, height: 80, backgroundColor: '#FFFFFF' }} />
+              
+              {/* 2. Top White Filler (fills the area above the Bottom Curve) */}
+              <View style={{ position: 'absolute', top: -5, right: 145, width: 40, height: 40, backgroundColor: '#FFFFFF' }} />
+              
+              {/* 3. Bottom Curve (Convex part) */}
+              <View style={{ position: 'absolute', top: 35, right: 145, width: 40, height: 40, backgroundColor: '#FFC700' }}>
+                <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 40 }} />
               </View>
-              <View style={styles.pointsWrap}>
-                <Text style={styles.pointsLabel}>{t('total_stamps_awarded')}</Text>
-                <View style={styles.pointsRow}>
-                  <View style={styles.coinGraphic}>
-                    <Ionicons name="star" size={12} color="#D97706" />
+              
+              {/* 4. Top Curve (Concave part) */}
+              <View style={{ position: 'absolute', top: -5, right: 185, width: 40, height: 40, backgroundColor: '#FFFFFF' }}>
+                <View style={{ flex: 1, backgroundColor: '#FFC700', borderTopRightRadius: 40 }} />
+              </View>
+
+              {/* 5. Outer Corner Curve (Rounds the top-right of the lowered yellow part OUTWARDS/CONVEX) */}
+              <View style={{ position: 'absolute', top: 75, right: -5, width: 32, height: 32, backgroundColor: '#FFFFFF' }}>
+                <View style={{ flex: 1, backgroundColor: '#FFC700', borderTopRightRadius: 32 }} />
+              </View>
+            </View>
+
+            {/* Header Content */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
+              <View>
+                <Image source={{ uri: avatarUrl }} style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#FFFFFF', marginBottom: 16 }} />
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400', marginBottom: 2 }}>{getGreeting()} 🖐</Text>
+                <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', lineHeight: 36, letterSpacing: -1 }}>
+                  Welcome back,{'\n'}{user?.name ? user.name.split(' ')[0] : 'Fazli'}
+                </Text>
+              </View>
+
+              <View style={{ position: 'absolute', top: -2, right: 10, width: 125, alignItems: 'center' }}>
+                <Image source={require('../../assets/risev logo.png')} style={{ width: 125, height: 42, resizeMode: 'contain' }} />
+              </View>
+            </View>
+
+            {/* Unified Full-Width Reward Card */}
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, shadowColor: '#B38B00', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 4 }}>
+              {/* Header Row: Title & Total Stamps Badge */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE38F', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="gift-outline" size={18} color="#806400" />
                   </View>
-                  <Text style={styles.pointsValue}>
-                    {loyaltyCards.reduce((acc, curr) => acc + curr.collectedStamps, 0)}
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Next Reward</Text>
+                </View>
+                
+                {/* Sleek Total Stamps Badge */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1400', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 }}>
+                  <Ionicons name="star" size={12} color="#FFC700" />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    Total: {loyaltyCards.reduce((acc, curr) => acc + curr.collectedStamps, 0)}
                   </Text>
                 </View>
               </View>
-            </View>
-            
-            {/* Structured Tagline Divider */}
-            <View style={styles.cardDivider} />
-
-            <View style={styles.taglineRow}>
-              <Text style={styles.taglineBold}>{t('every_visit_rewarded')}</Text>
-              <Text style={styles.taglineSub}>
-                {locale === 'en'
-                  ? `You have ${loyaltyCards.length} active stamp card${loyaltyCards.length === 1 ? '' : 's'}`
-                  : `Anda mempunyai ${loyaltyCards.length} kad setem aktif`}
-              </Text>
-            </View>
-
-            {/* Quick Action Capsules */}
-            <View style={styles.capsulesRow}>
-              <TouchableOpacity
-                style={styles.capsuleActive}
-                onPress={() => setQrModalVisible(true)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="qr-code" size={14} color="#FFFFFF" />
-                <Text style={styles.capsuleActiveText}>{t('show_my_qr_code')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.capsuleInactive}
-                onPress={() => router.push('/(customer)/explore')}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="search" size={14} color="#004ac6" />
-                <Text style={styles.capsuleInactiveText}>{t('discover_shops')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* RISEV Campaign Promo Banner */}
-          <View style={styles.promoCard}>
-            <View style={styles.promoHeaderRow}>
-              <Text style={styles.promoTitle}>{t('promo_title')}</Text>
-              <View style={styles.promoBadge}>
-                <Text style={styles.promoBadgeText}>{t('promo_badge')}</Text>
+              
+              {/* Progress Bar */}
+              <View style={{ flexDirection: 'row', gap: 4, marginBottom: 16 }}>
+                {progressArray.map((isFilled, index) => (
+                  <View key={index} style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: isFilled ? '#FFC700' : '#FFF1C5' }} />
+                ))}
+              </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -0.5 }}>
+                    {currentStamps} / {maxStamps} Stamps
+                  </Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', marginTop: 2 }}>
+                    {maxStamps - currentStamps > 0 ? `${maxStamps - currentStamps} more to unlock reward` : 'Reward unlocked!'}
+                  </Text>
+                </View>
+                
+                {/* Integrated QR Code Button */}
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEA', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#FFE38F' }}
+                  onPress={() => setQrModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="qr-code-outline" size={16} color="#806400" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>My QR</Text>
+                </TouchableOpacity>
               </View>
             </View>
-            <Text style={styles.promoDesc}>{t('promo_desc')}</Text>
-            <TouchableOpacity
-              style={styles.viewPromoBtn}
-              onPress={() => router.push('/(customer)/explore')}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.viewPromoText}>{t('explore_now')}</Text>
-              <Ionicons name="arrow-forward" size={12} color="#000000" />
-            </TouchableOpacity>
+
+            {/* Promo Banner inside Supercard */}
+            <View style={{ backgroundColor: '#1A1400', borderRadius: 24, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#1A1400', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6, overflow: 'hidden' }}>
+              <View style={{ position: 'absolute', right: -20, top: -20, width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.1)', borderStyle: 'dashed' }} />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFC700', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF1C5', shadowColor: '#FFC700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 }}>
+                  <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#E6B300', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFD352' }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>2x</Text>
+                  </View>
+                </View>
+                
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>2X STAMPS</Text>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700', letterSpacing: 0.5, marginBottom: 2 }}>WEEKEND SPECIAL</Text>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', lineHeight: 12 }}>
+                    Visit any partner shop & earn double stamps!
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={{ backgroundColor: '#FFC700', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => router.push('/(customer)/explore')}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Collect Now</Text>
+                <Ionicons name="chevron-forward" size={12} color="#1A1400" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* My Stamp Cards Header */}
@@ -647,7 +728,7 @@ export default function CustomerDashboard() {
                     style={[
                       styles.stackedCard,
                       {
-                        backgroundColor: item.gradientColors[0],
+                        backgroundColor: (item.gradientColors ?? ['#EC4899', '#8B5CF6'])[0],
                         zIndex: currentZIndex,
                         marginTop: idx === 0 ? 0 : -145,
                         transform: [
@@ -681,6 +762,18 @@ export default function CustomerDashboard() {
 
 
                       <View style={styles.stackedCardContent}>
+                        {/* Realistic Gloss Reflection */}
+                        <View style={{
+                          position: 'absolute',
+                          top: -100,
+                          right: -100,
+                          width: 400,
+                          height: 400,
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          transform: [{ rotate: '35deg' }],
+                          pointerEvents: 'none',
+                        }} />
+                        
                         {/* Header: Shop Name & Logo */}
                         <View style={styles.cardInfoRow}>
                           <View style={styles.shopLogoBg}>
@@ -714,8 +807,8 @@ export default function CustomerDashboard() {
                           <Ionicons 
                             name="wifi" 
                             size={16} 
-                            color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                            style={{ opacity: 0.35 }} 
+                            color="#E2E8F0" 
+                            style={{ opacity: 0.9 }} 
                           />
                         </View>
 
@@ -723,28 +816,28 @@ export default function CustomerDashboard() {
                         {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
                         <View style={styles.cardBottomRow}>
                           <View style={styles.holderBlock}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
                               CARD HOLDER
                             </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
+                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]} numberOfLines={1}>
                               {(user?.name || 'Ahmad Fazli').toUpperCase()}
                             </Text>
                           </View>
 
                           <View style={styles.validBlock}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
                               VALID
                             </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
                               12/30
                             </Text>
                           </View>
 
                           <View style={styles.cvvBlock}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
+                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
                               CVV
                             </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
                               888
                             </Text>
                           </View>
@@ -808,7 +901,7 @@ export default function CustomerDashboard() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#000000',
+                    backgroundColor: '#FFC700',
                     borderRadius: 20,
                     paddingVertical: 8,
                     paddingHorizontal: 16,
@@ -821,8 +914,8 @@ export default function CustomerDashboard() {
                   onPress={cycleCard}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="swap-horizontal" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                  <Ionicons name="swap-horizontal" size={14} color="#1A1400" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, color: '#1A1400', fontFamily: 'PlusJakartaSans_700Bold' }}>
                     {locale === 'en' ? 'Next Card' : 'Kad Seterusnya'}
                   </Text>
                 </TouchableOpacity>
@@ -830,6 +923,7 @@ export default function CustomerDashboard() {
             </View>
           )}
         </ScrollView>
+        </View>
       </SafeAreaView>
 
       {/* QR Code Pop-up Modal */}
@@ -840,27 +934,27 @@ export default function CustomerDashboard() {
         onRequestClose={() => setQrModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: '#1A1400', borderWidth: 1, borderColor: '#332900' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Scan Loyalty Card</Text>
+              <Text style={[styles.modalTitle, { color: '#FFFFFF' }]}>Your RISEV Card</Text>
               <TouchableOpacity onPress={() => setQrModalVisible(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#0b1c30" />
+                <Ionicons name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.qrWrapper}>
+            <View style={[styles.qrWrapper, { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 5 }]}>
                <Image
                 source={{
                   uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${user?.phone || 'risev-loyalty-customer'}`,
                 }}
-                style={styles.qrCodeImage}
+                style={[styles.qrCodeImage, { width: 200, height: 200 }]}
               />
             </View>
 
-            <Text style={styles.phoneLabel}>MEMBER ID</Text>
-            <Text style={styles.phoneValue}>{user?.phone || '+60 11-2345678'}</Text>
-            <Text style={styles.scanNotice}>
-              Present this code to the store staff to collect stamps or redeem reward vouchers.
+            <Text style={[styles.phoneLabel, { color: '#94A3B8', marginTop: 10 }]}>MEMBER ID</Text>
+            <Text style={[styles.phoneValue, { color: '#FFC700', fontSize: 20, letterSpacing: 2, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{user?.phone || '+60 11-2345678'}</Text>
+            <Text style={[styles.scanNotice, { color: '#64748B' }]}>
+              Present this card to the store staff to collect stamps or redeem reward vouchers.
             </Text>
           </View>
         </View>
@@ -884,73 +978,16 @@ export default function CustomerDashboard() {
               </View>
 
               <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-                {/* Large credit-card style loyalty details card */}
-                <View style={[styles.largeCardView, { backgroundColor: selectedCard.gradientColors[0], overflow: 'hidden' }]}>
-                  {selectedCard.cardBackground ? (
-                    <Image source={{ uri: selectedCard.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : null}
-
-                  <View style={styles.largeCardHeader}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={[styles.largeCardMerchant, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                        {selectedCard.merchantName}
-                      </Text>
-                      <Text style={[styles.shopCategoryText, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.65 }]}>
-                        {selectedCard.category.toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.goldBadge}>
-                      <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
-                    </View>
-                  </View>
-
-                  {/* EMV Microchip */}
-                  <View style={styles.cardMidRow}>
-                    <View style={styles.cardChip}>
-                      <View style={styles.chipLineHoriz} />
-                      <View style={styles.chipLineVert} />
-                      <View style={styles.chipCenterPin} />
-                    </View>
-                    <Ionicons 
-                      name="wifi" 
-                      size={18} 
-                      color={selectedCard.fontColor ? selectedCard.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                      style={{ opacity: 0.35 }} 
-                    />
-                  </View>
-
-                  {/* Stamps grid details */}
-                  <View style={styles.largeStampsGrid}>
-                    {renderDetailStampSlots(selectedCard)}
-                  </View>
-
-                  <View style={styles.largeCardFooter}>
-                    <View style={styles.holderCol}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CARD HOLDER</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]} numberOfLines={1}>
-                        {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={{ width: 45 }}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>VALID</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>12/30</Text>
-                    </View>
-
-                    <View style={{ width: 35 }}>
-                      <Text style={[styles.holderLabel, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.5 }]}>CVV</Text>
-                      <Text style={[styles.holderValue, selectedCard.fontColor && { color: selectedCard.fontColor }]}>888</Text>
-                    </View>
-
-                    <View style={styles.brandBadge}>
-                      <View style={styles.mastercardBadge}>
-                        <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                        <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
-                      </View>
-                      <Text style={[styles.largeProgressPercentage, selectedCard.fontColor && { color: selectedCard.fontColor, opacity: 0.8 }]}>
-                        {selectedCard.collectedStamps}/{selectedCard.totalStamps} STAMPS
-                      </Text>
-                    </View>
+                {/* 3D Flippable Loyalty Card & Hint */}
+                <View>
+                  <FlippableLoyaltyCard 
+                    card={selectedCard} 
+                    user={user} 
+                    autoFlipDelay={500}
+                  />
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6, opacity: 0.8 }}>
+                    <Ionicons name="swap-horizontal" size={14} color="#6B7280" />
+                    <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>Tap card to flip</Text>
                   </View>
                 </View>
 
@@ -1202,7 +1239,7 @@ export default function CustomerDashboard() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Clean pure white background
+    backgroundColor: '#243339', // Dark slate background for margins
   },
   container: {
     flex: 1,
@@ -1269,7 +1306,7 @@ const styles = StyleSheet.create({
     top: 10,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingTop: 16,
     paddingBottom: 110,
     gap: 20,
@@ -1326,11 +1363,15 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFBEA', // primary[50]
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FFE38F', // primary[200]
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   pointsValue: {
     fontSize: 26,
@@ -1480,12 +1521,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     height: 200,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     overflow: 'hidden',
   },
   stackedCardContent: {
@@ -1978,9 +2019,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   holderValueText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#E2E8F0',
+    letterSpacing: 0.5,
   },
   validBlock: {
     width: 45,

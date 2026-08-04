@@ -250,65 +250,82 @@ export default function CustomerProfile() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Top Header Row */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-          <Image
-            source={{ uri: avatarUrl }}
-            style={styles.avatarMini}
-          />
+        {/* ── Yellow S-Curve Header (Idea 1) ── */}
+        <View style={{ backgroundColor: '#FFFFFF' }}>
+          {/* Yellow Block */}
+          <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 24, paddingBottom: 48, paddingTop: 16 }}>
+            {/* Header Top Row */}
+            <View style={[isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Image
+                  source={require('../../assets/risev logo.png')}
+                  style={{ width: 90, height: 32, resizeMode: 'contain' }}
+                />
+                <View style={{ width: 1, height: 16, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>My Profile</Text>
+              </View>
+              
+              <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => setSupportModalVisible(true)} activeOpacity={0.8}>
+                <Ionicons name="help-buoy-outline" size={18} color="#000000" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* User Profile Integrated in Header */}
+            <View style={[isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { flexDirection: 'row', alignItems: 'center', gap: 20 }]}>
+              <Image source={{ uri: avatarUrl }} style={{ width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: '#FFFFFF' }} />
+              
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={{ fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.5, marginBottom: -2 }}>
+                  {user?.name || 'Ahmad Fazli'}
+                </Text>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', opacity: 0.65, letterSpacing: 0.2 }}>
+                  {user?.phone || '+60 12-345 6789'}
+                </Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 }}>
+                  {/* Premium Pill Badges */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 4 }}>
+                    <Ionicons name="shield-checkmark" size={12} color="#FFC700" />
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5, marginTop: 1 }}>
+                      {(user?.tier || 'BRONZE').toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
+                    <Ionicons name="star" size={12} color="#EAB308" />
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5, marginTop: 1 }}>
+                      {user?.total_points || 0} PTS
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
           
-          <Image
-            source={require('../../theme/rise_officiallogo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
-          />
+          {/* White Bottom S-Curve overlapping */}
+          <View style={{ backgroundColor: '#FFC700' }}>
+            <View style={{ height: 40, backgroundColor: '#FFFFFF', borderTopLeftRadius: 40 }} />
+          </View>
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { paddingTop: 0 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Intro Section */}
-          <View style={styles.introSection}>
-            <Text style={styles.title}>My Profile</Text>
-            <Text style={styles.subtitle}>
-              Manage your personal information, settings, and partner merchant credentials.
-            </Text>
-          </View>
 
-          {/* User Profile Card */}
-          <View style={styles.profileCard}>
-            <Image
-              source={{ uri: avatarUrl }}
-              style={styles.avatarLarge}
-            />
-            <View style={styles.userInfo}>
-              <Text style={styles.name}>{user?.name || 'Ahmad Fazli'}</Text>
-              <Text style={styles.phone}>{user?.phone || '+60 12-345 6789'}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <View style={styles.memberBadge}>
-                  <Ionicons name="shield-checkmark" size={12} color="#000000" />
-                  <Text style={styles.memberBadgeText}>{(user?.tier || 'BRONZE').toUpperCase()} MEMBER</Text>
-                </View>
-                <View style={[styles.memberBadge, { marginLeft: 8, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}>
-                  <Ionicons name="star" size={12} color="#EAB308" />
-                  <Text style={[styles.memberBadgeText, { color: '#854D0E' }]}>{user?.total_points || 0} PTS</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Switch Role Card (Matches new payment/topup mockup visual weight) */}
-          <View style={styles.switchCard}>
+          {/* Premium Merchant Switch Card (Idea 2) */}
+          <View style={[styles.switchCard, { backgroundColor: '#0F172A', borderColor: '#1E293B', shadowColor: '#FFC700', shadowOpacity: 0.1, shadowRadius: 20 }]}>
             <View style={styles.switchHeader}>
-              <Ionicons name="storefront-outline" size={24} color="#000000" />
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="storefront" size={22} color="#FFC700" />
+              </View>
               <View style={styles.switchInfo}>
-                <Text style={styles.switchTitle}>Business Owner?</Text>
-                <Text style={styles.switchSubtitle}>Switch to merchant console to scan stamps and manage reward plans.</Text>
+                <Text style={[styles.switchTitle, { color: '#FFFFFF' }]}>Business Owner?</Text>
+                <Text style={[styles.switchSubtitle, { color: '#94A3B8' }]}>Switch to merchant console to scan stamps and manage reward plans.</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.switchButton} onPress={handleSwitchToMerchant} activeOpacity={0.8}>
-              <Text style={styles.switchButtonText}>Switch to Merchant Mode</Text>
-              <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+            <TouchableOpacity style={[styles.switchButton, { backgroundColor: '#FFC700' }]} onPress={handleSwitchToMerchant} activeOpacity={0.8}>
+              <Text style={[styles.switchButtonText, { color: '#000000' }]}>Switch to Merchant Mode</Text>
+              <Ionicons name="arrow-forward" size={16} color="#000000" />
             </TouchableOpacity>
           </View>
 

@@ -4,48 +4,48 @@
 // ============================================
 
 export const colors = {
-  // ── Primary Brand: Royal Purple ───────────
+  // ── Primary Brand: Vibrant Yellow-Gold ───────────
   primary: {
-    50:  '#F0EBFF',
-    100: '#DDD3FF',
-    200: '#BBA8FF',
-    300: '#997CFF',
-    400: '#7750F8',
-    500: '#5C3BCC',
-    600: '#4A2EA8',
-    700: '#372285',
-    800: '#251661',
-    900: '#130A3E',
-    DEFAULT: '#5C3BCC',
+    50:  '#FFFBEA',
+    100: '#FFF1C5',
+    200: '#FFE38F',
+    300: '#FFD352',
+    400: '#FFC700', // Core Brand Yellow
+    500: '#E6B300',
+    600: '#B38B00',
+    700: '#806400',
+    800: '#4D3C00',
+    900: '#1A1400',
+    DEFAULT: '#FFC700',
   },
 
-  // ── Accent: Amber Gold ─────────────────────
+  // ── Accent: Dark Slate/Black (Secondary action) ────
   accent: {
-    50:  '#FFFBEB',
-    100: '#FEF3C7',
-    200: '#FDE68A',
-    300: '#FCD34D',
-    400: '#FBBF24',
-    500: '#F4A825',
-    600: '#D97706',
-    700: '#B45309',
-    800: '#92400E',
-    900: '#78350F',
-    DEFAULT: '#F4A825',
+    50:  '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
+    DEFAULT: '#1E293B', // Dark accent for buttons/headers
   },
 
   dark: {
-    bg:      '#1C1340',
-    surface: '#261A54',
-    border:  '#352470',
-    muted:   '#7060A8',
+    bg:      '#000000',
+    surface: '#111827',
+    border:  '#374151',
+    muted:   '#4B5563',
   },
 
   light: {
-    bg:      '#F4F2FF',
-    surface: '#FFFFFF',
-    border:  '#E4E0F5',
-    muted:   '#9B94C4',
+    bg:      '#FAFAFA', // Very light off-white background
+    surface: '#FFFFFF', // Pure white cards
+    border:  '#E5E7EB',
+    muted:   '#D1D5DB',
   },
 
   success: { DEFAULT: '#22C55E', light: '#DCFCE7', dark: '#15803D' },
@@ -54,17 +54,17 @@ export const colors = {
   info:    { DEFAULT: '#3B82F6', light: '#DBEAFE', dark: '#1D4ED8' },
 
   text: {
-    primary:   '#111827',
-    secondary: '#374151',
-    muted:     '#6B7280',
+    primary:   '#000000', // Deep black for headings
+    secondary: '#4B5563', // Dark grey for body text
+    muted:     '#6B7280', // Medium grey for less important text
     disabled:  '#9CA3AF',
-    inverse:   '#FFFFFF',
+    inverse:   '#FFFFFF', // White text on dark/colored backgrounds
   },
 
   stamp: {
-    filled:  '#5C3BCC',
-    empty:   '#E4E0F5',
-    special: '#F4A825',
+    filled:  '#FFC700',
+    empty:   '#F3F4F6',
+    special: '#000000',
   },
 
   white:       '#FFFFFF',
