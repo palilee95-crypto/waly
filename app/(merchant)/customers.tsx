@@ -74,13 +74,13 @@ export default function CustomersScreen() {
     }
   };
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (showLoader = true) => {
     if (!user || !user.merchant_id) {
       setLoading(false);
       return;
     }
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const records = await pb.collection('transactions').getFullList({
         filter: `merchant = '${user.merchant_id}'`,
         expand: 'customer',
@@ -356,17 +356,17 @@ export default function CustomersScreen() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(true);
     fetchMerchant();
     if (user && user.merchant_id) {
-      pb.collection('transactions').subscribe('*', () => {
-        fetchTransactions();
-      }, {
-        filter: `merchant = '${user.merchant_id}'`
-      });
+      pb.collection('transactions').subscribe('*', (e) => {
+        if (e.record && e.record.merchant === user.merchant_id) {
+          fetchTransactions(false);
+        }
+      }).catch(err => console.warn("Realtime transaction sub error:", err));
     }
     return () => {
-      pb.collection('transactions').unsubscribe('*');
+      pb.collection('transactions').unsubscribe('*').catch(() => {});
     };
   }, [user]);
 
@@ -468,6 +468,82 @@ export default function CustomersScreen() {
   const percentText = percentChange >= 0 ? `+${percentChange}%` : `${percentChange}%`;
   const trendIcon = (percentChange >= 0 ? 'trending-up' : 'trending-down') as 'trending-up' | 'trending-down';
 
+  const weeklyStampData = React.useMemo(() => {
+    const days = [];
+    const stampsCount: Record<string, number> = {};
+
+    // Initialize last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toLocaleDateString([], { weekday: 'short' }); // "Mon", "Tue", etc.
+      days.push(key);
+      stampsCount[key] = 0;
+    }
+
+    // Aggregate stamps
+    transactions.forEach(tx => {
+      if (tx.type === 'PURCHASE') {
+        const txDate = new Date(tx.created);
+        const diffTime = Math.abs(new Date().getTime() - txDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays <= 7) {
+          const key = txDate.toLocaleDateString([], { weekday: 'short' });
+          if (stampsCount[key] !== undefined) {
+            stampsCount[key] += tx.stamps;
+          }
+        }
+      }
+    });
+
+    const values = days.map(day => stampsCount[day]);
+    const maxVal = Math.max(...values, 1);
+
+    return days.map((day, idx) => ({
+      day,
+      value: values[idx],
+      percentage: (values[idx] / maxVal) * 100,
+      isMax: values[idx] === maxVal && values[idx] > 0
+    }));
+  }, [transactions]);
+
+  const idleCustomers = React.useMemo(() => {
+    const lastVisitedMap: Record<string, { lastVisited: Date; name: string; phone: string; initials: string; bgCircleColor: string; avatar: string | null }> = {};
+
+    transactions.forEach(tx => {
+      if (!tx.customerId) return;
+      const txDate = new Date(tx.created);
+      const existing = lastVisitedMap[tx.customerId];
+      if (!existing || txDate > existing.lastVisited) {
+        lastVisitedMap[tx.customerId] = {
+          lastVisited: txDate,
+          name: tx.name,
+          phone: tx.customerPhone,
+          initials: tx.initials,
+          bgCircleColor: tx.bgCircleColor,
+          avatar: tx.avatar
+        };
+      }
+    });
+
+    const now = new Date();
+    const idleList = Object.keys(lastVisitedMap)
+      .map(id => {
+        const item = lastVisitedMap[id];
+        const diffTime = Math.abs(now.getTime() - item.lastVisited.getTime());
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        return {
+          customerId: id,
+          daysIdle: diffDays,
+          ...item
+        };
+      })
+      .filter(item => item.daysIdle >= 30)
+      .sort((a, b) => b.daysIdle - a.daysIdle);
+
+    return idleList;
+  }, [transactions]);
+
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
@@ -477,123 +553,209 @@ export default function CustomersScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark Wave Background */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 200, zIndex: 0 }}>
-          <View style={{ flex: 1, backgroundColor: '#1A1400' }} />
-          {/* Main White Cutout */}
-          <View style={{ position: 'absolute', top: 0, right: -20, width: 165, height: 120, backgroundColor: '#FFFFFF' }} />
-          {/* Top White Filler */}
-          <View style={{ position: 'absolute', top: 0, right: 145, width: 60, height: 60, backgroundColor: '#FFFFFF' }} />
-          {/* Bottom Curve (Convex part) */}
-          <View style={{ position: 'absolute', top: 60, right: 145, width: 60, height: 60, backgroundColor: '#1A1400' }}>
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 60 }} />
-          </View>
-          {/* Top Curve (Concave part) */}
-          <View style={{ position: 'absolute', top: 0, right: 205, width: 60, height: 60, backgroundColor: '#FFFFFF' }}>
-            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 60 }} />
-          </View>
-        </View>
+        {/* Centered Dark Wave Background */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, backgroundColor: '#1A1400', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, zIndex: 0 }} />
 
-        {/* Top Header Row (Now floating over wave) */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { zIndex: 10, marginBottom: 20 }]}>
-          <View style={styles.headerTitleWrap}>
-            <Image
-              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
-              style={[styles.merchantAvatar, { borderColor: '#1A1400', borderWidth: 2 }]}
-            />
-            <Text style={[styles.headerTitle, { color: '#FFFFFF' }]}>{t('transaction_history')}</Text>
-          </View>
+        {/* Top Centered Header Content */}
+        <View style={{ alignItems: 'center', justifyContent: 'center', zIndex: 10, height: 140, paddingTop: 10 }}>
           <Image
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
+            source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+            style={{ width: 56, height: 56, borderRadius: 28, borderColor: '#FFFFFF', borderWidth: 2, marginBottom: 8 }}
           />
-        </View>
-        {/* Metric Cards Section */}
-        {/* Card 1: Blue Points Collected Card */}
-        <View style={[styles.metricCard, styles.blueCard]}>
-          <Text style={styles.metricLabelBlue}>{t('total_stamps_distributed')}</Text>
-          <Text style={styles.metricValueBlue}>
-            {loading ? '...' : totalStampsDistributed.toLocaleString()}
+          <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>
+            {t('transaction_history')}
           </Text>
-          <View style={styles.trendRow}>
-            <Feather name={trendIcon} size={14} color="#1A1400" />
-            <Text style={styles.trendText}>{percentText} {t('from_last_month')}</Text>
+        </View>
+
+        {/* 💳 Replicated Transfer-style Stats Card */}
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -30, marginBottom: 8 }}>
+          {/* Row 1: Stamps Distributed */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 16 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="ribbon-outline" size={20} color="#1A1400" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>{t('total_stamps_distributed')}</Text>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+                {loading ? '...' : totalStampsDistributed.toLocaleString()}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+              <Feather name={trendIcon} size={12} color="#059669" />
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>{percentText}</Text>
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
+
+          {/* Row 2: Points Redeemed */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 16 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="gift-outline" size={20} color="#1A1400" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>{t('points_redeemed')}</Text>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+                {loading ? '...' : Math.abs(totalPointsRedeemed).toLocaleString()}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+              {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} claims`}
+            </Text>
           </View>
         </View>
 
-        {/* Card 2: Grey Points Redeemed Card */}
-        <View style={[styles.metricCard, styles.greyCard]}>
-          <Text style={styles.metricLabelGrey}>{t('points_redeemed')}</Text>
-          <Text style={styles.metricValueGrey}>
-            {loading ? '...' : Math.abs(totalPointsRedeemed).toLocaleString()}
+        {/* Sales Gaps Analytics Navigation Button */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#1A1400',
+            borderRadius: 20,
+            paddingVertical: 16,
+            paddingHorizontal: 20,
+            marginBottom: 8,
+            borderWidth: 1,
+            borderColor: '#FFC700',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 4,
+            zIndex: 20
+          }}
+          onPress={() => router.push('/(merchant)/analytics')}
+          activeOpacity={0.85}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="bar-chart" size={16} color="#FFC700" />
+            </View>
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.2 }}>
+              View Sales Opportunity Analytics
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#FFC700" />
+        </TouchableOpacity>
+
+        {/* 📊 Weekly Activity Bar Chart */}
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, marginBottom: 8 }}>
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginBottom: 16 }}>
+            Weekly stamps distributed
           </Text>
-          <Text style={styles.subtextGrey}>
-            {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} ${t('rewards_claimed')}`}
-          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, paddingBottom: 8 }}>
+            {weeklyStampData.map((item, idx) => (
+              <View key={idx} style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: item.isMax ? '#FFC700' : '#94A3B8', marginBottom: 4 }}>
+                  {item.value}
+                </Text>
+                <View style={{ width: 16, height: 60, backgroundColor: '#F1F5F9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' }}>
+                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#1A1400', borderRadius: 8 }} />
+                </View>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#1A1400' : '#94A3B8', marginTop: 6 }}>
+                  {item.day}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Card 3: Light Active Customers Card */}
-        <View style={[styles.metricCard, styles.lightCard]}>
-          <Text style={styles.metricLabelLight}>{t('active_members')}</Text>
-          <Text style={styles.metricValueLight}>
-            {loading ? '...' : activeMembersCount.toLocaleString()}
+        {/* 👥 Replicated "Last Transfer" Horizontal Row (Recent Active Members) */}
+        <View style={{ marginVertical: 8 }}>
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginBottom: 12 }}>
+            Recent active members
           </Text>
-          <View style={styles.avatarsRow}>
-            {activeCustomersList.length > 0 ? (
-              <View style={styles.avatarStack}>
-                {activeCustomersList.slice(0, 3).map((cust, idx) => (
-                  <View 
-                    key={cust.id} 
-                    style={[
-                      styles.stackImgWrap, 
-                      idx > 0 && { marginLeft: -10 }
-                    ]}
-                  >
-                    {cust.avatar ? (
-                      <Image source={{ uri: cust.avatar }} style={styles.stackImg} />
-                    ) : (
-                      <View style={[styles.stackInitialsBg, { backgroundColor: cust.bgCircleColor }]}>
-                        <Text style={styles.stackInitialsText}>{cust.initials}</Text>
-                      </View>
-                    )}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
+            {activeCustomersList.map((cust) => (
+              <TouchableOpacity
+                key={cust.id}
+                onPress={() => openCustomerDetails(cust as any)}
+                style={{ alignItems: 'center', width: 64 }}
+                activeOpacity={0.8}
+              >
+                {cust.avatar ? (
+                  <Image source={{ uri: cust.avatar }} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 6 }} />
+                ) : (
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: cust.bgCircleColor || '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{cust.initials}</Text>
                   </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.emptyStack}>
-                <Ionicons name="people-outline" size={14} color="#64748B" />
-                <Text style={styles.emptyStackText}>{t('no_active_members')}</Text>
-              </View>
+                )}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400', textAlign: 'center' }} numberOfLines={1}>
+                  {cust.name ? cust.name.split(' ')[0] : 'Member'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {activeCustomersList.length === 0 && (
+              <Text style={{ fontSize: 12, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', paddingVertical: 10 }}>
+                No active members today
+              </Text>
             )}
-            {activeMembersCount > 3 && (
-              <View style={styles.badgeMore}>
-                <Text style={styles.badgeMoreText}>+{activeMembersCount - 3}</Text>
-              </View>
-            )}
-          </View>
+          </ScrollView>
         </View>
 
-        {/* Filter Tab Row */}
+        {/* ⚠️ Idle Customers (>30 Days) Section */}
+        {idleCustomers.length > 0 && (
+          <View style={{ marginVertical: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+                Inactive customers (>30 days)
+              </Text>
+              <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
+                  {idleCustomers.length} at risk
+                </Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
+              {idleCustomers.map((cust) => (
+                <TouchableOpacity
+                  key={cust.customerId}
+                  onPress={() => openCustomerDetails(cust as any)}
+                  style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, width: 140, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, alignItems: 'center' }}
+                  activeOpacity={0.8}
+                >
+                  {cust.avatar ? (
+                    <Image source={{ uri: cust.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} />
+                  ) : (
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: cust.bgCircleColor || '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{cust.initials}</Text>
+                    </View>
+                  )}
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', textAlign: 'center' }} numberOfLines={1}>
+                    {cust.name}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444', marginTop: 4 }}>
+                    {cust.daysIdle} days idle
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* 📄 Replicated "Transfer List" Bottom Sheet Container */}
         <View style={styles.filterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+          {/* Symmetrical Text Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 24, paddingVertical: 8 }}>
             {(['All', 'Purchase', 'Redemption', 'Adjustment'] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
-                style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
+                style={{ paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: activeTab === tab ? '#1A1400' : 'transparent' }}
                 onPress={() => setActiveTab(tab)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                <Text style={{ fontSize: 13, fontFamily: activeTab === tab ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold', color: activeTab === tab ? '#1A1400' : '#94A3B8' }}>
                   {t(tab.toLowerCase())}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          {/* Search bar & filter icons row */}
+          {/* Search bar & filter icons row (Pill Search with icon on right) */}
           <View style={styles.searchRow}>
-            <View style={styles.searchField}>
-              <Ionicons name="search-outline" size={18} color="#BEC6E0" />
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 24, paddingHorizontal: 16, gap: 8 }}>
               <TextInput
                 style={styles.searchInput}
                 value={searchQuery}
@@ -601,27 +763,28 @@ export default function CustomersScreen() {
                 placeholder={t('search_customer')}
                 placeholderTextColor="#BEC6E0"
               />
+              <Ionicons name="search-outline" size={18} color="#BEC6E0" />
             </View>
             <TouchableOpacity 
-              style={[styles.filterBtn, dateFilter !== 'All' && { backgroundColor: '#000000', borderColor: '#000000' }]} 
+              style={[styles.filterBtn, dateFilter !== 'All' && { backgroundColor: '#1A1400', borderColor: '#1A1400' }, { borderRadius: 24 }]} 
               onPress={() => setDateModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="calendar-outline" size={20} color={dateFilter !== 'All' ? '#FFFFFF' : '#0b1c30'} />
+              <Ionicons name="calendar-outline" size={20} color={dateFilter !== 'All' ? '#FFFFFF' : '#1A1400'} />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.filterBtn, sortBy !== 'newest' && { backgroundColor: '#000000', borderColor: '#000000' }]} 
+              style={[styles.filterBtn, sortBy !== 'newest' && { backgroundColor: '#1A1400', borderColor: '#1A1400' }, { borderRadius: 24 }]} 
               onPress={() => setOptionsModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="options-outline" size={20} color={sortBy !== 'newest' ? '#FFFFFF' : '#0b1c30'} />
+              <Ionicons name="options-outline" size={20} color={sortBy !== 'newest' ? '#FFFFFF' : '#1A1400'} />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.filterBtn} 
+              style={[styles.filterBtn, { borderRadius: 24 }]} 
               onPress={() => setExportModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="download-outline" size={20} color="#0b1c30" />
+              <Ionicons name="download-outline" size={20} color="#1A1400" />
             </TouchableOpacity>
           </View>
         </View>
@@ -1255,12 +1418,9 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   filterSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
+    backgroundColor: 'transparent',
+    padding: 0,
     gap: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   tabsScroll: {
     gap: 8,

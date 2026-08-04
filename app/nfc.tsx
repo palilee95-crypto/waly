@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   Image,
   ImageBackground,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -44,12 +45,129 @@ const renderStampIcon = (iconId: string, size: number, color: string) => {
   return <Ionicons name="cafe" size={size} color={color} />;
 };
 
+// ─── Animated Stamp Bubble ──────────────────────────────────────────────────
+// Plays a "physical ink press" animation when a new stamp is freshly earned.
+interface AnimatedStampBubbleProps {
+  isEarned: boolean;
+  isNew: boolean;           // true = just received this session
+  delay: number;            // stagger delay in ms
+  iconId: string;
+  bubbleColor: string;      // filled bg color
+  iconColor: string;        // icon tint
+  borderColor: string;
+  emptyBgColor: string;
+}
+
+const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
+  isEarned,
+  isNew,
+  delay,
+  iconId,
+  bubbleColor,
+  iconColor,
+  borderColor,
+  emptyBgColor,
+}) => {
+  const scaleAnim = useRef(new Animated.Value(isNew ? 2.5 : 1.0)).current;
+  const ringScale = useRef(new Animated.Value(1.0)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (isNew && !hasAnimated.current) {
+      hasAnimated.current = true;
+      const timeout = setTimeout(() => {
+        // 1. Slow spring slam: scale 2.5x → 1x
+        Animated.spring(scaleAnim, {
+          toValue: 1.0,
+          friction: 12,
+          tension: 40,
+          useNativeDriver: true,
+        }).start();
+
+        // 2. Ring burst: expand ring and fade
+        Animated.sequence([
+          Animated.timing(ringOpacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+          Animated.parallel([
+            Animated.timing(ringScale, { toValue: 2.0, duration: 900, useNativeDriver: true }),
+            Animated.timing(ringOpacity, { toValue: 0, duration: 900, useNativeDriver: true }),
+          ]),
+        ]).start();
+      }, delay);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isNew]);
+
+  return (
+    <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Ring burst overlay */}
+      {isNew && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: '80%',
+            aspectRatio: 1,
+            borderRadius: 99,
+            borderWidth: 2.5,
+            borderColor: bubbleColor,
+            opacity: ringOpacity,
+            transform: [{ scale: ringScale }],
+          }}
+        />
+      )}
+
+      {/* Stamp bubble */}
+      <Animated.View
+        style={{
+          width: '80%',
+          aspectRatio: 1,
+          borderRadius: 99,
+          borderWidth: isEarned ? 0 : 1.5,
+          borderColor: isEarned ? 'transparent' : borderColor,
+          borderStyle: isEarned ? 'solid' : 'dashed',
+          backgroundColor: isEarned ? bubbleColor : emptyBgColor,
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ scale: scaleAnim }],
+        }}
+      >
+        {isEarned
+          ? renderStampIcon(iconId, 14, iconColor)
+          : renderStampIcon(iconId, 14, borderColor)}
+      </Animated.View>
+    </View>
+  );
+};
+
 export default function NfcLandingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ m: string }>();
   const { user, quickRegister, logout } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
+
+  // Contrast calculations for text color overlay on dynamic brand primary colors
+  const getContrastColor = (hex: string) => {
+    if (!hex) return '#FFFFFF';
+    const cleanHex = hex.replace('#', '');
+    if (cleanHex.length === 3) {
+      const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+      const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+      const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 170 ? '#1A1400' : '#FFFFFF';
+    }
+    if (cleanHex.length === 6) {
+      const r = parseInt(cleanHex.substring(0, 2), 16);
+      const g = parseInt(cleanHex.substring(2, 4), 16);
+      const b = parseInt(cleanHex.substring(4, 6), 16);
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 170 ? '#1A1400' : '#FFFFFF';
+    }
+    return '#FFFFFF';
+  };
 
   const [merchant, setMerchant] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
@@ -71,6 +189,36 @@ export default function NfcLandingScreen() {
   const [claimId, setClaimId] = useState<string>('');
   const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+  const [showBack, setShowBack] = useState<boolean>(false);
+  // Tracks which stamp slot indices are "newly earned" this session for animation
+  const [newlyEarnedIndices, setNewlyEarnedIndices] = useState<Set<number>>(new Set());
+  const prevStampsRef = useRef<number>(-1); // -1 = not yet initialised
+
+  const flipAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isApproved) {
+      setShowBack(true);
+    }
+  }, [isApproved]);
+
+  useEffect(() => {
+    Animated.spring(flipAnim, {
+      toValue: showBack ? 180 : 0,
+      friction: 8,
+      tension: 10,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [showBack]);
+
+  const frontInterpolate = flipAnim.interpolate({
+    inputRange: [0, 180],
+    outputRange: ['0deg', '180deg'],
+  });
+  const backInterpolate = flipAnim.interpolate({
+    inputRange: [0, 180],
+    outputRange: ['180deg', '360deg'],
+  });
 
   const handleViewStampCard = () => {
     const authRecord = pb.authStore.record;
@@ -358,6 +506,7 @@ export default function NfcLandingScreen() {
     : (merchant?.onboarding_bg_url || null);
 
   const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#5C3BCC';
+  const contrastTextColor = getContrastColor(primaryColor);
   
   // Exact Loyalty Card Tokens configured by Merchant
   const cardBgColor = program?.card_color || merchant?.onboarding_primary_color || '#5C3BCC';
@@ -368,6 +517,24 @@ export default function NfcLandingScreen() {
   const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
   const stampGoal = program?.stamp_goal || 10;
   const currentStamps = loyaltyCard?.stamps_collected || 0;
+
+  // Detect newly-earned stamps and store their 0-based indices for animation
+  useEffect(() => {
+    if (prevStampsRef.current === -1) {
+      // First initialisation — set baseline without animating
+      prevStampsRef.current = currentStamps;
+      return;
+    }
+    const prev = prevStampsRef.current;
+    if (currentStamps > prev) {
+      const newIndices = new Set<number>();
+      for (let i = prev; i < currentStamps; i++) {
+        newIndices.add(i); // 0-based index of each newly earned slot
+      }
+      setNewlyEarnedIndices(newIndices);
+    }
+    prevStampsRef.current = currentStamps;
+  }, [currentStamps]);
 
   // Real Merchant Reward Title & Image Resolution
   const linkedReward = program?.expand?.linked_reward;
@@ -538,17 +705,359 @@ export default function NfcLandingScreen() {
             )}
           </View>
 
-          {/* Merchant Brand Logo & Header */}
-          <View style={styles.brandHeaderSection}>
-            {merchantLogoUrl ? (
-              <Image source={{ uri: merchantLogoUrl }} style={styles.brandLogoImage} resizeMode="contain" />
-            ) : (
-              <View style={[styles.brandLogoFallback, { backgroundColor: primaryColor }]}>
-                <Ionicons name="storefront" size={32} color="#FFFFFF" />
-              </View>
-            )}
-            <Text style={styles.brandNameText}>{merchantName}</Text>
-          </View>
+          {/* Merchant Brand Logo & Header / Animated Flipping Loyalty Card */}
+          {step === 'form' || step === 'sent' ? (
+            <TouchableOpacity
+              activeOpacity={0.95}
+              onPress={() => setShowBack(prev => !prev)}
+              style={{ marginBottom: 20, position: 'relative' }}
+            >
+              {/* Front Card Panel */}
+              <Animated.View
+                style={[
+                  styles.largeCardView,
+                  {
+                    backgroundColor: cardBgColor,
+                    overflow: 'hidden',
+                    backfaceVisibility: 'hidden',
+                    transform: [{ rotateY: frontInterpolate }],
+                  },
+                ]}
+              >
+                {program?.card_background ? (
+                  <Image
+                    source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                {/* Card plastic gloss shine reflection */}
+                <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none">
+                  {/* Soft wide reflection zone */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: -80,
+                      width: '150%',
+                      height: 260,
+                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                  {/* Sharp bright specular highlight line */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: 25,
+                      width: 28,
+                      height: 600,
+                      backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                </View>
+
+                {/* Card Header: Shop Name, Category & Gold Badge */}
+                <View style={styles.largeCardHeader}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text
+                      style={[
+                        styles.largeCardMerchant,
+                        { color: cardFontColor },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {merchantName}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.shopCategoryText,
+                        { color: cardFontColor + 'B3' },
+                      ]}
+                    >
+                      {(merchant?.category || 'store').toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.goldBadge}>
+                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
+                  </View>
+                </View>
+
+                {/* EMV Microchip & Contactless Wifi */}
+                <View style={styles.cardMidRow}>
+                  <View style={styles.cardChip}>
+                    <View style={styles.chipLineHoriz} />
+                    <View style={styles.chipLineVert} />
+                    <View style={styles.chipCenterPin} />
+                  </View>
+                  <Ionicons
+                    name="wifi"
+                    size={18}
+                    color={cardFontColor + '66'}
+                    style={{ opacity: 0.5 }}
+                  />
+                </View>
+
+                {/* Vertical Spacer (logo omitted to prevent card background overlap) */}
+                <View style={{ height: 60 }} />
+
+                {/* Card Footer */}
+                <View style={styles.largeCardFooter}>
+                  <View style={styles.holderCol}>
+                    <Text
+                      style={[
+                        styles.holderLabel,
+                        { color: cardFontColor + '80' },
+                      ]}
+                    >
+                      CARD HOLDER
+                    </Text>
+                    <Text
+                      style={[
+                        styles.holderValue,
+                        { color: cardFontColor },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {isApproved ? (user?.name || 'VALUED CUSTOMER').toUpperCase() : '----'}
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 45 }}>
+                    <Text
+                      style={[
+                        styles.holderLabel,
+                        { color: cardFontColor + '80' },
+                      ]}
+                    >
+                      VALID
+                    </Text>
+                    <Text
+                      style={[
+                        styles.holderValue,
+                        { color: cardFontColor },
+                      ]}
+                    >
+                      12/30
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 35 }}>
+                    <Text
+                      style={[
+                        styles.holderLabel,
+                        { color: cardFontColor + '80' },
+                      ]}
+                    >
+                      CVV
+                    </Text>
+                    <Text
+                      style={[
+                        styles.holderValue,
+                        { color: cardFontColor },
+                      ]}
+                    >
+                      888
+                    </Text>
+                  </View>
+
+                  <View style={styles.brandBadge}>
+                    <View style={styles.mastercardBadge}>
+                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
+                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                    </View>
+                    <Text
+                      style={[
+                        styles.largeProgressPercentage,
+                        { color: cardFontColor + 'CC' },
+                      ]}
+                    >
+                      STAMP CARD
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+
+              {/* Back Card Panel */}
+              <Animated.View
+                style={[
+                  styles.largeCardView,
+                  {
+                    backgroundColor: cardBgColor,
+                    overflow: 'hidden',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backfaceVisibility: 'hidden',
+                    transform: [{ rotateY: backInterpolate }],
+                  },
+                ]}
+              >
+                {program?.card_background ? (
+                  <Image
+                    source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                {/* Card plastic gloss shine reflection */}
+                <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none">
+                  {/* Soft wide reflection zone */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: -80,
+                      width: '150%',
+                      height: 260,
+                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                  {/* Sharp bright specular highlight line */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: 25,
+                      width: 28,
+                      height: 600,
+                      backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                </View>
+
+                {/* Magnetic Stripe overlay */}
+                <View style={{ height: 35, backgroundColor: '#111827', width: '112%', marginLeft: '-6%', marginTop: -4, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: cardFontColor === '#FFFFFF' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.22)', fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 5 }}>
+                    {merchantName.toUpperCase()}
+                  </Text>
+                </View>
+
+                {/* Back card info row */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor + 'CC', letterSpacing: 0.5 }}>
+                    YOUR STAMPS
+                  </Text>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }}>
+                    {currentStamps}/{stampGoal}
+                  </Text>
+                </View>
+
+                 {/* Stamps Grid Row */}
+                {stampGoal === 10 ? (
+                  <View style={{ gap: 6, marginVertical: 6 }}>
+                    {/* Row 1 (6 Stamps) */}
+                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
+                      {Array.from({ length: 6 }).map((_, idx) => {
+                        const isEarned = (idx + 1) <= currentStamps;
+                        const isNew = newlyEarnedIndices.has(idx);
+                        const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                        const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                        return (
+                          <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
+                            <AnimatedStampBubble
+                              isEarned={isEarned}
+                              isNew={isNew}
+                              delay={isNew ? (idx - minIdx) * 400 : 0}
+                              iconId={cardIcon}
+                              bubbleColor={bubbleColor}
+                              iconColor={cardBgColor}
+                              borderColor={cardFontColor + '30'}
+                              emptyBgColor={cardFontColor + '08'}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Row 2 (4 Stamps, Centered) */}
+                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
+                      {Array.from({ length: 4 }).map((_, idx) => {
+                        const globalIdx = idx + 6;
+                        const isEarned = (globalIdx + 1) <= currentStamps;
+                        const isNew = newlyEarnedIndices.has(globalIdx);
+                        const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                        const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                        return (
+                          <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
+                            <AnimatedStampBubble
+                              isEarned={isEarned}
+                              isNew={isNew}
+                              delay={isNew ? (globalIdx - minIdx) * 400 : 0}
+                              iconId={cardIcon}
+                              bubbleColor={bubbleColor}
+                              iconColor={cardBgColor}
+                              borderColor={cardFontColor + '30'}
+                              emptyBgColor={cardFontColor + '08'}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6 }}>
+                    {Array.from({ length: stampGoal }).map((_, idx) => {
+                      const isEarned = (idx + 1) <= currentStamps;
+                      const isNew = newlyEarnedIndices.has(idx);
+                      const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                      const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                      return (
+                        <View key={idx} style={{ width: '17%', aspectRatio: 1 }}>
+                          <AnimatedStampBubble
+                            isEarned={isEarned}
+                            isNew={isNew}
+                            delay={isNew ? (idx - minIdx) * 400 : 0}
+                            iconId={cardIcon}
+                            bubbleColor={bubbleColor}
+                            iconColor={cardBgColor}
+                            borderColor={cardFontColor + '30'}
+                            emptyBgColor={cardFontColor + '08'}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Bottom footer row */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 4 }}>
+                  <View>
+                    <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor + '80', letterSpacing: 0.5 }}>CARD HOLDER</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor }}>
+                      {(user?.name || 'VALUED CUSTOMER').toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: 'center', gap: 2 }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor + '80', letterSpacing: 0.5 }}>SCAN</Text>
+                    <View style={{ width: 30, height: 30, backgroundColor: '#FFFFFF', padding: 3, borderRadius: 5, justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="qr-code" size={20} color="#000000" />
+                    </View>
+                  </View>
+                </View>
+              </Animated.View>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.brandHeaderSection}>
+              {merchantLogoUrl ? (
+                <Image source={{ uri: merchantLogoUrl }} style={styles.brandLogoImage} resizeMode="contain" />
+              ) : (
+                <View style={[styles.brandLogoFallback, { backgroundColor: primaryColor }]}>
+                  <Ionicons name="storefront" size={32} color="#FFFFFF" />
+                </View>
+              )}
+              <Text style={styles.brandNameText}>{merchantName}</Text>
+            </View>
+          )}
 
           {/* ───────────────────────────────────────────────────────── */}
           {/* STEP 1: Phone Input Form */}
@@ -556,8 +1065,8 @@ export default function NfcLandingScreen() {
           {step === 'form' && (
             <View style={styles.innerFormCard}>
               <View style={styles.nfcBadgeRow}>
-                <Ionicons name="wifi-outline" size={14} color={primaryColor} />
-                <Text style={[styles.nfcBadgeTitle, { color: primaryColor }]}>NFC CARD SCANNED</Text>
+                <Ionicons name="wifi" size={14} color="#B45309" />
+                <Text style={styles.nfcBadgeTitle}>NFC CARD SCANNED</Text>
               </View>
 
               <Text style={styles.formWelcomeTitle}>Claim Your Stamps</Text>
@@ -593,9 +1102,9 @@ export default function NfcLandingScreen() {
                       setPhoneInput('');
                       setNameInput('');
                     }}
-                    style={{ marginTop: 6, alignSelf: 'flex-end', paddingVertical: 4 }}
+                    style={{ marginTop: 8, alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#FEF2F2', borderRadius: 8, borderWidth: 1, borderColor: '#FEE2E2' }}
                   >
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
                       Not {user.name || 'you'}? Log out
                     </Text>
                   </TouchableOpacity>
@@ -606,24 +1115,16 @@ export default function NfcLandingScreen() {
               {showNameField && (
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>FULL NAME (NEW CUSTOMER)</Text>
-                  <View style={styles.inputGroup}>
-                    <Ionicons name="person-outline" size={18} color="#64748B" style={{ marginLeft: 12 }} />
-                    <TextInput
-                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                      placeholder="e.g. Fazli"
-                      placeholderTextColor="#94A3B8"
-                      value={nameInput}
-                      onChangeText={(text) => {
-                        setNameInput(text);
-                        setErrorMsg('');
-                      }}
-                      autoFocus
-                    />
-                  </View>
+                  <TextInput
+                    style={[styles.input, styles.nameInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#94A3B8"
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                  />
                 </View>
               )}
 
-              {/* Submit Button with Custom Primary Color */}
               <TouchableOpacity
                 style={[
                   styles.primaryActionBtn,
@@ -635,11 +1136,29 @@ export default function NfcLandingScreen() {
                 activeOpacity={0.85}
               >
                 {isLoading || isCheckingPhone ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={(() => {
+                    const r = parseInt(primaryColor.slice(1, 3), 16);
+                    const g = parseInt(primaryColor.slice(3, 5), 16);
+                    const b = parseInt(primaryColor.slice(5, 7), 16);
+                    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                    return brightness > 128 ? '#000000' : '#FFFFFF';
+                  })()} />
                 ) : (
                   <>
-                    <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.primaryActionBtnText}>
+                    <Ionicons name="paper-plane-outline" size={18} color={(() => {
+                      const r = parseInt(primaryColor.slice(1, 3), 16);
+                      const g = parseInt(primaryColor.slice(3, 5), 16);
+                      const b = parseInt(primaryColor.slice(5, 7), 16);
+                      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                      return brightness > 128 ? '#000000' : '#FFFFFF';
+                    })()} style={{ marginRight: 8 }} />
+                    <Text style={[styles.primaryActionBtnText, { color: (() => {
+                      const r = parseInt(primaryColor.slice(1, 3), 16);
+                      const g = parseInt(primaryColor.slice(3, 5), 16);
+                      const b = parseInt(primaryColor.slice(5, 7), 16);
+                      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                      return brightness > 128 ? '#000000' : '#FFFFFF';
+                    })() }]}>
                       {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
                     </Text>
                   </>
@@ -653,77 +1172,85 @@ export default function NfcLandingScreen() {
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={styles.innerFormCard}>
-              <View style={styles.sentIconWrap}>
-                <Ionicons
-                  name={isApproved ? "checkmark-circle" : "time-outline"}
-                  size={56}
-                  color={isApproved ? "#10B981" : "#F59E0B"}
-                />
-              </View>
-              <Text style={styles.sentHeaderTitle}>
-                {isApproved
-                  ? '🎉 Claim Approved by Store!'
-                  : 'Stamp Request Sent! 🎉'}
-              </Text>
-              <Text style={styles.sentHeaderDesc}>
-                {isApproved
-                  ? `Your stamps have been credited to your account by ${merchantName} staff!`
-                  : `Your claim is active on ${merchantName}'s terminal. Please wait while staff approves your stamps.`}
-              </Text>
-
-              {/* Status Indicator Banner */}
-              <View
-                style={[
-                  styles.liveSyncBanner,
-                  isApproved
-                    ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }
-                    : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
-                ]}
-              >
-                {isApproved ? (
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
-                ) : (
-                  <ActivityIndicator size="small" color="#D97706" />
-                )}
-                <Text
-                  style={[
-                    styles.liveSyncText,
-                    isApproved
-                      ? { color: '#065F46' }
-                      : { color: '#92400E' },
-                  ]}
-                >
-                  {isApproved
-                    ? '✅ Real-time approval received! Stamps credited.'
-                    : 'Waiting for store approval in real-time...'}
-                </Text>
-              </View>
-
-              {errorMsg ? <Text style={[styles.errorText, { textAlign: 'center', marginTop: 10 }]}>{errorMsg}</Text> : null}
-
-              {/* ACTION BUTTONS (Single Primary Action) */}
-              {!isApproved ? (
-                /* Pending State: Spinner and Info note */
-                <View style={{ alignItems: 'center', marginTop: 24, paddingVertical: 12 }}>
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginBottom: 6 }}>
-                    Show Cashier/Staff
+              {/* Header Status Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isApproved ? '#DEF7EC' : '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons
+                    name={isApproved ? "checkmark-circle" : "sync-outline"}
+                    size={18}
+                    color={isApproved ? "#10B981" : "#D97706"}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {isApproved ? 'Claim Approved!' : 'Stamp Request Sent'}
                   </Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 }}>
-                    Please ask store staff to approve your pending stamp request on their Risev dashboard.
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    {isApproved ? 'Stamps credited successfully.' : 'Waiting for cashier confirmation...'}
                   </Text>
                 </View>
-              ) : (
-                /* Approved State: ONLY 1 Button -> View My Stamp Card (with Onboarding check) */
+              </View>
+
+              {/* Status Indicator Banner (Only if pending) */}
+              {!isApproved && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: '#FEF9C3',
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#FEF08A',
+                    marginBottom: 12,
+                  }}
+                >
+                  <ActivityIndicator size="small" color="#A16207" />
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#854D0E', flex: 1 }}>
+                    Keep this screen open for real-time sync
+                  </Text>
+                </View>
+              )}
+
+              {/* Cashier/Staff Instruction Card (Only if pending) */}
+              {!isApproved && (
+                <View
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    padding: 12,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="storefront" size={14} color="#64748B" />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#475569', letterSpacing: 0.5 }}>
+                      CASHIER INSTRUCTION
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16 }}>
+                    Ask staff to approve your pending stamp claim on their merchant dashboard.
+                  </Text>
+                </View>
+              )}
+
+              {/* Action Button (If approved) */}
+              {isApproved && (
                 <TouchableOpacity
                   style={[
                     styles.primaryActionBtn,
-                    { backgroundColor: primaryColor || '#10B981', marginTop: 14 },
+                    { backgroundColor: primaryColor || '#10B981', marginTop: 4 },
                   ]}
                   onPress={handleViewStampCard}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="card-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryActionBtnText}>💳 View My Stamp Card</Text>
+                  <Ionicons name="card" size={18} color={contrastTextColor} style={{ marginRight: 8 }} />
+                  <Text style={[styles.primaryActionBtnText, { color: contrastTextColor }]}>
+                    View My Stamp Card
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -751,6 +1278,34 @@ export default function NfcLandingScreen() {
                     resizeMode="cover"
                   />
                 ) : null}
+
+                {/* Card plastic gloss shine reflection */}
+                <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none">
+                  {/* Soft wide reflection zone */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: -80,
+                      width: '150%',
+                      height: 260,
+                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                  {/* Sharp bright specular highlight line */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -160,
+                      left: 25,
+                      width: 28,
+                      height: 600,
+                      backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                      transform: [{ rotate: '-30deg' }],
+                    }}
+                  />
+                </View>
 
                 {/* Card Header: Shop Name, Category & Gold Badge */}
                 <View style={styles.largeCardHeader}>
@@ -1154,13 +1709,21 @@ const styles = StyleSheet.create({
   nfcBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
-    marginBottom: 10,
+    backgroundColor: '#FFFDF0',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginBottom: 14,
   },
   nfcBadgeTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     letterSpacing: 0.5,
+    color: '#B45309',
   },
   formWelcomeTitle: {
     fontSize: 20,
@@ -1188,10 +1751,10 @@ const styles = StyleSheet.create({
   inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     overflow: 'hidden',
   },
   prefixBox: {
@@ -1288,11 +1851,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 22,
+    elevation: 10,
   },
   largeCardHeader: {
     flexDirection: 'row',

@@ -177,11 +177,11 @@ export default function GiveStampsScreen() {
       {/* Top Header Bar */}
       <View style={[styles.headerRow, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.headerTitleGroup}>
-          <Ionicons name="card-outline" size={22} color="#000000" />
+          <Ionicons name="card" size={22} color="#B45309" />
           <Text style={styles.headerTitle}>Issue & Redeem</Text>
         </View>
         <TouchableOpacity style={styles.refreshIconBtn} onPress={fetchTransactions} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={18} color="#64748B" />
+          <Ionicons name="refresh" size={18} color="#B45309" />
         </TouchableOpacity>
       </View>
 
@@ -201,7 +201,7 @@ export default function GiveStampsScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#FFFFFF' : '#64748B'} />
+            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#1A1400' : '#64748B'} />
             <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>
               Scan Voucher QR
             </Text>
@@ -217,7 +217,7 @@ export default function GiveStampsScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#FFFFFF' : '#64748B'} />
+            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#1A1400' : '#64748B'} />
             <Text style={[styles.tabBtnText, activeTab === 'manual' && styles.tabBtnTextActive]}>
               Manual Issuance
             </Text>
@@ -271,7 +271,7 @@ export default function GiveStampsScreen() {
               ) : (
                 <View style={styles.viewfinderPlaceholder}>
                   <View style={styles.scannerTargetGraphic}>
-                    <Ionicons name="qr-code" size={44} color="#FFFFFF" />
+                    <Ionicons name="qr-code" size={44} color="#FFC700" />
                     <View style={[styles.cornerBracket, styles.topLeft]} />
                     <View style={[styles.cornerBracket, styles.topRight]} />
                     <View style={[styles.cornerBracket, styles.bottomLeft]} />
@@ -288,8 +288,9 @@ export default function GiveStampsScreen() {
                         setIsCameraActive(true);
                       }
                     }}
+                    activeOpacity={0.8}
                   >
-                    <Ionicons name="camera-outline" size={18} color="#000000" />
+                    <Ionicons name="camera-outline" size={18} color="#B45309" />
                     <Text style={styles.activateCameraBtnText}>Open Camera Scanner</Text>
                   </TouchableOpacity>
                 </View>
@@ -307,7 +308,7 @@ export default function GiveStampsScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>VOUCHER CODE</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="qr-code-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+                <Ionicons name="qr-code-outline" size={20} color="#FFC700" style={{ marginLeft: 16, marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                   placeholder="e.g. WV-1234-5678"
@@ -327,13 +328,13 @@ export default function GiveStampsScreen() {
               style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
               onPress={handleRedeemVoucher}
               disabled={isRedeemingVoucher}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {isRedeemingVoucher ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#FFC700" />
               ) : (
                 <>
-                  <Ionicons name="gift-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Ionicons name="gift-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
                   <Text style={styles.primaryBtnText}>Redeem Voucher Now</Text>
                 </>
               )}
@@ -393,6 +394,7 @@ export default function GiveStampsScreen() {
                     key={amt}
                     style={[styles.presetPill, billAmount === amt && styles.presetPillActive]}
                     onPress={() => setBillAmount(amt)}
+                    activeOpacity={0.8}
                   >
                     <Text style={[styles.presetText, billAmount === amt && styles.presetTextActive]}>RM {amt}</Text>
                   </TouchableOpacity>
@@ -404,7 +406,7 @@ export default function GiveStampsScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>STAMPS TO ISSUE</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="ribbon-outline" size={20} color="#64748B" style={{ marginLeft: 16, marginRight: 8 }} />
+                <Ionicons name="ribbon-outline" size={20} color="#FFC700" style={{ marginLeft: 16, marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                   placeholder="1"
@@ -422,6 +424,7 @@ export default function GiveStampsScreen() {
                     key={s}
                     style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
                     onPress={() => setStampAmount(s)}
+                    activeOpacity={0.8}
                   >
                     <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
                       {s} {parseInt(s, 10) === 1 ? 'Stamp' : 'Stamps'}
@@ -436,13 +439,13 @@ export default function GiveStampsScreen() {
               style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
               onPress={handleManualIssue}
               disabled={isSubmitting}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#FFC700" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
                   <Text style={styles.primaryBtnText}>Issue Stamps Directly</Text>
                 </>
               )}
@@ -483,23 +486,25 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFDF0',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FEF3C7',
   },
   scrollContent: {
     padding: 20,
   },
 
-  // Segment Tab Selector (Monochrome Black & White)
+  // Segment Tab Selector (Capsule Style)
   tabBarWrap: {
     flexDirection: 'row',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 4,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   tabBtn: {
     flex: 1,
@@ -511,12 +516,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tabBtnActive: {
-    backgroundColor: '#000000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFC700',
   },
   tabBtnText: {
     fontSize: 14,
@@ -524,14 +524,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   tabBtnTextActive: {
-    color: '#FFFFFF',
+    color: '#1A1400',
   },
 
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#ECFDF5',
     padding: 16,
     borderRadius: 16,
     marginBottom: 20,
@@ -566,11 +566,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.03,
+    shadowRadius: 16,
+    elevation: 2,
   },
   cardTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#1A1400',
     marginBottom: 4,
   },
   cardSubtitle: {
@@ -583,13 +588,15 @@ const styles = StyleSheet.create({
 
   // Viewfinder & Camera Scanner Card
   viewfinderCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    borderRadius: 24,
     overflow: 'hidden',
     marginBottom: 20,
     minHeight: 220,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#334155',
   },
   cameraView: {
     width: '100%',
@@ -606,7 +613,7 @@ const styles = StyleSheet.create({
     height: 180,
     position: 'relative',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,199,0,0.3)',
     borderRadius: 16,
   },
   viewfinderPlaceholder: {
@@ -624,37 +631,37 @@ const styles = StyleSheet.create({
   },
   cornerBracket: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: '#FFFFFF',
+    width: 22,
+    height: 22,
+    borderColor: '#FFC700',
   },
   topLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 6,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 8,
   },
   topRight: {
     top: 0,
     right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 6,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 8,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 6,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 8,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 6,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 8,
   },
   viewfinderHint: {
     fontSize: 13,
@@ -672,11 +679,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#FFC700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   activateCameraBtnText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
   },
   cameraFallbackWrap: {
     padding: 20,
@@ -714,9 +728,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
   },
@@ -733,18 +747,18 @@ const styles = StyleSheet.create({
   prefixCode: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
   },
   prefixDivider: {
     width: 1,
     height: 20,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E2E8F0',
     marginLeft: 8,
   },
   currencyPrefix: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#FFC700',
     marginLeft: 16,
     marginRight: 8,
   },
@@ -754,7 +768,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
   },
   presetRow: {
     flexDirection: 'row',
@@ -765,12 +779,15 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   presetPillActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1400',
+    borderColor: '#FFC700',
   },
   presetText: {
     fontSize: 12,
@@ -778,24 +795,31 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   presetTextActive: {
-    color: '#FFFFFF',
+    color: '#FFC700',
   },
   primaryBtn: {
     height: 54,
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1400',
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FFC700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   primaryBtnDisabled: {
     opacity: 0.5,
   },
   primaryBtnText: {
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
   },
   historySection: {
     marginTop: 8,
@@ -809,7 +833,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#1A1400',
   },
   sectionCount: {
     fontSize: 12,
@@ -827,7 +851,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
     marginTop: 8,
     marginBottom: 2,
   },
@@ -851,14 +875,16 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFDF0',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   txnName: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
   },
   txnDate: {
     fontSize: 11,
@@ -869,7 +895,7 @@ const styles = StyleSheet.create({
   txnStamps: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#1A1400',
   },
   txnBill: {
     fontSize: 11,

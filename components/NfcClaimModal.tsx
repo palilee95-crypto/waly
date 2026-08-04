@@ -13,6 +13,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 
+const getInitials = (name: string) => {
+  if (!name) return '??';
+  const parts = name.split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
 export default function NfcClaimModal() {
   const { user } = useAuth();
   const merchantId = user?.merchant_id;
@@ -126,11 +135,11 @@ export default function NfcClaimModal() {
             // ── In-Modal Success Confirmation Screen ──────────────
             <View style={styles.successWrap}>
               <View style={styles.successIconBg}>
-                <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={42} color="#10B981" />
               </View>
               <Text style={styles.successTitle}>Stamps Issued Successfully!</Text>
               <Text style={styles.successSubtitle}>
-                {stampAmount} stamp(s) credited to <Text style={{ fontWeight: '800', color: '#000000' }}>{claim.customer_name || 'Customer'}</Text>
+                {stampAmount} stamp(s) credited to <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{claim.customer_name || 'Customer'}</Text>
               </Text>
 
               <View style={styles.summaryBox}>
@@ -151,7 +160,10 @@ export default function NfcClaimModal() {
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Stamps Added</Text>
-                  <Text style={styles.summaryValueStamps}>+{stampAmount} 🎁</Text>
+                  <View style={styles.stampPillBadge}>
+                    <Ionicons name="ribbon" size={12} color="#10B981" />
+                    <Text style={styles.summaryValueStamps}>+{stampAmount} stamps</Text>
+                  </View>
                 </View>
               </View>
 
@@ -165,7 +177,7 @@ export default function NfcClaimModal() {
               {/* Header */}
               <View style={styles.headerRow}>
                 <View style={styles.iconBg}>
-                  <Ionicons name="wifi" size={24} color="#000000" />
+                  <Ionicons name="wifi" size={22} color="#B45309" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title}>NFC Stamp Claim!</Text>
@@ -184,12 +196,21 @@ export default function NfcClaimModal() {
                 </View>
               ) : null}
 
-              {/* Customer Details Box */}
+              {/* Customer Details Box as VIP Pass */}
               <View style={styles.customerBox}>
-                <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
-                <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
-                <View style={styles.sessionBadge}>
-                  <Text style={styles.sessionText}>NFC CODE: {claim.session_code}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' }}>
+                  <View style={styles.initialsBadge}>
+                    <Text style={styles.initialsText}>
+                      {getInitials(claim.customer_name || 'Customer')}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
+                    <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
+                  </View>
+                  <View style={styles.sessionBadge}>
+                    <Text style={styles.sessionText}>{claim.session_code}</Text>
+                  </View>
                 </View>
               </View>
 
@@ -197,23 +218,31 @@ export default function NfcClaimModal() {
               <View style={styles.inputRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
-                  <TextInput
-                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    keyboardType="numeric"
-                    value={billAmount}
-                    onChangeText={setBillAmount}
-                    placeholder="10"
-                  />
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="cash-outline" size={16} color="#FFC700" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                      keyboardType="numeric"
+                      value={billAmount}
+                      onChangeText={setBillAmount}
+                      placeholder="10"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
-                  <TextInput
-                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    keyboardType="numeric"
-                    value={stampAmount}
-                    onChangeText={setStampAmount}
-                    placeholder="1"
-                  />
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="star-outline" size={16} color="#FFC700" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                      keyboardType="numeric"
+                      value={stampAmount}
+                      onChangeText={setStampAmount}
+                      placeholder="1"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -222,9 +251,9 @@ export default function NfcClaimModal() {
                 <TouchableOpacity style={styles.cancelBtn} onPress={handleDismiss} disabled={isLoading}>
                   <Text style={styles.cancelBtnText}>Dismiss</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} disabled={isLoading} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} disabled={isLoading} activeOpacity={0.85}>
                   {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color="#FFC700" />
                   ) : (
                     <Text style={styles.confirmBtnText}>Issue Stamps & Confirm</Text>
                   )}
@@ -250,12 +279,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 440,
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 24,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
     elevation: 10,
   },
   headerRow: {
@@ -268,14 +297,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFDF0',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#1A1400',
   },
   subtitle: {
     fontSize: 12,
@@ -283,7 +314,9 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   closeBtn: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -301,36 +334,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customerBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+    backgroundColor: '#FFFDF0',
+    borderRadius: 20,
     padding: 16,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FEF3C7',
     marginBottom: 16,
   },
-  customerName: {
-    fontSize: 18,
+  initialsBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  initialsText: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#B45309',
+  },
+  customerName: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#1A1400',
   },
   customerPhone: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#475569',
-    marginTop: 2,
+    color: '#64748B',
+    marginTop: 1,
   },
   sessionBadge: {
-    marginTop: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'rgba(255, 199, 0, 0.1)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.2)',
   },
   sessionText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#B45309',
     letterSpacing: 0.5,
   },
   inputRow: {
@@ -345,16 +393,21 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.5,
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: 44,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     paddingHorizontal: 12,
+  },
+  inputField: {
+    flex: 1,
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
   },
   actionRow: {
     flexDirection: 'row',
@@ -364,7 +417,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -377,14 +432,21 @@ const styles = StyleSheet.create({
     flex: 2,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1400',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFC700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   confirmBtnText: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
   },
 
   /* Success Screen Styles */
@@ -396,7 +458,9 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 4,
+    borderColor: '#A7F3D0',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -404,7 +468,7 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#1A1400',
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -417,12 +481,17 @@ const styles = StyleSheet.create({
   },
   summaryBox: {
     width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 1,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -432,7 +501,7 @@ const styles = StyleSheet.create({
   },
   summaryDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
     marginVertical: 4,
   },
   summaryLabel: {
@@ -443,24 +512,37 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#1A1400',
+  },
+  stampPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   summaryValueStamps: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#10B981',
   },
   doneBtn: {
     width: '100%',
     height: 50,
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1400',
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFC700',
   },
   doneBtnText: {
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
   },
 });
