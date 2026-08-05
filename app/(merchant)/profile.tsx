@@ -2711,8 +2711,8 @@ export default function ProfileScreen() {
                             cardBackground: program?.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` : null,
                             fontColor: program?.font_color || undefined,
                             cardIcon: program?.card_icon || 'coffee',
-                            merchantName: merchant?.name || user?.brand_name || 'Your Brand',
-                            category: user?.category || 'OTHER',
+                            merchantName: merchant?.name || user?.name || 'Your Brand',
+                            category: merchant?.category || 'OTHER',
                             totalStamps: 10,
                             collectedStamps: 0,
                           }}

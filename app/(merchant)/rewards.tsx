@@ -205,10 +205,10 @@ export default function UnifiedRewardsScreen() {
   });
 
   const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: frontInterpolate }],
   };
   const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: backInterpolate }],
   };
 
   const [expiryFocused, setExpiryFocused] = useState(false);
@@ -2402,7 +2402,6 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1.586,
     position: 'relative',
-    perspective: 1000,
   },
   flipBtn: {
     flexDirection: 'row',

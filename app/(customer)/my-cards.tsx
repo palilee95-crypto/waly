@@ -120,7 +120,7 @@ const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, s
         ]}
       >
         {/* Clipping Layer for Background & Gloss */}
-        <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 24, overflow: 'hidden' }}>
+        <View style={{ ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' }}>
           {/* Subtle metallic sheen */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
           <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
