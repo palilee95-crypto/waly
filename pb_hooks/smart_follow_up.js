@@ -143,15 +143,58 @@ function runSmartFollowUp() {
         const staggerMs = memberIndex * intervalMinutes * 60 * 1000;
 
         for (const msg of seqMessages) {
-          let body = msg.getString("message_body") || "";
-          body = body
-            .replace(/\{\{\s*name\s*\}\}/g, customerName)
-            .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
-            .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
-            .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
-            .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
+          const rawBody = msg.getString("message_body") || "";
+          
+          let templateName = "risev_notification";
+          let languageCode = "en_US";
+          let plainText = "";
+          let waParams = [];
+          let isTemplateJson = false;
 
-          const formattedMsg = `💌 *${merchantName}*\n\n📣 *${nextSeq.getString("title")}*\n───────────────────\n${body}\n───────────────────\n\n_Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV._`;
+          if (rawBody.indexOf("{") === 0 && rawBody.lastIndexOf("}") === rawBody.length - 1) {
+            try {
+              const config = JSON.parse(rawBody);
+              templateName = config.templateName || "risev_notification";
+              languageCode = config.languageCode || "en_US";
+              const templateText = config.templateText || "";
+              const parameters = config.parameters || [];
+              isTemplateJson = true;
+
+              // Map parameters
+              const mappedVals = parameters.map(p => {
+                let val = String(p);
+                val = val
+                  .replace(/\{\{\s*name\s*\}\}/g, customerName)
+                  .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
+                  .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
+                  .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
+                  .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
+                return val;
+              });
+
+              waParams = mappedVals;
+
+              // Generate plain text for inapp/push
+              let resolvedText = templateText;
+              for (let idx = 0; idx < mappedVals.length; idx++) {
+                resolvedText = resolvedText.replace(new RegExp(`\\{\\{\\s*${idx + 1}\\s*\\}\\}`, 'g'), mappedVals[idx]);
+              }
+              plainText = resolvedText;
+            } catch (err) {
+              isTemplateJson = false;
+            }
+          }
+
+          if (!isTemplateJson) {
+            plainText = rawBody
+              .replace(/\{\{\s*name\s*\}\}/g, customerName)
+              .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
+              .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
+              .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
+              .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
+            
+            waParams = [merchantName, nextSeq.getString("title"), plainText];
+          }
 
           // Create log record
           const logsCol = $app.findCollectionByNameOrId("follow_up_logs");
@@ -174,20 +217,20 @@ function runSmartFollowUp() {
           $app.save(logRecord);
 
           // In-app notification
-          createNotification(customerId, nextSeq.getString("title"), body, "campaign", {
+          createNotification(customerId, nextSeq.getString("title"), plainText, "campaign", {
             merchant_id: merchantId,
             automated: true,
             follow_up_group: groupId,
           });
 
           // Push notification
-          sendPushNotification(customerId, nextSeq.getString("title"), body, {
+          sendPushNotification(customerId, nextSeq.getString("title"), plainText, {
             type: "campaign",
             merchantId: merchantId,
             automated: "true",
           });
 
-          // WhatsApp (Meta Cloud API using risev_notification template)
+          // WhatsApp (Meta Cloud API using selected template or fallback)
           if (phone) {
             const cleanPhone = phone.replace(/[^\d]/g, '');
             if (cleanPhone) {
@@ -195,9 +238,9 @@ function runSmartFollowUp() {
                 sendTemplateMessage(
                   merchantId,
                   cleanPhone,
-                  "risev_notification",
-                  "en_US",
-                  [merchantName, nextSeq.getString("title"), body]
+                  templateName,
+                  languageCode,
+                  waParams
                 );
               } catch (err) {
                 console.log(`Smart Follow Up WhatsApp error for ${cleanPhone}:`, err.message || err);
