@@ -626,7 +626,7 @@ export default function CustomersScreen() {
             elevation: 4,
             zIndex: 20
           }}
-          onPress={() => router.push('/(merchant)/analytics')}
+          onPress={() => router.push('/(merchant)/analytics' as any)}
           activeOpacity={0.85}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -700,7 +700,7 @@ export default function CustomersScreen() {
           <View style={{ marginVertical: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
-                Inactive customers (>30 days)
+                {"Inactive customers (>30 days)"}
               </Text>
               <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>

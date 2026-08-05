@@ -73,7 +73,7 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
         ]}
       >
         {/* Clipping Layer for Background & Gloss */}
-        <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 24, overflow: 'hidden' }}>
+        <View style={{ ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' }}>
           {item.cardBackground ? (
             <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : null}

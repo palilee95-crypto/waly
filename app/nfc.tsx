@@ -1116,7 +1116,7 @@ export default function NfcLandingScreen() {
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>FULL NAME (NEW CUSTOMER)</Text>
                   <TextInput
-                    style={[styles.input, styles.nameInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                     placeholder="Enter your full name"
                     placeholderTextColor="#94A3B8"
                     value={nameInput}

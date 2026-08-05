@@ -83,6 +83,7 @@ export default function ProfileScreen() {
 
   const [showMetaHelp, setShowMetaHelp] = useState(false);
   const [showManualSetup, setShowManualSetup] = useState(false);
+  const [showMetaDetails, setShowMetaDetails] = useState(false);
 
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
@@ -2237,115 +2238,170 @@ export default function ProfileScreen() {
             </View>
 
              {metaConfigId ? (
-              <View style={{ width: '100%', gap: 16 }}>
-                {/* Connected status badge card */}
-                <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 12, padding: 16, gap: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857' }}>
-                      Connected to WhatsApp
+              <View style={{ width: '100%', gap: 20 }}>
+                {/* 1. Connected Status Banner */}
+                <View style={{ 
+                  backgroundColor: '#ECFDF5', 
+                  borderRadius: 16, 
+                  padding: 16, 
+                  borderWidth: 1, 
+                  borderColor: '#A7F3D0',
+                  alignItems: 'center',
+                  gap: 4
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {locale === 'en' ? 'Active & Connected' : 'Aktif & Bersambung'}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 13, color: '#065F46', lineHeight: 18, marginTop: 4 }}>
-                    Your business account is linked and ready to run automated campaigns.
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#065F46', marginTop: 4 }}>
+                    {metaPhone}
                   </Text>
-                  <Text style={{ fontSize: 13, color: '#065F46', fontFamily: 'PlusJakartaSans_700Bold', marginTop: 4 }}>
-                    Verified Number: {metaPhone}
+                  <Text style={{ fontSize: 11, color: '#047857', textAlign: 'center', marginTop: 2, opacity: 0.8, lineHeight: 16 }}>
+                    {locale === 'en' 
+                      ? 'Your Meta Cloud API is set up. Auto campaigns are active.' 
+                      : 'Meta Cloud API anda telah siap. Kempen automatik sedang aktif.'}
                   </Text>
-                  
+                </View>
+
+                {/* 2. Sleek Actions Dashboard */}
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', marginLeft: 4, marginBottom: 2 }}>
+                    {locale === 'en' ? 'WhatsApp Dashboard Actions' : 'Tindakan Papan Pemuka WhatsApp'}
+                  </Text>
+
                   {metaWabaId ? (
                     <>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#10B981',
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          marginTop: 10,
+                          backgroundColor: '#F8FAFC',
+                          paddingVertical: 12,
+                          paddingHorizontal: 16,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
                           width: '100%',
                         }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                          {locale === 'en' ? 'Link Payment Card on Meta' : 'Pautkan Kad Ganjaran di Meta'}
-                        </Text>
+                        <Ionicons name="card-outline" size={20} color="#10B981" style={{ marginRight: 12 }} />
+                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Link Payment Card' : 'Pautkan Kad Pembayaran'}
+                          </Text>
+                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Add billing details to Meta for campaign blasts' : 'Tambah maklumat bil ke Meta untuk kempen blast'}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#0F172A',
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          marginTop: 8,
+                          backgroundColor: '#F8FAFC',
+                          paddingVertical: 12,
+                          paddingHorizontal: 16,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
                           width: '100%',
                         }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/templates/?waba_id=${metaWabaId}`)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="document-text-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                          {locale === 'en' ? 'Manage Message Templates' : 'Urus Templat Mesej'}
-                        </Text>
+                        <Ionicons name="document-text-outline" size={20} color="#0F172A" style={{ marginRight: 12 }} />
+                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Manage Message Templates' : 'Urus Templat Mesej'}
+                          </Text>
+                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Edit or request new approved templates' : 'Edit atau mohon templat baharu yang diluluskan'}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#475569',
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          marginTop: 8,
+                          backgroundColor: '#F8FAFC',
+                          paddingVertical: 12,
+                          paddingHorizontal: 16,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
                           width: '100%',
                         }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/home/?waba_id=${metaWabaId}`)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="settings-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                          {locale === 'en' ? 'Edit Business Profile & Settings' : 'Edit Profil & Tetapan Perniagaan'}
-                        </Text>
+                        <Ionicons name="settings-outline" size={20} color="#475569" style={{ marginRight: 12 }} />
+                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Edit Profile & Settings' : 'Edit Profil & Tetapan'}
+                          </Text>
+                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Change photo, description, category on Meta' : 'Tukar foto, penerangan, kategori di Meta'}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                       </TouchableOpacity>
                     </>
                   ) : null}
                 </View>
 
-                {/* Facebook Business Details Card */}
-                <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, gap: 12 }}>
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 8 }}>
-                    Facebook Business Information
-                  </Text>
-
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>WhatsApp Business Account (WABA) ID</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaWabaId}</Text>
-                  </View>
-
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Phone Number ID</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaPhoneId}</Text>
-                  </View>
-
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Verified Phone Number</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155', marginTop: 2 }}>{metaPhone}</Text>
-                  </View>
-
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Status</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#047857' }}>Active & Synced</Text>
+                {/* 3. Collapsible Diagnostics Accordion */}
+                <View style={{ borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 12, overflow: 'hidden', width: '100%' }}>
+                  <TouchableOpacity
+                    onPress={() => setShowMetaDetails(!showMetaDetails)}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: '#F8FAFC',
+                      padding: 12
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="construct-outline" size={16} color="#64748B" />
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Advanced Diagnostics Details' : 'Butiran Diagnostik Lanjutan'}
+                      </Text>
                     </View>
-                  </View>
+                    <Ionicons name={showMetaDetails ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {showMetaDetails && (
+                    <View style={{ padding: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 8 }}>
+                      <View style={{ gap: 2, alignItems: 'flex-start' }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>WhatsApp Business Account (WABA) ID</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>{metaWabaId || '-'}</Text>
+                      </View>
+                      <View style={{ gap: 2, alignItems: 'flex-start' }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Phone Number ID</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>{metaPhoneId || '-'}</Text>
+                      </View>
+                      <View style={{ gap: 2, alignItems: 'flex-start' }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Verified Phone Number</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>{metaPhone || '-'}</Text>
+                      </View>
+                      <View style={{ gap: 2, alignItems: 'flex-start' }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Status</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#047857' }}>Active & Synced</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
                 </View>
               </View>
             ) : (
@@ -2428,26 +2484,27 @@ export default function ProfileScreen() {
             )}
 
             {/* Actions (Disconnect) */}
-            <View style={{ gap: 10, marginTop: 24, width: '100%' }}>
+            <View style={{ marginTop: 24, width: '100%', alignItems: 'center' }}>
               {metaConfigId && (
                 <TouchableOpacity
                   style={{
-                    backgroundColor: '#EF4444',
-                    paddingVertical: 12,
-                    borderRadius: 12,
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    borderRadius: 8,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '100%',
                     opacity: isDisconnectingMeta ? 0.7 : 1
                   }}
                   onPress={handleDisconnectMeta}
                   disabled={isDisconnectingMeta}
-                  activeOpacity={0.8}
+                  activeOpacity={0.7}
                 >
                   {isDisconnectingMeta ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#EF4444" />
                   ) : (
-                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>Disconnect & Delete WABA</Text>
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', textDecorationLine: 'underline' }}>
+                      {locale === 'en' ? 'Disconnect WABA Account' : 'Putuskan Sambungan Akaun WABA'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               )}
