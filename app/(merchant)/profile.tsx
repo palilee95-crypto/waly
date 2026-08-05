@@ -15,8 +15,8 @@ import {
   useWindowDimensions,
   Switch,
   Linking,
-  Clipboard,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
@@ -2980,9 +2980,9 @@ export default function ProfileScreen() {
                     width: '100%',
                     marginTop: 12,
                   }}
-                  onPress={() => {
+                  onPress={async () => {
                     const url = `https://risev.app/nfc?m=${user?.merchant_id}`;
-                    Clipboard.setString(url);
+                    await Clipboard.setStringAsync(url);
                     Alert.alert('Copied', 'NFC Claim URL copied to clipboard!');
                   }}
                   activeOpacity={0.8}
