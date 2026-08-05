@@ -1609,7 +1609,10 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                               activeOpacity={0.8}
                             >
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                <Text style={{ flex: 1, marginRight: 8, fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#0F172A' }}>
+                                <Text 
+                                  style={{ flex: 1, flexShrink: 1, marginRight: 8, fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#0F172A' }}
+                                  numberOfLines={1}
+                                >
                                   {t.name}
                                 </Text>
                                 <View style={{
