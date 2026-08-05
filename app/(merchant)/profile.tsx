@@ -2312,7 +2312,7 @@ export default function ProfileScreen() {
                           borderColor: '#E2E8F0',
                           width: '100%',
                         }}
-                        onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/templates/?waba_id=${metaWabaId}`)}
+                        onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/message-templates/?waba_id=${metaWabaId}`)}
                         activeOpacity={0.7}
                       >
                         <Ionicons name="document-text-outline" size={20} color="#0F172A" style={{ marginRight: 12 }} />
