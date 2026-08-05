@@ -80,4 +80,5 @@ onRecordCreate((e) => {
   } catch (err) {
     console.log("[NOTIFICATION HOOK] Stamp notification error:", err.message || err);
   }
+  return e.next();
 }, 'transactions');

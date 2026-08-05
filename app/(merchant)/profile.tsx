@@ -2254,25 +2254,67 @@ export default function ProfileScreen() {
                   </Text>
                   
                   {metaWabaId ? (
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#10B981',
-                        paddingVertical: 10,
-                        borderRadius: 8,
-                        marginTop: 10,
-                        width: '100%',
-                      }}
-                      onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                        Link Payment Card on Meta
-                      </Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#10B981',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          marginTop: 10,
+                          width: '100%',
+                        }}
+                        onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                          {locale === 'en' ? 'Link Payment Card on Meta' : 'Pautkan Kad Ganjaran di Meta'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#0F172A',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          marginTop: 8,
+                          width: '100%',
+                        }}
+                        onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/templates/?waba_id=${metaWabaId}`)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="document-text-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                          {locale === 'en' ? 'Manage Message Templates' : 'Urus Templat Mesej'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#475569',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          marginTop: 8,
+                          width: '100%',
+                        }}
+                        onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/home/?waba_id=${metaWabaId}`)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="settings-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                          {locale === 'en' ? 'Edit Business Profile & Settings' : 'Edit Profil & Tetapan Perniagaan'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
                   ) : null}
                 </View>
 
@@ -2308,6 +2350,55 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <>
+                {/* Step-by-Step Connection Guide */}
+                <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 10, width: '100%' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 6 }}>
+                    <Ionicons name="list-outline" size={16} color="#0F172A" />
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                      {locale === 'en' ? 'Setup Instructions (Important!)' : 'Arahan Persediaan (Penting!)'}
+                    </Text>
+                  </View>
+
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                      {locale === 'en' ? '1. Prepare a Dedicated Phone Number' : '1. Sediakan Nombor Telefon Khas'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
+                      {locale === 'en' ? (
+                        <>
+                          The number must <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>NOT</Text> be active on any phone's WhatsApp app. If it is, you must open the app on your phone, go to Settings → Account → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Delete My Account</Text> before linking. (Just uninstalling the app is not enough).
+                        </>
+                      ) : (
+                        <>
+                          Nombor ini mestilah <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>TIDAK</Text> aktif pada mana-mana aplikasi WhatsApp di telefon anda. Jika aktif, anda mesti membuka aplikasi di telefon anda, pergi ke Tetapan → Akaun → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Padam Akaun Saya</Text> sebelum menghubungkannya. (Membuang aplikasi sahaja tidak mencukupi).
+                        </>
+                      )}
+                    </Text>
+
+                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                      {locale === 'en' ? '2. Meta Embedded Signup Flow' : '2. Aliran Pendaftaran Meta'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
+                      {locale === 'en' ? (
+                        'Click the blue button below, log in with your Facebook account, select your Business Portfolio, and verify your phone number via SMS/Voice code.'
+                      ) : (
+                        'Klik butang biru di bawah, log masuk dengan akaun Facebook anda, pilih Portfolio Perniagaan anda, dan sahkan nombor telefon anda melalui kod SMS/Panggilan.'
+                      )}
+                    </Text>
+
+                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                      {locale === 'en' ? '3. Automatic Sync' : '3. Penyegerakan Automatik'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
+                      {locale === 'en' ? (
+                        'Once you complete the Meta popup flow, the setup will finish and your Risev app will automatically sync.'
+                      ) : (
+                        'Sebaik sahaja anda melengkapkan aliran tetingkap Meta, persediaan akan selesai dan aplikasi Risev anda akan disegerakkan secara automatik.'
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
                 {/* Quick Connect Button */}
                 <TouchableOpacity 
                   onPress={handleQuickConnectMeta}
@@ -2330,7 +2421,7 @@ export default function ProfileScreen() {
                 >
                   <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
                   <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
-                    Quick Connect via Meta
+                    {locale === 'en' ? 'Quick Connect via Meta' : 'Sambungan Pantas via Meta'}
                   </Text>
                 </TouchableOpacity>
               </>
