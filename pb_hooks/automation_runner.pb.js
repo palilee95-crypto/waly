@@ -59,3 +59,63 @@ routerAdd("GET", "/api/risev/test/run-smart-follow-up", (e) => {
     });
   }
 });
+
+// 5. Subscription Expiration Cron — runs at 1:00 AM daily
+cronAdd("check_expired_subscriptions", "0 1 * * *", () => {
+  try {
+    const now = new Date();
+    const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const expiredSubs = $app.findRecordsByFilter(
+      "subscriptions",
+      `(status = 'active' || status = 'trialing') && current_period_end <= '${nowStr}'`,
+      "-created",
+      500,
+      0
+    );
+
+    for (const sub of expiredSubs) {
+      sub.set("status", "expired");
+      $app.save(sub);
+      console.log(`[Subscription Cron] Subscription ${sub.id} for merchant ${sub.get("merchant")} has expired. Status set to expired.`);
+    }
+  } catch (err) {
+    console.log("[Subscription Cron] Error:", err.message || err);
+  }
+});
+
+// 6. HTTP endpoint to trigger subscription check manually
+routerAdd("GET", "/api/risev/test/check-expired-subscriptions", (e) => {
+  try {
+    const now = new Date();
+    const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const expiredSubs = $app.findRecordsByFilter(
+      "subscriptions",
+      `(status = 'active' || status = 'trialing') && current_period_end <= '${nowStr}'`,
+      "-created",
+      500,
+      0
+    );
+
+    const stats = [];
+    for (const sub of expiredSubs) {
+      sub.set("status", "expired");
+      $app.save(sub);
+      stats.push({ subId: sub.id, merchant: sub.get("merchant") });
+    }
+
+    return e.json(200, {
+      success: true,
+      message: "Expired subscriptions check completed",
+      processedCount: stats.length,
+      expired: stats
+    });
+  } catch (err) {
+    return e.json(500, {
+      success: false,
+      message: "Failed to run expired subscriptions check: " + err.message
+    });
+  }
+});
+
