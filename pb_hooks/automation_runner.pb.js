@@ -75,9 +75,9 @@ cronAdd("check_expired_subscriptions", "0 1 * * *", () => {
     );
 
     for (const sub of expiredSubs) {
-      sub.set("status", "expired");
+      sub.set("status", "canceled");
       $app.save(sub);
-      console.log(`[Subscription Cron] Subscription ${sub.id} for merchant ${sub.get("merchant")} has expired. Status set to expired.`);
+      console.log(`[Subscription Cron] Subscription ${sub.id} for merchant ${sub.get("merchant")} has expired. Status set to canceled.`);
     }
   } catch (err) {
     console.log("[Subscription Cron] Error:", err.message || err);
@@ -100,7 +100,7 @@ routerAdd("GET", "/api/risev/test/check-expired-subscriptions", (e) => {
 
     const stats = [];
     for (const sub of expiredSubs) {
-      sub.set("status", "expired");
+      sub.set("status", "canceled");
       $app.save(sub);
       stats.push({ subId: sub.id, merchant: sub.get("merchant") });
     }
