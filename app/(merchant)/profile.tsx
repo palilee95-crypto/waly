@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
+import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 
 const { width } = Dimensions.get('window');
 
@@ -87,6 +88,7 @@ export default function ProfileScreen() {
 
   // WhatsApp connection states
   const [whatsappStatus, setWhatsappStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [program, setProgram] = useState<any>(null);
   const [whatsappQr, setWhatsappQr] = useState<string>('');
   const [whatsappPhone, setWhatsappPhone] = useState<string>('');
   const [showQrModal, setShowQrModal] = useState(false);
@@ -117,7 +119,7 @@ export default function ProfileScreen() {
 
   // Onboarding branding states
   const [brandingModalVisible, setBrandingModalVisible] = useState(false);
-  const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#000000');
+  const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#050505');
   const [brandingWelcomeText, setBrandingWelcomeText] = useState('');
   const [brandingLogoUrl, setBrandingLogoUrl] = useState('');
   const [brandingBgUrl, setBrandingBgUrl] = useState('');
@@ -482,6 +484,14 @@ export default function ProfileScreen() {
           console.log("No active subscription row found for profile view:", e.message);
         }
 
+        // Fetch program record for live preview
+        try {
+          const progRec = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user.merchant_id}"`);
+          setProgram(progRec);
+        } catch (e: any) {
+          console.log("No active program row found for profile view");
+        }
+
         const locs = await pb.collection('store_locations').getFullList({
           filter: `merchant = "${user.merchant_id}"`,
           requestKey: null,
@@ -637,7 +647,7 @@ export default function ProfileScreen() {
   }, [editModalVisible]);
 
   const handleOpenBranding = () => {
-    setBrandingPrimaryColor(merchant?.onboarding_primary_color || '#000000');
+    setBrandingPrimaryColor(merchant?.onboarding_primary_color || '#050505');
     setBrandingWelcomeText(merchant?.onboarding_welcome_text || '');
     setBrandingLogoUrl(merchant?.onboarding_logo_url || '');
     setBrandingBgUrl(merchant?.onboarding_bg_url || '');
@@ -1082,27 +1092,24 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      <View style={[styles.headerRow, isDesktop && { paddingLeft: 260 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between' }]}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="cafe" size={16} color="#000000" />
-          </View>
-          <Text style={styles.headerLogoText}>{t('merchant_portal')}</Text>
-        </View>
-        <Image
-          source={require('../../assets/risev logo.png')}
-          style={{ width: 110, height: 38, resizeMode: 'contain' }}
-        />
-      </View>
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Premium Dark Header Background */}
+        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 260, backgroundColor: '#050505', zIndex: 0 }} />
+
+        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'flex-end', paddingHorizontal: 0 }]}>
+          <Image
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 100, height: 34, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
+        </View>
+
         {/* Screen Intro */}
-        <View style={styles.introSection}>
-          <Text style={styles.screenTitle}>{t('profile_settings')}</Text>
-          <Text style={styles.screenSubtitle}>
+        <View style={[styles.introSection, { zIndex: 1, marginTop: 12 }]}>
+          <Text style={[styles.screenTitle, { color: '#FFFFFF' }]}>{t('profile_settings')}</Text>
+          <Text style={[styles.screenSubtitle, { color: '#94A3B8' }]}>
             {t('profile_subtitle')}
           </Text>
         </View>
@@ -1176,7 +1183,7 @@ export default function ProfileScreen() {
         {/* Switch Role Card (Go back to Customer mode) */}
         <View style={styles.switchCard}>
           <View style={styles.switchHeader}>
-            <Ionicons name="people-outline" size={24} color="#000000" />
+            <Ionicons name="people-outline" size={24} color="#050505" />
             <View style={styles.switchInfo}>
               <Text style={styles.switchTitle}>{t('personal_account')}</Text>
               <Text style={styles.switchSubtitle}>{t('switch_customer_desc')}</Text>
@@ -1213,7 +1220,7 @@ export default function ProfileScreen() {
                 title={t('manage_staff')}
                 subtitle={t('manage_staff_desc')}
                 iconBgColor="#F1F5F9"
-                iconColor="#000000"
+                iconColor="#050505"
                 onPress={() => router.push('/(merchant)/staff' as any)}
               />
 
@@ -1240,7 +1247,7 @@ export default function ProfileScreen() {
             title="Onboarding Setup"
             subtitle="Customize your customer-facing onboarding page"
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
             onPress={handleOpenBranding}
           />
           <SettingItem
@@ -1248,14 +1255,14 @@ export default function ProfileScreen() {
             title={t('notifications')}
             subtitle={t('notifications_desc')}
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
           />
           <SettingItem
             iconName="shield-checkmark-outline"
             title={t('security')}
             subtitle={t('security_desc')}
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
             onPress={() => setPasswordModalVisible(true)}
           />
           <SettingItem
@@ -1263,7 +1270,7 @@ export default function ProfileScreen() {
             title={t('language')}
             subtitle={locale === 'en' ? 'English' : 'Bahasa Melayu'}
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
             onPress={() => setLanguageModalVisible(true)}
           />
           <SettingItem
@@ -1271,14 +1278,14 @@ export default function ProfileScreen() {
             title={t('payment_method')}
             subtitle={t('payment_method_desc')}
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
           />
           <SettingItem
             iconName="document-text-outline"
             title={t('privacy_policy')}
             subtitle={t('privacy_policy_desc')}
             iconBgColor="#F1F5F9"
-            iconColor="#000000"
+            iconColor="#050505"
           />
         </View>
 
@@ -1402,7 +1409,7 @@ export default function ProfileScreen() {
             <Text style={styles.modalSubtitle}>{resultModalConfig.desc}</Text>
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
-                style={[styles.modalConfirmBtn, { flex: 1, backgroundColor: '#000000' }]}
+                style={[styles.modalConfirmBtn, { flex: 1, backgroundColor: '#050505' }]}
                 onPress={() => setShowResultModal(false)}
                 activeOpacity={0.8}
               >
@@ -1439,7 +1446,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: whatsappQr }} style={{ width: 180, height: 180, borderRadius: 12 }} />
             ) : (
               <View style={{ width: 180, height: 180, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 }}>
-                <ActivityIndicator size="large" color="#000000" />
+                <ActivityIndicator size="large" color="#050505" />
                 <Text style={{ fontSize: 11, color: '#64748B', marginTop: 8 }}>{t('generating_qr')}</Text>
               </View>
             )}
@@ -1513,7 +1520,7 @@ export default function ProfileScreen() {
                     width: '100%',
                     height: 48,
                     borderRadius: 12,
-                    backgroundColor: '#000000',
+                    backgroundColor: '#050505',
                     justifyContent: 'center',
                     alignItems: 'center',
                     marginTop: 8
@@ -1901,7 +1908,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={monClosed}
                       onValueChange={setMonClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={monClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -1933,7 +1940,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={tueClosed}
                       onValueChange={setTueClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={tueClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -1965,7 +1972,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={wedClosed}
                       onValueChange={setWedClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={wedClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -1997,7 +2004,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={thuClosed}
                       onValueChange={setThuClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={thuClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -2029,7 +2036,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={friClosed}
                       onValueChange={setFriClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={friClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -2061,7 +2068,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={satClosed}
                       onValueChange={setSatClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={satClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -2093,7 +2100,7 @@ export default function ProfileScreen() {
                     <Switch
                       value={sunClosed}
                       onValueChange={setSunClosed}
-                      trackColor={{ false: '#CBD5E1', true: '#000000' }}
+                      trackColor={{ false: '#CBD5E1', true: '#050505' }}
                       thumbColor={sunClosed ? '#FFFFFF' : '#F4F3F4'}
                     />
                   </View>
@@ -2169,7 +2176,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.languageOptionText, locale === 'en' && styles.languageOptionTextActive]}>English</Text>
-              {locale === 'en' && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+              {locale === 'en' && <Ionicons name="checkmark-circle" size={20} color="#050505" />}
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -2181,7 +2188,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.languageOptionText, locale === 'ms' && styles.languageOptionTextActive]}>Bahasa Melayu</Text>
-              {locale === 'ms' && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+              {locale === 'ms' && <Ionicons name="checkmark-circle" size={20} color="#050505" />}
             </TouchableOpacity>
           </View>
         </View>
@@ -2195,45 +2202,60 @@ export default function ProfileScreen() {
         onRequestClose={() => setMetaModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <ScrollView 
-            style={[styles.modalCard, styles.editModalCard, { maxHeight: '90%' }]}
-            contentContainerStyle={{ paddingBottom: 24 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 16 }}>
-              <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>WhatsApp Cloud API</Text>
+          <View style={[styles.modalCard, styles.editModalCard, { maxHeight: '90%', padding: 0, overflow: 'hidden' }]}>
+            <ScrollView 
+              style={{ width: '100%' }}
+              contentContainerStyle={{ padding: 24, paddingBottom: 24 }}
+              showsVerticalScrollIndicator={false}
+            >
+            {/* Header Area with WhatsApp Green branding */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Ionicons name="logo-whatsapp" size={26} color="#25D366" />
+                  <Text style={[styles.modalTitle, { textAlign: 'left', marginBottom: 0 }]}>WhatsApp Cloud API</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18 }}>
+                  Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => setMetaModalVisible(false)} activeOpacity={0.7} style={{ padding: 4 }}>
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close-circle" size={28} color="#E2E8F0" />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 16 }}>
-              Configure your official Meta WhatsApp Business Cloud API credentials to run automated campaigns.
-            </Text>
-
             {/* Meta API Pricing & Billing Info Card */}
-            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 6, width: '100%' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="card" size={16} color="#475569" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
-                  Meta WhatsApp API Pricing (Malaysia)
-                </Text>
-              </View>
-              <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 17 }}>
-                Meta charges directly to your linked card per message sent:
-              </Text>
-              <View style={{ gap: 4, marginTop: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>• Utility/Notifications (Follow-ups):</Text>
-                  <Text style={{ fontSize: 12, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold' }}>~RM 0.06 /msg</Text>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, width: '100%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
+                <View style={{ backgroundColor: '#EEF2FF', padding: 6, borderRadius: 8 }}>
+                  <Ionicons name="card" size={16} color="#4F46E5" />
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>• Marketing / Broadcast Blasts:</Text>
-                  <Text style={{ fontSize: 12, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold' }}>~RM 0.35 /msg</Text>
+                <View>
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B' }}>
+                    Meta API Pricing (Malaysia)
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                    Meta charges directly to your linked card
+                  </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 15, marginTop: 4 }}>
-                *Note: You must link a debit/credit card to your WhatsApp Business Account (WABA) in Meta Business Suite to allow message delivery.
+              
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Utility (Follow-ups)</Text>
+                  <View style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 13, color: '#1E293B', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>~RM 0.06 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>/msg</Text></Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Marketing (Blasts)</Text>
+                  <View style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 13, color: '#1E293B', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>~RM 0.35 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>/msg</Text></Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginTop: 16, fontStyle: 'italic' }}>
+                *You must link a debit/credit card to your WhatsApp Business Account (WABA) in Meta Business Suite to allow message delivery.
               </Text>
             </View>
 
@@ -2241,119 +2263,100 @@ export default function ProfileScreen() {
               <View style={{ width: '100%', gap: 20 }}>
                 {/* 1. Connected Status Banner */}
                 <View style={{ 
-                  backgroundColor: '#ECFDF5', 
+                  backgroundColor: '#FFFFFF', 
                   borderRadius: 16, 
-                  padding: 16, 
-                  borderWidth: 1, 
-                  borderColor: '#A7F3D0',
+                  padding: 20, 
+                  shadowColor: '#10B981', 
+                  shadowOffset: { width: 0, height: 4 }, 
+                  shadowOpacity: 0.1, 
+                  shadowRadius: 12, 
+                  elevation: 4,
                   alignItems: 'center',
-                  gap: 4
+                  gap: 8,
+                  borderWidth: 1,
+                  borderColor: '#A7F3D0'
                 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#047857', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      {locale === 'en' ? 'Active & Connected' : 'Aktif & Bersambung'}
-                    </Text>
+                  <View style={{ backgroundColor: '#ECFDF5', width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                    <Ionicons name="checkmark-circle" size={28} color="#10B981" />
                   </View>
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#065F46', marginTop: 4 }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {locale === 'en' ? 'Verified & Connected' : 'Disahkan & Bersambung'}
+                  </Text>
+                  <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#064E3B' }}>
                     {metaPhone}
                   </Text>
-                  <Text style={{ fontSize: 11, color: '#047857', textAlign: 'center', marginTop: 2, opacity: 0.8, lineHeight: 16 }}>
+                  <Text style={{ fontSize: 12, color: '#047857', textAlign: 'center', opacity: 0.8, lineHeight: 18, marginTop: 4 }}>
                     {locale === 'en' 
-                      ? 'Your Meta Cloud API is set up. Auto campaigns are active.' 
-                      : 'Meta Cloud API anda telah siap. Kempen automatik sedang aktif.'}
+                      ? 'Your Meta Cloud API is fully set up. Automated campaigns are now active.' 
+                      : 'Meta Cloud API anda telah disiapkan sepenuhnya. Kempen automatik kini aktif.'}
                   </Text>
                 </View>
 
                 {/* 2. Sleek Actions Dashboard */}
                 <View style={{ gap: 8 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', marginLeft: 4, marginBottom: 2 }}>
-                    {locale === 'en' ? 'WhatsApp Dashboard Actions' : 'Tindakan Papan Pemuka WhatsApp'}
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', marginLeft: 4, marginBottom: 4, letterSpacing: 0.5 }}>
+                    {locale === 'en' ? 'Dashboard Actions' : 'Tindakan Papan Pemuka'}
                   </Text>
 
                   {metaWabaId ? (
-                    <>
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
                       <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: '#F8FAFC',
-                          paddingVertical: 12,
-                          paddingHorizontal: 16,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          width: '100%',
-                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/billing_hub/payment_methods?asset_id=${metaWabaId}`)}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="card-outline" size={20} color="#10B981" style={{ marginRight: 12 }} />
-                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                        <View style={{ backgroundColor: '#F0FDF4', padding: 8, borderRadius: 10, marginRight: 16 }}>
+                          <Ionicons name="card" size={20} color="#10B981" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#0F172A', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
                             {locale === 'en' ? 'Link Payment Card' : 'Pautkan Kad Pembayaran'}
                           </Text>
-                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
-                            {locale === 'en' ? 'Add billing details to Meta for campaign blasts' : 'Tambah maklumat bil ke Meta untuk kempen blast'}
+                          <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Add billing details to Meta' : 'Tambah maklumat bil ke Meta'}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: '#F8FAFC',
-                          paddingVertical: 12,
-                          paddingHorizontal: 16,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          width: '100%',
-                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/message-templates/?waba_id=${metaWabaId}`)}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="document-text-outline" size={20} color="#0F172A" style={{ marginRight: 12 }} />
-                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                            {locale === 'en' ? 'Manage Message Templates' : 'Urus Templat Mesej'}
+                        <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 10, marginRight: 16 }}>
+                          <Ionicons name="document-text" size={20} color="#3B82F6" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#0F172A', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Message Templates' : 'Templat Mesej'}
                           </Text>
-                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
-                            {locale === 'en' ? 'Edit or request new approved templates' : 'Edit atau mohon templat baharu yang diluluskan'}
+                          <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Edit or request new approved templates' : 'Edit atau mohon templat baharu'}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: '#F8FAFC',
-                          paddingVertical: 12,
-                          paddingHorizontal: 16,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          width: '100%',
-                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/home/?waba_id=${metaWabaId}`)}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="settings-outline" size={20} color="#475569" style={{ marginRight: 12 }} />
-                        <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                          <Text style={{ color: '#1E293B', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                            {locale === 'en' ? 'Edit Profile & Settings' : 'Edit Profil & Tetapan'}
+                        <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 10, marginRight: 16 }}>
+                          <Ionicons name="settings" size={20} color="#64748B" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#0F172A', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Profile & Settings' : 'Profil & Tetapan'}
                           </Text>
-                          <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
-                            {locale === 'en' ? 'Change photo, description, category on Meta' : 'Tukar foto, penerangan, kategori di Meta'}
+                          <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Change photo, description on Meta' : 'Tukar foto, penerangan di Meta'}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
                       </TouchableOpacity>
-                    </>
+                    </View>
                   ) : null}
                 </View>
 
@@ -2407,51 +2410,81 @@ export default function ProfileScreen() {
             ) : (
               <>
                 {/* Step-by-Step Connection Guide */}
-                <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 10, width: '100%' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 6 }}>
-                    <Ionicons name="list-outline" size={16} color="#0F172A" />
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                      {locale === 'en' ? 'Setup Instructions (Important!)' : 'Arahan Persediaan (Penting!)'}
-                    </Text>
-                  </View>
+                <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, width: '100%' }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 20 }}>
+                    {locale === 'en' ? 'Setup Instructions' : 'Arahan Persediaan'}
+                  </Text>
 
-                  <View style={{ gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                      {locale === 'en' ? '1. Prepare a Dedicated Phone Number' : '1. Sediakan Nombor Telefon Khas'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
-                      {locale === 'en' ? (
-                        <>
-                          The number must <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>NOT</Text> be active on any phone's WhatsApp app. If it is, you must open the app on your phone, go to Settings → Account → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Delete My Account</Text> before linking. (Just uninstalling the app is not enough).
-                        </>
-                      ) : (
-                        <>
-                          Nombor ini mestilah <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>TIDAK</Text> aktif pada mana-mana aplikasi WhatsApp di telefon anda. Jika aktif, anda mesti membuka aplikasi di telefon anda, pergi ke Tetapan → Akaun → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Padam Akaun Saya</Text> sebelum menghubungkannya. (Membuang aplikasi sahaja tidak mencukupi).
-                        </>
-                      )}
-                    </Text>
+                  {/* Vertical Timeline */}
+                  <View style={{ gap: 20 }}>
+                    {/* Step 1 */}
+                    <View style={{ flexDirection: 'row' }}>
+                      <View style={{ alignItems: 'center', marginRight: 16 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#3B82F6' }}>1</Text>
+                        </View>
+                        <View style={{ width: 2, height: '100%', backgroundColor: '#E2E8F0', position: 'absolute', top: 28, bottom: -20 }} />
+                      </View>
+                      <View style={{ flex: 1, paddingBottom: 8 }}>
+                        <Text style={{ fontSize: 14, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold', marginBottom: 4 }}>
+                          {locale === 'en' ? 'Prepare a Dedicated Number' : 'Sediakan Nombor Khas'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                          {locale === 'en' ? (
+                            <>
+                              The number must <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>NOT</Text> be active on any WhatsApp app. If it is, go to Settings → Account → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Delete My Account</Text>.
+                            </>
+                          ) : (
+                            <>
+                              Nombor mestilah <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#EF4444' }}>TIDAK</Text> aktif di WhatsApp. Jika ya, pergi ke Tetapan → Akaun → <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>Padam Akaun</Text>.
+                            </>
+                          )}
+                        </Text>
+                      </View>
+                    </View>
 
-                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                      {locale === 'en' ? '2. Meta Embedded Signup Flow' : '2. Aliran Pendaftaran Meta'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
-                      {locale === 'en' ? (
-                        'Click the blue button below, log in with your Facebook account, select your Business Portfolio, and verify your phone number via SMS/Voice code.'
-                      ) : (
-                        'Klik butang biru di bawah, log masuk dengan akaun Facebook anda, pilih Portfolio Perniagaan anda, dan sahkan nombor telefon anda melalui kod SMS/Panggilan.'
-                      )}
-                    </Text>
+                    {/* Step 2 */}
+                    <View style={{ flexDirection: 'row' }}>
+                      <View style={{ alignItems: 'center', marginRight: 16 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#3B82F6' }}>2</Text>
+                        </View>
+                        <View style={{ width: 2, height: '100%', backgroundColor: '#E2E8F0', position: 'absolute', top: 28, bottom: -20 }} />
+                      </View>
+                      <View style={{ flex: 1, paddingBottom: 8 }}>
+                        <Text style={{ fontSize: 14, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold', marginBottom: 4 }}>
+                          {locale === 'en' ? 'Meta Signup Flow' : 'Aliran Pendaftaran Meta'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                          {locale === 'en' ? (
+                            'Click the blue button below, log in with Facebook, select your Business Portfolio, and verify your number.'
+                          ) : (
+                            'Klik butang biru di bawah, log masuk dengan Facebook, pilih Portfolio Perniagaan, dan sahkan nombor.'
+                          )}
+                        </Text>
+                      </View>
+                    </View>
 
-                    <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                      {locale === 'en' ? '3. Automatic Sync' : '3. Penyegerakan Automatik'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginLeft: 12 }}>
-                      {locale === 'en' ? (
-                        'Once you complete the Meta popup flow, the setup will finish and your Risev app will automatically sync.'
-                      ) : (
-                        'Sebaik sahaja anda melengkapkan aliran tetingkap Meta, persediaan akan selesai dan aplikasi Risev anda akan disegerakkan secara automatik.'
-                      )}
-                    </Text>
+                    {/* Step 3 */}
+                    <View style={{ flexDirection: 'row' }}>
+                      <View style={{ alignItems: 'center', marginRight: 16 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#3B82F6' }}>3</Text>
+                        </View>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold', marginBottom: 4 }}>
+                          {locale === 'en' ? 'Automatic Sync' : 'Penyegerakan Automatik'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                          {locale === 'en' ? (
+                            'Once completed, your Risev app will automatically sync and activate.'
+                          ) : (
+                            'Selepas selesai, aplikasi Risev anda akan disegerakkan dan aktif.'
+                          )}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
@@ -2509,7 +2542,8 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
@@ -2619,218 +2653,332 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              {/* Primary Color */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={styles.inputLabel}>PRIMARY COLOR</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: brandingPrimaryColor, borderWidth: 1.5, borderColor: '#CBD5E1', overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center' }}>
-                    {Platform.OS === 'web' && (
-                      <input
-                        type="color"
-                        value={brandingPrimaryColor}
-                        onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
-                        style={{
-                          position: 'absolute',
-                          top: -10,
-                          left: -10,
-                          width: 64,
-                          height: 64,
-                          opacity: 0,
-                          cursor: 'pointer',
-                        }}
-                      />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 20 }}>
+              
+              <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 20, marginTop: 4 }}>
+                Customize your storefront. Make your loyalty program look and feel like your own brand.
+              </Text>
+
+              {/* LIVE PREVIEW SMARTPHONE MOCKUP */}
+              <View style={{ marginBottom: 24, alignSelf: 'center' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 8, textAlign: 'center', letterSpacing: 0.5 }}>Live Customer Preview</Text>
+                
+                {/* Phone Frame */}
+                <View style={{ 
+                  width: 260, 
+                  height: 520, 
+                  backgroundColor: '#0F172A', 
+                  borderRadius: 36, 
+                  borderWidth: 6, 
+                  borderColor: '#1E293B', 
+                  overflow: 'hidden', 
+                  position: 'relative',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 12 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 24,
+                  elevation: 10
+                }}>
+                  
+                  {/* Fake Notch */}
+                  <View style={{ position: 'absolute', top: 0, left: '50%', transform: [{ translateX: -40 }], width: 80, height: 20, backgroundColor: '#1E293B', borderBottomLeftRadius: 10, borderBottomRightRadius: 10, zIndex: 10 }} />
+
+                  {/* Customer View Content */}
+                  <View style={{ flex: 1, backgroundColor: '#E2E8F0', position: 'relative', padding: 12, paddingTop: 32 }}>
+                    
+                    {/* Background Layer */}
+                    {brandingBgUrl || brandingBgPreview ? (
+                      <Image source={{ uri: brandingBgPreview || brandingBgUrl }} style={[StyleSheet.absoluteFill, { zIndex: -1 }]} resizeMode="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: brandingPrimaryColor, zIndex: -1 }]} />
                     )}
-                    <Ionicons name="color-palette-outline" size={20} color={['#ffffff', '#fff'].includes(brandingPrimaryColor.toLowerCase()) ? '#000000' : '#FFFFFF'} />
+
+                    {/* Gradient Overlay for better readability */}
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.15)', zIndex: -1 }]} />
+
+                    {/* Back Button */}
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                      <Ionicons name="chevron-back" size={16} color="#0F172A" />
+                    </View>
+
+                    {/* Mock Loyalty Card */}
+                    <View style={{ marginTop: -40, marginBottom: -28, transform: [{ scale: 0.65 }] }}>
+                      <View style={{ width: 360, alignSelf: 'center' }}>
+                        <FlippableLoyaltyCard 
+                          card={{
+                            gradientColors: [program?.card_color || '#5C3BCC'],
+                            logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://via.placeholder.com/150',
+                            cardBackground: program?.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` : null,
+                            fontColor: program?.font_color || undefined,
+                            cardIcon: program?.card_icon || 'coffee',
+                            merchantName: merchant?.name || user?.brand_name || 'Your Brand',
+                            category: user?.category || 'OTHER',
+                            totalStamps: 10,
+                            collectedStamps: 0,
+                          }}
+                          user={user}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Bottom Sheet Claim Form */}
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 5 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF3C7', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 12 }}>
+                        <Ionicons name="wifi" size={10} color="#B45309" style={{ transform: [{ rotate: '90deg' }] }} />
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>NFC CARD SCANNED</Text>
+                      </View>
+
+                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 2 }}>
+                        Claim Your Stamps
+                      </Text>
+                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 12 }} numberOfLines={2}>
+                        {brandingWelcomeText || 'Welcome to our loyalty program! Scan to earn stamps.'}
+                      </Text>
+
+                      <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 4 }}>PHONE NUMBER</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, height: 36, paddingHorizontal: 10, marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12 }}>🇲🇾</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A', marginLeft: 4 }}>+60</Text>
+                        <View style={{ width: 1, height: 16, backgroundColor: '#E2E8F0', marginHorizontal: 8 }} />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>11 234 5678</Text>
+                      </View>
+
+                      <View style={{ backgroundColor: '#050505', borderRadius: 10, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <Ionicons name="paper-plane-outline" size={14} color="#FFFFFF" />
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Claim Stamps Now</Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
+                </View>
+              </View>
+
+              {/* 1. Brand Identity Card */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <Ionicons name="color-palette" size={20} color="#3B82F6" />
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B' }}>Brand Identity</Text>
+                </View>
+
+                {/* Primary Color */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 8 }]}>PRIMARY COLOR</Text>
+                  
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: brandingPrimaryColor, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', position: 'relative', justifyContent: 'center', alignItems: 'center', shadowColor: brandingPrimaryColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}>
+                      {Platform.OS === 'web' && (
+                        <input
+                          type="color"
+                          value={brandingPrimaryColor}
+                          onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
+                          style={{
+                            position: 'absolute',
+                            top: -10,
+                            left: -10,
+                            width: 68,
+                            height: 68,
+                            opacity: 0,
+                            cursor: 'pointer',
+                          }}
+                        />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, height: 48, paddingHorizontal: 12 }}>
+                      <Text style={{ color: '#94A3B8', fontFamily: 'PlusJakartaSans_700Bold', marginRight: 4 }}>#</Text>
+                      <TextInput
+                        style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                        value={brandingPrimaryColor.replace('#', '')}
+                        onChangeText={(text) => setBrandingPrimaryColor(text.startsWith('#') ? text : `#${text}`)}
+                        placeholder="050505"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="none"
+                        maxLength={7}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Preset Swatches */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {['#050505', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
+                      <TouchableOpacity
+                        key={c}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: c,
+                          borderWidth: brandingPrimaryColor.toLowerCase() === c.toLowerCase() ? 2 : 0,
+                          borderColor: '#1E293B',
+                        }}
+                        onPress={() => setBrandingPrimaryColor(c)}
+                        activeOpacity={0.8}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Store Logo */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 8 }]}>STORE LOGO (SQUARE)</Text>
+                  
+                  <View
+                    style={{
+                      borderWidth: 1.5,
+                      borderColor: (brandingLogoPreview || brandingLogoUrl) ? '#E2E8F0' : '#CBD5E1',
+                      borderStyle: (brandingLogoPreview || brandingLogoUrl) ? 'solid' : 'dashed',
+                      borderRadius: 16,
+                      backgroundColor: '#F8FAFC',
+                      overflow: 'hidden',
+                      height: 120,
+                      width: 120,
+                      alignSelf: 'center',
+                      marginBottom: 12,
+                      position: 'relative'
+                    }}
+                  >
+                    {!!(brandingLogoPreview || brandingLogoUrl) ? (
+                      <>
+                        <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={handlePickBrandingLogo} activeOpacity={0.9}>
+                          <Image
+                            source={{ uri: brandingLogoPreview || brandingLogoUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
+                          onPress={() => { setBrandingLogoFile(null); setBrandingLogoPreview(null); setBrandingLogoUrl(''); }}
+                        >
+                          <Ionicons name="trash" size={14} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', gap: 4 }} onPress={handlePickBrandingLogo}>
+                        <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Upload Logo</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, height: 44, paddingHorizontal: 12 }}>
+                    <Ionicons name="link-outline" size={16} color="#94A3B8" style={{ marginRight: 8 }} />
                     <TextInput
-                      style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
-                      value={brandingPrimaryColor}
-                      onChangeText={setBrandingPrimaryColor}
-                      placeholder="#000000"
-                      placeholderTextColor="#BEC6E0"
+                      style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#1E293B', ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                      value={brandingLogoUrl}
+                      onChangeText={setBrandingLogoUrl}
+                      placeholder="or enter image URL..."
+                      placeholderTextColor="#94A3B8"
                       autoCapitalize="none"
                     />
                   </View>
                 </View>
-                {/* Preset Color Swatches & Color Wheel Trigger */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {['#000000', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
-                    <TouchableOpacity
-                      key={c}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: c,
-                        borderWidth: brandingPrimaryColor.toLowerCase() === c.toLowerCase() ? 2.5 : 0,
-                        borderColor: '#000000',
-                      }}
-                      onPress={() => setBrandingPrimaryColor(c)}
-                    />
-                  ))}
 
-                  {/* Native Color Wheel Button */}
-                  {Platform.OS === 'web' && (
-                    <TouchableOpacity
-                      style={{
-                        height: 32,
-                        paddingHorizontal: 12,
-                        borderRadius: 16,
-                        backgroundColor: '#F1F5F9',
-                        borderWidth: 1,
-                        borderColor: '#CBD5E1',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        flexDirection: 'row',
-                        gap: 6,
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <Ionicons name="color-palette-outline" size={15} color="#000000" />
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>Color Wheel</Text>
-                      <input
-                        type="color"
-                        value={brandingPrimaryColor}
-                        onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          opacity: 0,
-                          cursor: 'pointer',
-                        }}
-                      />
-                    </TouchableOpacity>
-                  )}
+                {/* Background Image */}
+                <View>
+                  <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 8 }]}>BACKGROUND IMAGE (9:16)</Text>
+                  
+                  <View
+                    style={{
+                      borderWidth: 1.5,
+                      borderColor: (brandingBgPreview || brandingBgUrl) ? '#E2E8F0' : '#CBD5E1',
+                      borderStyle: (brandingBgPreview || brandingBgUrl) ? 'solid' : 'dashed',
+                      borderRadius: 16,
+                      backgroundColor: '#F8FAFC',
+                      overflow: 'hidden',
+                      height: 200,
+                      width: '100%',
+                      marginBottom: 12,
+                      position: 'relative'
+                    }}
+                  >
+                    {!!(brandingBgPreview || brandingBgUrl) ? (
+                      <>
+                        <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={handlePickBrandingBg} activeOpacity={0.9}>
+                          <Image
+                            source={{ uri: brandingBgPreview || brandingBgUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.6)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                          onPress={() => { setBrandingBgFile(null); setBrandingBgPreview(null); setBrandingBgUrl(''); }}
+                        >
+                          <Ionicons name="trash" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6 }} onPress={handlePickBrandingBg}>
+                        <Ionicons name="images-outline" size={32} color="#64748B" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Upload Background (9:16)</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, height: 44, paddingHorizontal: 12 }}>
+                    <Ionicons name="link-outline" size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#1E293B', ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                      value={brandingBgUrl}
+                      onChangeText={setBrandingBgUrl}
+                      placeholder="or enter image URL..."
+                      placeholderTextColor="#94A3B8"
+                      autoCapitalize="none"
+                    />
+                  </View>
                 </View>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 6 }}>
-                  Click color box or Color Wheel button to choose custom brand colors.
-                </Text>
               </View>
 
-              {/* Welcome Text */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={styles.inputLabel}>WELCOME TEXT</Text>
-                <View style={{ marginTop: 8, backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, minHeight: 80, paddingHorizontal: 12, paddingVertical: 8 }}>
+              {/* 2. Messaging Card */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Ionicons name="chatbubble-ellipses" size={20} color="#F59E0B" />
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B' }}>Messaging</Text>
+                </View>
+
+                <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 8 }]}>WELCOME TEXT</Text>
+                <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, minHeight: 96, paddingHorizontal: 16, paddingVertical: 12 }}>
                   <TextInput
-                    style={{ flex: 1, minHeight: 80, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', textAlignVertical: 'top', ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
+                    style={{ flex: 1, minHeight: 70, fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: '#1E293B', textAlignVertical: 'top', lineHeight: 20, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
                     value={brandingWelcomeText}
                     onChangeText={setBrandingWelcomeText}
                     placeholder="Welcome to our loyalty program! Scan to earn stamps."
-                    placeholderTextColor="#BEC6E0"
+                    placeholderTextColor="#94A3B8"
                     multiline
-                    numberOfLines={3}
+                    numberOfLines={4}
                   />
                 </View>
               </View>
 
-              {/* Logo Upload & URL */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={styles.inputLabel}>STORE LOGO (RECOMMENDED)</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                  <TouchableOpacity
-                    style={{
-                      paddingHorizontal: 16,
-                      height: 48,
-                      borderRadius: 12,
-                      backgroundColor: '#000000',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      flexDirection: 'row',
-                      gap: 6
-                    }}
-                    onPress={handlePickBrandingLogo}
-                  >
-                    <Ionicons name="image-outline" size={18} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload Logo</Text>
-                  </TouchableOpacity>
-                  {!!(brandingLogoPreview || brandingLogoUrl) && (
-                    <Image
-                      source={{ uri: brandingLogoPreview || brandingLogoUrl }}
-                      style={{ width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}
-                    />
-                  )}
-                </View>
-                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
-                  <TextInput
-                    style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
-                    value={brandingLogoUrl}
-                    onChangeText={setBrandingLogoUrl}
-                    placeholder="or enter Logo Image URL (https://...)"
-                    placeholderTextColor="#BEC6E0"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* 9:16 Custom Background Image Upload & URL */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={styles.inputLabel}>CUSTOM 9:16 BACKGROUND IMAGE</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                  <TouchableOpacity
-                    style={{
-                      paddingHorizontal: 16,
-                      height: 48,
-                      borderRadius: 12,
-                      backgroundColor: '#000000',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      flexDirection: 'row',
-                      gap: 6
-                    }}
-                    onPress={handlePickBrandingBg}
-                  >
-                    <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>Upload 9:16 Image</Text>
-                  </TouchableOpacity>
-                  {!!(brandingBgPreview || brandingBgUrl) && (
-                    <Image
-                      source={{ uri: brandingBgPreview || brandingBgUrl }}
-                      style={{ width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}
-                    />
-                  )}
-                </View>
-                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, height: 52 }}>
-                  <TextInput
-                    style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', paddingHorizontal: 12, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
-                    value={brandingBgUrl}
-                    onChangeText={setBrandingBgUrl}
-                    placeholder="or enter Background Image URL (https://...)"
-                    placeholderTextColor="#BEC6E0"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* NFC Setup Link */}
-              <View style={{ marginBottom: 24, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 6, width: '100%' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="wifi-outline" size={16} color="#475569" style={{ transform: [{ rotate: '90deg' }] }} />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
-                    Merchant NFC Claim Link
+              {/* 3. NFC Setup Link (Premium Dark Theme) */}
+              <View style={{ marginBottom: 24, backgroundColor: '#0F172A', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 5 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View style={{ backgroundColor: '#1E293B', padding: 6, borderRadius: 8 }}>
+                    <Ionicons name="wifi" size={16} color="#38BDF8" style={{ transform: [{ rotate: '90deg' }] }} />
+                  </View>
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#F8FAFC' }}>
+                    NFC Hardware Link
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 17 }}>
-                  Use this link to write to your custom NFC tag stickers:
+                <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 16 }}>
+                  Copy this unique link and write it to your physical NFC tags so customers can tap to claim.
                 </Text>
-                <Text style={{ fontSize: 13, color: '#0F172A', fontFamily: 'PlusJakartaSans_700Bold', backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginTop: 4, textAlign: 'center' }} selectable>
-                  https://risev.app/nfc?m={user?.merchant_id}
-                </Text>
+                
+                <View style={{ backgroundColor: '#1E293B', borderRadius: 12, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 12, color: '#F8FAFC', fontFamily: 'PlusJakartaSans_600SemiBold', padding: 12, textAlign: 'center' }} selectable>
+                    https://risev.app/nfc?m={user?.merchant_id}
+                  </Text>
+                </View>
+
                 <TouchableOpacity
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#1E293B',
-                    paddingVertical: 10,
-                    borderRadius: 8,
+                    backgroundColor: '#38BDF8',
+                    paddingVertical: 12,
+                    borderRadius: 12,
                     width: '100%',
-                    marginTop: 4,
+                    marginTop: 12,
                   }}
                   onPress={() => {
                     const url = `https://risev.app/nfc?m=${user?.merchant_id}`;
@@ -2852,7 +3000,7 @@ export default function ProfileScreen() {
                   {
                     height: 52,
                     borderRadius: 14,
-                    backgroundColor: '#000000',
+                    backgroundColor: '#050505',
                     justifyContent: 'center',
                     alignItems: 'center',
                     marginTop: 8,
@@ -2880,17 +3028,16 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Clean White Background
+    backgroundColor: '#F8FAFC',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    height: 60,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    height: 64,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -2937,15 +3084,17 @@ const styles = StyleSheet.create({
   profileCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 20,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    borderColor: '#E2E8F0',
+    gap: 20,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+    marginTop: -10,
+    zIndex: 2,
   },
   profileHeaderRow: {
     flexDirection: 'row',
@@ -2963,69 +3112,71 @@ const styles = StyleSheet.create({
   },
   shopName: {
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
   },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   proBadge: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   proBadgeText: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#3B82F6',
+    color: '#047857',
+    letterSpacing: 0.5,
   },
   trialBadge: {
     backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FCD34D',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   trialBadgeText: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#D97706',
+    letterSpacing: 0.5,
   },
   expiredBadge: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   expiredBadgeText: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#EF4444',
+    letterSpacing: 0.5,
   },
   locationText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#737686',
+    color: '#64748B',
   },
   updateBtn: {
-    borderWidth: 1,
-    borderColor: '#000000', // Black borders
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    backgroundColor: '#050505',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   updateBtnText: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black label
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   divider: {
     height: 1,
@@ -3038,24 +3189,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#9CA3AF',
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
+    letterSpacing: 1.0,
+    marginBottom: 4,
   },
   detailValue: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0b1c30',
-    lineHeight: 18,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+    lineHeight: 20,
   },
   hoursCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 20,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
     gap: 16,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
   },
   hoursHeader: {
     flexDirection: 'row',
@@ -3063,9 +3220,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   hoursTitle: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
   },
   hoursList: {
     gap: 10,
@@ -3076,14 +3233,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   hoursDay: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#565e74',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
   hoursTime: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
   },
   sectionHeader: {
     fontSize: 16,
@@ -3160,17 +3317,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   switchCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    gap: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.02,
-    shadowRadius: 10,
-    elevation: 2,
+    backgroundColor: '#FFC700',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 0,
+    gap: 20,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 3,
     marginTop: 8,
   },
   switchHeader: {
@@ -3182,29 +3338,36 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   switchTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   switchSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+    opacity: 0.8,
     lineHeight: 18,
   },
   switchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
-    height: 44,
-    borderRadius: 12,
+    backgroundColor: '#050505',
+    height: 52,
+    borderRadius: 16,
     gap: 8,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   switchButtonText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   modalOverlay: {
     flex: 1,
@@ -3221,7 +3384,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
     alignItems: 'center',
     gap: 16,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
@@ -3307,7 +3470,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -3335,7 +3498,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   categoryChipActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     backgroundColor: '#F1F5F9',
   },
   categoryChipText: {
@@ -3344,7 +3507,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   categoryChipTextActive: {
-    color: '#000000',
+    color: '#050505',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   inputContainer: {
@@ -3383,7 +3546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
+    color: '#050505',
     backgroundColor: '#F8FAFC',
     width: '100%',
   },
@@ -3391,7 +3554,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3445,7 +3608,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   languageOptionRowActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     backgroundColor: '#F8FAFC',
   },
   languageOptionText: {
@@ -3455,6 +3618,6 @@ const styles = StyleSheet.create({
   },
   languageOptionTextActive: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
 });

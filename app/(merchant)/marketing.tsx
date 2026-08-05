@@ -55,7 +55,7 @@ const stampIcons: StampIconOption[] = [
 ];
 
 const colorOptions = [
-  { label: 'Carbon Black', value: '#000000' },
+  { label: 'Carbon Black', value: '#050505' },
   { label: 'Deep Indigo', value: '#1E1B4B' },
   { label: 'Emerald Green', value: '#064E3B' },
   { label: 'Wine Crimson', value: '#4C0519' },
@@ -69,12 +69,12 @@ const stampColorOptions = [
   { label: 'Green', value: '#10B981' },
   { label: 'Amber', value: '#F59E0B' },
   { label: 'Purple', value: '#8B5CF6' },
-  { label: 'Black', value: '#000000' },
+  { label: 'Black', value: '#050505' },
 ];
 
 const fontColorOptions = [
   { label: 'White', value: '#FFFFFF' },
-  { label: 'Black', value: '#000000' },
+  { label: 'Black', value: '#050505' },
   { label: 'Silver', value: '#D1D5DB' },
   { label: 'Slate', value: '#1E293B' },
   { label: 'Gold', value: '#FFD700' },
@@ -99,8 +99,8 @@ export default function MarketingScreen() {
   const [expiryDays, setExpiryDays] = useState('30');
   const [rewardDesc, setRewardDesc] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<string>('coffee');
-  const [cardColor, setCardColor] = useState<string>('#000000');
-  const [customHexInput, setCustomHexInput] = useState<string>('#000000');
+  const [cardColor, setCardColor] = useState<string>('#050505');
+  const [customHexInput, setCustomHexInput] = useState<string>('#050505');
   const [stampColor, setStampColor] = useState<string>('#3B82F6');
   const [customStampHexInput, setCustomStampHexInput] = useState<string>('#3B82F6');
   const [fontColor, setFontColor] = useState<string>('#FFFFFF');
@@ -603,8 +603,8 @@ export default function MarketingScreen() {
         setExpiryDays(String(prog.expiry_days || '30'));
         setRewardDesc(prog.reward_description || '');
         setSelectedIcon(prog.card_icon || 'coffee');
-        setCardColor(prog.card_color || '#000000');
-        setCustomHexInput(prog.card_color || '#000000');
+        setCardColor(prog.card_color || '#050505');
+        setCustomHexInput(prog.card_color || '#050505');
         setStampColor(prog.stamp_color || '#3B82F6');
         setCustomStampHexInput(prog.stamp_color || '#3B82F6');
         setFontColor(prog.font_color || '#FFFFFF');
@@ -713,8 +713,8 @@ export default function MarketingScreen() {
             setIsActive(false);
             setRewardDesc('');
             setSelectedIcon('coffee');
-            setCardColor('#000000');
-            setCustomHexInput('#000000');
+            setCardColor('#050505');
+            setCustomHexInput('#050505');
             setBgImage('');
             setBgFile(null);
             setRemoveBgImage(false);
@@ -768,7 +768,7 @@ export default function MarketingScreen() {
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#000000" />
+        <ActivityIndicator size="large" color="#050505" />
         <Text style={styles.loaderText}>Loading card details...</Text>
       </View>
     );
@@ -806,6 +806,9 @@ export default function MarketingScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Dark Background - true black */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0, backgroundColor: '#050505' }} />
+
         {/* Welcome Merchant Profile Header */}
         <View style={styles.profileHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -820,7 +823,7 @@ export default function MarketingScreen() {
           </View>
           <Image
             source={require('../../assets/risev logo.png')}
-            style={{ width: 110, height: 38, resizeMode: 'contain' }}
+            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
           />
         </View>
 
@@ -859,24 +862,27 @@ export default function MarketingScreen() {
                 onPress={() => setCreateModalVisible(true)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-                <Text style={styles.createCampBtnText}>{t('new_btn')}</Text>
+                <Ionicons name="add" size={16} color="#050505" />
+                <Text style={styles.createCampBtnText}>New</Text>
               </TouchableOpacity>
             </View>
 
             {/* Campaigns List */}
             {loadingCampaigns ? (
-              <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
+              <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
             ) : campaignsList.length === 0 ? (
               <View style={styles.campEmptyState}>
-                <Ionicons name="megaphone-outline" size={48} color="#94A3B8" />
-                <Text style={styles.campEmptyTitle}>{t('no_active_promotions')}</Text>
-                <Text style={styles.campEmptySub}>
-                  {t('no_promotions_desc')}
-                </Text>
-                <TouchableOpacity 
+                <Ionicons name="megaphone-outline" size={48} color="#FFC700" />
+                <View style={{ alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.campEmptyTitle}>{t('no_active_promotions')}</Text>
+                  <Text style={styles.campEmptySub}>
+                    {t('no_promotions_desc')}
+                  </Text>
+                </View>
+                <TouchableOpacity
                   style={styles.campEmptyBtn}
                   onPress={() => setCreateModalVisible(true)}
+                  activeOpacity={0.8}
                 >
                   <Text style={styles.campEmptyBtnText}>{t('create_campaign')}</Text>
                 </TouchableOpacity>
@@ -903,7 +909,7 @@ export default function MarketingScreen() {
                             value={camp.is_active}
                             onValueChange={() => toggleCampaignActive(camp)}
                             trackColor={{ false: '#E2E8F0', true: '#A3A3A3' }}
-                            thumbColor={camp.is_active ? '#000000' : '#9CA3AF'}
+                            thumbColor={camp.is_active ? '#050505' : '#9CA3AF'}
                           />
                           <TouchableOpacity onPress={() => handleDeleteCampaign(camp)} style={{ padding: 4 }}>
                             <Feather name="trash-2" size={18} color="#EF4444" />
@@ -1028,7 +1034,7 @@ export default function MarketingScreen() {
                 <Text style={styles.previewSectionHeader}>{t('broadcast_history')}</Text>
 
                 {loadingBroadcasts ? (
-                  <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
+                  <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
                 ) : broadcastsList.length === 0 ? (
                   <View style={styles.campEmptyState}>
                     <Ionicons name="megaphone-outline" size={40} color="#94A3B8" />
@@ -1074,7 +1080,7 @@ export default function MarketingScreen() {
                               }}
                               activeOpacity={0.8}
                             >
-                              <Ionicons name={"reply-outline" as any} size={14} color="#000000" style={{ marginRight: 4 }} />
+                              <Ionicons name={"reply-outline" as any} size={14} color="#050505" style={{ marginRight: 4 }} />
                               <Text style={styles.followUpBtnText}>{t('follow_up')}</Text>
                             </TouchableOpacity>
                           </View>
@@ -1248,7 +1254,7 @@ export default function MarketingScreen() {
                 <Text style={styles.previewSectionHeader}>{t('active_automation_rules')}</Text>
 
                 {loadingRules ? (
-                  <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
+                  <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
                 ) : automationRules.length === 0 ? (
                   <View style={styles.campEmptyState}>
                     <Ionicons name="time-outline" size={40} color="#94A3B8" />
@@ -1330,7 +1336,7 @@ export default function MarketingScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('launch_campaign')}</Text>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
+                <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
             </View>
 
@@ -1592,7 +1598,7 @@ export default function MarketingScreen() {
                 : 'Kempen promosi baharu anda telah berjaya dilancarkan!'}
             </Text>
             <TouchableOpacity
-              style={[styles.confirmBtnAction, { width: '100%', backgroundColor: '#000000', height: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginTop: 8 }]}
+              style={[styles.confirmBtnAction, { width: '100%', backgroundColor: '#050505', height: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginTop: 8 }]}
               onPress={() => setLaunchSuccessModalVisible(false)}
               activeOpacity={0.8}
             >
@@ -1633,7 +1639,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    paddingVertical: 12,
+    paddingTop: 16,
+    marginBottom: 20,
   },
   merchantAvatar: {
     width: 48,
@@ -1648,12 +1656,12 @@ const styles = StyleSheet.create({
   welcomeSub: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   merchantName: {
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
   titleSection: {
     gap: 8,
@@ -1661,7 +1669,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 26,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
     letterSpacing: -0.5,
   },
   welcomeSubtitle: {
@@ -1690,7 +1698,7 @@ const styles = StyleSheet.create({
   cardSectionTitle: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   cardSectionDesc: {
     fontSize: 12,
@@ -1699,31 +1707,33 @@ const styles = StyleSheet.create({
   },
   segmentRow: {
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: '#171717',
+    borderRadius: 100,
+    padding: 6,
   },
   segmentBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
   },
   segmentBtnActive: {
-    borderColor: '#000000',
-    borderWidth: 2,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFC700',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   segmentText: {
-    fontSize: 14,
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
+    color: '#FFFFFF',
   },
   segmentTextActive: {
-    color: '#000000',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   helpText: {
     fontSize: 11,
@@ -1747,7 +1757,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   colorCircleActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1766,14 +1776,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   inputFocused: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     backgroundColor: '#FFFFFF',
   },
   textInput: {
     flex: 1,
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
+    color: '#050505',
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -1811,7 +1821,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   iconOptionActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     borderWidth: 2,
     backgroundColor: '#F8FAFC',
   },
@@ -1826,7 +1836,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     gap: 20,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -1896,12 +1906,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveBtn: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 16,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -1930,11 +1940,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 16,
     padding: 14,
     marginTop: 10,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1948,33 +1958,34 @@ const styles = StyleSheet.create({
   // Sub-tabs styles
   subTabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    padding: 4,
-    marginBottom: 8,
+    backgroundColor: '#171717',
+    borderRadius: 100,
+    padding: 6,
+    marginBottom: 24,
+    zIndex: 10,
   },
   subTabButton: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 100,
   },
   subTabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
+    backgroundColor: '#FFC700',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
   subTabText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
+    color: '#FFFFFF',
   },
   subTabTextActive: {
-    color: '#000000',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
   // Campaigns content styles
@@ -1990,7 +2001,7 @@ const styles = StyleSheet.create({
   campTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   campSubtitle: {
     fontSize: 12,
@@ -2002,32 +2013,41 @@ const styles = StyleSheet.create({
   createCampBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000000',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    backgroundColor: '#FFC700',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 100,
     gap: 4,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   createCampBtnText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
   },
   campEmptyState: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     marginTop: 12,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 4,
   },
   campEmptyTitle: {
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
   },
   campEmptySub: {
@@ -2039,16 +2059,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   campEmptyBtn: {
-    backgroundColor: '#000000',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginTop: 8,
+    backgroundColor: '#050505',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginTop: 12,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#FFC700',
   },
   campEmptyBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#FFC700',
   },
   campList: {
     gap: 16,
@@ -2074,7 +2101,7 @@ const styles = StyleSheet.create({
   campCardName: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   campTypeBadge: {
     backgroundColor: '#F1F5F9',
@@ -2178,7 +2205,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   closeBtn: {
     padding: 4,
@@ -2195,18 +2222,23 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#94A3B8',
     letterSpacing: 1.0,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   modalTextInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#000000',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
   },
   condFieldWrap: {
     gap: 8,
@@ -2240,7 +2272,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   connectLinkBtn: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,
@@ -2284,8 +2316,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   tagButtonActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
+    backgroundColor: '#050505',
+    borderColor: '#050505',
   },
   tagText: {
     fontSize: 12,
@@ -2353,7 +2385,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 340,
     gap: 16,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -2362,7 +2394,7 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   confirmMsg: {
     fontSize: 14,
@@ -2389,7 +2421,7 @@ const styles = StyleSheet.create({
   },
   confirmBtnAction: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -2416,8 +2448,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   modeSegmentBtnActive: {
-    backgroundColor: '#000000',
-    shadowColor: '#000000',
+    backgroundColor: '#050505',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -2442,7 +2474,7 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   switchDesc: {
     fontSize: 11,
@@ -2481,7 +2513,7 @@ const styles = StyleSheet.create({
   followUpBtnText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   replyCard: {
     flexDirection: 'row',
@@ -2534,8 +2566,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   triggerDayBtnActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
+    backgroundColor: '#050505',
+    borderColor: '#050505',
   },
   triggerDayBtnText: {
     fontSize: 12,
@@ -2675,7 +2707,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -2706,7 +2738,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   restrictionBtn: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 16,
     height: 50,
     width: '100%',
@@ -2848,7 +2880,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,

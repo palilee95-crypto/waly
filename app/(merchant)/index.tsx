@@ -435,64 +435,45 @@ export default function MerchantDashboard() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark Wave Background */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0 }}>
-          <View style={{ flex: 1, backgroundColor: '#1A1400' }} />
-          {/* Main White Cutout */}
-          <View style={{ position: 'absolute', top: -5, right: -5, width: 150, height: 80, backgroundColor: '#FFFFFF' }} />
-          {/* Top White Filler */}
-          <View style={{ position: 'absolute', top: -5, right: 145, width: 40, height: 40, backgroundColor: '#FFFFFF' }} />
-          {/* Bottom Curve (Convex part) */}
-          <View style={{ position: 'absolute', top: 35, right: 145, width: 40, height: 40, backgroundColor: '#1A1400' }}>
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 40 }} />
-          </View>
-          {/* Top Curve (Concave part) */}
-          <View style={{ position: 'absolute', top: -5, right: 185, width: 40, height: 40, backgroundColor: '#FFFFFF' }}>
-            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 40 }} />
-          </View>
-          {/* Outer Corner Curve */}
-          <View style={{ position: 'absolute', top: 75, right: -5, width: 32, height: 32, backgroundColor: '#FFFFFF' }}>
-            <View style={{ flex: 1, backgroundColor: '#1A1400', borderTopRightRadius: 32 }} />
-          </View>
-        </View>
+        {/* Dark Background - full black */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0, backgroundColor: '#050505' }} />
 
         {/* Header Content */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', zIndex: 10, marginBottom: 20 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Image
               source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
-              style={[styles.merchantAvatar, { borderColor: '#1A1400', borderWidth: 2 }]}
+              style={[styles.merchantAvatar, { borderColor: '#050505', borderWidth: 2 }]}
             />
             <View style={styles.profileTextWrap}>
               <Text style={[styles.welcomeSub, { color: 'rgba(255,255,255,0.7)' }]}>{t('welcome_back')}</Text>
               <Text style={[styles.merchantName, { color: '#FFFFFF' }]}>{merchant?.name || 'Boutique Royal'}</Text>
             </View>
           </View>
-          <View style={{ position: 'absolute', top: -5, right: 0, width: 120, alignItems: 'center' }}>
-            <Image
-              source={require('../../assets/risev logo.png')}
-              style={{ width: 110, height: 38, resizeMode: 'contain' }}
-            />
-          </View>
+          
+          <Image
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
         </View>
 
         {/* Unified Floating Analytics Card */}
-        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#1A1400', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
+        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
             {/* Stamps Awarded */}
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name="wallet-outline" size={14} color="#1A1400" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>{t('total_stamps_awarded')}</Text>
+                <Ionicons name="wallet-outline" size={14} color="#050505" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{t('total_stamps_awarded')}</Text>
               </View>
-              <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>
+              <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -1 }}>
                 {loading ? '...' : totalStampsAwarded.toLocaleString()}
               </Text>
             </View>
 
             {/* Scan QR Button */}
             <TouchableOpacity 
-              style={{ backgroundColor: '#1A1400', borderRadius: 16, width: 64, height: 64, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+              style={{ backgroundColor: '#050505', borderRadius: 16, width: 64, height: 64, alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
               onPress={() => router.push('/(merchant)/give')}
             >
               <Ionicons name="qr-code" size={28} color="#FFC700" />
@@ -500,7 +481,7 @@ export default function MerchantDashboard() {
           </View>
 
           {/* Sales Progress */}
-          <View style={{ backgroundColor: '#1A1400', borderRadius: 16, padding: 16 }}>
+          <View style={{ backgroundColor: '#050505', borderRadius: 16, padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="trending-up" size={14} color="#FFC700" />
@@ -620,7 +601,7 @@ export default function MerchantDashboard() {
           {pendingClaims.length === 0 ? (
             <View style={styles.pendingEmptyCard}>
               <View style={styles.pendingEmptyIconWrap}>
-                <Ionicons name="radio-outline" size={22} color="#000000" />
+                <Ionicons name="radio-outline" size={22} color="#050505" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pendingEmptyTitle}>Ready for Customer NFC Taps</Text>
@@ -709,7 +690,7 @@ export default function MerchantDashboard() {
                             }))
                           }
                         >
-                          <Ionicons name="remove" size={14} color="#000000" />
+                          <Ionicons name="remove" size={14} color="#050505" />
                         </TouchableOpacity>
                         <Text style={styles.stepperValue}>{cInput.stampAmount}</Text>
                         <TouchableOpacity
@@ -721,7 +702,7 @@ export default function MerchantDashboard() {
                             }))
                           }
                         >
-                          <Ionicons name="add" size={14} color="#000000" />
+                          <Ionicons name="add" size={14} color="#050505" />
                         </TouchableOpacity>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 4, marginTop: 6, justifyContent: 'center' }}>
@@ -1012,11 +993,11 @@ const styles = StyleSheet.create({
     color: '#0b1c30',
   },
   balanceCard: {
-    backgroundColor: '#000000', // Carbon black card
+    backgroundColor: '#050505', // Carbon black card
     borderRadius: 24,
     padding: 20,
     gap: 16,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.06,
     shadowRadius: 20,
@@ -1061,7 +1042,7 @@ const styles = StyleSheet.create({
   scanBtnText: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   progressCard: {
     backgroundColor: '#FFFFFF',
@@ -1099,7 +1080,7 @@ const styles = StyleSheet.create({
   },
   barFill: {
     height: '100%',
-    backgroundColor: '#000000', // Black progress fill
+    backgroundColor: '#050505', // Black progress fill
     borderRadius: 4,
   },
   remainingText: {
@@ -1136,8 +1117,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   filterBtnActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
+    backgroundColor: '#050505',
+    borderColor: '#050505',
   },
   filterText: {
     fontSize: 12,
@@ -1204,7 +1185,7 @@ const styles = StyleSheet.create({
   stampDelta: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black stamps counter text
+    color: '#050505', // Black stamps counter text
   },
   transAmount: {
     fontSize: 11,
@@ -1413,7 +1394,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     width: '100%',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
@@ -1458,7 +1439,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   planCardActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     backgroundColor: '#F8FAFC',
   },
   planDuration: {
@@ -1496,7 +1477,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   promoBtn: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 40,
@@ -1568,11 +1549,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 52,
     borderRadius: 16,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -1642,7 +1623,7 @@ const styles = StyleSheet.create({
   pendingSectionTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   pendingEmptyCard: {
     backgroundColor: '#FFFFFF',
@@ -1651,7 +1632,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -1668,7 +1649,7 @@ const styles = StyleSheet.create({
   pendingEmptyTitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   pendingEmptyDesc: {
     fontSize: 11,
@@ -1681,7 +1662,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.06,
     shadowRadius: 20,
@@ -1700,7 +1681,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1765,7 +1746,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   presetChip: {
     paddingHorizontal: 8,
@@ -1776,8 +1757,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   presetChipActive: {
-    backgroundColor: '#1A1400',
-    borderColor: '#1A1400',
+    backgroundColor: '#050505',
+    borderColor: '#050505',
   },
   presetChipText: {
     fontSize: 10,
@@ -1809,7 +1790,7 @@ const styles = StyleSheet.create({
   stepperValue: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   pendingActionsRow: {
     flexDirection: 'row',
@@ -1834,7 +1815,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#1A1400',
+    backgroundColor: '#050505',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -27,6 +27,16 @@ const stampIcons = [
   { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
   { id: 'cake', family: 'MaterialIcons', name: 'cake' },
   { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
+  { id: 'tag', family: 'Ionicons', name: 'pricetag' },
+  { id: 'gift', family: 'Ionicons', name: 'gift' },
+  { id: 'beer', family: 'Ionicons', name: 'beer' },
+  { id: 'pizza', family: 'Ionicons', name: 'pizza' },
+  { id: 'card', family: 'Ionicons', name: 'card' },
+  { id: 'store', family: 'Ionicons', name: 'storefront' },
+  { id: 'car', family: 'Ionicons', name: 'car-sport' },
+  { id: 'icecream', family: 'Ionicons', name: 'ice-cream' },
+  { id: 'barbell', family: 'Ionicons', name: 'barbell' },
+  { id: 'scissors', family: 'Ionicons', name: 'scissors' },
   { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
   { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
 ];
@@ -732,151 +742,90 @@ export default function NfcLandingScreen() {
                   />
                 ) : null}
 
+
+
                 {/* Card plastic gloss shine reflection */}
                 <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none">
-                  {/* Soft wide reflection zone */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -160,
-                      left: -80,
-                      width: '150%',
-                      height: 260,
-                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                      transform: [{ rotate: '-30deg' }],
-                    }}
-                  />
-                  {/* Sharp bright specular highlight line */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -160,
-                      left: 25,
-                      width: 28,
-                      height: 600,
-                      backgroundColor: 'rgba(255, 255, 255, 0.16)',
-                      transform: [{ rotate: '-30deg' }],
-                    }}
-                  />
+                  <View style={{ position: 'absolute', top: -160, left: -80, width: '150%', height: 260, backgroundColor: 'rgba(255, 255, 255, 0.04)', transform: [{ rotate: '-30deg' }] }} />
+                  <View style={{ position: 'absolute', top: -160, left: 25, width: 28, height: 600, backgroundColor: 'rgba(255, 255, 255, 0.16)', transform: [{ rotate: '-30deg' }] }} />
                 </View>
 
-                {/* Card Header: Shop Name, Category & Gold Badge */}
-                <View style={styles.largeCardHeader}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text
-                      style={[
-                        styles.largeCardMerchant,
-                        { color: cardFontColor },
-                      ]}
-                      numberOfLines={1}
-                    >
+                {/* Header: Shop Name & Logo */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 2 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+                    {merchantLogoUrl ? (
+                      <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
+                    ) : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }} numberOfLines={1}>
                       {merchantName}
                     </Text>
-                    <Text
-                      style={[
-                        styles.shopCategoryText,
-                        { color: cardFontColor + 'B3' },
-                      ]}
-                    >
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: cardFontColor, opacity: 0.65 }} numberOfLines={1}>
                       {(merchant?.category || 'store').toUpperCase()}
                     </Text>
                   </View>
-                  <View style={styles.goldBadge}>
-                    <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }}>
+                      0/{program?.stamp_goal || 10}
+                    </Text>
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: cardFontColor, opacity: 0.75 }}>
+                      STAMPS
+                    </Text>
                   </View>
                 </View>
 
-                {/* EMV Microchip & Contactless Wifi */}
-                <View style={styles.cardMidRow}>
-                  <View style={styles.cardChip}>
-                    <View style={styles.chipLineHoriz} />
-                    <View style={styles.chipLineVert} />
-                    <View style={styles.chipCenterPin} />
+                {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
+                <View style={[styles.cardMidRow, { zIndex: 2 }]}>
+                  <View style={{ width: 32, height: 24, borderRadius: 6, backgroundColor: '#F59E0B', position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#D97706' }}>
+                    <View style={{ position: 'absolute', top: 11, left: 0, width: '100%', height: 1, backgroundColor: '#B45309' }} />
+                    <View style={{ position: 'absolute', top: 0, left: 15, width: 1, height: '100%', backgroundColor: '#B45309' }} />
+                    <View style={{ position: 'absolute', top: 6, left: 10, width: 12, height: 12, borderRadius: 2, backgroundColor: '#FBBF24', borderWidth: 1, borderColor: '#B45309' }} />
                   </View>
-                  <Ionicons
-                    name="wifi"
-                    size={18}
-                    color={cardFontColor + '66'}
-                    style={{ opacity: 0.5 }}
+                  <Ionicons 
+                    name="wifi" 
+                    size={18} 
+                    color={cardFontColor ? cardFontColor : "rgba(255, 255, 255, 0.35)"} 
+                    style={{ opacity: 0.45 }} 
                   />
                 </View>
 
-                {/* Vertical Spacer (logo omitted to prevent card background overlap) */}
-                <View style={{ height: 60 }} />
+                <View style={{ flex: 1 }} />
 
-                {/* Card Footer */}
-                <View style={styles.largeCardFooter}>
-                  <View style={styles.holderCol}>
-                    <Text
-                      style={[
-                        styles.holderLabel,
-                        { color: cardFontColor + '80' },
-                      ]}
-                    >
+                {/* Footer row: Holder Name, Expiration, CVV, and brand logo */}
+                <View style={[styles.largeCardFooter, { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', zIndex: 2 }]}>
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_600SemiBold', color: cardFontColor, opacity: 0.5, letterSpacing: 0.5 }}>
                       CARD HOLDER
                     </Text>
-                    <Text
-                      style={[
-                        styles.holderValue,
-                        { color: cardFontColor },
-                      ]}
-                      numberOfLines={1}
-                    >
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor, marginTop: 2, letterSpacing: 0.5, textTransform: 'uppercase' }} numberOfLines={1}>
                       {isApproved ? (user?.name || 'VALUED CUSTOMER').toUpperCase() : '----'}
                     </Text>
                   </View>
 
-                  <View style={{ width: 45 }}>
-                    <Text
-                      style={[
-                        styles.holderLabel,
-                        { color: cardFontColor + '80' },
-                      ]}
-                    >
+                  <View style={{ flex: 0.8 }}>
+                    <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_600SemiBold', color: cardFontColor, opacity: 0.5, letterSpacing: 0.5 }}>
                       VALID
                     </Text>
-                    <Text
-                      style={[
-                        styles.holderValue,
-                        { color: cardFontColor },
-                      ]}
-                    >
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor, marginTop: 2, letterSpacing: 0.5 }}>
                       12/30
                     </Text>
                   </View>
 
-                  <View style={{ width: 35 }}>
-                    <Text
-                      style={[
-                        styles.holderLabel,
-                        { color: cardFontColor + '80' },
-                      ]}
-                    >
+                  <View style={{ flex: 0.6 }}>
+                    <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_600SemiBold', color: cardFontColor, opacity: 0.5, letterSpacing: 0.5 }}>
                       CVV
                     </Text>
-                    <Text
-                      style={[
-                        styles.holderValue,
-                        { color: cardFontColor },
-                      ]}
-                    >
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor, marginTop: 2, letterSpacing: 0.5 }}>
                       888
                     </Text>
                   </View>
 
-                  <View style={styles.brandBadge}>
-                    <View style={styles.mastercardBadge}>
-                      <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                      <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
-                    </View>
-                    <Text
-                      style={[
-                        styles.largeProgressPercentage,
-                        { color: cardFontColor + 'CC' },
-                      ]}
-                    >
-                      STAMP CARD
-                    </Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Image
+                      source={require('../assets/risev logo.png')}
+                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: cardFontColor || '#FFFFFF' }}
+                    />
                   </View>
                 </View>
               </Animated.View>
@@ -893,14 +842,16 @@ export default function NfcLandingScreen() {
                     left: 0,
                     right: 0,
                     bottom: 0,
+                    padding: 0,
+                    gap: 0,
                     backfaceVisibility: 'hidden',
                     transform: [{ rotateY: backInterpolate }],
                   },
                 ]}
               >
-                {program?.card_background ? (
+                {program?.card_background_back ? (
                   <Image
-                    source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` }}
+                    source={{ uri: `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background_back}` }}
                     style={StyleSheet.absoluteFill}
                     resizeMode="cover"
                   />
@@ -908,140 +859,113 @@ export default function NfcLandingScreen() {
 
                 {/* Card plastic gloss shine reflection */}
                 <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="none">
-                  {/* Soft wide reflection zone */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -160,
-                      left: -80,
-                      width: '150%',
-                      height: 260,
-                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                      transform: [{ rotate: '-30deg' }],
-                    }}
-                  />
-                  {/* Sharp bright specular highlight line */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -160,
-                      left: 25,
-                      width: 28,
-                      height: 600,
-                      backgroundColor: 'rgba(255, 255, 255, 0.16)',
-                      transform: [{ rotate: '-30deg' }],
-                    }}
-                  />
+                  <View style={{ position: 'absolute', top: -160, left: -80, width: '150%', height: 260, backgroundColor: 'rgba(255, 255, 255, 0.04)', transform: [{ rotate: '-30deg' }] }} />
+                  <View style={{ position: 'absolute', top: -160, left: 25, width: 28, height: 600, backgroundColor: 'rgba(255, 255, 255, 0.16)', transform: [{ rotate: '-30deg' }] }} />
                 </View>
 
+
                 {/* Magnetic Stripe overlay */}
-                <View style={{ height: 35, backgroundColor: '#111827', width: '112%', marginLeft: '-6%', marginTop: -4, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: cardFontColor === '#FFFFFF' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.22)', fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 5 }}>
+                <View style={{ width: '100%', height: 44, backgroundColor: '#111827', marginTop: 16, opacity: 0.95, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.15)', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, letterSpacing: 6 }} numberOfLines={1}>
                     {merchantName.toUpperCase()}
                   </Text>
                 </View>
 
-                {/* Back card info row */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 }}>
-                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor + 'CC', letterSpacing: 0.5 }}>
-                    YOUR STAMPS
-                  </Text>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }}>
-                    {currentStamps}/{stampGoal}
-                  </Text>
-                </View>
-
-                 {/* Stamps Grid Row */}
-                {stampGoal === 10 ? (
-                  <View style={{ gap: 6, marginVertical: 6 }}>
-                    {/* Row 1 (6 Stamps) */}
-                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
-                      {Array.from({ length: 6 }).map((_, idx) => {
-                        const isEarned = (idx + 1) <= currentStamps;
-                        const isNew = newlyEarnedIndices.has(idx);
-                        const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
-                        const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
-                        return (
-                          <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
-                            <AnimatedStampBubble
-                              isEarned={isEarned}
-                              isNew={isNew}
-                              delay={isNew ? (idx - minIdx) * 400 : 0}
-                              iconId={cardIcon}
-                              bubbleColor={bubbleColor}
-                              iconColor={cardBgColor}
-                              borderColor={cardFontColor + '30'}
-                              emptyBgColor={cardFontColor + '08'}
-                            />
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    {/* Row 2 (4 Stamps, Centered) */}
-                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
-                      {Array.from({ length: 4 }).map((_, idx) => {
-                        const globalIdx = idx + 6;
-                        const isEarned = (globalIdx + 1) <= currentStamps;
-                        const isNew = newlyEarnedIndices.has(globalIdx);
-                        const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
-                        const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
-                        return (
-                          <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
-                            <AnimatedStampBubble
-                              isEarned={isEarned}
-                              isNew={isNew}
-                              delay={isNew ? (globalIdx - minIdx) * 400 : 0}
-                              iconId={cardIcon}
-                              bubbleColor={bubbleColor}
-                              iconColor={cardBgColor}
-                              borderColor={cardFontColor + '30'}
-                              emptyBgColor={cardFontColor + '08'}
-                            />
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6 }}>
-                    {Array.from({ length: stampGoal }).map((_, idx) => {
-                      const isEarned = (idx + 1) <= currentStamps;
-                      const isNew = newlyEarnedIndices.has(idx);
-                      const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
-                      const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
-                      return (
-                        <View key={idx} style={{ width: '17%', aspectRatio: 1 }}>
-                          <AnimatedStampBubble
-                            isEarned={isEarned}
-                            isNew={isNew}
-                            delay={isNew ? (idx - minIdx) * 400 : 0}
-                            iconId={cardIcon}
-                            bubbleColor={bubbleColor}
-                            iconColor={cardBgColor}
-                            borderColor={cardFontColor + '30'}
-                            emptyBgColor={cardFontColor + '08'}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* Bottom footer row */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 4 }}>
-                  <View>
-                    <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor + '80', letterSpacing: 0.5 }}>CARD HOLDER</Text>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor }}>
-                      {(user?.name || 'VALUED CUSTOMER').toUpperCase()}
+                <View style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12, flex: 1 }}>
+                  {/* Minimalist Status Header */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, gap: 8 }}>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: cardFontColor, letterSpacing: 0.5, opacity: 0.7 }}>
+                      YOUR STAMPS
+                    </Text>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: cardFontColor }}>
+                      {currentStamps}/{stampGoal}
                     </Text>
                   </View>
 
-                  <View style={{ alignItems: 'center', gap: 2 }}>
-                    <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor + '80', letterSpacing: 0.5 }}>SCAN</Text>
-                    <View style={{ width: 30, height: 30, backgroundColor: '#FFFFFF', padding: 3, borderRadius: 5, justifyContent: 'center', alignItems: 'center' }}>
-                      <Ionicons name="qr-code" size={20} color="#000000" />
-                    </View>
+                  {/* Stamps Grid Row */}
+                  <View style={{ flex: 1, justifyContent: 'center' }}>
+                    {stampGoal === 10 ? (
+                      <View style={{ gap: 6, marginVertical: 6 }}>
+                        {/* Row 1 (6 Stamps) */}
+                        <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
+                          {Array.from({ length: 6 }).map((_, idx) => {
+                            const isEarned = (idx + 1) <= currentStamps;
+                            const isNew = newlyEarnedIndices.has(idx);
+                            const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                            const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                            return (
+                              <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
+                                <AnimatedStampBubble
+                                  isEarned={isEarned}
+                                  isNew={isNew}
+                                  delay={isNew ? (idx - minIdx) * 400 : 0}
+                                  iconId={cardIcon}
+                                  bubbleColor={bubbleColor}
+                                  iconColor={cardBgColor}
+                                  borderColor={cardFontColor + '30'}
+                                  emptyBgColor={cardFontColor + '08'}
+                                />
+                              </View>
+                            );
+                          })}
+                        </View>
+
+                        {/* Row 2 (4 Stamps, Centered) */}
+                        <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
+                          {Array.from({ length: 4 }).map((_, idx) => {
+                            const globalIdx = idx + 6;
+                            const isEarned = (globalIdx + 1) <= currentStamps;
+                            const isNew = newlyEarnedIndices.has(globalIdx);
+                            const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                            const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                            return (
+                              <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
+                                <AnimatedStampBubble
+                                  isEarned={isEarned}
+                                  isNew={isNew}
+                                  delay={isNew ? (globalIdx - minIdx) * 400 : 0}
+                                  iconId={cardIcon}
+                                  bubbleColor={bubbleColor}
+                                  iconColor={cardBgColor}
+                                  borderColor={cardFontColor + '30'}
+                                  emptyBgColor={cardFontColor + '08'}
+                                />
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6, justifyContent: 'center' }}>
+                        {Array.from({ length: stampGoal }).map((_, idx) => {
+                          const isEarned = (idx + 1) <= currentStamps;
+                          const isNew = newlyEarnedIndices.has(idx);
+                          const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
+                          const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                          return (
+                            <View key={idx} style={{ width: '17%', aspectRatio: 1 }}>
+                              <AnimatedStampBubble
+                                isEarned={isEarned}
+                                isNew={isNew}
+                                delay={isNew ? (idx - minIdx) * 400 : 0}
+                                iconId={cardIcon}
+                                bubbleColor={bubbleColor}
+                                iconColor={cardBgColor}
+                                borderColor={cardFontColor + '30'}
+                                emptyBgColor={cardFontColor + '08'}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={{ position: 'absolute', bottom: 16, right: 24 }}>
+                    <Image
+                      source={require('../assets/risev logo.png')}
+                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: cardFontColor || '#FFFFFF' }}
+                    />
                   </View>
                 </View>
               </Animated.View>
@@ -1070,7 +994,7 @@ export default function NfcLandingScreen() {
               </View>
 
               <Text style={styles.formWelcomeTitle}>Claim Your Stamps</Text>
-              <Text style={styles.formWelcomeSubtitle}>{welcomeText}</Text>
+
 
               {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
@@ -1095,20 +1019,7 @@ export default function NfcLandingScreen() {
                     keyboardType="phone-pad"
                   />
                 </View>
-                {user && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await logout();
-                      setPhoneInput('');
-                      setNameInput('');
-                    }}
-                    style={{ marginTop: 8, alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#FEF2F2', borderRadius: 8, borderWidth: 1, borderColor: '#FEE2E2' }}
-                  >
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
-                      Not {user.name || 'you'}? Log out
-                    </Text>
-                  </TouchableOpacity>
-                )}
+
               </View>
 
               {/* Full Name Input (New Customer) */}
@@ -1128,7 +1039,7 @@ export default function NfcLandingScreen() {
               <TouchableOpacity
                 style={[
                   styles.primaryActionBtn,
-                  { backgroundColor: primaryColor },
+                  { backgroundColor: '#050505' },
                   (isLoading || isCheckingPhone) && { opacity: 0.5 }
                 ]}
                 onPress={handleNfcSubmit}
@@ -1136,29 +1047,11 @@ export default function NfcLandingScreen() {
                 activeOpacity={0.85}
               >
                 {isLoading || isCheckingPhone ? (
-                  <ActivityIndicator color={(() => {
-                    const r = parseInt(primaryColor.slice(1, 3), 16);
-                    const g = parseInt(primaryColor.slice(3, 5), 16);
-                    const b = parseInt(primaryColor.slice(5, 7), 16);
-                    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                    return brightness > 128 ? '#000000' : '#FFFFFF';
-                  })()} />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons name="paper-plane-outline" size={18} color={(() => {
-                      const r = parseInt(primaryColor.slice(1, 3), 16);
-                      const g = parseInt(primaryColor.slice(3, 5), 16);
-                      const b = parseInt(primaryColor.slice(5, 7), 16);
-                      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                      return brightness > 128 ? '#000000' : '#FFFFFF';
-                    })()} style={{ marginRight: 8 }} />
-                    <Text style={[styles.primaryActionBtnText, { color: (() => {
-                      const r = parseInt(primaryColor.slice(1, 3), 16);
-                      const g = parseInt(primaryColor.slice(3, 5), 16);
-                      const b = parseInt(primaryColor.slice(5, 7), 16);
-                      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                      return brightness > 128 ? '#000000' : '#FFFFFF';
-                    })() }]}>
+                    <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF' }]}>
                       {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
                     </Text>
                   </>
@@ -1242,13 +1135,13 @@ export default function NfcLandingScreen() {
                 <TouchableOpacity
                   style={[
                     styles.primaryActionBtn,
-                    { backgroundColor: primaryColor || '#10B981', marginTop: 4 },
+                    { backgroundColor: '#050505', marginTop: 4 },
                   ]}
                   onPress={handleViewStampCard}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="card" size={18} color={contrastTextColor} style={{ marginRight: 8 }} />
-                  <Text style={[styles.primaryActionBtnText, { color: contrastTextColor }]}>
+                  <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF' }]}>
                     View My Stamp Card
                   </Text>
                 </TouchableOpacity>
@@ -1516,7 +1409,7 @@ export default function NfcLandingScreen() {
   );
 
   return (
-    <View style={[styles.fullPageContainer, !merchantBgUrl && { backgroundColor: primaryColor + '20' }]}>
+    <View style={[styles.fullPageContainer, !merchantBgUrl && { backgroundColor: primaryColor }]}>
       {merchantBgUrl ? (
         <ImageBackground
           source={{ uri: merchantBgUrl }}
@@ -1539,7 +1432,8 @@ export default function NfcLandingScreen() {
           </SafeAreaView>
         </ImageBackground>
       ) : (
-        <View style={styles.fullPageBackground}>
+        <View style={[styles.fullPageBackground, { backgroundColor: primaryColor }]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.15)', zIndex: -1 }]} />
           <SafeAreaView style={{ flex: 1 }} edges={['top']}>
             <ScrollView
               contentContainerStyle={[
@@ -1849,13 +1743,20 @@ const styles = StyleSheet.create({
   },
   largeCardView: {
     borderRadius: 24,
-    padding: 20,
-    gap: 14,
+    padding: 24,
+    paddingBottom: 24,
+    gap: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.18,
-    shadowRadius: 22,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+    position: 'relative',
+    overflow: 'hidden',
+    aspectRatio: 1.586,
+    width: '100%',
   },
   largeCardHeader: {
     flexDirection: 'row',
@@ -1887,6 +1788,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 8,
+    zIndex: 2,
   },
   cardChip: {
     width: 36,

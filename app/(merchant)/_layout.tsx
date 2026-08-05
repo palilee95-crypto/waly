@@ -1,6 +1,10 @@
 import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert, Linking, LayoutAnimation, UIManager } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
+import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
@@ -98,62 +103,72 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
   }
 
   // Mobile Bottom Tab Bar view
-  return (
-    <View style={[styles.mobileTabBar, { paddingBottom: insets.bottom + 8 }]}>
-      {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
-        const isFocused = state.routes[state.index]?.name === route.name;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+  const tabBarWidth = width - 32;
 
-        if (route.name === 'give') {
+  return (
+    <View style={[styles.mobileTabBarWrap, { bottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
+      <GooeyTabBarBackground width={tabBarWidth} color="#FFC700" />
+      <View style={styles.mobileTabBar}>
+        {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
+          const isFocused = state.routes[state.index]?.name === route.name;
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              LayoutAnimation.configureNext({
+                duration: 350,
+                create: { type: 'easeInEaseOut', property: 'opacity' },
+                update: { type: 'spring', springDamping: 0.8 },
+                delete: { type: 'easeInEaseOut', property: 'opacity' },
+              });
+              navigation.navigate(route.name);
+            }
+          };
+
+          if (route.name === 'give') {
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                style={styles.floatingBtnWrap}
+                activeOpacity={0.9}
+              >
+                <View style={styles.floatingBtn}>
+                  <Ionicons name="qr-code" size={32} color="#050505" />
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          let iconName = 'home';
+          let label = t('home');
+          if (route.name === 'customers') {
+            iconName = 'people';
+            label = t('customers');
+          } else if (route.name === 'marketing') {
+            iconName = 'megaphone';
+            label = t('marketing');
+          } else if (route.name === 'profile') {
+            iconName = 'person';
+            label = t('profile');
+          }
+
           return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={onPress}
-              style={styles.floatingBtnWrap}
-              activeOpacity={0.9}
-            >
-              <View style={styles.floatingBtn}>
-                <Ionicons name="card" size={24} color="#FFFFFF" />
+            <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabButton} activeOpacity={0.8}>
+              <View style={[styles.iconContainer, isFocused && styles.iconContainerActive]}>
+                <Ionicons
+                  name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
+                  size={24}
+                  color={isFocused ? '#FFC700' : '#050505'}
+                />
               </View>
             </TouchableOpacity>
           );
-        }
-
-        let iconName = 'home';
-        let label = t('home');
-        if (route.name === 'customers') {
-          iconName = 'people';
-          label = t('customers');
-        } else if (route.name === 'marketing') {
-          iconName = 'megaphone';
-          label = t('marketing');
-        } else if (route.name === 'profile') {
-          iconName = 'person';
-          label = t('profile');
-        }
-
-        return (
-          <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabButton} activeOpacity={0.8}>
-            <Ionicons
-              name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
-              size={20}
-              color={isFocused ? '#000000' : '#9CA3AF'}
-            />
-            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+        })}
+      </View>
     </View>
   );
 }
@@ -650,7 +665,7 @@ export default function MerchantLayout() {
   if (isLoading || checkingProfile) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
-        <ActivityIndicator size="large" color="#000000" />
+        <ActivityIndicator size="large" color="#050505" />
       </View>
     );
   }
@@ -1053,56 +1068,55 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  mobileTabBarWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
   mobileTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
-    borderTopWidth: 1,
-    height: 64,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 8,
+    height: 56, // Thinner pill
     alignItems: 'center',
     justifyContent: 'space-around',
+    paddingHorizontal: 12,
   },
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    height: '100%',
-    paddingTop: 8,
+    height: 56,
   },
-  tabLabel: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#9CA3AF',
-    marginTop: 4,
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
   },
-  tabLabelActive: {
-    color: '#000000',
-    fontFamily: 'PlusJakartaSans_700Bold',
+  iconContainerActive: {
+    backgroundColor: '#050505', // The active black circle
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   floatingBtnWrap: {
-    top: -16,
     justifyContent: 'center',
     alignItems: 'center',
-    height: 64,
-    width: 64,
+    height: 88, // Total height of the bulge
+    width: 88,
+    zIndex: 2,
   },
   floatingBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#000000', // Black brand styling
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'transparent', // The SVG handles the background here
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 6,
   },
   // Subscription Billing Block Overlays
   gateContainer: {
@@ -1119,7 +1133,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.05,
     shadowRadius: 20,
@@ -1199,11 +1213,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 52,
     borderRadius: 16,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -1247,7 +1261,7 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
     letterSpacing: -1.0,
   },
   brandSubtitle: {
@@ -1270,7 +1284,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   sidebarBtnActive: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
   },
   sidebarBtnText: {
     fontSize: 14,
@@ -1343,7 +1357,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1408,7 +1422,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
+    color: '#050505',
     backgroundColor: '#F8FAFC',
     marginBottom: 8,
     width: '100%',
@@ -1434,8 +1448,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categoryCardActive: {
-    borderColor: '#000000',
-    backgroundColor: '#000000',
+    borderColor: '#050505',
+    backgroundColor: '#050505',
   },
   categoryEmoji: {
     fontSize: 18,
@@ -1466,7 +1480,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 14,
     height: 48,
     marginTop: 24,
@@ -1508,7 +1522,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   planCardActive: {
-    borderColor: '#000000',
+    borderColor: '#050505',
     backgroundColor: '#F8FAFC',
   },
   planDuration: {
@@ -1546,7 +1560,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   promoBtn: {
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 40,

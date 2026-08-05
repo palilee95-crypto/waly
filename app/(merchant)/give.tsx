@@ -174,26 +174,42 @@ export default function GiveStampsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Top Header Bar */}
-      <View style={[styles.headerRow, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}>
-        <View style={styles.headerTitleGroup}>
-          <Ionicons name="card" size={22} color="#B45309" />
-          <Text style={styles.headerTitle}>Issue & Redeem</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshIconBtn} onPress={fetchTransactions} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={18} color="#B45309" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#000000" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFC700" />}
       >
-        {/* Segment Tab Selector (Monochrome Black & White) */}
-        <View style={styles.tabBarWrap}>
+        {/* Dark Background - true black */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 280, zIndex: 0, backgroundColor: '#050505' }} />
+
+        {/* Header Content */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, marginBottom: 24, paddingTop: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.3)' }}>
+              <Ionicons name="qr-code" size={20} color="#FFC700" />
+            </View>
+            <View>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>
+                Issue & Redeem
+              </Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                Scan vouchers or issue stamps manually
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' }} 
+            onPress={fetchTransactions} 
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* High-Contrast Segment Tabs Embedded */}
+        <View style={{ flexDirection: 'row', backgroundColor: '#171717', borderRadius: 100, padding: 6, marginBottom: 24, zIndex: 10 }}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'voucher' && styles.tabBtnActive]}
+            style={[styles.tabBtn, activeTab === 'voucher' && { backgroundColor: '#FFC700' }]}
             onPress={() => {
               setActiveTab('voucher');
               setSuccessMsg(null);
@@ -201,14 +217,14 @@ export default function GiveStampsScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#1A1400' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>
+            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#050505' : '#FFC700'} />
+            <Text style={[styles.tabBtnText, { color: activeTab === 'voucher' ? '#050505' : '#FFC700', fontFamily: activeTab === 'voucher' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold' }]}>
               Scan Voucher QR
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'manual' && styles.tabBtnActive]}
+            style={[styles.tabBtn, activeTab === 'manual' && { backgroundColor: '#FFC700' }]}
             onPress={() => {
               setActiveTab('manual');
               setSuccessMsg(null);
@@ -217,8 +233,8 @@ export default function GiveStampsScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#1A1400' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'manual' && styles.tabBtnTextActive]}>
+            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#050505' : '#FFC700'} />
+            <Text style={[styles.tabBtnText, { color: activeTab === 'manual' ? '#050505' : '#FFC700', fontFamily: activeTab === 'manual' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold' }]}>
               Manual Issuance
             </Text>
           </TouchableOpacity>
@@ -308,7 +324,7 @@ export default function GiveStampsScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>VOUCHER CODE</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="qr-code-outline" size={20} color="#FFC700" style={{ marginLeft: 16, marginRight: 8 }} />
+                <Ionicons name="qr-code-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                   placeholder="e.g. WV-1234-5678"
@@ -406,7 +422,7 @@ export default function GiveStampsScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>STAMPS TO ISSUE</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="ribbon-outline" size={20} color="#FFC700" style={{ marginLeft: 16, marginRight: 8 }} />
+                <Ionicons name="ribbon-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                   placeholder="1"
@@ -480,7 +496,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   refreshIconBtn: {
     width: 36,
@@ -508,8 +524,8 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 100,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -524,7 +540,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   tabBtnTextActive: {
-    color: '#1A1400',
+    color: '#050505',
   },
 
   successBanner: {
@@ -564,23 +580,23 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 4,
   },
   cardTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
     marginBottom: 4,
   },
   cardSubtitle: {
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans_400Regular',
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     lineHeight: 18,
     marginBottom: 20,
@@ -588,15 +604,15 @@ const styles = StyleSheet.create({
 
   // Viewfinder & Camera Scanner Card
   viewfinderCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 24,
+    backgroundColor: '#050505',
+    borderRadius: 32,
     overflow: 'hidden',
-    marginBottom: 20,
-    minHeight: 220,
+    marginBottom: 24,
+    minHeight: 240,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#334155',
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   cameraView: {
     width: '100%',
@@ -622,46 +638,46 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   scannerTargetGraphic: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   cornerBracket: {
     position: 'absolute',
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderColor: '#FFC700',
   },
   topLeft: {
     top: 0,
     left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 8,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 12,
   },
   topRight: {
     top: 0,
     right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 8,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 12,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 8,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 12,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 8,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 12,
   },
   viewfinderHint: {
     fontSize: 13,
@@ -690,7 +706,7 @@ const styles = StyleSheet.create({
   activateCameraBtnText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
   },
   cameraFallbackWrap: {
     padding: 20,
@@ -709,7 +725,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   permissionBtnText: {
-    color: '#000000',
+    color: '#050505',
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
   },
@@ -727,11 +743,11 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    height: 56,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     overflow: 'hidden',
   },
   prefixBox: {
@@ -747,7 +763,7 @@ const styles = StyleSheet.create({
   prefixCode: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
   },
   prefixDivider: {
     width: 1,
@@ -758,7 +774,7 @@ const styles = StyleSheet.create({
   currencyPrefix: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFC700',
+    color: '#050505',
     marginLeft: 16,
     marginRight: 8,
   },
@@ -768,7 +784,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
   },
   presetRow: {
     flexDirection: 'row',
@@ -777,17 +793,22 @@ const styles = StyleSheet.create({
   },
   presetPill: {
     flex: 1,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    height: 40,
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   presetPillActive: {
-    backgroundColor: '#1A1400',
-    borderColor: '#FFC700',
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   presetText: {
     fontSize: 12,
@@ -798,8 +819,8 @@ const styles = StyleSheet.create({
     color: '#FFC700',
   },
   primaryBtn: {
-    height: 54,
-    backgroundColor: '#1A1400',
+    height: 56,
+    backgroundColor: '#050505',
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -807,11 +828,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#FFC700',
-    shadowColor: '#000',
+    shadowColor: '#FFC700',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
   },
   primaryBtnDisabled: {
     opacity: 0.5,
@@ -833,7 +854,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
   },
   sectionCount: {
     fontSize: 12,
@@ -851,7 +872,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
     marginTop: 8,
     marginBottom: 2,
   },
@@ -884,7 +905,7 @@ const styles = StyleSheet.create({
   txnName: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
   },
   txnDate: {
     fontSize: 11,
@@ -895,7 +916,7 @@ const styles = StyleSheet.create({
   txnStamps: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
   },
   txnBill: {
     fontSize: 11,

@@ -239,7 +239,7 @@ export default function AnalyticsScreen() {
       total,
       segments: [
         { length: t1Len, offset: 0, color: '#FFC700', label: 'Stalled at 1-3 Stamps', count: funnelMetrics.tier1, pct: funnelMetrics.tier1Pct },
-        { length: t2Len, offset: -t1Len, color: '#1A1400', label: 'Stalled at 4-7 Stamps', count: funnelMetrics.tier2, pct: funnelMetrics.tier2Pct },
+        { length: t2Len, offset: -t1Len, color: '#050505', label: 'Stalled at 4-7 Stamps', count: funnelMetrics.tier2, pct: funnelMetrics.tier2Pct },
         { length: t3Len, offset: -(t1Len + t2Len), color: '#10B981', label: 'Close to Reward (8-10)', count: funnelMetrics.tier3, pct: funnelMetrics.tier3Pct }
       ]
     };
@@ -274,7 +274,7 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#1A1400" />
+        <ActivityIndicator size="large" color="#050505" />
         <Text style={styles.loaderText}>Analysing sales data...</Text>
       </View>
     );
@@ -290,7 +290,7 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 210, backgroundColor: '#1A1400', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, zIndex: 0 }} />
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 210, backgroundColor: '#050505', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, zIndex: 0 }} />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, marginTop: 10, marginBottom: 15, width: '100%' }}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -316,7 +316,7 @@ export default function AnalyticsScreen() {
           marginBottom: 16,
           borderWidth: 1,
           borderColor: '#E2E8F0',
-          shadowColor: '#000000',
+          shadowColor: '#050505',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.02,
           shadowRadius: 8,
@@ -338,7 +338,7 @@ export default function AnalyticsScreen() {
               <Text style={{
                 fontSize: 12,
                 fontFamily: 'PlusJakartaSans_800ExtraBold',
-                color: timeframe === tab ? '#1A1400' : '#64748B',
+                color: timeframe === tab ? '#050505' : '#64748B',
                 textTransform: 'capitalize'
               }}>
                 {tab}
@@ -356,7 +356,7 @@ export default function AnalyticsScreen() {
             marginBottom: 16,
             borderWidth: 1,
             borderColor: '#E2E8F0',
-            shadowColor: '#000000',
+            shadowColor: '#050505',
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.03,
             shadowRadius: 16,
@@ -397,7 +397,7 @@ export default function AnalyticsScreen() {
                       flex: 1,
                       fontSize: 12,
                       fontFamily: 'PlusJakartaSans_600SemiBold',
-                      color: '#1A1400',
+                      color: '#050505',
                       outlineStyle: 'none'
                     } as any}
                   />
@@ -430,7 +430,7 @@ export default function AnalyticsScreen() {
                       flex: 1,
                       fontSize: 12,
                       fontFamily: 'PlusJakartaSans_600SemiBold',
-                      color: '#1A1400',
+                      color: '#050505',
                       outlineStyle: 'none'
                     } as any}
                   />
@@ -484,7 +484,7 @@ export default function AnalyticsScreen() {
         {/* 📊 KPI Grid */}
         <View style={{ marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="people" size={14} color="#3B82F6" />
@@ -494,12 +494,12 @@ export default function AnalyticsScreen() {
                   <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {merchantMetrics.totalCustomers.toLocaleString()}
               </Text>
             </View>
 
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="cash" size={14} color="#10B981" />
@@ -509,14 +509,14 @@ export default function AnalyticsScreen() {
                   <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 RM {merchantMetrics.totalSales.toLocaleString()}
               </Text>
             </View>
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="ribbon" size={14} color="#F59E0B" />
@@ -526,12 +526,12 @@ export default function AnalyticsScreen() {
                   <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {merchantMetrics.totalStamps.toLocaleString()}
               </Text>
             </View>
 
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="star" size={14} color="#8B5CF6" />
@@ -541,14 +541,14 @@ export default function AnalyticsScreen() {
                   <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {merchantMetrics.totalPoints.toLocaleString()}
               </Text>
             </View>
           </View>
 
           {/* Average Spending Customer */}
-          <View style={{ backgroundColor: '#1A1400', borderRadius: 20, padding: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+          <View style={{ backgroundColor: '#050505', borderRadius: 20, padding: 16, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Ionicons name="wallet" size={18} color="#FFC700" />
@@ -588,7 +588,7 @@ export default function AnalyticsScreen() {
           <View style={{ height: 24, backgroundColor: '#F1F5F9', borderRadius: 12, overflow: 'hidden', flexDirection: 'row', marginTop: 16 }}>
             <View style={{ width: `${100 - churnMetrics.rate}%`, height: '100%', backgroundColor: '#FFC700', justifyContent: 'center', paddingLeft: 12 }}>
               {100 - churnMetrics.rate > 20 && (
-                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
                   {100 - churnMetrics.rate}% Loyal
                 </Text>
               )}
@@ -650,7 +650,7 @@ export default function AnalyticsScreen() {
                 </G>
               </Svg>
               <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                   {donutData.total}
                 </Text>
                 <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
@@ -664,7 +664,7 @@ export default function AnalyticsScreen() {
                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: seg.color }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }} numberOfLines={1}>
                       {seg.label}
                     </Text>
                     <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
@@ -694,9 +694,9 @@ export default function AnalyticsScreen() {
                   RM{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value}
                 </Text>
                 <View style={{ width: 20, height: 80, backgroundColor: '#F1F5F9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#1A1400', borderRadius: 8 }} />
+                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#050505', borderRadius: 8 }} />
                 </View>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#1A1400' : '#94A3B8', marginTop: 6 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8', marginTop: 6 }}>
                   {item.month}
                 </Text>
               </View>
@@ -717,13 +717,13 @@ export default function AnalyticsScreen() {
           <View style={{ gap: 12, marginTop: 16 }}>
             {slowHoursMetrics.map((item, idx) => (
               <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Text style={{ width: 120, fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400' }}>
+                <Text style={{ width: 120, fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#050505' }}>
                   {item.label}
                 </Text>
                 <View style={{ flex: 1, height: 16, backgroundColor: '#F1F5F9', borderRadius: 8, overflow: 'hidden' }}>
-                  <View style={{ width: `${item.percentage}%`, height: '100%', backgroundColor: item.isQuietest ? '#EF4444' : '#1A1400', borderRadius: 8 }} />
+                  <View style={{ width: `${item.percentage}%`, height: '100%', backgroundColor: item.isQuietest ? '#EF4444' : '#050505', borderRadius: 8 }} />
                 </View>
-                <Text style={{ width: 50, fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: item.isQuietest ? '#EF4444' : '#1A1400', textAlign: 'right' }}>
+                <Text style={{ width: 50, fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: item.isQuietest ? '#EF4444' : '#050505', textAlign: 'right' }}>
                   {item.value} txs
                 </Text>
               </View>
@@ -740,7 +740,7 @@ export default function AnalyticsScreen() {
               <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name="information-circle" size={16} color="#FFC700" />
               </View>
-              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {helpModal.title}
               </Text>
             </View>
@@ -750,7 +750,7 @@ export default function AnalyticsScreen() {
             <TouchableOpacity
               onPress={() => setHelpModal({ ...helpModal, visible: false })}
               style={{
-                backgroundColor: '#1A1400',
+                backgroundColor: '#050505',
                 borderRadius: 14,
                 paddingVertical: 12,
                 alignItems: 'center',
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#1A1400',
+    color: '#050505',
   },
   backBtn: {
     padding: 8,
@@ -822,7 +822,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingVertical: 8,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   statsValue: {
     fontSize: 22,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
   },
   sectionSubtitle: {
     fontSize: 11,
@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     maxWidth: 380,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.15,
     shadowRadius: 24,

@@ -597,7 +597,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: activeSmartTab === 'campaigns' ? '#FFFFFF' : 'transparent',
-            shadowColor: '#000000',
+            shadowColor: '#050505',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: activeSmartTab === 'campaigns' ? 0.05 : 0,
             shadowRadius: 4,
@@ -607,8 +607,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
           activeOpacity={0.8}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="git-branch-outline" size={16} color={activeSmartTab === 'campaigns' ? '#0F172A' : '#64748B'} />
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'campaigns' ? '#0F172A' : '#64748B' }}>
+            <Ionicons name="git-branch-outline" size={16} color={activeSmartTab === 'campaigns' ? '#050505' : '#64748B'} />
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'campaigns' ? '#050505' : '#64748B' }}>
               Campaigns
             </Text>
           </View>
@@ -622,7 +622,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: activeSmartTab === 'analytics' ? '#FFFFFF' : 'transparent',
-            shadowColor: '#000000',
+            shadowColor: '#050505',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: activeSmartTab === 'analytics' ? 0.05 : 0,
             shadowRadius: 4,
@@ -632,8 +632,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
           activeOpacity={0.8}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="stats-chart-outline" size={16} color={activeSmartTab === 'analytics' ? '#0F172A' : '#64748B'} />
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'analytics' ? '#0F172A' : '#64748B' }}>
+            <Ionicons name="stats-chart-outline" size={16} color={activeSmartTab === 'analytics' ? '#050505' : '#64748B'} />
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'analytics' ? '#050505' : '#64748B' }}>
               Analytics & Logs
             </Text>
           </View>
@@ -642,7 +642,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
       {activeSmartTab === 'campaigns' ? (
         loadingSmartGroups ? (
-          <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 30 }} />
+          <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
         ) : smartGroups.length === 0 ? (
           <View style={s.campEmptyState}>
             <Ionicons name="git-branch-outline" size={48} color="#94A3B8" />
@@ -745,9 +745,9 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                         activeOpacity={0.8}
                       >
                         {loadingEditGroupId === group.id ? (
-                          <ActivityIndicator size="small" color="#000000" />
+                          <ActivityIndicator size="small" color="#050505" />
                         ) : (
-                          <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Edit</Text>
+                          <Text style={[btnStyles.btnText, { color: '#050505' }]}>Edit</Text>
                         )}
                       </TouchableOpacity>
 
@@ -776,14 +776,14 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
       ) : (
         /* ── Analytics & Logs View ── */
         loadingAnalytics ? (
-          <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
+          <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
         ) : (
           <View style={{ width: '100%', gap: 20 }}>
             {/* Summary Cards */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Enrolled</Text>
-                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 4 }}>{analyticsStats.total}</Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginTop: 4 }}>{analyticsStats.total}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Queue</Text>
@@ -807,7 +807,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   paddingVertical: 8,
                   paddingHorizontal: 16,
                   borderRadius: 99,
-                  backgroundColor: activeAnalyticsSubTab === 'queue' ? '#0F172A' : 'transparent',
+                  backgroundColor: activeAnalyticsSubTab === 'queue' ? '#050505' : 'transparent',
                 }}
               >
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'queue' ? '#FFFFFF' : '#475569' }}>
@@ -820,7 +820,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   paddingVertical: 8,
                   paddingHorizontal: 16,
                   borderRadius: 99,
-                  backgroundColor: activeAnalyticsSubTab === 'logs' ? '#0F172A' : 'transparent',
+                  backgroundColor: activeAnalyticsSubTab === 'logs' ? '#050505' : 'transparent',
                 }}
               >
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'logs' ? '#FFFFFF' : '#475569' }}>
@@ -858,7 +858,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       <View key={member.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 12 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <View style={{ gap: 2 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
                               {customer.name || customer.phone || 'Unnamed Customer'}
                             </Text>
                             <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
@@ -937,7 +937,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     return (
                       <View key={log.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 10 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
                             {customer.name || customer.phone || 'Unnamed Customer'}
                           </Text>
                           <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -1000,13 +1000,13 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                           width: 36, 
                           height: 36, 
                           borderRadius: 18, 
-                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#000000' : '#F1F5F9', 
+                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#050505' : '#F1F5F9', 
                           borderWidth: isActive ? 0 : 1,
                           borderColor: isCompleted ? '#A7F3D0' : '#E2E8F0',
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           marginBottom: 6,
-                          shadowColor: isActive ? '#000000' : '#000',
+                          shadowColor: isActive ? '#050505' : '#000',
                           shadowOffset: { width: 0, height: isActive ? 3 : 0 },
                           shadowOpacity: isActive ? 0.2 : 0,
                           shadowRadius: isActive ? 5 : 0,
@@ -1023,7 +1023,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                       </View>
                       <Text style={{ 
                         fontSize: 11, 
-                        color: isActive ? '#0F172A' : '#64748B', 
+                        color: isActive ? '#050505' : '#64748B', 
                         fontFamily: isActive ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_500Medium' 
                       }}>
                         {step === 1 ? 'Group Info' : step === 2 ? 'Sequences' : 'Members'}
@@ -1141,7 +1141,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                             <Ionicons name="git-commit-outline" size={20} color="#475569" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{seq.title || 'Untitled Sequence'}</Text>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{seq.title || 'Untitled Sequence'}</Text>
                             <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
                               Sends after: {seq.send_after_days}d {seq.send_after_hours}h {seq.send_after_minutes}m · {(seq.messages || []).length} message{(seq.messages || []).length !== 1 ? 's' : ''}
                             </Text>
@@ -1164,8 +1164,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     onPress={() => openSeqModal(null)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="add" size={18} color="#0F172A" style={{ marginRight: 6 }} />
-                    <Text style={[btnStyles.btnText, { color: '#0F172A' }]}>Add Sequence Step</Text>
+                    <Ionicons name="add" size={18} color="#050505" style={{ marginRight: 6 }} />
+                    <Text style={[btnStyles.btnText, { color: '#050505' }]}>Add Sequence Step</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1188,7 +1188,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                             borderRadius: 10, 
                             alignItems: 'center', 
                             justifyContent: 'center',
-                            backgroundColor: isActive ? '#000000' : 'transparent',
+                            backgroundColor: isActive ? '#050505' : 'transparent',
                           }} 
                           onPress={() => setMemberMethod(m)}
                           activeOpacity={0.8}
@@ -1207,7 +1207,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
 
                   {memberMethod === 'all' && (
                     <TouchableOpacity 
-                      style={[btnStyles.btn, { width: '100%', backgroundColor: '#000000' }]} 
+                      style={[btnStyles.btn, { width: '100%', backgroundColor: '#050505' }]} 
                       onPress={addAllMembers}
                       activeOpacity={0.8}
                     >
@@ -1243,7 +1243,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                           activeOpacity={0.7}
                         >
                           <View style={{ gap: 2 }}>
-                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{cust.name || 'Unnamed Customer'}</Text>
+                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{cust.name || 'Unnamed Customer'}</Text>
                             <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>{cust.phone}</Text>
                           </View>
                           <Ionicons name="add-circle" size={20} color="#5C3BCC" />
@@ -1275,7 +1275,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                   {smartMembers.length > 0 && (
                     <View style={{ marginTop: 12 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 6 }}>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
                           Selected Target List ({smartMembers.length})
                         </Text>
                         <TouchableOpacity onPress={() => setSmartMembers([])}>
@@ -1405,7 +1405,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                               paddingVertical: 8, 
                               borderRadius: 9, 
                               alignItems: 'center', 
-                              backgroundColor: isActive ? '#000000' : 'transparent' 
+                              backgroundColor: isActive ? '#050505' : 'transparent' 
                             }} 
                             onPress={() => setSeqStatus(st)}
                             activeOpacity={0.8}
@@ -1426,7 +1426,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
                       <TouchableOpacity onPress={() => openMsgModal(null)}>
-                        <Text style={{ fontSize: 12, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
+                        <Text style={{ fontSize: 12, color: '#050505', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
                       </TouchableOpacity>
                     </View>
                     
@@ -1495,8 +1495,8 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                               paddingVertical: 8, 
                               borderRadius: 10, 
                               borderWidth: 1, 
-                              borderColor: isActive ? '#000000' : '#E2E8F0', 
-                              backgroundColor: isActive ? '#000000' : '#FFFFFF',
+                              borderColor: isActive ? '#050505' : '#E2E8F0', 
+                              backgroundColor: isActive ? '#050505' : '#FFFFFF',
                               marginBottom: 4
                             }} 
                             onPress={() => setSeqConvType(ct.v)}
@@ -1541,7 +1541,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
             </View>
             
             <TouchableOpacity 
-              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
+              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#050505' }]} 
               onPress={saveSequence}
               activeOpacity={0.8}
             >
@@ -1610,7 +1610,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
                             >
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                 <Text 
-                                  style={{ flex: 1, flexShrink: 1, marginRight: 8, fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#0F172A' }}
+                                  style={{ flex: 1, flexShrink: 1, marginRight: 8, fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#050505' }}
                                   numberOfLines={1}
                                 >
                                   {t.name}
@@ -1715,7 +1715,7 @@ export default function SmartFollowUp({ styles: s, Alert }: Props) {
             </View>
             
             <TouchableOpacity 
-              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#000000' }]} 
+              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#050505' }]} 
               onPress={saveMessage}
               activeOpacity={0.8}
             >
@@ -1873,7 +1873,7 @@ const previewStyles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 6,
     borderColor: '#1E293B',
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
@@ -2039,23 +2039,24 @@ const previewStyles = StyleSheet.create({
 
 const btnStyles = StyleSheet.create({
   btn: { 
-    backgroundColor: '#000000', 
-    borderRadius: 12, 
+    backgroundColor: '#050505', 
+    borderRadius: 16, 
     paddingHorizontal: 18, 
-    height: 38, 
+    height: 52, 
     alignItems: 'center', 
     justifyContent: 'center', 
     flexDirection: 'row',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   btnText: { 
-    fontSize: 13, 
-    fontFamily: 'PlusJakartaSans_700Bold', 
-    color: '#FFFFFF' 
+    fontSize: 14, 
+    fontFamily: 'PlusJakartaSans_800ExtraBold', 
+    color: '#FFFFFF',
+    letterSpacing: 0.5
   },
 });
 
@@ -2065,12 +2066,12 @@ const badgeStyles = StyleSheet.create({
 });
 
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, width: '100%', maxWidth: 500, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
-  title: { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 28, padding: 24, width: '100%', maxWidth: 500, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
+  title: { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' },
 });
 
 const inputStyles = StyleSheet.create({
-  label: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#0F172A', backgroundColor: '#F8FAFC' },
+  label: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1.0, marginBottom: 8 },
+  input: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#050505', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
 });

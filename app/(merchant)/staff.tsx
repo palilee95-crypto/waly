@@ -151,19 +151,22 @@ export default function StaffManagementScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#000000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Dark Background */}
+        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 210, backgroundColor: '#050505', zIndex: 0 }} />
+
+        {/* Header */}
+        <View style={[styles.header, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
         <Text style={styles.sectionSubtitle}>
           {t('manage_staff_desc')}
         </Text>
@@ -210,7 +213,7 @@ export default function StaffManagementScreen() {
 
         {loading ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator color="#000000" size="large" />
+            <ActivityIndicator color="#050505" size="large" />
           </View>
         ) : staff.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -327,20 +330,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
+    height: 64,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   backBtn: {
     padding: 4,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -349,17 +350,25 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    color: '#94A3B8',
     lineHeight: 20,
     marginBottom: 24,
+    zIndex: 1,
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: radii.lg,
-    padding: 20,
+    padding: 24,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 28,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+    marginTop: -10,
+    zIndex: 2,
   },
   cardTitle: {
     fontSize: 16,
@@ -394,23 +403,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
-    borderRadius: radii.md,
+    backgroundColor: '#050505',
+    borderRadius: 24,
     height: 48,
     paddingHorizontal: 20,
     gap: 4,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   addBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.5,
   },
   sectionHeader: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.0,
     marginBottom: 14,
   },
   loaderContainer: {
@@ -418,27 +433,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderRadius: radii.lg,
     padding: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
   },
   emptyIconBg: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyTitle: {
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
     marginBottom: 6,
   },
   emptySubtitle: {

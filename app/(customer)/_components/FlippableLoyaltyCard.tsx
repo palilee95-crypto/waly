@@ -16,6 +16,16 @@ const stampIcons = [
   { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
   { id: 'cake', family: 'MaterialIcons', name: 'cake' },
   { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
+  { id: 'tag', family: 'Ionicons', name: 'pricetag' },
+  { id: 'gift', family: 'Ionicons', name: 'gift' },
+  { id: 'beer', family: 'Ionicons', name: 'beer' },
+  { id: 'pizza', family: 'Ionicons', name: 'pizza' },
+  { id: 'card', family: 'Ionicons', name: 'card' },
+  { id: 'store', family: 'Ionicons', name: 'storefront' },
+  { id: 'car', family: 'Ionicons', name: 'car-sport' },
+  { id: 'icecream', family: 'Ionicons', name: 'ice-cream' },
+  { id: 'barbell', family: 'Ionicons', name: 'barbell' },
+  { id: 'scissors', family: 'Ionicons', name: 'scissors' },
   { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
   { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
 ];
@@ -117,13 +127,34 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
     return slots;
   };
 
+  // Detect if the card background is bright (light color)
+  const isColorBright = (hex: string): boolean => {
+    try {
+      const c = hex.replace('#', '');
+      const r = parseInt(c.substring(0, 2), 16);
+      const g = parseInt(c.substring(2, 4), 16);
+      const b = parseInt(c.substring(4, 6), 16);
+      // Perceived brightness formula
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness > 155;
+    } catch { return false; }
+  };
+
+  const bgColor = (card.gradientColors ?? ['#EC4899'])[0];
+  const logoTint = isColorBright(bgColor) ? '#000000' : '#FFFFFF';
+
   const cardStyle = {
     backgroundColor: (card.gradientColors ?? ['#EC4899', '#8B5CF6'])[0],
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     aspectRatio: 1.586,
     width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 14,
   } as any;
 
   return (
@@ -144,7 +175,9 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
           }
         ]}>
           <View style={[StyleSheet.absoluteFill, { borderRadius: 24, overflow: 'hidden' }]}>
-            <View style={styles.glossyReflection} />
+            {/* Subtle metallic sheen */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+            <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
             {card.cardBackground ? (
               <Image source={{ uri: card.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : null}
@@ -154,7 +187,7 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
                 <View style={styles.shopLogoBg}>
                   <Image source={{ uri: card.logo }} style={styles.shopLogo} />
                 </View>
-                <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flex: 1, marginLeft: 0, gap: 2 }}>
                   <Text style={[styles.largeCardMerchant, card.fontColor && { color: card.fontColor }]} numberOfLines={1}>
                     {card.merchantName}
                   </Text>
@@ -162,8 +195,11 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
                     {card.category.toUpperCase()}
                   </Text>
                 </View>
-                <View style={styles.goldBadge}>
-                  <Text style={styles.goldBadgeText}>LOYALTY CARD</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, card.fontColor && { color: card.fontColor }]}>
+                    {card.collectedStamps}/{card.totalStamps}
+                  </Text>
+                  <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, card.fontColor && { color: card.fontColor, opacity: 0.75 }]}>STAMPS</Text>
                 </View>
               </View>
 
@@ -190,17 +226,17 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
                 </View>
                 <View style={{ width: 45 }}>
                   <Text style={[styles.holderLabel, card.fontColor && { color: card.fontColor, opacity: 0.5 }]}>VALID</Text>
-                  <Text style={[styles.holderValue, card.fontColor && { color: card.fontColor }]}>12/30</Text>
+                  <Text style={[styles.holderValue, card.fontColor && { color: card.fontColor }]}>{card.validUntil || '12/30'}</Text>
                 </View>
                 <View style={{ width: 35 }}>
                   <Text style={[styles.holderLabel, card.fontColor && { color: card.fontColor, opacity: 0.5 }]}>CVV</Text>
                   <Text style={[styles.holderValue, card.fontColor && { color: card.fontColor }]}>888</Text>
                 </View>
                 <View style={styles.brandBadge}>
-                  <View style={styles.mastercardBadge}>
-                    <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                    <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
-                  </View>
+                  <Image
+                    source={require('../../../assets/risev logo.png')}
+                    style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: logoTint }}
+                  />
                 </View>
               </View>
             </View>
@@ -217,8 +253,11 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
           }
         ]}>
           <View style={[StyleSheet.absoluteFill, { borderRadius: 24, overflow: 'hidden' }]}>
-            {card.cardBackground ? (
-              <Image source={{ uri: card.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {/* Subtle metallic sheen (back) */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+            <View style={{ position: 'absolute', top: -300, right: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '-40deg' }], zIndex: 1, pointerEvents: 'none' }} />
+            {card.cardBackgroundBack ? (
+              <Image source={{ uri: card.cardBackgroundBack }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : null}
             <View style={styles.glossyReflectionBack} />
 
@@ -230,29 +269,28 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
             </View>
             
             <View style={styles.cardContentPaddingBack}>
-              {/* Minimalist Status Header */}
-              <View style={styles.minimalBackHeader}>
-                <Text style={[styles.minimalBackLabel, card.fontColor && { color: card.fontColor, opacity: 0.6 }]}>
-                  YOUR STAMPS
-                </Text>
-                <Text style={[styles.minimalBackProgress, card.fontColor && { color: card.fontColor }]}>
-                  {card.collectedStamps}/{card.totalStamps}
-                </Text>
-              </View>
-
-              {/* Stamps grid details */}
-              <View style={styles.largeStampsGridWrapper}>
-                {renderMiniStamps()}
-              </View>
-
-              <View style={styles.backFooter}>
-                <Text style={[styles.memberIdText, card.fontColor && { color: card.fontColor }]}>
-                  {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                </Text>
-                <View style={styles.qrCodeWrapper}>
-                  <Text style={[styles.qrLabel, card.fontColor && { color: card.fontColor }]}>SCAN</Text>
-                  <Ionicons name="qr-code" size={24} color={card.fontColor || '#FFFFFF'} style={{ opacity: 0.9 }} />
+              <View>
+                {/* Minimalist Status Header */}
+                <View style={styles.minimalBackHeader}>
+                  <Text style={[styles.minimalBackLabel, card.fontColor && { color: card.fontColor, opacity: 0.6 }]}>
+                    YOUR STAMPS
+                  </Text>
+                  <Text style={[styles.minimalBackProgress, card.fontColor && { color: card.fontColor }]}>
+                    {card.collectedStamps}/{card.totalStamps}
+                  </Text>
                 </View>
+
+                {/* Stamps grid details */}
+                <View style={styles.largeStampsGridWrapper}>
+                  {renderMiniStamps()}
+                </View>
+              </View>
+
+              <View style={{ position: 'absolute', bottom: 16, right: 24 }}>
+                <Image
+                  source={require('../../../assets/risev logo.png')}
+                  style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: logoTint }}
+                />
               </View>
             </View>
           </View>
@@ -264,37 +302,22 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
 
 const styles = StyleSheet.create({
   glossyReflection: {
-    position: 'absolute',
-    top: -200,
-    left: '20%',
-    width: 140,
-    height: 800,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    transform: [{ rotate: '40deg' }],
-    pointerEvents: 'none',
-    zIndex: 1,
+    display: 'none', // replaced by inline metallic layers
   },
   glossyReflectionBack: {
-    position: 'absolute',
-    top: -200,
-    right: '20%',
-    width: 140,
-    height: 800,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    transform: [{ rotate: '-40deg' }],
-    pointerEvents: 'none',
-    zIndex: 1,
+    display: 'none', // replaced by inline metallic layers
   },
   cardContentPadding: {
     flex: 1,
-    padding: 20,
+    padding: 24,
+    paddingBottom: 24,
     justifyContent: 'space-between',
     zIndex: 2,
   },
   cardContentPaddingBack: {
     flex: 1,
-    padding: 16,
-    paddingTop: 4,
+    padding: 24,
+    paddingTop: 12,
     justifyContent: 'space-between',
     zIndex: 2,
   },
@@ -304,36 +327,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   shopLogoBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    marginRight: 10,
+    padding: 6,
+    marginRight: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
   },
   shopLogo: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
   },
   largeCardMerchant: {
-    fontSize: 18,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    letterSpacing: 1.2,
+    letterSpacing: -0.2,
   },
   shopCategoryText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#FFFFFF',
-    letterSpacing: 1,
-    marginTop: 2,
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
   goldBadge: {
     borderColor: 'rgba(255, 255, 255, 0.25)',
@@ -356,38 +379,41 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   cardChip: {
-    width: 44,
-    height: 32,
+    width: 32,
+    height: 24,
     borderRadius: 6,
-    backgroundColor: '#EAB308',
-    borderWidth: 1.2,
-    borderColor: '#CA8A04',
+    backgroundColor: '#F59E0B',
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D97706',
   },
   chipLineHoriz: {
     position: 'absolute',
+    top: 11,
     left: 0,
-    right: 0,
-    top: 15,
+    width: '100%',
     height: 1,
-    backgroundColor: '#854D0E',
+    backgroundColor: '#B45309',
   },
   chipLineVert: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
-    left: 14,
+    left: 15,
     width: 1,
-    backgroundColor: '#854D0E',
+    height: '100%',
+    backgroundColor: '#B45309',
   },
   chipCenterPin: {
     position: 'absolute',
     top: 6,
-    bottom: 6,
-    left: 20,
-    width: 1,
-    backgroundColor: '#854D0E',
+    left: 10,
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#FBBF24',
+    borderWidth: 1,
+    borderColor: '#B45309',
   },
   largeCardFooter: {
     flexDirection: 'row',
@@ -400,20 +426,22 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   holderLabel: {
-    fontSize: 9,
+    fontSize: 7,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'rgba(255, 255, 255, 0.5)',
     letterSpacing: 0.5,
   },
   holderValue: {
-    fontSize: 13,
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
+    marginTop: 2,
+    letterSpacing: 0.5,
   },
   brandBadge: {
     alignItems: 'flex-end',
-    justifyContent: 'center',
-    height: 30,
+    justifyContent: 'flex-end',
+    paddingBottom: 2,
   },
   mastercardBadge: {
     flexDirection: 'row',
@@ -427,7 +455,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 44,
     backgroundColor: '#111827',
-    marginTop: 20,
+    marginTop: 16,
     opacity: 0.95,
     justifyContent: 'center',
     alignItems: 'center',
@@ -441,8 +469,9 @@ const styles = StyleSheet.create({
   },
   minimalBackHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 8,
     marginTop: 0, // Moved up closer to the magnetic stripe
   },
@@ -459,15 +488,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   largeStampsGridWrapper: {
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'center',
-    alignContent: 'center',
+    alignContent: 'flex-start',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    marginTop: 8, // Added margin to push stamps down away from the text
+    marginTop: 12,
   },
   miniStampEarned: {
     width: 32,

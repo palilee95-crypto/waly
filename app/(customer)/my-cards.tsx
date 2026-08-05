@@ -14,6 +14,8 @@ import {
   Platform,
   Animated,
   Pressable,
+  TextInput,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
@@ -40,14 +42,42 @@ type LoyaltyCardItem = {
   stampColor?: string;
   fontColor?: string;
   cardBackground?: string;
+  cardBackgroundBack?: string;
+  validUntil?: string;
   tier?: string;
   merchantId?: string;
   linkedRewardId?: string;
 };
 
 // --- Sub-component for Hoverable Wallet Card ---
-const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: any) => {
+const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, styles }: any) => {
   const pullAnim = React.useRef(new Animated.Value(isPulledOut ? 1 : 0)).current;
+  const enterAnim = React.useRef(new Animated.Value(0)).current;
+  const exitAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Entrance animation (Drop down 1-by-1)
+  React.useEffect(() => {
+    Animated.timing(enterAnim, {
+      toValue: 1,
+      duration: 500,
+      delay: index * 100, // Stagger effect
+      useNativeDriver: true,
+      easing: Easing.out(Easing.exp) // Smooth drop
+    }).start();
+  }, []);
+
+  // Exit animation (Slide left 1-by-1)
+  React.useEffect(() => {
+    if (isExiting) {
+      Animated.timing(exitAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: index * 100, // Stagger effect
+        useNativeDriver: true,
+        easing: Easing.inOut(Easing.ease) // Smooth slide
+      }).start();
+    }
+  }, [isExiting]);
 
   React.useEffect(() => {
     Animated.spring(pullAnim, {
@@ -58,13 +88,30 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
     }).start();
   }, [isPulledOut]);
 
-  const translateY = pullAnim.interpolate({
+  const translateYPull = pullAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -110], // Pulls the card up significantly to reveal it
   });
 
+  const translateXEnter = enterAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Dimensions.get('window').width + 100, 0], // Slide in from right
+  });
+  
+  const translateXExit = exitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -Dimensions.get('window').width - 100], // Slide far to left
+  });
+
   return (
-    <Animated.View style={{ zIndex: index, marginTop: index > 0 ? -160 : 0, transform: [{ translateY }] }}>
+    <Animated.View style={{ 
+      zIndex: index, 
+      marginTop: index > 0 ? -160 : 0, 
+      transform: [
+        { translateY: translateYPull },
+        { translateX: Animated.add(translateXEnter, translateXExit) }
+      ] 
+    }}>
       <Pressable
         onPress={onTap}
         style={[
@@ -73,29 +120,22 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
         ]}
       >
         {/* Clipping Layer for Background & Gloss */}
-        <View style={{ ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' }}>
+        <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 24, overflow: 'hidden' }}>
+          {/* Subtle metallic sheen */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+          <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
+          
           {item.cardBackground ? (
             <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : null}
-          
-          {/* Realistic Gloss Reflection */}
-          <View style={{
-            position: 'absolute',
-            top: -100,
-            right: -100,
-            width: 400,
-            height: 400,
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            transform: [{ rotate: '35deg' }],
-            pointerEvents: 'none',
-          }} />
         </View>
 
-        <View style={styles.cardHeader}>
+        {/* Header: Shop Name & Logo */}
+        <View style={styles.cardInfoRow}>
           <View style={styles.shopLogoBg}>
             <Image source={{ uri: item.logo }} style={styles.shopLogo} />
           </View>
-          <View style={styles.shopTextColumn}>
+          <View style={{ flex: 1, marginLeft: 0, gap: 2 }}>
             <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
               {item.merchantName}
             </Text>
@@ -103,11 +143,11 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
               {item.category.toUpperCase()}
             </Text>
           </View>
-          <View style={styles.ptsColumn}>
-            <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
               {item.collectedStamps}/{item.totalStamps}
             </Text>
-            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>STAMPS</Text>
+            <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
           </View>
         </View>
 
@@ -120,45 +160,46 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
           </View>
           <Ionicons 
             name="wifi" 
-            size={16} 
-            color="#E2E8F0" 
-            style={{ opacity: 0.9 }} 
+            size={22} 
+            color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
+            style={{ opacity: 0.45 }} 
           />
         </View>
 
-        {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
+        {/* Footer row: Holder Name, Expiration, CVV, and brand logo */}
         <View style={styles.cardBottomRow}>
           <View style={styles.holderBlock}>
-            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
               CARD HOLDER
             </Text>
-            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]} numberOfLines={1}>
+            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
               {(user?.name || 'Ahmad Fazli').toUpperCase()}
             </Text>
           </View>
 
-          <View style={styles.validBlock}>
-            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+          <View style={{ width: 45 }}>
+            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
               VALID
             </Text>
-            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
-              12/30
+            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+              {item.validUntil || '12/30'}
             </Text>
           </View>
 
-          <View style={styles.cvvBlock}>
-            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+          <View style={{ width: 35 }}>
+            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
               CVV
             </Text>
-            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
+            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
               888
             </Text>
           </View>
 
-          {/* Mastercard-style overlapping circles */}
-          <View style={styles.mastercardBadge}>
-            <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-            <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+          <View style={{ alignItems: 'flex-end' }}>
+            <Image
+              source={require('../../assets/risev logo.png')}
+              style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: item.fontColor || '#FFFFFF' }}
+            />
           </View>
         </View>
 
@@ -178,6 +219,10 @@ const StackedWalletCard = ({ item, index, isPulledOut, onTap, user, styles }: an
 export default function MyCardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [displayPage, setDisplayPage] = useState(1);
+  const [isPaginating, setIsPaginating] = useState(false);
   const [selectedCard, setSelectedCard] = useState<LoyaltyCardItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
@@ -185,6 +230,25 @@ export default function MyCardsScreen() {
   const [loading, setLoading] = useState(true);
   const [pulledOutCardId, setPulledOutCardId] = useState<string | null>(null);
   const [pinnedCards, setPinnedCards] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setDisplayPage(1);
+  }, [searchQuery]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage || isPaginating) return;
+    
+    setCurrentPage(newPage);
+    setIsPaginating(true);
+    
+    // Wait for exit animation (500ms duration + up to 300ms stagger)
+    setTimeout(() => {
+      setDisplayPage(newPage);
+      setIsPaginating(false);
+    }, 500 + (3 * 100)); // Total ~800ms before showing next cards
+  };
+
 
   const loadPinnedCards = async () => {
     try {
@@ -260,6 +324,14 @@ export default function MyCardsScreen() {
           cardBackground: program?.card_background
             ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
             : undefined,
+          cardBackgroundBack: program?.card_background_back
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background_back}`
+            : undefined,
+          validUntil: (() => {
+            const expDate = new Date(rec.created);
+            expDate.setDate(expDate.getDate() + (program?.expiry_days || 30));
+            return `${String(expDate.getMonth() + 1).padStart(2, '0')}/${String(expDate.getFullYear()).slice(-2)}`;
+          })(),
         };
       });
       setLoyaltyCards(mapped);
@@ -456,40 +528,49 @@ export default function MyCardsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const CARDS_PER_PAGE = 4;
+  const filteredCards = loyaltyCards.filter(item => item.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
+  const totalPages = Math.ceil(filteredCards.length / CARDS_PER_PAGE);
+  const paginatedCards = filteredCards.slice((displayPage - 1) * CARDS_PER_PAGE, displayPage * CARDS_PER_PAGE);
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Unified Yellow Header Block */}
-        <View style={{ backgroundColor: '#FFFFFF', zIndex: 10 }}>
-          {/* Yellow Block with rounded bottom-right corner = the outer convex part */}
-          <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 28 }}>
-            <View style={[{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-              {/* Top Header Row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#B38B00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 3 }} onPress={() => router.back()}>
-                  <Ionicons name="arrow-back" size={18} color="#1A1400" />
+        {/* Yellow Header Foreground (Z-Index 10 so cards scroll UNDER this part) */}
+        <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 28, zIndex: 10 }}>
+          <View style={[{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+            
+            {/* Page Titles inside the Yellow Header */}
+            <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>All Stamp Cards</Text>
+
+            {/* Search Bar */}
+            <View style={{ marginTop: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 16, height: 48, shadowColor: '#B38B00', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }}>
+              <Ionicons name="search" size={20} color="#94A3B8" />
+              <TextInput
+                style={{ flex: 1, marginLeft: 12, fontSize: 15, fontFamily: 'PlusJakartaSans_500Medium', color: '#1A1400' }}
+                placeholder="Search merchant name..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
                 </TouchableOpacity>
-                
-                <Image
-                  source={require('../../assets/risev logo.png')}
-                  style={{ width: 110, height: 38, resizeMode: 'contain' }}
-                />
-              </View>
-              
-              {/* Page Titles inside the Yellow Header */}
-              <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>All Stamp Cards</Text>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', marginTop: 6, lineHeight: 18 }}>
-                Here is the complete wallet list of all merchant partners you have collected stamps from.
-              </Text>
+              )}
             </View>
-          </View>
-          {/* White overlay with rounded top-left = the inner concave swoop that completes the S */}
-          <View style={{ height: 28, backgroundColor: '#FFC700' }}>
-            <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
           </View>
         </View>
 
+        {/* White swoop Background (Z-Index 1 so cards scroll OVER this part) */}
+        <View style={{ height: 28, backgroundColor: '#FFC700', zIndex: 1 }}>
+          <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
+        </View>
+
         <ScrollView
+          style={{ marginTop: -28, zIndex: 5 }}
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
           onScroll={() => {
@@ -517,17 +598,54 @@ export default function MyCardsScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              loyaltyCards.map((item, index) => (
-                <StackedWalletCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  isPulledOut={pulledOutCardId === item.id}
-                  onTap={() => handleCardTap(item)}
-                  user={user}
-                  styles={styles}
-                />
-              ))
+              <>
+                {paginatedCards.map((item, index) => (
+                  <StackedWalletCard
+                    key={`${item.id}-${displayPage}`} // Force remount on new page to trigger enter animation
+                    item={item}
+                    index={index}
+                    isPulledOut={pulledOutCardId === item.id}
+                    isExiting={isPaginating}
+                    onTap={() => handleCardTap(item)}
+                    user={user}
+                    styles={styles}
+                  />
+                ))}
+
+                {/* Pagination Controls */}
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 0, paddingBottom: 40, zIndex: 10, gap: 12 }}>
+                    <TouchableOpacity 
+                      disabled={currentPage === 1 || isPaginating}
+                      onPress={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      style={{ padding: 8, opacity: currentPage === 1 ? 0.3 : 1 }}
+                    >
+                      <Ionicons name="chevron-back" size={24} color="#1A1400" />
+                    </TouchableOpacity>
+                    
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {Array.from({ length: totalPages }).map((_, i) => (
+                        <TouchableOpacity 
+                          key={i} 
+                          disabled={isPaginating}
+                          onPress={() => handlePageChange(i + 1)}
+                          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: currentPage === i + 1 ? '#FFC700' : '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                        >
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: currentPage === i + 1 ? '#1A1400' : '#64748B' }}>
+                            {i + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity 
+                      disabled={currentPage === totalPages || isPaginating}
+                      onPress={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      style={{ padding: 8, opacity: currentPage === totalPages ? 0.3 : 1 }}
+                    >
+                      <Ionicons name="chevron-forward" size={24} color="#1A1400" />
+                    </TouchableOpacity>
+                  </View>
+              </>
             )}
           </View>
         </ScrollView>
@@ -883,7 +1001,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     justifyContent: 'space-between',
-    aspectRatio: 1.586, // Standard credit card aspect ratio
+    aspectRatio: 1.75, // Wider aspect ratio makes it shorter to fit screen
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
@@ -896,24 +1014,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  cardInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   shopLogoBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    padding: 6,
   },
   shopLogo: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
   },
   shopTextColumn: {
     flex: 1,
-    marginLeft: 12,
-    gap: 1,
+    gap: 2,
   },
   shopNameText: {
     fontSize: 14,
@@ -921,7 +1043,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   shopCategoryText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: 'rgba(255, 255, 255, 0.65)',
   },
@@ -929,12 +1051,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   ptsValueText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
   },
   ptsLabelText: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: 'rgba(255, 255, 255, 0.75)',
   },
@@ -945,40 +1067,41 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   cardChip: {
-    width: 28,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: '#F3C06B',
+    width: 32,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#F59E0B',
     position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#D97706',
   },
   chipLineHoriz: {
     position: 'absolute',
+    top: 11,
     left: 0,
-    right: 0,
-    top: 9,
+    width: '100%',
     height: 1,
-    backgroundColor: '#D97706',
+    backgroundColor: '#B45309',
   },
   chipLineVert: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
-    left: 13,
+    left: 15,
     width: 1,
-    backgroundColor: '#D97706',
+    height: '100%',
+    backgroundColor: '#B45309',
   },
   chipCenterPin: {
     position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 1,
-    backgroundColor: '#F3C06B',
+    top: 6,
+    left: 10,
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#FBBF24',
     borderWidth: 1,
-    borderColor: '#D97706',
-    top: 5,
-    left: 9,
+    borderColor: '#B45309',
   },
   cardProgressWrap: {
     height: 4,

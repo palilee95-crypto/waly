@@ -41,6 +41,8 @@ type LoyaltyCardItem = {
   stampColor?: string;
   fontColor?: string;
   cardBackground?: string;
+  cardBackgroundBack?: string;
+  validUntil?: string;
   tier?: string;
   merchantId?: string;
   linkedRewardId?: string;
@@ -53,6 +55,16 @@ const stampIcons = [
   { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
   { id: 'cake', family: 'MaterialIcons', name: 'cake' },
   { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
+  { id: 'tag', family: 'Ionicons', name: 'pricetag' },
+  { id: 'gift', family: 'Ionicons', name: 'gift' },
+  { id: 'beer', family: 'Ionicons', name: 'beer' },
+  { id: 'pizza', family: 'Ionicons', name: 'pizza' },
+  { id: 'card', family: 'Ionicons', name: 'card' },
+  { id: 'store', family: 'Ionicons', name: 'storefront' },
+  { id: 'car', family: 'Ionicons', name: 'car-sport' },
+  { id: 'icecream', family: 'Ionicons', name: 'ice-cream' },
+  { id: 'barbell', family: 'Ionicons', name: 'barbell' },
+  { id: 'scissors', family: 'Ionicons', name: 'scissors' },
   { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
   { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
 ];
@@ -181,6 +193,14 @@ export default function CustomerDashboard() {
           cardBackground: program?.card_background
             ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
             : undefined,
+          cardBackgroundBack: program?.card_background_back
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background_back}`
+            : undefined,
+          validUntil: (() => {
+            const expDate = new Date(rec.created);
+            expDate.setDate(expDate.getDate() + (program?.expiry_days || 30));
+            return `${String(expDate.getMonth() + 1).padStart(2, '0')}/${String(expDate.getFullYear()).slice(-2)}`;
+          })(),
         };
       });
 
@@ -762,24 +782,16 @@ export default function CustomerDashboard() {
 
 
                       <View style={styles.stackedCardContent}>
-                        {/* Realistic Gloss Reflection */}
-                        <View style={{
-                          position: 'absolute',
-                          top: -100,
-                          right: -100,
-                          width: 400,
-                          height: 400,
-                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                          transform: [{ rotate: '35deg' }],
-                          pointerEvents: 'none',
-                        }} />
+                        {/* Subtle metallic sheen */}
+                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+                        <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
                         
                         {/* Header: Shop Name & Logo */}
                         <View style={styles.cardInfoRow}>
                           <View style={styles.shopLogoBg}>
                             <Image source={{ uri: item.logo }} style={styles.shopLogo} />
                           </View>
-                          <View style={styles.shopTextColumn}>
+                          <View style={{ flex: 1, marginLeft: 0, gap: 2 }}>
                             <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
                               {item.merchantName}
                             </Text>
@@ -787,13 +799,11 @@ export default function CustomerDashboard() {
                               {item.category.toUpperCase()}
                             </Text>
                           </View>
-
-                          {/* Stamp progress display in header (instead of big block) */}
-                          <View style={styles.ptsColumn}>
-                            <Text style={[styles.ptsValueText, item.fontColor && { color: item.fontColor }]}>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
                               {item.collectedStamps}/{item.totalStamps}
                             </Text>
-                            <Text style={[styles.ptsLabelText, item.fontColor && { color: item.fontColor, opacity: 0.8 }]}>STAMPS</Text>
+                            <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
                           </View>
                         </View>
 
@@ -806,46 +816,47 @@ export default function CustomerDashboard() {
                           </View>
                           <Ionicons 
                             name="wifi" 
-                            size={16} 
-                            color="#E2E8F0" 
-                            style={{ opacity: 0.9 }} 
+                            size={22} 
+                            color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                            style={{ opacity: 0.45 }} 
                           />
                         </View>
 
 
-                        {/* Footer row: Holder Name, Expiration, CVV, and branded circles */}
+                        {/* Footer row: Holder Name, Expiration, CVV, and brand logo */}
                         <View style={styles.cardBottomRow}>
                           <View style={styles.holderBlock}>
-                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
                               CARD HOLDER
                             </Text>
-                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]} numberOfLines={1}>
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
                               {(user?.name || 'Ahmad Fazli').toUpperCase()}
                             </Text>
                           </View>
 
-                          <View style={styles.validBlock}>
-                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+                          <View style={{ width: 45 }}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
                               VALID
                             </Text>
-                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
-                              12/30
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
+                              {item.validUntil || '12/30'}
                             </Text>
                           </View>
 
-                          <View style={styles.cvvBlock}>
-                            <Text style={[styles.cardLabelText, { color: '#E2E8F0', opacity: 0.7 }]}>
+                          <View style={{ width: 35 }}>
+                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
                               CVV
                             </Text>
-                            <Text style={[styles.holderValueText, { color: '#E2E8F0' }]}>
+                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
                               888
                             </Text>
                           </View>
 
-                          {/* Mastercard-style overlapping circles */}
-                          <View style={styles.mastercardBadge}>
-                            <View style={[styles.badgeCircle, { backgroundColor: '#EF4444' }]} />
-                            <View style={[styles.badgeCircle, { backgroundColor: '#F59E0B', marginLeft: -9, opacity: 0.9 }]} />
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Image
+                              source={require('../../assets/risev logo.png')}
+                              style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: item.fontColor || '#FFFFFF' }}
+                            />
                           </View>
                         </View>
 
@@ -979,12 +990,14 @@ export default function CustomerDashboard() {
 
               <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
                 {/* 3D Flippable Loyalty Card & Hint */}
-                <View>
-                  <FlippableLoyaltyCard 
-                    card={selectedCard} 
-                    user={user} 
-                    autoFlipDelay={500}
-                  />
+                <View style={{ alignItems: 'center', width: '100%' }}>
+                  <View style={{ width: '100%', maxWidth: 360 }}>
+                    <FlippableLoyaltyCard 
+                      card={selectedCard} 
+                      user={user} 
+                      autoFlipDelay={500}
+                    />
+                  </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6, opacity: 0.8 }}>
                     <Ionicons name="swap-horizontal" size={14} color="#6B7280" />
                     <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>Tap card to flip</Text>
@@ -1519,7 +1532,8 @@ const styles = StyleSheet.create({
   },
   stackedCard: {
     borderRadius: 24,
-    height: 200,
+    aspectRatio: 1.586,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
@@ -1531,7 +1545,7 @@ const styles = StyleSheet.create({
   },
   stackedCardContent: {
     flex: 1,
-    padding: 18,
+    padding: 20,
     justifyContent: 'space-between',
     position: 'relative',
   },
@@ -1671,41 +1685,41 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardChip: {
-    width: 38,
-    height: 28,
+    width: 32,
+    height: 24,
     borderRadius: 6,
-    backgroundColor: '#EAB308',
-    borderWidth: 1.2,
-    borderColor: '#CA8A04',
+    backgroundColor: '#F59E0B',
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D97706',
   },
   chipLineHoriz: {
     position: 'absolute',
+    top: 11,
     left: 0,
-    right: 0,
-    top: 13,
+    width: '100%',
     height: 1,
-    backgroundColor: '#854D0E',
+    backgroundColor: '#B45309',
   },
   chipLineVert: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
-    left: 18,
+    left: 15,
     width: 1,
-    backgroundColor: '#854D0E',
+    height: '100%',
+    backgroundColor: '#B45309',
   },
   chipCenterPin: {
     position: 'absolute',
-    width: 10,
-    height: 8,
+    top: 6,
+    left: 10,
+    width: 12,
+    height: 12,
     borderRadius: 2,
-    backgroundColor: '#FACC15',
-    borderColor: '#854D0E',
+    backgroundColor: '#FBBF24',
     borderWidth: 1,
-    left: 13,
-    top: 9,
+    borderColor: '#B45309',
   },
   nfcIcon: {
     transform: [{ rotate: '90deg' }],

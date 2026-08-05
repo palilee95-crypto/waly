@@ -553,30 +553,38 @@ export default function CustomersScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Centered Dark Wave Background */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, backgroundColor: '#1A1400', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, zIndex: 0 }} />
+        {/* Standard Dark Background */}
+        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, backgroundColor: '#050505', zIndex: 0 }} />
 
-        {/* Top Centered Header Content */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', zIndex: 10, height: 140, paddingTop: 10 }}>
+        {/* Profile Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingTop: 16, marginBottom: 20, zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Image
+              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+              style={{ width: 44, height: 44, borderRadius: 22, borderColor: '#050505', borderWidth: 2 }}
+            />
+            <View style={{ justifyContent: 'center' }}>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>{t('welcome_back')}</Text>
+              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant?.name || 'Boutique Royal'}</Text>
+            </View>
+          </View>
+          
           <Image
-            source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
-            style={{ width: 56, height: 56, borderRadius: 28, borderColor: '#FFFFFF', borderWidth: 2, marginBottom: 8 }}
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
           />
-          <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>
-            {t('transaction_history')}
-          </Text>
         </View>
 
         {/* 💳 Replicated Transfer-style Stats Card */}
-        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -30, marginBottom: 8 }}>
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -30, marginBottom: 8 }}>
           {/* Row 1: Stamps Distributed */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 16 }}>
             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="ribbon-outline" size={20} color="#1A1400" />
+              <Ionicons name="ribbon-outline" size={20} color="#050505" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>{t('total_stamps_distributed')}</Text>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {loading ? '...' : totalStampsDistributed.toLocaleString()}
               </Text>
             </View>
@@ -592,11 +600,11 @@ export default function CustomersScreen() {
           {/* Row 2: Points Redeemed */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 16 }}>
             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="gift-outline" size={20} color="#1A1400" />
+              <Ionicons name="gift-outline" size={20} color="#050505" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>{t('points_redeemed')}</Text>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {loading ? '...' : Math.abs(totalPointsRedeemed).toLocaleString()}
               </Text>
             </View>
@@ -612,14 +620,14 @@ export default function CustomersScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#1A1400',
+            backgroundColor: '#050505',
             borderRadius: 20,
             paddingVertical: 16,
             paddingHorizontal: 20,
             marginBottom: 8,
             borderWidth: 1,
             borderColor: '#FFC700',
-            shadowColor: '#000000',
+            shadowColor: '#050505',
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.15,
             shadowRadius: 12,
@@ -641,8 +649,8 @@ export default function CustomersScreen() {
         </TouchableOpacity>
 
         {/* 📊 Weekly Activity Bar Chart */}
-        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, marginBottom: 8 }}>
-          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginBottom: 16 }}>
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, marginBottom: 8 }}>
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 16 }}>
             Weekly stamps distributed
           </Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, paddingBottom: 8 }}>
@@ -652,9 +660,9 @@ export default function CustomersScreen() {
                   {item.value}
                 </Text>
                 <View style={{ width: 16, height: 60, backgroundColor: '#F1F5F9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#1A1400', borderRadius: 8 }} />
+                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#050505', borderRadius: 8 }} />
                 </View>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#1A1400' : '#94A3B8', marginTop: 6 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8', marginTop: 6 }}>
                   {item.day}
                 </Text>
               </View>
@@ -664,7 +672,7 @@ export default function CustomersScreen() {
 
         {/* 👥 Replicated "Last Transfer" Horizontal Row (Recent Active Members) */}
         <View style={{ marginVertical: 8 }}>
-          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginBottom: 12 }}>
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 12 }}>
             Recent active members
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
@@ -679,10 +687,10 @@ export default function CustomersScreen() {
                   <Image source={{ uri: cust.avatar }} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 6 }} />
                 ) : (
                   <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: cust.bgCircleColor || '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{cust.initials}</Text>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{cust.initials}</Text>
                   </View>
                 )}
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400', textAlign: 'center' }} numberOfLines={1}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#050505', textAlign: 'center' }} numberOfLines={1}>
                   {cust.name ? cust.name.split(' ')[0] : 'Member'}
                 </Text>
               </TouchableOpacity>
@@ -699,7 +707,7 @@ export default function CustomersScreen() {
         {idleCustomers.length > 0 && (
           <View style={{ marginVertical: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {"Inactive customers (>30 days)"}
               </Text>
               <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
@@ -713,17 +721,17 @@ export default function CustomersScreen() {
                 <TouchableOpacity
                   key={cust.customerId}
                   onPress={() => openCustomerDetails(cust as any)}
-                  style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, width: 140, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, alignItems: 'center' }}
+                  style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, width: 140, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, alignItems: 'center' }}
                   activeOpacity={0.8}
                 >
                   {cust.avatar ? (
                     <Image source={{ uri: cust.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} />
                   ) : (
                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: cust.bgCircleColor || '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{cust.initials}</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{cust.initials}</Text>
                     </View>
                   )}
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', textAlign: 'center' }} numberOfLines={1}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', textAlign: 'center' }} numberOfLines={1}>
                     {cust.name}
                   </Text>
                   <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444', marginTop: 4 }}>
@@ -742,11 +750,11 @@ export default function CustomersScreen() {
             {(['All', 'Purchase', 'Redemption', 'Adjustment'] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
-                style={{ paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: activeTab === tab ? '#1A1400' : 'transparent' }}
+                style={{ paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: activeTab === tab ? '#050505' : 'transparent' }}
                 onPress={() => setActiveTab(tab)}
                 activeOpacity={0.8}
               >
-                <Text style={{ fontSize: 13, fontFamily: activeTab === tab ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold', color: activeTab === tab ? '#1A1400' : '#94A3B8' }}>
+                <Text style={{ fontSize: 13, fontFamily: activeTab === tab ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold', color: activeTab === tab ? '#050505' : '#94A3B8' }}>
                   {t(tab.toLowerCase())}
                 </Text>
               </TouchableOpacity>
@@ -766,25 +774,25 @@ export default function CustomersScreen() {
               <Ionicons name="search-outline" size={18} color="#BEC6E0" />
             </View>
             <TouchableOpacity 
-              style={[styles.filterBtn, dateFilter !== 'All' && { backgroundColor: '#1A1400', borderColor: '#1A1400' }, { borderRadius: 24 }]} 
+              style={[styles.filterBtn, dateFilter !== 'All' && { backgroundColor: '#050505', borderColor: '#050505' }, { borderRadius: 24 }]} 
               onPress={() => setDateModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="calendar-outline" size={20} color={dateFilter !== 'All' ? '#FFFFFF' : '#1A1400'} />
+              <Ionicons name="calendar-outline" size={20} color={dateFilter !== 'All' ? '#FFFFFF' : '#050505'} />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.filterBtn, sortBy !== 'newest' && { backgroundColor: '#1A1400', borderColor: '#1A1400' }, { borderRadius: 24 }]} 
+              style={[styles.filterBtn, sortBy !== 'newest' && { backgroundColor: '#050505', borderColor: '#050505' }, { borderRadius: 24 }]} 
               onPress={() => setOptionsModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="options-outline" size={20} color={sortBy !== 'newest' ? '#FFFFFF' : '#1A1400'} />
+              <Ionicons name="options-outline" size={20} color={sortBy !== 'newest' ? '#FFFFFF' : '#050505'} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.filterBtn, { borderRadius: 24 }]} 
               onPress={() => setExportModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="download-outline" size={20} color="#1A1400" />
+              <Ionicons name="download-outline" size={20} color="#050505" />
             </TouchableOpacity>
           </View>
         </View>
@@ -890,7 +898,7 @@ export default function CustomersScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('customer_profile')}</Text>
               <TouchableOpacity onPress={closeCustomerModal} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
+                <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
             </View>
 
@@ -911,7 +919,7 @@ export default function CustomersScreen() {
                 </View>
 
                 {loadingDetails ? (
-                  <ActivityIndicator size="large" color="#000000" style={{ marginVertical: 40 }} />
+                  <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
                 ) : (
                   <View style={styles.detailsBody}>
                     {/* Selected Transaction Detail Receipt */}
@@ -1063,7 +1071,7 @@ export default function CustomersScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('filter_by_date')}</Text>
               <TouchableOpacity onPress={() => setDateModalVisible(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
+                <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
             </View>
 
@@ -1096,7 +1104,7 @@ export default function CustomersScreen() {
                     {opt.label}
                   </Text>
                   {dateFilter === opt.value && (
-                    <Ionicons name="checkmark" size={18} color="#000000" />
+                    <Ionicons name="checkmark" size={18} color="#050505" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -1117,7 +1125,7 @@ export default function CustomersScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('sort_preferences')}</Text>
               <TouchableOpacity onPress={() => setOptionsModalVisible(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
+                <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
             </View>
 
@@ -1148,7 +1156,7 @@ export default function CustomersScreen() {
                     {opt.label}
                   </Text>
                   {sortBy === opt.value && (
-                    <Ionicons name="checkmark" size={18} color="#000000" />
+                    <Ionicons name="checkmark" size={18} color="#050505" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -1170,7 +1178,7 @@ export default function CustomersScreen() {
               <Text style={styles.modalTitle}>{t('export_data_csv')}</Text>
               {!isExporting && (
                 <TouchableOpacity onPress={() => setExportModalVisible(false)} style={styles.closeBtn}>
-                  <Feather name="x" size={20} color="#000000" />
+                  <Feather name="x" size={20} color="#050505" />
                 </TouchableOpacity>
               )}
             </View>
@@ -1292,7 +1300,7 @@ const styles = StyleSheet.create({
   },
   blueCard: {
     backgroundColor: '#FFC700', // RISEV Yellow
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 16,
@@ -1307,7 +1315,7 @@ const styles = StyleSheet.create({
   metricValueBlue: {
     fontSize: 32,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#1A1400',
+    color: '#050505',
     letterSpacing: -0.5,
   },
   trendRow: {
@@ -1318,11 +1326,11 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1A1400',
+    color: '#050505',
   },
   greyCard: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -1337,7 +1345,7 @@ const styles = StyleSheet.create({
   metricValueGrey: {
     fontSize: 32,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
     letterSpacing: -0.5,
   },
   subtextGrey: {
@@ -1347,7 +1355,7 @@ const styles = StyleSheet.create({
   },
   lightCard: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -1362,7 +1370,7 @@ const styles = StyleSheet.create({
   metricValueLight: {
     fontSize: 32,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
     letterSpacing: -0.5,
   },
   avatarsRow: {
@@ -1394,7 +1402,7 @@ const styles = StyleSheet.create({
   stackInitialsText: {
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
   },
   emptyStack: {
     flexDirection: 'row',
@@ -1432,7 +1440,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   tabBtnActive: {
-    backgroundColor: '#000000', // Black tab selector active
+    backgroundColor: '#050505', // Black tab selector active
   },
   tabText: {
     fontSize: 12,
@@ -1515,7 +1523,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#000000',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -1544,7 +1552,7 @@ const styles = StyleSheet.create({
   initialsText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black text
+    color: '#050505', // Black text
   },
   customerNameText: {
     fontSize: 13,
@@ -1580,7 +1588,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   textPurchase: {
-    color: '#000000', // Black text
+    color: '#050505', // Black text
   },
   textRedeem: {
     color: '#64748B', // Slate text
@@ -1662,7 +1670,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   closeBtn: {
     padding: 4,
@@ -1695,12 +1703,12 @@ const styles = StyleSheet.create({
   detailInitialsText: {
     fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   detailNameText: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   detailPhoneText: {
     fontSize: 13,
@@ -1745,7 +1753,7 @@ const styles = StyleSheet.create({
   progValue: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#050505',
   },
   progressBarBg: {
     height: 8,
@@ -1755,7 +1763,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     borderRadius: 4,
   },
   progFooter: {
@@ -1814,7 +1822,7 @@ const styles = StyleSheet.create({
   voucherName: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
+    color: '#050505',
     maxWidth: 160,
   },
   voucherCode: {
@@ -1894,7 +1902,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   filterOptionTextActive: {
-    color: '#000000',
+    color: '#050505',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   // Receipt Card Styles
