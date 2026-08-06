@@ -1057,6 +1057,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="profile" />
         <Tabs.Screen name="staff" options={{ href: null }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />
+        <Tabs.Screen name="subscription" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
     </View>

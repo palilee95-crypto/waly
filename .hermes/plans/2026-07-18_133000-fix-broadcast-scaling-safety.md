@@ -35,7 +35,7 @@
 **Objective:** Create a reusable pagination helper inside the blast route file so all `findRecordsByFilter` calls can fetch unlimited records.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js` (top of file, after the comment header)
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js` (top of file, after the comment header)
 
 **Step 1: Add the helper function**
 
@@ -70,7 +70,7 @@ Expected: no `failed to execute` lines. The helper is defined but not yet called
 **Step 3: Commit**
 
 ```bash
-cd "C:\Users\User\Documents\Work\WALY MOBILE\web-app"
+cd "C:\Users\User\Documents\Work\RISEV MOBILE\web-app"
 git add pb_hooks/blast_message.pb.js
 git commit -m "feat(blast): add fetchAllRecords pagination helper"
 ```
@@ -82,7 +82,7 @@ git commit -m "feat(blast): add fetchAllRecords pagination helper"
 **Objective:** Use `fetchAllRecords` for the two capped queries in the blast route.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js:177` and `:202`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js:177` and `:202`
 
 **Step 1: Replace the loyalty_cards query (line 177)**
 
@@ -130,7 +130,7 @@ git commit -m "fix(blast): remove 1000-record cap on recipient queries"
 **Objective:** Skip customers who received a campaign notification from this merchant in the last 24 hours.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js` (inside the `POST /api/risev/merchant/blast` handler, after the recipient collection loop and before the send loop)
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js` (inside the `POST /api/risev/merchant/blast` handler, after the recipient collection loop and before the send loop)
 
 **Step 1: Build the `recentlyNotifiedIds` Set**
 
@@ -200,7 +200,7 @@ git commit -m "feat(blast): add 24h anti-spam cooldown for manual broadcasts"
 **Objective:** Apply the same pagination fix to the automation runner.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\automation_logic.js:51`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\automation_logic.js:51`
 
 **Step 1: Add the same helper at the top of the file**
 
@@ -256,9 +256,9 @@ git commit -m "fix(automation): remove 1000-record cap on inactive card query"
 **Objective:** Avoid duplicating the helper across two files. Move it to `whatsapp_helper.js` (already required by both files) and import it.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\whatsapp_helper.js` (add export)
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js` (remove local def, import)
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\automation_logic.js` (remove local def, import)
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\whatsapp_helper.js` (add export)
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js` (remove local def, import)
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\automation_logic.js` (remove local def, import)
 
 **Step 1: Add `fetchAllRecords` to `whatsapp_helper.js`**
 
@@ -374,9 +374,9 @@ ssh root@166.88.35.57 "docker logs --since 5m risev-pocketbase | grep -i 'blast\
 # Run via execute_code before each SCP
 from hermes_tools import read_file
 files = [
-    r"C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js",
-    r"C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\automation_logic.js",
-    r"C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\whatsapp_helper.js",
+    r"C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js",
+    r"C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\automation_logic.js",
+    r"C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\whatsapp_helper.js",
 ]
 for f in files:
     content = read_file(f)["content"]
@@ -405,10 +405,10 @@ After each task, SCP the changed file(s) to the VPS:
 
 ```bash
 # Single file
-scp "C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js" root@166.88.35.57:/opt/risev/pb_hooks/blast_message.pb.js
+scp "C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js" root@166.88.35.57:/opt/risev/pb_hooks/blast_message.pb.js
 
 # Multiple files (Task 5)
-scp "C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\whatsapp_helper.js" "C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\blast_message.pb.js" "C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\automation_logic.js" root@166.88.35.57:/opt/risev/pb_hooks/
+scp "C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\whatsapp_helper.js" "C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\blast_message.pb.js" "C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\automation_logic.js" root@166.88.35.57:/opt/risev/pb_hooks/
 ```
 
 PocketBase hot-reloads hooks on file change — no restart needed.

@@ -1,7 +1,7 @@
 const https = require('https');
 
 const pbUrl = 'https://api.166.88.35.57.sslip.io';
-const adminEmail = 'admin@walyapp.com';
+const adminEmail = 'admin@risevapp.com';
 const adminPassword = 'Fadhly0603#';
 
 function request(method, path, headers = {}, body = null) {

@@ -3941,7 +3941,7 @@ migrate((app) => {
           "type": "bool"
         }
       ],
-      "id": "pbc_subscr_waly",
+      "id": "pbc_subscr_risev",
       "indexes": [
         "CREATE UNIQUE INDEX idx_sub_chipin ON subscriptions (chipin_payment_id) WHERE chipin_payment_id != ''"
       ],

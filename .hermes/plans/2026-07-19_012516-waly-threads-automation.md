@@ -1,8 +1,8 @@
-# WALY Mobile — Threads.com Marketing + Copywriting-Study Automation Plan
+# RISEV Mobile — Threads.com Marketing + Copywriting-Study Automation Plan
 
 > **For Hermes:** Use `cronjob` to schedule recurring jobs, `delegate_task` for research/synthesis, `memory` to persist the house style guide, and `skill_manage` if a reusable copywriting workflow emerges. **Do not implement yet — this is planning only.** Confirm with the user before building.
 
-**Goal:** Stand up two recurring automations for WALY Mobile (Risev) that (1) publish marketing content to Threads.com on a fixed cadence and (2) continuously study copywriting frameworks + competitor swipe files to match our B2B-loyalty-SaaS-for-merchants business model — producing a living "house style guide" that every Threads post is generated from.
+**Goal:** Stand up two recurring automations for RISEV Mobile (Risev) that (1) publish marketing content to Threads.com on a fixed cadence and (2) continuously study copywriting frameworks + competitor swipe files to match our B2B-loyalty-SaaS-for-merchants business model — producing a living "house style guide" that every Threads post is generated from.
 
 **Business context (from `AGENTS.md`):**
 - **Product:** Risev — customer-loyalty / WhatsApp-marketing SaaS for merchants.
@@ -10,7 +10,7 @@
 - **Buyer:** Small/medium Malaysian merchants (cafés, salons, retail) who want repeat customers via stamp cards, vouchers, points, tiers, and WhatsApp broadcasts.
 - **Differentiators:** All-in-one (loyalty + WhatsApp marketing + rewards), WhatsApp-native (Evolution Go), Pro plan with 7-day trial, dual-role (customer + merchant) app.
 - **Current marketing:** None. Cold start.
-- **Repo:** `C:\Users\User\Documents\Work\WALY MOBILE\web-app` (Expo + PocketBase + Evolution Go). Backend already has a daily-cron pattern (`pb_hooks/automation_runner.pb.js`) and a WhatsApp broadcast system — useful precedent for cadence + anti-spam, but **this plan is for outbound social marketing on Threads, not in-app messaging.**
+- **Repo:** `C:\Users\User\Documents\Work\RISEV MOBILE\web-app` (Expo + PocketBase + Evolution Go). Backend already has a daily-cron pattern (`pb_hooks/automation_runner.pb.js`) and a WhatsApp broadcast system — useful precedent for cadence + anti-spam, but **this plan is for outbound social marketing on Threads, not in-app messaging.**
 
 **Tech stack for the automations:**
 - **Hermes `cronjob`** — schedules both jobs.
@@ -37,7 +37,7 @@ Daily, studies copywriting and produces/updates the house style guide:
 
 - Monitors a rotating set of swipe sources: competitor Threads accounts (other loyalty/CRM/SaaS-for-SMB brands), classic copywriting frameworks (AIDA, PAS, BAB, 4Ps, FAB, Schwartz's "Awareness Stages"), and Malaysian SMB marketing angles.
 - Extracts patterns (hook structures, CTA phrasing, length, tone, hashtag use).
-- Updates `memory` entries: `waly_threads_house_style`, `waly_swipe_index`, `waly_content_pillars`, `waly_post_templates`.
+- Updates `memory` entries: `risev_threads_house_style`, `risev_swipe_index`, `risev_content_pillars`, `risev_post_templates`.
 - Flags swipe-worthy posts into a swipe file under `web-app/.hermes/marketing/swipe/`.
 
 The two streams are **chained**: Stream B (study) runs first and refreshes the style guide; Stream A (publish) reads the style guide to draft the day's post. Use `cronjob` `context_from` to feed Stream B's latest output into Stream A.
@@ -83,13 +83,13 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 - Confirm: required account type (professional), auth flow (OAuth 2 + Facebook Page link), publishing endpoint (`POST /v1.0/me/threads` or similar), rate limits, media support, char limit (500).
 - **Output:** a short findings note saved to `web-app/.hermes/marketing/threads_api_research.md`.
 
-#### Task 0.2: Confirm WALY has / can create a Threads professional account
-- Ask user: does WALY Mobile already have a Threads account linked to its Facebook Page, or do we need to create one?
+#### Task 0.2: Confirm RISEV has / can create a Threads professional account
+- Ask user: does RISEV Mobile already have a Threads account linked to its Facebook Page, or do we need to create one?
 - If creating: document the manual steps (account creation, link to FB Page, switch to professional, get API access in Meta App Dashboard).
 - **Output:** `web-app/.hermes/marketing/threads_account_setup.md`.
 
 #### Task 0.3: Store credentials safely
-- Once we have a long-lived access token + Threads user ID, store in Hermes via `hermes config` or a `.env`-style secret **outside the repo** (consistent with WALY's `.env` policy in `AGENTS.md` — "Never commit the real `.env`").
+- Once we have a long-lived access token + Threads user ID, store in Hermes via `hermes config` or a `.env`-style secret **outside the repo** (consistent with RISEV's `.env` policy in `AGENTS.md` — "Never commit the real `.env`").
 - **Output:** token stored; never written to the workspace.
 
 **Gate:** Do not proceed to Phase 1 until Task 0.1 confirms a usable publishing API. If Threads API is still gated/limited, fall back to **draft-and-schedule via Hermes delivery + manual paste** until access opens.
@@ -98,7 +98,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 
 ### Phase 1 — Build the house style guide (one-time, then maintained by Stream B)
 
-**Objective:** A concrete, living document that defines WALY's Threads voice, post structures, and content pillars — every generated post references it.
+**Objective:** A concrete, living document that defines RISEV's Threads voice, post structures, and content pillars — every generated post references it.
 
 **Files:**
 - Create: `web-app/.hermes/marketing/house_style.md`
@@ -127,7 +127,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 - **Output:** Section 3 of `house_style.md` with copy-pasteable templates.
 
 #### Task 1.4: Save the guide to memory
-- Use `memory` with `target='memory'` to persist a compact version (`waly_threads_house_style`) that survives across sessions. Full detail stays in the markdown file; memory holds the pointer + key rules.
+- Use `memory` with `target='memory'` to persist a compact version (`risev_threads_house_style`) that survives across sessions. Full detail stays in the markdown file; memory holds the pointer + key rules.
 - **Output:** memory entry created.
 
 ---
@@ -146,13 +146,13 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
   1. `web_search` for the day's competitor + framework.
   2. Extract 3–5 patterns (hook structure, length, CTA phrasing, hashtag usage).
   3. Save any exceptional post to `web-app/.hermes/marketing/swipe/YYYY-MM-DD-<source>.md`.
-  4. `memory` — update `waly_swipe_index` (append new entries) and `waly_threads_house_style` if a clear improvement is found.
+  4. `memory` — update `risev_swipe_index` (append new entries) and `risev_threads_house_style` if a clear improvement is found.
   5. Output: a 5-line "today's brief" naming the angle + pillar for Stream A.
 - **Output:** the prompt text (saved in this plan, then embedded in the cronjob `prompt` field).
 
 #### Task 2.2: Create the cronjob
 - `cronjob action='create'`
-  - `name`: `waly-copywriting-study`
+  - `name`: `risev-copywriting-study`
   - `schedule`: `0 7 * * *` (07:00 MYT daily — Asia/Kuala_Lumpur; if Hermes cron is UTC, use `23 * * * *` = 07:00 MYT = 23:00 UTC previous day; verify in Q3).
   - `prompt`: <the self-contained prompt from Task 2.1>
   - `skills`: `[]` (no skill needed; uses web tools natively)
@@ -169,7 +169,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 #### Task 3.1: Define the publishing prompt
 - Self-contained. Reads style guide from `memory` and today's brief from Stream B (`context_from: [job_id_b]`).
 - Steps in the prompt:
-  1. Load `waly_threads_house_style` and `waly_post_templates` from memory.
+  1. Load `risev_threads_house_style` and `risev_post_templates` from memory.
   2. Read today's brief (Stream B output) for angle + pillar.
   3. Draft a post using the matching template. ~150–280 chars. One hook line, one value/scenario line, one soft CTA. Optional BM variant as a second post in a thread reply.
   4. **If in approval mode (first 2 weeks):** deliver draft to chat via `deliver='origin'` and STOP. Wait for user to approve/edit; on approval, the user pastes into Threads (or replies "post it" and a follow-up cron/action publishes).
@@ -178,7 +178,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 
 #### Task 3.2: Create the cronjob
 - `cronjob action='create'`
-  - `name`: `waly-threads-publish`
+  - `name`: `risev-threads-publish`
   - `schedule`: `30 4,11 * * *` (12:30 MYT and 19:30 MYT, assuming UTC cron → 04:30 UTC and 11:30 UTC; verify in Q3).
   - `prompt`: <the self-contained prompt from Task 3.1>
   - `context_from`: `[<job_id_b>]` — chains Stream B → Stream A.
@@ -196,7 +196,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 ### Phase 4 — Safety, review, and iteration
 
 #### Task 4.1: Weekly review digest (cron job)
-- A third `cronjob` `waly-weekly-marketing-review` running every Sunday 20:00 MYT.
+- A third `cronjob` `risev-weekly-marketing-review` running every Sunday 20:00 MYT.
 - Reads `web-app/.hermes/marketing/published.md`, summarizes what was posted, flags any drafts that were rejected/edited (in approval mode), surfaces swipe-file highlights from the week.
 - `deliver: 'origin'` — chatted to the user.
 
@@ -212,7 +212,7 @@ The two streams are **chained**: Stream B (study) runs first and refreshes the s
 
 ```
 web-app/.hermes/
-  plans/2026-07-19_012516-waly-threads-automation.md   (this file)
+  plans/2026-07-19_012516-risev-threads-automation.md   (this file)
   marketing/
     README.md                  # job IDs, how to pause, how to swap tokens
     threads_api_research.md    # Phase 0 output
@@ -225,10 +225,10 @@ web-app/.hermes/
 ```
 
 Memory entries (created via `memory` tool, target='memory'):
-- `waly_threads_house_style` — compact rules + template pointers
-- `waly_swipe_index` — append-only list of saved swipe posts
-- `waly_content_pillars` — the 5 pillars + rotation
-- `waly_post_templates` — the 6 reusable templates
+- `risev_threads_house_style` — compact rules + template pointers
+- `risev_swipe_index` — append-only list of saved swipe posts
+- `risev_content_pillars` — the 5 pillars + rotation
+- `risev_post_templates` — the 6 reusable templates
 
 ---
 
@@ -238,7 +238,7 @@ Memory entries (created via `memory` tool, target='memory'):
 - **Threads API availability**: Meta's Threads API is newer and access has been gated. If we can't get a publishing token, the entire auto-publish path is blocked. **Mitigation:** Phase 0 first; fall back to "draft in chat → user pastes manually" — still useful, just less automated.
 - **Brand voice drift**: An LLM writing daily without supervision can drift toward generic SaaS-speak. **Mitigation:** approval mode for 2 weeks; house style guide with concrete do/don'ts; weekly review digest.
 - **Cron timing/timezone**: Hermes cron schedule syntax is UTC by default. MYT = UTC+8, no DST. Easy to get off-by-one. **Mitigation:** verify in Q3; document the UTC↔MYT mapping in `marketing/README.md`.
-- **Token leakage**: Threads access token in the repo would be a real secret leak. **Mitigation:** env var outside repo, consistent with WALY's existing `.env` policy.
+- **Token leakage**: Threads access token in the repo would be a real secret leak. **Mitigation:** env var outside repo, consistent with RISEV's existing `.env` policy.
 - **Repetitive content**: 5 pillars × 2 posts/day can repeat quickly. **Mitigation:** Stream B feeds a fresh angle daily; weekly review surfaces repetition; rotate pillar-to-weekday mapping monthly.
 - **Bahasa Malaysia quality**: Generated BM may sound stilted to native speakers. **Mitigation:** BM as optional second post (not required), human review in approval mode.
 
@@ -251,7 +251,7 @@ Memory entries (created via `memory` tool, target='memory'):
 - **Q1:** Confirm Threads API is still publishing-enabled in 2026 and acceptable for a business account — Phase 0 will answer this; do you want me to run Phase 0 research now (read-only) or wait for full go-ahead?
 - **Q2:** Which 5–10 competitor / inspiration Threads accounts should Stream B study? (Suggest: loyalty/CRM SaaS brands + Malaysian SMB marketing accounts — please name any you admire.)
 - **Q3:** Is the Hermes cron schedule UTC or local? (I'll verify with `cronjob action='list'` + docs before creating jobs; if UTC, all times above are pre-converted.)
-- **Q4:** Do you already have a Threads account for WALY Mobile linked to a Facebook Page, or should the plan include account-creation steps?
+- **Q4:** Do you already have a Threads account for RISEV Mobile linked to a Facebook Page, or should the plan include account-creation steps?
 - **Q5:** Language mix — English-only Threads posts, or bilingual EN + BM (with BM as a thread reply / separate post)? Your call.
 - **Q6:** Approval mode for 2 weeks first, or auto-publish from day one? (Strong recommendation: approval mode.)
 - **Q7:** Any topics/claims to avoid on Threads (e.g., don't promise specific ROI numbers, don't name competitors, halal/alcohol-sensitive examples for Malaysian audience)?
@@ -262,8 +262,8 @@ Memory entries (created via `memory` tool, target='memory'):
 
 - **Phase 0 done:** `threads_api_research.md` exists and clearly says "publishable" or "blocked — fallback to manual paste."
 - **Phase 1 done:** `house_style.md` has all 3 sections; `memory` shows the 4 entries.
-- **Stream B live:** `cronjob action='list'` shows `waly-copywriting-study` enabled; after first run, `swipe/` has at least 1 file and `waly_swipe_index` memory entry grew.
-- **Stream A live:** `cronjob action='list'` shows `waly-threads-publish`; in approval mode, drafts arrive in chat at scheduled times; in auto mode, `published.md` accumulates posts.
+- **Stream B live:** `cronjob action='list'` shows `risev-copywriting-study` enabled; after first run, `swipe/` has at least 1 file and `risev_swipe_index` memory entry grew.
+- **Stream A live:** `cronjob action='list'` shows `risev-threads-publish`; in approval mode, drafts arrive in chat at scheduled times; in auto mode, `published.md` accumulates posts.
 - **Weekly review:** Sunday 20:00 MYT, a digest arrives in chat.
 
 ---

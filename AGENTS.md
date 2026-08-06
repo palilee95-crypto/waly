@@ -1,4 +1,4 @@
-# AGENTS.md — Risev (WALY Mobile) Project Guide
+# AGENTS.md — Risev (RISEV Mobile) Project Guide
 
 > Read this FIRST before working on this codebase. It contains hard-won
 > operational knowledge, architecture facts, and pitfalls that are NOT
@@ -56,7 +56,7 @@ This project has MCP (Model Context Protocol) servers configured so AI agents ca
 
 ### PocketBase MCP (`ssakone/pb_mcp_server`)
 - **Config location**: `opencode.jsonc` in the project root (gitignored — never committed).
-- **Server**: `ssakone/pb_mcp_server` (63⭐) — cloned to `C:\Users\User\Documents\Work\WALY MOBILE\pb_mcp_server`, built with `npm run build`.
+- **Server**: `ssakone/pb_mcp_server` (63⭐) — cloned to `C:\Users\User\Documents\Work\RISEV MOBILE\pb_mcp_server`, built with `npm run build`.
 - **Auth**: Auto-authenticates at startup via `.env` in the `pb_mcp_server` directory (admin email + password). Falls back to manual `pocketbase_authenticate_admin` if needed.
 - **Endpoint**: `https://api.166.88.35.57.sslip.io` (PocketBase admin UI at `/_/`).
 - **Available tools** (prefixed with `pocketbase_`):
@@ -93,17 +93,17 @@ If you ever re-add a pooler, do NOT put evolution-go behind it.
 
 ### Database layout (PostgreSQL cluster — `risev-evolution-db`)
 
-- **Cluster superuser**: `waly_db_admin` (NOT `postgres` — that role does NOT exist on this cluster).
+- **Cluster superuser**: `risev_db_admin` (NOT `postgres` — that role does NOT exist on this cluster).
 - **`evogo_auth`** (18 tables): `whatsmeow_*` WhatsApp session/crypto store + `whatsmeow_version` + `poll_votes`. "auth" = WhatsApp auth/session. This is correct by design, NOT swapped.
 - **`evogo_users`** (4 tables): `instances`, `labels`, `messages`, `runtime_configs`. Evolution Go instance management. No gorm `version` table here (by design).
 - **`evolution`**: created by `POSTGRES_DB`, largely unused by evolution-go.
-- **`evolution_db_init/init.sql`** only runs on an EMPTY data dir (first-ever start). For existing clusters, the `evogo_*` DBs must be created manually with `psql -U waly_db_admin`.
+- **`evolution_db_init/init.sql`** only runs on an EMPTY data dir (first-ever start). For existing clusters, the `evogo_*` DBs must be created manually with `psql -U risev_db_admin`.
 
 ### DB credentials
 
 - Real values live in `/opt/risev/.env` on the VPS:
-  - `EVOLUTION_DB_USER=waly_db_admin`
-  - `EVOLUTION_DB_PASSWORD=db_pg_waly_7a8f9e0c1b2a3d4e5f6a7b8c9d0e1f2a3b`
+  - `EVOLUTION_DB_USER=risev_db_admin`
+  - `EVOLUTION_DB_PASSWORD=db_pg_risev_7a8f9e0c1b2a3d4e5f6a7b8c9d0e1f2a3b`
   - `EVOLUTION_DB_NAME=evolution`
 - `.env.example` was corrected to match (was misleadingly `postgres` before).
 
@@ -320,10 +320,10 @@ docker logs -f risev-pocketbase        # Backend
 docker logs --since 5m risev-evolution-db | grep -E "bind message|unnamed prepared|driver: bad"
 # (the above should return NOTHING if the stack is healthy)
 
-# DB inspection (use waly_db_admin, NEVER postgres)
-docker exec -it risev-evolution-db psql -U waly_db_admin -l
-docker exec -it risev-evolution-db psql -U waly_db_admin -d evogo_users -c "\dt"
-docker exec -it risev-evolution-db psql -U waly_db_admin -d evogo_auth -c "\dt"
+# DB inspection (use risev_db_admin, NEVER postgres)
+docker exec -it risev-evolution-db psql -U risev_db_admin -l
+docker exec -it risev-evolution-db psql -U risev_db_admin -d evogo_users -c "\dt"
+docker exec -it risev-evolution-db psql -U risev_db_admin -d evogo_auth -c "\dt"
 
 # Apply compose changes + clean up removed services
 docker compose up -d --remove-orphans
@@ -337,10 +337,10 @@ docker exec risev-evolution-go env | grep POSTGRES
 
 ## Known Pitfalls
 
-1. **Never use `-U postgres`** on `risev-evolution-db` — the role doesn't exist. Use `-U waly_db_admin`.
+1. **Never use `-U postgres`** on `risev-evolution-db` — the role doesn't exist. Use `-U risev_db_admin`.
 2. **Never route evolution-go through PgBouncer** — prepared-statement desync breaks it (see above).
 3. **`init.sql` only runs on empty data dir** — for existing clusters, create `evogo_auth`/`evogo_users` manually.
-4. **`.env.example` user is `waly_db_admin`** (corrected 2026-07-17). If you see `postgres` there, it's been reverted — fix it.
+4. **`.env.example` user is `risev_db_admin`** (corrected 2026-07-17). If you see `postgres` there, it's been reverted — fix it.
 5. **QR polling must stay backoff-capped** — a tight 3s loop spawns dozens of websocket clients in evolution-go and exhausts resources.
 6. **`docker-compose.yml` `version` key is obsolete** — the WARN on `docker compose up` is harmless, but you can remove `version: '3.8'` to silence it.
 7. **PocketBase hooks hot-reload** — don't restart the container for hook-only changes; just SCP the file.
@@ -363,4 +363,4 @@ docker exec risev-evolution-go env | grep POSTGRES
 - `app/(merchant)/profile.tsx` — WhatsApp QR modal + backoff polling.
 - `lib/pocketbase.ts` — PocketBase client singleton.
 - `context/AuthContext.tsx` / `context/LanguageContext.tsx` — auth + i18n (en/ms).
-- `.env.example` — env var reference (DB user is waly_db_admin).
+- `.env.example` — env var reference (DB user is risev_db_admin).

@@ -75,7 +75,7 @@ Merchant enters phone + bill amount in main form
 **Objective:** Make the auto-generated email unique even if the same phone number is used twice (due to formatting differences or re-creation attempts).
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\app\(merchant)\give.tsx:264`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\app\(merchant)\give.tsx:264`
 
 **Step 1: Change the email generation**
 
@@ -103,7 +103,7 @@ const emailVal = `user_${cleanNum}_${randomSuffix}@risev.app`;
 **Step 3: Commit**
 
 ```bash
-cd "C:\Users\User\Documents\Work\WALY MOBILE\web-app"
+cd "C:\Users\User\Documents\Work\RISEV MOBILE\web-app"
 git add app/\(merchant\)/give.tsx
 git commit -m "fix(give): use UUID suffix in auto-generated email to prevent collision"
 ```
@@ -115,7 +115,7 @@ git commit -m "fix(give): use UUID suffix in auto-generated email to prevent col
 **Objective:** Stop resetting `billSubtotal` to `''` when transitioning from the create-customer modal to the scan-award modal. Instead, preserve the value the merchant already entered.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\app\(merchant)\give.tsx:284`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\app\(merchant)\give.tsx:284`
 
 **Step 1: Stop clearing `billSubtotal` in `handleCreateAndIssue()`**
 
@@ -179,7 +179,7 @@ git commit -m "fix(give): preserve bill subtotal across modal transitions"
 **Objective:** Ensure the phone number used in the email is always normalized, so the same customer always gets the same base email (with the UUID suffix as a tiebreaker).
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\app\(merchant)\give.tsx:263`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\app\(merchant)\give.tsx:263`
 
 **Step 1: Normalize the phone before generating the email**
 
@@ -222,7 +222,7 @@ git commit -m "fix(give): normalize phone before generating auto email"
 **Objective:** If the email collision still happens (edge case: exact same email already exists), fall back to looking up the user by phone number and proceeding with the stamp issuance instead of failing.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\app\(merchant)\give.tsx:267-290`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\app\(merchant)\give.tsx:267-290`
 
 **Step 1: Wrap the user creation in a try-catch with fallback**
 
@@ -326,7 +326,7 @@ git commit -m "fix(give): fallback to phone lookup if user creation fails"
 
 ### TypeScript check
 ```bash
-cd "C:\Users\User\Documents\Work\WALY MOBILE\web-app"
+cd "C:\Users\User\Documents\Work\RISEV MOBILE\web-app"
 npx tsc --noEmit
 ```
 Expected: no errors (we only changed string templates and control flow, no type changes).
@@ -379,7 +379,7 @@ Expected: no errors (we only changed string templates and control flow, no type 
 This is a frontend-only fix. Deploy via the normal Vercel auto-deploy (push to `main`):
 
 ```bash
-cd "C:\Users\User\Documents\Work\WALY MOBILE\web-app"
+cd "C:\Users\User\Documents\Work\RISEV MOBILE\web-app"
 git add app/\(merchant\)/give.tsx
 git commit -m "fix(give): resolve duplicate-key bug and bill amount state loss for new customers"
 git push origin main

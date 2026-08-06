@@ -1,4 +1,4 @@
-# Phase 0 — Threads API Research (WALY Mobile marketing automation)
+# Phase 0 — Threads API Research (RISEV Mobile marketing automation)
 
 > Research date: 2026-07-19
 > Source: https://developers.facebook.com/documentation/threads/ (Threads API docs)
@@ -15,7 +15,7 @@
 ✅ Text post limit: **500 characters** (emojis counted by UTF-8 bytes).
 ✅ Supports image / video / carousel / replies / quote / repost / polls / location / ghost posts.
 
-**No blocker.** Phase 1 can proceed once WALY creates a Meta App + Threads account (see Q4 in the plan).
+**No blocker.** Phase 1 can proceed once RISEV creates a Meta App + Threads account (see Q4 in the plan).
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## 2. Publishing flow (single text/image/video post) — TWO steps
 
-This is the flow we'll use for WALY marketing posts.
+This is the flow we'll use for RISEV marketing posts.
 
 ### Step 1 — Create a media container
 ```
@@ -63,7 +63,7 @@ curl -i -X POST \
   -d "access_token=<ACCESS_TOKEN>" \
   "https://graph.threads.com/v1.0/<THREADS_USER_ID>/threads"
 ```
-⚠️ `image_url` must be **publicly accessible** — Threads downloads the image from that URL. For WALY, host on the existing VPS Caddy or Vercel CDN.
+⚠️ `image_url` must be **publicly accessible** — Threads downloads the image from that URL. For RISEV, host on the existing VPS Caddy or Vercel CDN.
 
 ### Step 2 — Publish the container
 ```
@@ -105,7 +105,7 @@ curl -s -X GET \
 ```
 Response shape: `{ "data": [{ "quota_usage": 4, "config": { "quota_total": 250, "quota_duration": 86400 } }] }`
 
-**WALY plan: 1 post/day (week 1) → 2 posts/day (week 2+) = max ~60 posts/month, ~2% of quota.** No risk of hitting limits.
+**RISEV plan: 1 post/day (week 1) → 2 posts/day (week 2+) = max ~60 posts/month, ~2% of quota.** No risk of hitting limits.
 
 ---
 
@@ -139,7 +139,7 @@ curl -i -X GET "https://graph.threads.com/refresh_access_token
   &access_token=<LONG_LIVED_ACCESS_TOKEN>"
 ```
 
-⚠️ **Permission grants are valid 90 days for public profiles.** Refreshing the long-lived token extends the permission grant another 90 days **only if the Threads account is public**. If WALY's Threads profile is private, we'd need to re-auth every 90 days — **recommend keeping WALY's Threads profile public.**
+⚠️ **Permission grants are valid 90 days for public profiles.** Refreshing the long-lived token extends the permission grant another 90 days **only if the Threads account is public**. If RISEV's Threads profile is private, we'd need to re-auth every 90 days — **recommend keeping RISEV's Threads profile public.**
 
 **Automation implication:** a small monthly cron job can call `refresh_access_token` to keep the token alive indefinitely (as long as the profile stays public). Add this to the plan as a maintenance task.
 
@@ -156,15 +156,15 @@ Optional (later):
 - `threads_location_tagging` — to tag Malaysia location on posts
 - `threads_delete` — to retract bad posts
 
-**App Review:** Without App Review approval, the app can only post to its own account and tester accounts. Since WALY will post only to **its own Threads account**, **no App Review is needed** — we can post immediately once the app + token are set up. App Review only matters if we later want to post on behalf of *other* users (e.g. our merchants' Threads accounts) — that's a future feature, not Phase 0.
+**App Review:** Without App Review approval, the app can only post to its own account and tester accounts. Since RISEV will post only to **its own Threads account**, **no App Review is needed** — we can post immediately once the app + token are set up. App Review only matters if we later want to post on behalf of *other* users (e.g. our merchants' Threads accounts) — that's a future feature, not Phase 0.
 
 ---
 
 ## 6. Account & app setup steps (Phase 0 Task 0.2 — needs user)
 
-This is the manual part WALY's owner must do (cannot be automated):
+This is the manual part RISEV's owner must do (cannot be automated):
 
-1. **Create a Threads account** for WALY Mobile (if not already) at threads.net — sign up with the Instagram account linked to the business. Set profile to **public**.
+1. **Create a Threads account** for RISEV Mobile (if not already) at threads.net — sign up with the Instagram account linked to the business. Set profile to **public**.
 2. **Go to Meta Developer Dashboard** → https://developers.facebook.com/ → "Create App".
 3. Pick the **Threads Use Case** when creating the app.
    - Two app IDs / secrets will be generated; use the **Threads app ID** + its **app secret** for everything.
@@ -173,7 +173,7 @@ This is the manual part WALY's owner must do (cannot be automated):
 6. Implement / use the **Authorization Window** to get a short-lived token. Easiest path for a single-business self-publishing app: use the **Graph API Explorer** or Meta's [Threads API sample app](https://github.com/threads-api/threads-api-sample-app) to run the OAuth flow once manually.
 7. Exchange the short-lived token for a **long-lived token** (curl in §4).
 8. Get the **Threads user ID** — query `GET /me?fields=id,username&access_token=<TOKEN>` against `graph.threads.com`.
-9. Store `THREADS_USER_ID` + `THREADS_ACCESS_TOKEN` + `THREADS_APP_SECRET` (for refresh) somewhere safe outside the repo (WALY's `.env` policy from `AGENTS.md` — never commit).
+9. Store `THREADS_USER_ID` + `THREADS_ACCESS_TOKEN` + `THREADS_APP_SECRET` (for refresh) somewhere safe outside the repo (RISEV's `.env` policy from `AGENTS.md` — never commit).
 
 **Output needed from user:** the long-lived access token + Threads user ID (and the app secret if we want automated refresh). I'll never write these to the repo.
 
@@ -185,9 +185,9 @@ This is the manual part WALY's owner must do (cannot be automated):
 - Carousel: 2–20 items.
 - Image: JPEG/PNG, ≤8MB, 320–1440px wide, ≤10:1 aspect ratio, sRGB.
 - Video: MOV/MP4, H.264/HEVC, 23–60fps, ≤5 min, ≤1GB, ≤1920px wide.
-- First URL in `text` field becomes the link preview (good for "free trial" CTAs pointing to https://waly…).
+- First URL in `text` field becomes the link preview (good for "free trial" CTAs pointing to https://risev…).
 
-**For WALY's plan:** 150–280 char text posts → comfortably under 500, leaves room for hashtags + a CTA URL.
+**For RISEV's plan:** 150–280 char text posts → comfortably under 500, leaves room for hashtags + a CTA URL.
 
 ---
 
@@ -213,18 +213,18 @@ This is the manual part WALY's owner must do (cannot be automated):
 
 ## 10. Updates to the original plan
 
-Two changes worth noting to the plan in `2026-07-19_012516-waly-threads-automation.md`:
+Two changes worth noting to the plan in `2026-07-19_012516-risev-threads-automation.md`:
 
 1. **Add a token-refresh maintenance cron** — monthly `cronjob` calling `refresh_access_token` so the long-lived token never expires. Low priority (token lasts 60 days; we'd notice). Recommend adding as a Phase 4 task.
 2. **Two-step publish script** — the publish script in Phase 3 Task 3.3 must do **container-creation → (sleep 30s if media) → publish**, not a single call. For text-only posts (our default), the sleep can be skipped or shortened.
-3. **Keep WALY Threads profile public** — required for token refresh to extend permission grants. Document in `marketing/README.md`.
+3. **Keep RISEV Threads profile public** — required for token refresh to extend permission grants. Document in `marketing/README.md`.
 
 ---
 
 ## Next step (Phase 0 Task 0.2 — needs user input)
 
 Answer Q4 from the plan:
-- Do you already have a Threads account linked to your Instagram/Facebook for WALY Mobile? If yes → we just need to create the Meta App and grab a long-lived token (steps 2–8 above, ~15 min of manual work).
+- Do you already have a Threads account linked to your Instagram/Facebook for RISEV Mobile? If yes → we just need to create the Meta App and grab a long-lived token (steps 2–8 above, ~15 min of manual work).
 - If no → I'll write a step-by-step setup doc you can follow, then we proceed.
 
 Once you have a `THREADS_USER_ID` + long-lived `THREADS_ACCESS_TOKEN`, hand them to me in chat (I'll store them via Hermes secrets, never in the repo) and we move to Phase 1 (house style guide).

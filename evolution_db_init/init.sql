@@ -5,8 +5,8 @@
 --
 -- For existing deployments where evolution_db_data/ already has data,
 -- run these manually once (use the REAL cluster superuser from .env, NOT postgres):
---   docker exec -it risev-evolution-db psql -U waly_db_admin -c "CREATE DATABASE evogo_auth;"
---   docker exec -it risev-evolution-db psql -U waly_db_admin -c "CREATE DATABASE evogo_users;"
+--   docker exec -it risev-evolution-db psql -U risev_db_admin -c "CREATE DATABASE evogo_auth;"
+--   docker exec -it risev-evolution-db psql -U risev_db_admin -c "CREATE DATABASE evogo_users;"
 
 SELECT 'CREATE DATABASE evogo_auth'
 WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'evogo_auth')\gexec

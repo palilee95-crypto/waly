@@ -33,7 +33,7 @@
 **Objective:** Create the database schema to store prospects.
 
 **Files:**
-- Create: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_migrations\1782807020_create_prospects.js`
+- Create: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_migrations\1782807020_create_prospects.js`
 
 **Implementation:**
 ```javascript
@@ -67,7 +67,7 @@ Run migration on VPS and verify collection appears in PocketBase Admin UI.
 **Objective:** Create WhatsApp connection endpoints for sales agents (mirrors merchant endpoints but scoped to `sales_agent` role).
 
 **Files:**
-- Create: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\agent_whatsapp.pb.js`
+- Create: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\agent_whatsapp.pb.js`
 
 **Endpoints:**
 
@@ -109,8 +109,8 @@ curl -H "Authorization: Bearer <agent_token>" "https://api.risev.app/api/risev/a
 **Objective:** Add a WhatsApp connection card to the Sales Dashboard so agents can scan a QR code and connect.
 
 **Files:**
-- Create: `C:\Users\User\Documents\Work\WALY MOBILE\admin-portal\src\pages\sales-dashboard\components\WhatsAppConnectCard.tsx`
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\admin-portal\src\pages\sales-dashboard\index.tsx`
+- Create: `C:\Users\User\Documents\Work\RISEV MOBILE\admin-portal\src\pages\sales-dashboard\components\WhatsAppConnectCard.tsx`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\admin-portal\src\pages\sales-dashboard\index.tsx`
 
 **Step 1: Create `WhatsAppConnectCard` component**
 - Shows connection status: connected (green badge + phone number) or disconnected (red badge)
@@ -137,7 +137,7 @@ Place the card in Row 1 next to the Referral Link card. Change the grid from `lg
 **Objective:** Create endpoint that registers the prospect and sends the WhatsApp message.
 
 **Files:**
-- Create: `C:\Users\User\Documents\Work\WALY MOBILE\web-app\pb_hooks\create_prospect.pb.js`
+- Create: `C:\Users\User\Documents\Work\RISEV MOBILE\web-app\pb_hooks\create_prospect.pb.js`
 
 **Endpoint:** `POST /api/risev/agent/create-prospect`
 
@@ -149,7 +149,7 @@ Place the card in Row 1 next to the Referral Link card. Change the grid from `lg
 5. If new: create record in `prospects` collection with `status: "lead"`, `agent: authRecord.id`
 6. Check agent's WhatsApp instance is connected (`callEvo("GET", "/instance/fetchInstances")` → find `agent-${authRecord.id}` → state === "open")
 7. If not connected: return `{ success: false, message: "WhatsApp not connected. Please connect first." }`
-8. Build referral link from agent's `referral_code`: `https://waly-five.vercel.app/?ref=${referralCode}`
+8. Build referral link from agent's `referral_code`: `https://risev-five.vercel.app/?ref=${referralCode}`
 9. Send WhatsApp message via `sendTextMessage()` from `whatsapp_helper.js`
 10. Update `last_contacted` to now
 11. Return `{ success: true, prospect: { id, phone, status } }`
@@ -175,7 +175,7 @@ curl -X POST -H "Authorization: Bearer <agent_token>" \
 **Objective:** Add "Create Prospect" button and modal to the Inactive Prospects page.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\admin-portal\src\pages\sales-dashboard\prospects.tsx`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\admin-portal\src\pages\sales-dashboard\prospects.tsx`
 
 **Step 1: Add "Create Prospect" button**
 Next to the "Prospect List" heading, add a button with `person_add` icon.
@@ -208,8 +208,8 @@ After successful creation, refetch the prospects list so the new prospect appear
 **Objective:** The current "Inactive Prospects" page only shows registered merchants with status `pending`. It should also show prospects from the new `prospects` collection.
 
 **Files:**
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\admin-portal\src\pages\sales-dashboard\useSalesData.ts`
-- Modify: `C:\Users\User\Documents\Work\WALY MOBILE\admin-portal\src\pages\sales-dashboard\prospects.tsx`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\admin-portal\src\pages\sales-dashboard\useSalesData.ts`
+- Modify: `C:\Users\User\Documents\Work\RISEV MOBILE\admin-portal\src\pages\sales-dashboard\prospects.tsx`
 
 **Step 1: Fetch prospects in `useSalesData`**
 Add a `useList` call for the `prospects` collection filtered by `agent = identity.id`.

@@ -1,5 +1,5 @@
 ---
-name: Waly Visual Language
+name: Risev Visual Language
 colors:
   surface: '#f8f9ff'
   surface-dim: '#cbdbf5'

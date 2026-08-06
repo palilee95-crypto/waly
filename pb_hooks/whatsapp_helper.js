@@ -2,7 +2,7 @@
 // Official Meta Cloud API helper and Evolution Go mock fallback.
 
 const evolutionUrl = 'http://localhost:8080';
-const evolutionKey = 'waly_dev_api_key';
+const evolutionKey = 'risev_dev_api_key';
 
 // Pagination helper: fetch all records matching a filter by looping 500-record pages.
 // PocketBase's findRecordsByFilter caps at perPage records per call — this loops until exhausted.

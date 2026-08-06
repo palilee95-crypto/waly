@@ -35,6 +35,8 @@ type SettingItemProps = {
   onPress?: () => void;
   iconBgColor?: string;
   iconColor?: string;
+  badgeText?: string;
+  badgeColor?: string;
 };
 
 const SettingItem = ({
@@ -54,6 +56,32 @@ const SettingItem = ({
       <Text style={styles.settingSubtitle}>{subtitle}</Text>
     </View>
     <Ionicons name="chevron-forward" size={18} color="#BEC6E0" />
+  </TouchableOpacity>
+);
+
+const BentoSquareItem = ({
+  iconName,
+  title,
+  subtitle,
+  onPress,
+  iconBgColor = '#F3F4F6',
+  iconColor = '#565e74',
+  badgeText,
+  badgeColor = '#22C55E'
+}: SettingItemProps) => (
+  <TouchableOpacity style={styles.bentoSquareCard} onPress={onPress} activeOpacity={0.8}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <View style={[styles.settingIconBg, { backgroundColor: iconBgColor }]}>
+        <Ionicons name={iconName} size={22} color={iconColor} />
+      </View>
+      {badgeText && (
+        <View style={{ backgroundColor: badgeColor, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100, shadowColor: badgeColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 }}>
+          <Text style={{ color: '#FFF', fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5 }}>{badgeText}</Text>
+        </View>
+      )}
+    </View>
+    <Text style={styles.settingTitle} numberOfLines={1}>{title}</Text>
+    <Text style={styles.settingSubtitle} numberOfLines={2} style={{ marginTop: 4, color: '#737686', fontSize: 11 }}>{subtitle}</Text>
   </TouchableOpacity>
 );
 
@@ -1250,36 +1278,46 @@ export default function ProfileScreen() {
             iconColor="#050505"
             onPress={handleOpenBranding}
           />
-          <SettingItem
-            iconName="notifications-outline"
-            title={t('notifications')}
-            subtitle={t('notifications_desc')}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-          />
-          <SettingItem
-            iconName="shield-checkmark-outline"
-            title={t('security')}
-            subtitle={t('security_desc')}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            onPress={() => setPasswordModalVisible(true)}
-          />
-          <SettingItem
-            iconName="globe-outline"
-            title={t('language')}
-            subtitle={locale === 'en' ? 'English' : 'Bahasa Melayu'}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            onPress={() => setLanguageModalVisible(true)}
-          />
-          <SettingItem
-            iconName="card-outline"
-            title={t('payment_method')}
-            subtitle={t('payment_method_desc')}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-          />
+          
+          <View style={styles.bentoRow}>
+            <BentoSquareItem
+              iconName="notifications-outline"
+              title={t('notifications')}
+              subtitle={t('notifications_desc')}
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+            />
+            <BentoSquareItem
+              iconName="shield-checkmark-outline"
+              title={t('security')}
+              subtitle={t('security_desc')}
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+              onPress={() => setPasswordModalVisible(true)}
+            />
+          </View>
+
+          <View style={styles.bentoRow}>
+            <BentoSquareItem
+              iconName="globe-outline"
+              title={t('language')}
+              subtitle={locale === 'en' ? 'English' : 'Bahasa Melayu'}
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+              onPress={() => setLanguageModalVisible(true)}
+            />
+            <BentoSquareItem
+              iconName="sparkles-outline"
+              title="My Subscription"
+              subtitle="Manage your plan & billing"
+              iconBgColor="#FFF3E0"
+              iconColor="#FF9800"
+              badgeText="PRO"
+              badgeColor="#FF9800"
+              onPress={() => router.push('/(merchant)/subscription' as any)}
+            />
+          </View>
+          
           <SettingItem
             iconName="document-text-outline"
             title={t('privacy_policy')}
@@ -3249,16 +3287,35 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   settingsGrid: {
-    gap: 12,
+    gap: 16,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    gap: 16,
   },
   settingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  bentoSquareCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+    justifyContent: 'flex-start',
   },
   settingIconBg: {
     width: 40,
