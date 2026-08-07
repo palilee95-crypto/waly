@@ -13,6 +13,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
@@ -107,7 +108,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
 
   return (
     <View style={[styles.mobileTabBarWrap, { bottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
-      <GooeyTabBarBackground width={tabBarWidth} color="#FFC700" />
+      <GooeyTabBarBackground width={tabBarWidth} color="#121214" />
       <View style={styles.mobileTabBar}>
         {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
           const isFocused = state.routes[state.index]?.name === route.name;
@@ -136,8 +137,22 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
                 style={styles.floatingBtnWrap}
                 activeOpacity={0.9}
               >
-                <View style={styles.floatingBtn}>
-                  <Ionicons name="qr-code" size={32} color="#050505" />
+                <View style={styles.centerGlowBtnContainer}>
+                  <LinearGradient
+                    colors={['#FFFEE0', '#FFC700', '#FF8F00']}
+                    start={{ x: 0.2, y: 0.2 }}
+                    end={{ x: 0.8, y: 0.8 }}
+                    style={styles.centerGlowBtnGradient}
+                  >
+                    {/* Glass Orb Top Highlight */}
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.65)', 'rgba(255, 255, 255, 0.0)']}
+                      start={{ x: 0.5, y: 0 }}
+                      end={{ x: 0.5, y: 1 }}
+                      style={styles.orbHighlight}
+                    />
+                    <Ionicons name="qr-code" size={22} color="#FFFFFF" style={styles.qrIconShadow} />
+                  </LinearGradient>
                 </View>
               </TouchableOpacity>
             );
@@ -161,10 +176,13 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
               <View style={[styles.iconContainer, isFocused && styles.iconContainerActive]}>
                 <Ionicons
                   name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
-                  size={24}
-                  color={isFocused ? '#FFC700' : '#050505'}
+                  size={18}
+                  color={isFocused ? '#050505' : '#94A3B8'}
                 />
               </View>
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+                {label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -1077,47 +1095,82 @@ const styles = StyleSheet.create({
   },
   mobileTabBar: {
     flexDirection: 'row',
-    height: 56, // Thinner pill
+    height: 56, // Reduced height for sleeker profile
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
     height: 56,
+    paddingTop: 2,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'transparent',
+    marginBottom: 2,
   },
   iconContainerActive: {
-    backgroundColor: '#050505', // The active black circle
+    backgroundColor: '#FFFFFF', // Active tab gets a white circle background
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabLabel: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+  },
+  tabLabelActive: {
+    color: '#FFFFFF',
   },
   floatingBtnWrap: {
     justifyContent: 'center',
     alignItems: 'center',
-    height: 88, // Total height of the bulge
-    width: 88,
+    height: 56,
+    width: 56,
     zIndex: 2,
   },
-  floatingBtn: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'transparent', // The SVG handles the background here
+  centerGlowBtnContainer: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.85)', // Crisp white border ring
+    shadowColor: '#FF8F00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 6,
+    marginTop: -20, // Float nicely above the hump
+    overflow: 'hidden',
+  },
+  centerGlowBtnGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  orbHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+  },
+  qrIconShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   // Subscription Billing Block Overlays
   gateContainer: {

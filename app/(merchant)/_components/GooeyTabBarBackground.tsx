@@ -1,32 +1,31 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
-export default function GooeyTabBarBackground({ width, color = '#050505' }: { width: number; color?: string }) {
-  const H = 56; // height of the pill body (thinner)
-  const pillR = 28; // radius of the pill
+export default function GooeyTabBarBackground({ width, color = '#121214' }: { width: number; color?: string }) {
+  const H = 56; // Reduced height of the tab bar body for a sleeker look
+  const pillR = 28; // Reduced radius of the pill
   const cx = width / 2;
-  const pillY = 16; // offset to allow the top bulge to fit within the SVG viewBox
+  const pillY = 12; // Adjusted offset for top hump
   
-  // SVG Path for a pill that has a gooey bulge in the center
+  // Custom path: flat bottom with rounded corners, organic top hump in the center
   const path = `
     M ${pillR} ${pillY}
-    L ${cx - 42} ${pillY}
-    C ${cx - 18} ${pillY}, ${cx - 26} 0, ${cx} 0
-    C ${cx + 26} 0, ${cx + 18} ${pillY}, ${cx + 42} ${pillY}
+    L ${cx - 40} ${pillY}
+    C ${cx - 20} ${pillY}, ${cx - 28} 0, ${cx} 0
+    C ${cx + 28} 0, ${cx + 20} ${pillY}, ${cx + 40} ${pillY}
     L ${width - pillR} ${pillY}
     A ${pillR} ${pillR} 0 0 1 ${width} ${pillY + pillR}
+    L ${width} ${pillY + H - pillR}
     A ${pillR} ${pillR} 0 0 1 ${width - pillR} ${pillY + H}
-    L ${cx + 42} ${pillY + H}
-    C ${cx + 18} ${pillY + H}, ${cx + 26} ${pillY + H + 16}, ${cx} ${pillY + H + 16}
-    C ${cx - 26} ${pillY + H + 16}, ${cx - 18} ${pillY + H}, ${cx - 42} ${pillY + H}
     L ${pillR} ${pillY + H}
-    A ${pillR} ${pillR} 0 0 1 0 ${pillY + pillR}
+    A ${pillR} ${pillR} 0 0 1 0 ${pillY + H - pillR}
+    L 0 ${pillY + pillR}
     A ${pillR} ${pillR} 0 0 1 ${pillR} ${pillY}
     Z
   `;
 
   return (
-    <Svg width={width} height={H + 32} style={{ position: 'absolute', top: -16, left: 0 }}>
+    <Svg width={width} height={H + 32} style={{ position: 'absolute', top: -12, left: 0 }}>
       <Path d={path} fill={color} />
     </Svg>
   );
