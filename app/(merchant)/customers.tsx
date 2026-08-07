@@ -428,23 +428,56 @@ export default function CustomersScreen() {
 
   const activeMembersCount = new Set(transactions.map((tx) => tx.customerId).filter(Boolean)).size;
 
-  // Get unique customers from transactions list
-  const activeCustomersList = Array.from(
-    new Map(
-      transactions
-        .filter((t) => t.customerId)
-        .map((t) => [
-          t.customerId,
-          {
-            id: t.customerId,
-            name: t.name,
-            initials: t.initials,
-            avatar: t.avatar,
-            bgCircleColor: t.bgCircleColor,
-          },
-        ])
-    ).values()
-  );
+  // Calculate top spenders (by sum of bill_amount from PURCHASE transactions)
+  // and map the rest of unique customers
+  const activeCustomersList = React.useMemo(() => {
+    // 1. Group by customer and compute total purchase amount
+    const customerMap: Record<string, { id: string; name: string; initials: string; avatar: string | null; bgCircleColor: string; totalPurchase: number }> = {};
+    
+    transactions.forEach(t => {
+      if (!t.customerId) return;
+      if (!customerMap[t.customerId]) {
+        customerMap[t.customerId] = {
+          id: t.customerId,
+          name: t.name,
+          initials: t.initials,
+          avatar: t.avatar,
+          bgCircleColor: t.bgCircleColor,
+          totalPurchase: 0,
+        };
+      }
+      if (t.type === 'PURCHASE' && t.bill_amount) {
+        customerMap[t.customerId].totalPurchase += Number(t.bill_amount);
+      }
+    });
+
+    const list = Object.values(customerMap);
+    
+    // Sort descending by total purchase amount to rank top spenders
+    list.sort((a, b) => b.totalPurchase - a.totalPurchase);
+
+    // Map ranks, numbers, and medals for top 3
+    return list.map((cust, idx) => {
+      let rankText = '';
+      let medal = '';
+      if (idx === 0 && cust.totalPurchase > 0) {
+        rankText = '1st';
+        medal = '🥇';
+      } else if (idx === 1 && cust.totalPurchase > 0) {
+        rankText = '2nd';
+        medal = '🥈';
+      } else if (idx === 2 && cust.totalPurchase > 0) {
+        rankText = '3rd';
+        medal = '🥉';
+      }
+      
+      return {
+        ...cust,
+        rankText,
+        medal,
+      };
+    });
+  }, [transactions]);
 
   // Stamps distributed this month (last 30 days) vs previous month (30-60 days ago)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
@@ -670,31 +703,120 @@ export default function CustomersScreen() {
           </View>
         </View>
 
-        {/* 👥 Replicated "Last Transfer" Horizontal Row (Recent Active Members) */}
-        <View style={{ marginVertical: 8 }}>
-          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 12 }}>
-            Recent active members
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
-            {activeCustomersList.map((cust) => (
-              <TouchableOpacity
-                key={cust.id}
-                onPress={() => openCustomerDetails(cust as any)}
-                style={{ alignItems: 'center', width: 64 }}
-                activeOpacity={0.8}
-              >
-                {cust.avatar ? (
-                  <Image source={{ uri: cust.avatar }} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 6 }} />
-                ) : (
-                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: cust.bgCircleColor || '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{cust.initials}</Text>
+        {/* 🏆 Refined "Top Spenders" Leaderboard Card */}
+        <View style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: 24,
+          padding: 16,
+          shadowColor: '#050505',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.04,
+          shadowRadius: 16,
+          elevation: 3,
+          marginVertical: 8,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Ionicons name="trophy" size={18} color="#FFC700" />
+            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+              Top active spenders
+            </Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingRight: 10, paddingBottom: 4 }}>
+            {activeCustomersList.map((cust) => {
+              // Determine border ring color for top spenders
+              let ringColor = 'transparent';
+              if (cust.medal === '🥇') ringColor = '#FFC700'; // Gold
+              else if (cust.medal === '🥈') ringColor = '#CBD5E1'; // Silver
+              else if (cust.medal === '🥉') ringColor = '#D97706'; // Bronze
+
+              return (
+                <TouchableOpacity
+                  key={cust.id}
+                  onPress={() => openCustomerDetails(cust as any)}
+                  style={{ alignItems: 'center', width: 72, position: 'relative' }}
+                  activeOpacity={0.8}
+                >
+                  {/* Medal Badge */}
+                  {!!cust.medal && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -6,
+                      left: -2,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 10,
+                      width: 20,
+                      height: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 10,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.12,
+                      shadowRadius: 3,
+                      elevation: 3,
+                    }}>
+                      <Text style={{ fontSize: 11 }}>{cust.medal}</Text>
+                    </View>
+                  )}
+
+                  {/* Avatar Container with Ring */}
+                  <View style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    borderWidth: ringColor !== 'transparent' ? 2 : 0,
+                    borderColor: ringColor,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 6,
+                    backgroundColor: '#FFFFFF',
+                  }}>
+                    {cust.avatar ? (
+                      <Image source={{ uri: cust.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                    ) : (
+                      <View style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        backgroundColor: cust.bgCircleColor || '#F1F5F9',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                          {cust.initials}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                )}
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#050505', textAlign: 'center' }} numberOfLines={1}>
-                  {cust.name ? cust.name.split(' ')[0] : 'Member'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', textAlign: 'center' }} numberOfLines={1}>
+                    {cust.name ? cust.name.split(' ')[0] : 'Member'}
+                  </Text>
+
+                  {/* Purchase Total Amount Chip */}
+                  {cust.totalPurchase > 0 ? (
+                    <View style={{
+                      backgroundColor: '#F8FAFC',
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      marginTop: 4,
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                    }}>
+                      <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }} numberOfLines={1}>
+                        RM {Math.round(cust.totalPurchase)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 4 }}>
+                      Active
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
             {activeCustomersList.length === 0 && (
               <Text style={{ fontSize: 12, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', paddingVertical: 10 }}>
                 No active members today
