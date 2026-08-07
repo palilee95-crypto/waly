@@ -834,7 +834,9 @@ export default function ProfileScreen() {
               </View>
             </View>
             <TouchableOpacity style={styles.updateBtn} onPress={handleOpenEdit} activeOpacity={0.8}>
-              <Text style={styles.updateBtnText}>{t('update')}</Text>
+              <Text style={styles.updateBtnText}>
+                {locale === 'en' ? 'Edit Profile' : 'Edit Profil'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -928,11 +930,12 @@ export default function ProfileScreen() {
           
           <View style={styles.bentoRow}>
             <BentoSquareItem
-              iconName="notifications-outline"
-              title={t('notifications')}
-              subtitle={t('notifications_desc')}
+              iconName="cart-outline"
+              title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
+              subtitle={locale === 'en' ? 'Explore NFC stand marketplace' : 'Teroka pasaran stand NFC'}
               iconBgColor="#F1F5F9"
               iconColor="#050505"
+              onPress={() => router.push('/(merchant)/nfc-marketplace')}
             />
             <BentoSquareItem
               iconName="shield-checkmark-outline"

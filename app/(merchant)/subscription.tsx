@@ -1,205 +1,293 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Switch, 
+  Dimensions,
+  Image,
+  Alert,
+  Platform
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = screenWidth - 100; // Sleeker card width
-const CARD_GAP = 12;
-const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
 
-interface PricingCardProps {
-  title: string;
-  subtitle: string;
-  price: string;
-  period: string;
-  icon: string;
-  features: string[];
-  buttonText: string;
-  isPopular?: boolean;
-  accentColor?: string;
-  checkBgColor?: string;
-  checkIconColor?: string;
-}
-
-const PricingCard = ({
-  title,
-  subtitle,
-  price,
-  period,
-  icon,
-  features,
-  buttonText,
-  isPopular = false,
-  accentColor = '#FFC700',
-  checkBgColor = '#050505',
-  checkIconColor = '#FFFFFF',
-}: PricingCardProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <TouchableOpacity 
-      style={[styles.card, isPopular && styles.cardPopular]}
-      onPress={() => setIsOpen(!isOpen)}
-      activeOpacity={0.9}
-    >
-      {/* Popular Floating Tag */}
-      {isPopular && (
-        <View style={[styles.popularTag, { backgroundColor: accentColor }]}>
-          <Text style={styles.popularTagText}>Popular</Text>
-        </View>
-      )}
-
-      {/* Top Header Badge */}
-      <View style={styles.cardHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.iconBadge}>
-            <Ionicons name={icon as any} size={18} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>{title}</Text>
-            <Text style={styles.cardSubtitle}>{subtitle}</Text>
-          </View>
-        </View>
-        <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
-      </View>
-
-      {/* Price section */}
-      <View style={styles.priceContainer}>
-        <Text style={styles.cardPrice}>{price}</Text>
-        <Text style={styles.cardPeriod}> / {period}</Text>
-      </View>
-
-      {/* Action Button */}
-      <TouchableOpacity 
-        style={[styles.cardBtn, !isOpen && { marginBottom: 0 }]} 
-        activeOpacity={0.8}
-        onPress={(e) => {
-          e.stopPropagation(); // Prevent toggling expansion when clicking button
-          // Trigger upgrade action
-        }}
-      >
-        <Text style={styles.cardBtnText}>{buttonText}</Text>
-      </TouchableOpacity>
-
-      {/* Feature List (Toggled) */}
-      {isOpen && (
-        <View style={styles.featureList}>
-          {features.map((feat, idx) => (
-            <View key={idx} style={styles.featureRow}>
-              <View style={[styles.checkBadge, { backgroundColor: checkBgColor }]}>
-                <Ionicons name="checkmark" size={8} color={checkIconColor} />
-              </View>
-              <Text style={styles.featureText}>{feat}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
+const BENEFITS = [
+  { icon: 'rocket', title: 'Grow 5x Faster', desc: 'Digital loyalty cards that customers love.' },
+  { icon: 'chatbubble-ellipses', title: 'WhatsApp Automation', desc: 'Send stamp alerts & broadcasts instantly.' },
+  { icon: 'flash', title: 'NFC Magic Stand', desc: 'Collect stamps in 2 seconds at the counter.' }
+];
 
 export default function SubscriptionScreen() {
   const router = useRouter();
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [trialEnabled, setTrialEnabled] = useState(true);
+
+  // Auto-play benefits slider
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % BENEFITS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getPriceDetails = () => {
+    if (selectedPlan === 'starter') {
+      return {
+        price: billingCycle === 'monthly' ? 'RM 79' : 'RM 63',
+        originalPrice: billingCycle === 'monthly' ? 'RM 119' : 'RM 95',
+        label: 'Starter Plan'
+      };
+    } else if (selectedPlan === 'pro') {
+      return {
+        price: billingCycle === 'monthly' ? 'RM 99' : 'RM 79',
+        originalPrice: billingCycle === 'monthly' ? 'RM 198' : 'RM 158',
+        label: 'Pro Plan'
+      };
+    } else {
+      return {
+        price: billingCycle === 'monthly' ? 'RM 349' : 'RM 279',
+        originalPrice: billingCycle === 'monthly' ? 'RM 499' : 'RM 399',
+        label: 'Enterprise Plan'
+      };
+    }
+  };
+
+  const currentPrice = getPriceDetails();
+
+  const handlePurchase = () => {
+    Alert.alert(
+      'Processing Purchase',
+      `Initializing Google Play / App Store checkout for ${currentPrice.label} (${billingCycle}).`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const getFeaturesList = () => {
+    if (selectedPlan === 'starter') {
+      return [
+        'Digital Loyalty Cards',
+        'Basic Analytics Dashboard',
+        '1 Free NFC VIP Stand',
+        'Email support',
+        'Up to 100 active customers',
+        '[LOCK] WhatsApp Automations',
+        '[LOCK] Promotional Broadcasts',
+        '[LOCK] Up to 5 staff accounts'
+      ];
+    } else if (selectedPlan === 'pro') {
+      return [
+        'Everything in Starter',
+        'Up to 5 staff accounts',
+        'WhatsApp Automations',
+        'Promotional Broadcasts',
+        'Priority support',
+        'Unlimited active customers',
+        '[LOCK] Multi-Branch Support',
+        '[LOCK] Custom integration APIs'
+      ];
+    } else {
+      return [
+        'Everything in Pro',
+        'Unlimited staff accounts',
+        'Multi-Branch Support',
+        'Custom integrations',
+        '24/7 dedicated support',
+        'Custom branding'
+      ];
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        
-        {/* Header */}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Sticky Header with Logo & Tagline */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={22} color="#050505" />
-          </TouchableOpacity>
-          <Text style={styles.mainTitle}>Get Unlimited{'\n'}Access</Text>
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Image 
+              source={require('../../assets/risev logo.png')}
+              style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+            />
+          </View>
+          <View style={styles.headerUpsell}>
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+              <Ionicons name="sparkles" size={14} color="#FFC700" />
+              <Text style={styles.headerUpsellTitle}>Grow Your Shop on Autopilot</Text>
+            </View>
+            <Text style={styles.headerUpsellDesc}>
+              Turn one-time walk-ins into lifetime regular customers. Unlock automated WhatsApp alerts, custom loyalty programs, and detailed analytics to scale repeat sales without extra effort.
+            </Text>
+          </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          
-          {/* Card Stack (Vertical List) */}
-          <View style={styles.cardsContainer}>
-            {/* Starter Card */}
-            <PricingCard 
-              title="Starter"
-              subtitle="For early-stage shops"
-              price="RM 79"
-              period="month"
-              icon="flash-outline"
-              buttonText="Get Started"
-              checkBgColor="#050505"
-              checkIconColor="#FFFFFF"
-              features={[
-                'Digital Loyalty Cards',
-                'Basic Analytics Dashboard',
-                '1 Free NFC VIP Stand',
-                'Email support',
-                'Up to 100 active customers'
-              ]}
-            />
 
-            {/* Pro Card (Popular) */}
-            <PricingCard 
-              title="Pro"
-              subtitle="For growing businesses"
-              price="RM 99"
-              period="month"
-              icon="sparkles-outline"
-              buttonText="Upgrade now"
-              isPopular={true}
-              accentColor="#FFC700"
-              checkBgColor="#FFC700"
-              checkIconColor="#050505"
-              features={[
-                'Everything in Starter',
-                'Up to 5 staff accounts',
-                'WhatsApp Automations',
-                'Promotional Broadcasts',
-                'Priority support',
-                'Unlimited active customers'
-              ]}
-            />
-
-            {/* Enterprise Card */}
-            <PricingCard 
-              title="Enterprise"
-              subtitle="For franchise networks"
-              price="RM 349"
-              period="month"
-              icon="business-outline"
-              buttonText="Contact sales"
-              checkBgColor="#FFC700"
-              checkIconColor="#050505"
-              features={[
-                'Everything in Pro',
-                'Unlimited staff accounts',
-                'Multi-Branch Support',
-                'Custom integrations',
-                '24/7 dedicated support'
-              ]}
-            />
-          </View>
-
-          {/* Bottom Trial Toggle / Actions */}
-          <View style={styles.bottomSection}>
-            <View style={styles.trialRow}>
-              <Text style={styles.trialText}>Start 7-day free trial</Text>
-              <Switch 
-                value={trialEnabled} 
-                onValueChange={setTrialEnabled} 
-                trackColor={{ false: '#E2E8F0', true: '#FFC700' }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-
-            <TouchableOpacity style={styles.guestBtn} onPress={() => router.back()}>
-              <Text style={styles.guestBtnText}>Continue as Guest</Text>
+          {/* 2. Billing Toggle (Monthly / Annual) */}
+          <View style={styles.billingToggleWrapper}>
+            <TouchableOpacity 
+              style={[styles.billingToggleBtn, billingCycle === 'monthly' && styles.billingToggleBtnActive]}
+              onPress={() => setBillingCycle('monthly')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.billingToggleText, billingCycle === 'monthly' && styles.billingToggleTextActive]}>
+                Monthly
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.billingToggleBtn, billingCycle === 'annually' && styles.billingToggleBtnActive]}
+              onPress={() => setBillingCycle('annually')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.billingToggleText, billingCycle === 'annually' && styles.billingToggleTextActive]}>
+                Annually (Save 20%)
+              </Text>
             </TouchableOpacity>
           </View>
 
+          {/* 3. Compact Plan Selector (3 Columns Grid) */}
+          <Text style={styles.sectionLabel}>Select your plan:</Text>
+          <View style={styles.planSelectorRow}>
+            {/* Starter Plan */}
+            <TouchableOpacity
+              style={[
+                styles.planCard,
+                selectedPlan === 'starter' && styles.planCardActive
+              ]}
+              onPress={() => setSelectedPlan('starter')}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.planCardTitle}>Starter</Text>
+              <Text style={styles.planCardPrice}>
+                {billingCycle === 'monthly' ? 'RM 79' : 'RM 63'}
+              </Text>
+              <Text style={styles.planCardPeriod}>/mo</Text>
+            </TouchableOpacity>
+
+            {/* Pro Plan (Best Seller) */}
+            <TouchableOpacity
+              style={[
+                styles.planCard,
+                selectedPlan === 'pro' && styles.planCardActive,
+                styles.proPlanCardHighlight
+              ]}
+              onPress={() => setSelectedPlan('pro')}
+              activeOpacity={0.9}
+            >
+              <View style={styles.bestSellerTag}>
+                <Text style={styles.bestSellerTagText}>POPULAR</Text>
+              </View>
+              <Text style={styles.planCardTitle}>PRO</Text>
+              <Text style={[styles.planCardPrice, { color: '#050505' }]}>
+                {billingCycle === 'monthly' ? 'RM 99' : 'RM 79'}
+              </Text>
+              <Text style={styles.planCardPeriod}>/mo</Text>
+            </TouchableOpacity>
+
+            {/* Enterprise Plan */}
+            <TouchableOpacity
+              style={[
+                styles.planCard,
+                selectedPlan === 'enterprise' && styles.planCardActive
+              ]}
+              onPress={() => setSelectedPlan('enterprise')}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.planCardTitle}>Business</Text>
+              <Text style={styles.planCardPrice}>
+                {billingCycle === 'monthly' ? 'RM 349' : 'RM 279'}
+              </Text>
+              <Text style={styles.planCardPeriod}>/mo</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 4. Live Pricing & Urgency block */}
+          <View style={styles.priceHighlightCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View>
+                <Text style={styles.highlightPlanName}>{currentPrice.label}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                  <Text style={styles.highlightActivePrice}>{currentPrice.price}</Text>
+                  <Text style={styles.highlightOriginalPrice}>{currentPrice.originalPrice}</Text>
+                  <Text style={styles.highlightPeriod}>/ month</Text>
+                </View>
+              </View>
+              <View style={styles.highlightBadge}>
+                <Text style={styles.highlightBadgeText}>50% OFF</Text>
+              </View>
+            </View>
+
+            {/* Timer countdown row */}
+            <View style={styles.timerRow}>
+              <Ionicons name="time" size={13} color="#EA580C" />
+              <Text style={styles.timerText}>Offer ends in: 23h 41m 15s</Text>
+            </View>
+          </View>
+
+          {/* 5. Features List Box */}
+          <Text style={styles.sectionLabel}>Features included:</Text>
+          <View style={styles.featuresBox}>
+            {getFeaturesList().map((feat, idx) => {
+              const isLocked = feat.startsWith('[LOCK]');
+              const cleanFeat = feat.replace('[LOCK] ', '');
+              return (
+                <View key={idx} style={styles.featureRow}>
+                  <View style={[styles.checkBadge, { backgroundColor: isLocked ? '#F1F5F9' : '#FEF3C7' }]}>
+                    <Ionicons 
+                      name={isLocked ? "lock-closed" : "checkmark"} 
+                      size={8} 
+                      color={isLocked ? "#94A3B8" : "#B45309"} 
+                    />
+                  </View>
+                  <Text style={[styles.featureText, isLocked && { color: '#94A3B8', textDecorationLine: 'line-through' }]}>
+                    {cleanFeat}
+                    {cleanFeat === 'WhatsApp Automations' && <Text style={styles.inlineBadge}>  AI </Text>}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* 6. Sticky IAP Action Footer */}
+      <View style={styles.stickyFooter}>
+        <View style={styles.trialRow}>
+          <Text style={styles.trialText}>Enable 7-day free trial on upgrade</Text>
+          <Switch 
+            value={trialEnabled} 
+            onValueChange={setTrialEnabled} 
+            trackColor={{ false: '#E2E8F0', true: '#FFC700' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={styles.ctaButton} 
+          onPress={handlePurchase}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.ctaButtonText}>Upgrade to PRO today</Text>
+        </TouchableOpacity>
+
+        {/* Legal Row */}
+        <View style={styles.legalRow}>
+          <TouchableOpacity onPress={() => Alert.alert('Restore Purchases', 'Restoring past purchases...')}><Text style={styles.legalLink}>Restore Purchases</Text></TouchableOpacity>
+          <Text style={styles.legalSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Alert.alert('Terms of Service', 'Terms of service details...')}><Text style={styles.legalLink}>Terms</Text></TouchableOpacity>
+          <Text style={styles.legalSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Alert.alert('Privacy Policy', 'Privacy policy details...')}><Text style={styles.legalLink}>Privacy</Text></TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -207,156 +295,230 @@ export default function SubscriptionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // Slate-white background to let white cards stand out
+    backgroundColor: '#050505', // Deep dark theme matches iOS App Store Paywall
   },
   safeArea: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: '#050505',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
-  mainTitle: {
-    fontSize: 26,
+  headerUpsell: {
+    marginTop: 18,
+    width: '100%',
+  },
+  headerUpsellTitle: {
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    lineHeight: 32,
-    flex: 1,
+    color: '#FFFFFF',
+  },
+  headerUpsellDesc: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 6,
+    lineHeight: 16,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 180, // High bottom padding to avoid overlapping the sticky footer!
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    minHeight: '100%',
   },
-  cardsContainer: {
-    gap: 24,
-    marginBottom: 24,
-    paddingTop: 16,
+  upsellSparkle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,199,0,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  
-  /* Pricing Card Styles */
-  card: {
+  upsellTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  upsellCopyText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  dotInactive: {
+    width: 4,
+    backgroundColor: '#334155',
+  },
+  billingToggleWrapper: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 20,
+  },
+  billingToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billingToggleBtnActive: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 3,
-    position: 'relative',
-    width: '100%',
-  },
-  cardPopular: {
-    borderColor: '#FFE082',
-    borderWidth: 1.5,
-  },
-  popularTag: {
-    position: 'absolute',
-    top: -10,
-    right: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-    transform: [{ rotate: '4deg' }],
-    shadowColor: '#FFC700',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  popularTagText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  billingToggleText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  billingToggleTextActive: {
     color: '#050505',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    marginBottom: 10,
     textTransform: 'uppercase',
   },
-  cardHeader: {
+  planSelectorRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
+    marginBottom: 20,
+  },
+  planCard: {
     flex: 1,
-  },
-  iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    position: 'relative',
   },
-  cardTitle: {
+  planCardActive: {
+    borderColor: '#FFC700',
+    backgroundColor: '#FFFDF5',
+  },
+  proPlanCardHighlight: {
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  bestSellerTag: {
+    position: 'absolute',
+    top: -8,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  bestSellerTagText: {
+    fontSize: 7.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  planCardTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  planCardPrice: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
+    marginTop: 6,
   },
-  cardSubtitle: {
-    fontSize: 11,
+  planCardPeriod: {
+    fontSize: 9,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    marginTop: -2,
+    color: '#94A3B8',
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 10,
+  priceHighlightCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
   },
-  cardPrice: {
-    fontSize: 28,
+  highlightPlanName: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
-    letterSpacing: -0.5,
   },
-  cardPeriod: {
+  highlightActivePrice: {
+    fontSize: 22,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  highlightOriginalPrice: {
     fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    alignSelf: 'baseline',
+  },
+  highlightPeriod: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
   },
-  cardBtn: {
-    backgroundColor: '#050505',
-    borderRadius: 12,
-    paddingVertical: 11,
+  highlightBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  highlightBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+  },
+  timerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    gap: 5,
+    marginTop: 10,
   },
-  cardBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
+  timerText: {
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#EA580C',
   },
-  featureList: {
+  featuresBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     gap: 8,
   },
   featureRow: {
@@ -372,47 +534,77 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   featureText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#334155',
     flex: 1,
   },
-
-  /* Bottom Section */
-  bottomSection: {
+  inlineBadge: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    backgroundColor: '#FEF3C7',
+    color: '#D97706',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-    marginTop: 20, // Add top margin to separate it from the card stack
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
   },
   trialRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   trialText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#050505',
   },
-  guestBtn: {
-    backgroundColor: '#050505',
-    borderRadius: 12,
-    paddingVertical: 12,
+  ctaButton: {
+    backgroundColor: '#FFC700',
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  guestBtnText: {
-    color: '#FFFFFF',
+  ctaButtonText: {
+    color: '#050505',
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  legalLink: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+  },
+  legalSeparator: {
+    fontSize: 10,
+    color: '#E2E8F0',
   },
 });

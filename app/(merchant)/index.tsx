@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -430,8 +431,10 @@ export default function MerchantDashboard() {
 
   return (
     <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+      <StatusBar style="light" />
       {/* Scrollable Dashboard View */}
       <ScrollView
+        style={{ backgroundColor: '#FFFFFF' }}
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
@@ -958,7 +961,7 @@ export default function MerchantDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Unified white background
+    backgroundColor: '#050505',
   },
   scrollContent: {
     paddingHorizontal: 20,

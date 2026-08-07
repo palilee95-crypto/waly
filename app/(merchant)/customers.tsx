@@ -707,7 +707,7 @@ export default function CustomersScreen() {
         <View style={{
           backgroundColor: '#FFFFFF',
           borderRadius: 24,
-          padding: 16,
+          padding: 18,
           shadowColor: '#050505',
           shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.04,
@@ -715,114 +715,145 @@ export default function CustomersScreen() {
           elevation: 3,
           marginVertical: 8,
         }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Ionicons name="trophy" size={18} color="#FFC700" />
-            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-              Top active spenders
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="trophy" size={20} color="#FFC700" />
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                Top Spenders Leaderboard
+              </Text>
+            </View>
+            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706' }}>LIVE STATS</Text>
+            </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingRight: 10, paddingBottom: 4 }}>
-            {activeCustomersList.map((cust) => {
-              // Determine border ring color for top spenders
-              let ringColor = 'transparent';
-              if (cust.medal === '🥇') ringColor = '#FFC700'; // Gold
-              else if (cust.medal === '🥈') ringColor = '#CBD5E1'; // Silver
-              else if (cust.medal === '🥉') ringColor = '#D97706'; // Bronze
+          <View style={{ gap: 8 }}>
+            {activeCustomersList.slice(0, 3).map((cust, index) => {
+              const maxSpend = activeCustomersList[0]?.totalPurchase || 1;
+              const spendPercentage = Math.min((cust.totalPurchase / maxSpend) * 100, 100);
+
+              // Rank visual styling
+              let rankBg = '#E2E8F0';
+              let rankTextColor = '#475569';
+              if (index === 0) {
+                rankBg = '#FEF3C7'; // Gold
+                rankTextColor = '#B45309';
+              } else if (index === 1) {
+                rankBg = '#E2E8F0'; // Silver
+                rankTextColor = '#475569';
+              } else if (index === 2) {
+                rankBg = '#FFEDD5'; // Bronze
+                rankTextColor = '#C2410C';
+              }
+
+              // Row background style
+              const isFirst = index === 0;
 
               return (
                 <TouchableOpacity
                   key={cust.id}
                   onPress={() => openCustomerDetails(cust as any)}
-                  style={{ alignItems: 'center', width: 72, position: 'relative' }}
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    backgroundColor: isFirst ? '#FFFBEB' : '#FFFFFF',
+                    borderRadius: 16,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: isFirst ? '#FEF3C7' : '#F1F5F9',
+                  }}
                   activeOpacity={0.8}
                 >
-                  {/* Medal Badge */}
-                  {!!cust.medal && (
-                    <View style={{
-                      position: 'absolute',
-                      top: -6,
-                      left: -2,
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 10,
-                      width: 20,
-                      height: 20,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 10,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 3,
-                      elevation: 3,
+                  {/* Rank Badge Column */}
+                  <View style={{ 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: 12, 
+                    backgroundColor: rankBg, 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    marginRight: 12 
+                  }}>
+                    <Text style={{ 
+                      fontSize: 11, 
+                      fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                      color: rankTextColor 
                     }}>
-                      <Text style={{ fontSize: 11 }}>{cust.medal}</Text>
-                    </View>
-                  )}
+                      {index + 1}
+                    </Text>
+                  </View>
 
-                  {/* Avatar Container with Ring */}
+                  {/* Avatar */}
                   <View style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 28,
-                    borderWidth: ringColor !== 'transparent' ? 2 : 0,
-                    borderColor: ringColor,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 6,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: '#F1F5F9',
+                    marginRight: 12,
+                    borderWidth: isFirst ? 1.5 : 0,
+                    borderColor: '#FFC700'
                   }}>
                     {cust.avatar ? (
-                      <Image source={{ uri: cust.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                      <Image source={{ uri: cust.avatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />
                     ) : (
                       <View style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 24,
-                        backgroundColor: cust.bgCircleColor || '#F1F5F9',
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: cust.bgCircleColor || '#E2E8F0',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                           {cust.initials}
                         </Text>
                       </View>
                     )}
                   </View>
-                  
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', textAlign: 'center' }} numberOfLines={1}>
-                    {cust.name ? cust.name.split(' ')[0] : 'Member'}
-                  </Text>
 
-                  {/* Purchase Total Amount Chip */}
-                  {cust.totalPurchase > 0 ? (
-                    <View style={{
-                      backgroundColor: '#F8FAFC',
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      marginTop: 4,
-                      borderWidth: 1,
-                      borderColor: '#F1F5F9',
-                    }}>
-                      <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }} numberOfLines={1}>
+                  {/* Customer details & progress bar */}
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }} numberOfLines={1}>
+                          {cust.name || 'Member'}
+                        </Text>
+                        {isFirst && (
+                          <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>TOP</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                         RM {Math.round(cust.totalPurchase)}
                       </Text>
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 4 }}>
-                      Active
-                    </Text>
-                  )}
+
+                    {/* Spend Ratio Progress Bar */}
+                    <View style={{ height: 3, backgroundColor: '#E2E8F0', borderRadius: 1.5, overflow: 'hidden', width: '100%' }}>
+                      <View style={{ 
+                        height: '100%', 
+                        backgroundColor: isFirst ? '#FFC700' : '#94A3B8', 
+                        width: `${spendPercentage}%`,
+                        borderRadius: 1.5
+                      }} />
+                    </View>
+                  </View>
+
+                  {/* Chevron action */}
+                  <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                 </TouchableOpacity>
               );
             })}
+
             {activeCustomersList.length === 0 && (
               <Text style={{ fontSize: 12, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', paddingVertical: 10 }}>
                 No active members today
               </Text>
             )}
-          </ScrollView>
+          </View>
         </View>
 
         {/* ⚠️ Idle Customers (>30 Days) Section */}

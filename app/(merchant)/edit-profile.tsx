@@ -12,6 +12,7 @@ import {
   TextInput,
   ActivityIndicator,
   Switch,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ export default function EditProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [merchant, setMerchant] = useState<any>(null);
   const [locationRecord, setLocationRecord] = useState<any>(null);
 
@@ -66,6 +68,218 @@ export default function EditProfileScreen() {
   useEffect(() => {
     fetchProfileData();
   }, [user]);
+
+  const mapRef = React.useRef<any>(null);
+  const markerRef = React.useRef<any>(null);
+
+  // Leaflet Map Injection and Management (Web Only)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || loading) return;
+    
+    // Inject Leaflet Stylesheet if not already present
+    let link = document.getElementById('leaflet-css') as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    // Inject custom grayscale map and custom marker styles
+    let customStyle = document.getElementById('leaflet-custom-style') as HTMLStyleElement;
+    if (!customStyle) {
+      customStyle = document.createElement('style');
+      customStyle.id = 'leaflet-custom-style';
+      customStyle.innerHTML = `
+        .leaflet-container img.leaflet-tile {
+          filter: grayscale(100%) contrast(0.88) brightness(1.04);
+        }
+        .custom-yellow-pin {
+          background: none;
+          border: none;
+        }
+        .leaflet-bar {
+          border: none !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+          border-radius: 8px !important;
+          overflow: hidden;
+        }
+        .leaflet-bar a {
+          background-color: #FFFFFF !important;
+          color: #050505 !important;
+          border: none !important;
+          border-bottom: 1px solid #F1F5F9 !important;
+          width: 32px !important;
+          height: 32px !important;
+          line-height: 32px !important;
+          font-size: 16px !important;
+          transition: all 0.2s ease;
+        }
+        .leaflet-bar a:last-child {
+          border-bottom: none !important;
+        }
+        .leaflet-bar a:hover {
+          background-color: #F8FAFC !important;
+          color: #FFC700 !important;
+        }
+      `;
+      document.head.appendChild(customStyle);
+    }
+
+    function initMap() {
+      const L = (window as any).L;
+      if (!L) return;
+
+      const mapDiv = document.getElementById('store-edit-map');
+      if (!mapDiv) return;
+
+      const startLat = parseFloat(lat) || 6.2443;
+      const startLng = parseFloat(lng) || 100.4217;
+
+      try {
+        const mapInstance = L.map('store-edit-map', { attributionControl: false }).setView([startLat, startLng], 14);
+        mapRef.current = mapInstance;
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '© OpenStreetMap contributors, © CARTO'
+        }).addTo(mapInstance);
+
+        // Custom Yellow Marker Pin HTML
+        const yellowPinHtml = `
+          <div style="
+            width: 24px;
+            height: 24px;
+            border-radius: 50% 50% 50% 0;
+            background: #FFC700;
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -12px 0 0 -12px;
+            border: 2px solid #050505;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+          ">
+            <div style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #050505;
+              margin: 6px 0 0 6px;
+            "></div>
+          </div>
+        `;
+
+        const customIcon = L.divIcon({
+          className: 'custom-yellow-pin',
+          html: yellowPinHtml,
+          iconSize: [24, 24],
+          iconAnchor: [12, 24]
+        });
+
+        let marker = L.marker([startLat, startLng], { 
+          draggable: true,
+          icon: customIcon
+        }).addTo(mapInstance);
+        markerRef.current = marker;
+
+        marker.on('dragend', function (event: any) {
+          const position = marker.getLatLng();
+          setLat(position.lat.toFixed(6));
+          setLng(position.lng.toFixed(6));
+        });
+
+        mapInstance.on('click', function (event: any) {
+          const latlng = event.latlng;
+          marker.setLatLng(latlng);
+          setLat(latlng.lat.toFixed(6));
+          setLng(latlng.lng.toFixed(6));
+        });
+
+        // Trigger resize event to render correctly
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.invalidateSize();
+          }
+        }, 200);
+      } catch (err) {
+        console.warn("Leaflet initialization warning:", err);
+      }
+    }
+
+    // Inject Leaflet Javascript if not already present
+    let script = document.getElementById('leaflet-js') as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => {
+        initMap();
+      };
+      document.head.appendChild(script);
+    } else {
+      // If already loaded, initialize directly
+      setTimeout(initMap, 100);
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [loading]);
+
+  // Reactive updates from coords inputs or GPS locator button
+  useEffect(() => {
+    if (Platform.OS === 'web' && mapRef.current && markerRef.current) {
+      const lVal = parseFloat(lat);
+      const gVal = parseFloat(lng);
+      if (!isNaN(lVal) && !isNaN(gVal)) {
+        const currentLatLng = markerRef.current.getLatLng();
+        if (currentLatLng.lat.toFixed(6) !== lVal.toFixed(6) || currentLatLng.lng.toFixed(6) !== gVal.toFixed(6)) {
+          mapRef.current.setView([lVal, gVal], 14);
+          markerRef.current.setLatLng([lVal, gVal]);
+        }
+      }
+    }
+  }, [lat, lng]);
+
+  const handleUseGPS = () => {
+    if (Platform.OS === 'web') {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const currentLat = position.coords.latitude.toFixed(6);
+            const currentLng = position.coords.longitude.toFixed(6);
+            setLat(currentLat);
+            setLng(currentLng);
+          },
+          (error) => {
+            Alert.alert('GPS Error', 'Failed to retrieve current location.');
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      } else {
+        Alert.alert('Not Supported', 'Geolocation is not supported by your browser.');
+      }
+    } else {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLat(position.coords.latitude.toFixed(6));
+            setLng(position.coords.longitude.toFixed(6));
+          },
+          (error) => {
+            Alert.alert('GPS Error', 'Failed to retrieve current location.');
+          }
+        );
+      } else {
+        Alert.alert('Not Supported', 'GPS is not available on this device.');
+      }
+    }
+  };
 
   const fetchProfileData = async () => {
     if (!user?.merchant_id) return;
@@ -328,9 +542,7 @@ export default function EditProfileScreen() {
         });
       }
 
-      Alert.alert('Success', 'Store profile and operating hours updated successfully!', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      setShowSuccessModal(true);
     } catch (err: any) {
       Alert.alert('Save Error', err.message || 'Failed to update store profile.');
     } finally {
@@ -350,125 +562,152 @@ export default function EditProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Custom Header Bar */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-          <Ionicons name="chevron-back" size={22} color="#050505" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('edit_store_profile')}</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('edit_store_profile')}</Text>
+        </View>
+        <Image
+          source={require('../../assets/risev logo.png')}
+          style={{ width: 80, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+        />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Logo Picker */}
-        <View style={{ alignItems: 'center', width: '100%', marginVertical: 8 }}>
-          <TouchableOpacity style={styles.avatarPickerContainer} onPress={handlePickImage} activeOpacity={0.85}>
-            {logoPreview ? (
-              <Image source={{ uri: logoPreview }} style={styles.avatarPickerImage} />
-            ) : (
-              <View style={[styles.avatarPickerImage, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
-                <Ionicons name="storefront-outline" size={32} color="#94A3B8" />
-              </View>
-            )}
-            <View style={styles.avatarPencilIcon}>
-              <Ionicons name="camera" size={14} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.avatarPickerLabel}>{t('tap_logo_upload')}</Text>
-        </View>
+        {/* Scrolling Black Header Background */}
+        <View style={styles.scrollHeaderBg} />
 
-        {/* Background Banner Picker */}
-        <View style={{ width: '100%', marginVertical: 12, alignItems: 'center' }}>
-          <Text style={styles.sectionTitleLabel}>
-            {locale === 'en' ? 'Background Banner' : 'Banner Latar Belakang'}
-          </Text>
-          
-          <TouchableOpacity style={styles.bannerPickerContainer} onPress={handlePickBanner} activeOpacity={0.85}>
+        {/* Unified Cover & Logo Header Picker */}
+        <View style={styles.coverHeaderContainer}>
+          {/* Banner Image Frame */}
+          <TouchableOpacity 
+            style={styles.coverBannerPicker} 
+            onPress={handlePickBanner} 
+            activeOpacity={0.9}
+          >
             {bannerPreview ? (
-              <Image source={{ uri: bannerPreview }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              <Image source={{ uri: bannerPreview }} style={styles.coverBannerImage} />
             ) : (
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <Ionicons name="image-outline" size={28} color="#94A3B8" />
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+              <View style={styles.coverBannerPlaceholder}>
+                <Ionicons name="image-outline" size={24} color="#94A3B8" />
+                <Text style={styles.coverBannerPlaceholderText}>
                   {locale === 'en' ? 'Tap to upload background banner' : 'Ketik untuk memuat naik banner'}
                 </Text>
               </View>
             )}
-            <View style={[styles.avatarPencilIcon, { top: 8, right: 8, bottom: undefined }]}>
+            <View style={styles.coverBannerCameraIcon}>
               <Ionicons name="camera" size={14} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="information-circle-outline" size={13} color="#64748B" />
-            <Text style={styles.infoText}>
-              {locale === 'en' 
-                ? 'This image will be displayed as the background banner in customer explore.' 
-                : 'Imej ini akan dipaparkan sebagai banner latar belakang dalam carian pelanggan.'}
-            </Text>
+          {/* Floating Logo Overlay Container */}
+          <View style={styles.coverLogoWrapper}>
+            <TouchableOpacity 
+              style={styles.coverLogoPicker} 
+              onPress={handlePickImage} 
+              activeOpacity={0.9}
+            >
+              <View style={{ width: '100%', height: '100%', borderRadius: 45, overflow: 'hidden' }}>
+                {logoPreview ? (
+                  <Image source={{ uri: logoPreview }} style={styles.coverLogoImage} />
+                ) : (
+                  <View style={[styles.coverLogoImage, { backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="storefront-outline" size={24} color="#94A3B8" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.coverLogoCameraIcon}>
+                <Ionicons name="camera" size={12} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Helper Tooltip Info */}
+        <View style={[styles.infoRow, { marginTop: 4, marginBottom: 16, alignSelf: 'center', paddingHorizontal: 12 }]}>
+          <Ionicons name="information-circle-outline" size={13} color="#64748B" />
+          <Text style={[styles.infoText, { textAlign: 'center' }]}>
+            {locale === 'en' 
+              ? 'This previews your actual store profile appearance. Tap banner or logo circle to change.' 
+              : 'Imej ini menunjukkan rupa profil kedai sebenar anda. Ketik banner atau logo untuk menukar.'}
+          </Text>
         </View>
 
         {/* Store Name Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{t('store_name')}</Text>
-          <TextInput
-            style={styles.textInput}
-            value={storeName}
-            onChangeText={setStoreName}
-            placeholder="Enter store name"
-            placeholderTextColor="#94A3B8"
-            {...Platform.select({
-              web: { outlineStyle: 'none' } as any,
-            })}
-          />
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="storefront-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={storeName}
+              onChangeText={setStoreName}
+              placeholder="Enter store name"
+              placeholderTextColor="#94A3B8"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
         </View>
 
         {/* Business Email Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{t('business_email')}</Text>
-          <TextInput
-            style={styles.textInput}
-            value={businessEmail}
-            onChangeText={setBusinessEmail}
-            placeholder={t('business_email')}
-            placeholderTextColor="#94A3B8"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            {...Platform.select({
-              web: { outlineStyle: 'none' } as any,
-            })}
-          />
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="mail-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={businessEmail}
+              onChangeText={setBusinessEmail}
+              placeholder={t('business_email')}
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
         </View>
 
         {/* Phone Number Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{t('phone_number')}</Text>
-          <TextInput
-            style={styles.textInput}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            placeholder={t('phone_number')}
-            placeholderTextColor="#94A3B8"
-            keyboardType="phone-pad"
-            {...Platform.select({
-              web: { outlineStyle: 'none' } as any,
-            })}
-          />
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="call-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder={t('phone_number')}
+              placeholderTextColor="#94A3B8"
+              keyboardType="phone-pad"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
         </View>
 
         {/* Monthly Sales Goal Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{t('monthly_sales_goal')}</Text>
-          <TextInput
-            style={styles.textInput}
-            value={monthlySalesGoal}
-            onChangeText={setMonthlySalesGoal}
-            placeholder="e.g. 10000"
-            placeholderTextColor="#94A3B8"
-            keyboardType="numeric"
-            {...Platform.select({
-              web: { outlineStyle: 'none' } as any,
-            })}
-          />
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="cash-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={monthlySalesGoal}
+              onChangeText={setMonthlySalesGoal}
+              placeholder="e.g. 10000"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
         </View>
 
         {/* Category Selector Input */}
@@ -506,276 +745,305 @@ export default function EditProfileScreen() {
         {/* Address Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{t('address')}</Text>
-          <TextInput
-            style={styles.textInput}
-            value={address}
-            onChangeText={setAddress}
-            placeholder={t('address')}
-            placeholderTextColor="#94A3B8"
-            {...Platform.select({
-              web: { outlineStyle: 'none' } as any,
-            })}
-          />
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="location-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={address}
+              onChangeText={setAddress}
+              placeholder={t('address')}
+              placeholderTextColor="#94A3B8"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
         </View>
 
         {/* Daily Operating Hours Section */}
-        <Text style={[styles.sectionLabel, { marginTop: 16, marginBottom: 8 }]}>{t('operating_hours')}</Text>
-        
-        {/* Monday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('monday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="time" size={18} color="#050505" />
+          <Text style={styles.sectionLabel}>{t('operating_hours')}</Text>
+        </View>
+
+        <View style={styles.hoursCardList}>
+          {/* Monday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('monday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={monClosed}
                 onValueChange={setMonClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={monClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!monClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={monHours}
-              onChangeText={setMonHours}
-              placeholder="08:00 - 22:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!monClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={monHours}
+                  onChangeText={setMonHours}
+                  placeholder="08:00 - 22:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Tuesday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('tuesday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Tuesday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('tuesday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={tueClosed}
                 onValueChange={setTueClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={tueClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!tueClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={tueHours}
-              onChangeText={setTueHours}
-              placeholder="08:00 - 22:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!tueClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={tueHours}
+                  onChangeText={setTueHours}
+                  placeholder="08:00 - 22:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Wednesday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('wednesday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Wednesday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('wednesday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={wedClosed}
                 onValueChange={setWedClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={wedClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!wedClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={wedHours}
-              onChangeText={setWedHours}
-              placeholder="08:00 - 22:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!wedClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={wedHours}
+                  onChangeText={setWedHours}
+                  placeholder="08:00 - 22:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Thursday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('thursday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Thursday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('thursday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={thuClosed}
                 onValueChange={setThuClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={thuClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!thuClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={thuHours}
-              onChangeText={setThuHours}
-              placeholder="08:00 - 22:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!thuClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={thuHours}
+                  onChangeText={setThuHours}
+                  placeholder="08:00 - 22:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Friday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('friday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Friday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('friday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={friClosed}
                 onValueChange={setFriClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={friClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!friClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={friHours}
-              onChangeText={setFriHours}
-              placeholder="08:00 - 22:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!friClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={friHours}
+                  onChangeText={setFriHours}
+                  placeholder="08:00 - 22:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Saturday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('saturday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Saturday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('saturday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={satClosed}
                 onValueChange={setSatClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={satClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!satClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={satHours}
-              onChangeText={setSatHours}
-              placeholder="09:00 - 23:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!satClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={satHours}
+                  onChangeText={setSatHours}
+                  placeholder="09:00 - 23:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Sunday */}
-        <View style={styles.hoursEditRow}>
-          <View style={styles.hoursDayHeader}>
-            <Text style={styles.hoursDayLabel}>{t('sunday')}</Text>
-            <View style={styles.closedToggleRow}>
-              <Text style={styles.closedToggleText}>{t('closed')}</Text>
+          {/* Sunday */}
+          <View style={styles.compactHoursRow}>
+            <Text style={styles.compactDayLabel}>{t('sunday')}</Text>
+            <View style={styles.compactClosedWrap}>
+              <Text style={styles.compactClosedText}>{t('closed')}</Text>
               <Switch
                 value={sunClosed}
                 onValueChange={setSunClosed}
-                trackColor={{ false: '#CBD5E1', true: '#050505' }}
-                thumbColor={sunClosed ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
               />
             </View>
-          </View>
-          {!sunClosed ? (
-            <TextInput
-              style={styles.textInput}
-              value={sunHours}
-              onChangeText={setSunHours}
-              placeholder="09:00 - 21:00"
-              placeholderTextColor="#94A3B8"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-          ) : (
-            <View style={[styles.textInput, styles.disabledInput]}>
-              <Text style={styles.disabledInputText}>{t('closed')}</Text>
+            <View style={{ flex: 1 }}>
+              {!sunClosed ? (
+                <TextInput
+                  style={styles.compactTimeInput}
+                  value={sunHours}
+                  onChangeText={setSunHours}
+                  placeholder="09:00 - 21:00"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={[styles.compactTimeInput, styles.compactDisabledInput]}>
+                  <Text style={styles.compactDisabledInputText}>{t('closed')}</Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
         </View>
 
         {/* Coordinates & Map Pin */}
-        <Text style={[styles.sectionLabel, { marginTop: 12, marginBottom: 4 }]}>{t('map_location_coords')}</Text>
-        <View style={styles.hoursInputsRow}>
-          <View style={[styles.inputContainer, { flex: 1, marginVertical: 0 }]}>
-            <Text style={[styles.inputLabel, { fontSize: 10 }]}>{t('latitude')}</Text>
-            <TextInput
-              style={[styles.textInput, { fontSize: 12, paddingHorizontal: 8, paddingVertical: 6 }]}
-              value={lat}
-              onChangeText={setLat}
-              placeholder="e.g. 6.2443"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
+        <View style={[styles.sectionHeaderRow, { justifyContent: 'space-between', width: '100%' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="compass" size={18} color="#050505" />
+            <Text style={styles.sectionLabel}>{t('map_location_coords')}</Text>
           </View>
-          <View style={[styles.inputContainer, { flex: 1, marginLeft: 8, marginVertical: 0 }]}>
-            <Text style={[styles.inputLabel, { fontSize: 10 }]}>{t('longitude')}</Text>
-            <TextInput
-              style={[styles.textInput, { fontSize: 12, paddingHorizontal: 8, paddingVertical: 6 }]}
-              value={lng}
-              onChangeText={setLng}
-              placeholder="e.g. 100.4217"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
+          <TouchableOpacity 
+            onPress={handleUseGPS}
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              gap: 4, 
+              backgroundColor: '#EFF6FF', 
+              borderWidth: 1,
+              borderColor: '#DBEAFE',
+              paddingHorizontal: 12, 
+              paddingVertical: 6, 
+              borderRadius: 20,
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="location" size={12} color="#2563EB" />
+            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#2563EB' }}>
+              {locale === 'en' ? 'Detect Location' : 'Kesan Lokasi'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.hoursCardList}>
+          <View style={styles.hoursInputsRow}>
+            <View style={[styles.inputContainer, { flex: 1, marginVertical: 0 }]}>
+              <Text style={[styles.inputLabel, { fontSize: 10, color: '#64748B' }]}>{t('latitude')}</Text>
+              <TextInput
+                style={[styles.textInput, { fontSize: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF' }]}
+                value={lat}
+                onChangeText={setLat}
+                placeholder="e.g. 6.2443"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+            <View style={[styles.inputContainer, { flex: 1, marginLeft: 10, marginVertical: 0 }]}>
+              <Text style={[styles.inputLabel, { fontSize: 10, color: '#64748B' }]}>{t('longitude')}</Text>
+              <TextInput
+                style={[styles.textInput, { fontSize: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF' }]}
+                value={lng}
+                onChangeText={setLng}
+                placeholder="e.g. 100.4217"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
           </View>
+
+          {/* Leaflet Map Div (Web Only) */}
+          {Platform.OS === 'web' && (
+            <View style={{ width: '100%', height: 220, borderRadius: 12, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' }}>
+              <div id="store-edit-map" style={{ width: '100%', height: '100%' }} />
+            </View>
+          )}
         </View>
 
         {/* Action Buttons */}
@@ -792,6 +1060,41 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Premium Custom Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          router.back();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalCard}>
+            <View style={styles.successIconCircle}>
+              <Ionicons name="checkmark" size={28} color="#050505" />
+            </View>
+            <Text style={styles.successModalTitle}>
+              {locale === 'en' ? 'Success' : 'Berjaya'}
+            </Text>
+            <Text style={styles.successModalMessage}>
+              {locale === 'en' ? 'Successfully updated your information!' : 'Berjaya mengemas kini maklumat anda!'}
+            </Text>
+            <TouchableOpacity
+              style={styles.successModalBtn}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.back();
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successModalBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -807,47 +1110,120 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
+  scrollHeaderBg: {
+    position: 'absolute',
+    top: -20,
+    left: -20,
+    right: -20,
+    height: 170,
+    backgroundColor: '#050505',
+    zIndex: 0,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: '#F1F5F9',
+    paddingTop: 24,
+    paddingBottom: 16,
+    backgroundColor: '#050505',
+    zIndex: 10,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#FFFFFF',
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
-  avatarPickerContainer: {
+  coverHeaderContainer: {
+    width: '100%',
+    height: 185,
+    position: 'relative',
+    marginBottom: 40,
+    marginTop: 18,
+  },
+  coverBannerPicker: {
+    width: '100%',
+    height: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  coverBannerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  coverBannerPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+  },
+  coverBannerPlaceholderText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  coverBannerCameraIcon: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(5, 5, 5, 0.65)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  coverLogoWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: '50%',
+    marginLeft: -45,
+    zIndex: 10,
+    borderRadius: 45,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  coverLogoPicker: {
     width: 90,
     height: 90,
     borderRadius: 45,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
     position: 'relative',
-    borderWidth: 2,
-    borderColor: '#FFC700',
-    overflow: 'visible',
   },
-  avatarPickerImage: {
+  coverLogoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 45,
+    borderRadius: 42,
   },
-  avatarPencilIcon: {
+  coverLogoCameraIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
@@ -859,33 +1235,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-  },
-  avatarPickerLabel: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    marginTop: 8,
-  },
-  sectionTitleLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bannerPickerContainer: {
-    width: '100%',
-    height: 120,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
   infoRow: {
     flexDirection: 'row',
@@ -912,6 +1261,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  inputFieldWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  inputFieldIcon: {
+    marginRight: 8,
+  },
+  textInputWithIcon: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
   },
   textInput: {
     backgroundColor: '#F8FAFC',
@@ -947,50 +1315,79 @@ const styles = StyleSheet.create({
   categoryChipTextActive: {
     color: '#050505',
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 10,
+  },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  hoursEditRow: {
+  hoursCardList: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+    marginBottom: 8,
+  },
+  compactHoursRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  hoursDayHeader: {
-    flex: 1,
-    marginRight: 16,
-  },
-  hoursDayLabel: {
-    fontSize: 13,
+  compactDayLabel: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
-    marginBottom: 4,
+    color: '#334155',
+    width: 80,
   },
-  closedToggleRow: {
+  compactClosedWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 2,
+    marginRight: 10,
   },
-  closedToggleText: {
+  compactClosedText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
   },
-  disabledInput: {
+  compactTimeInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+    textAlign: 'center',
+  },
+  compactDisabledInput: {
     backgroundColor: '#F1F5F9',
     borderColor: '#E2E8F0',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  disabledInputText: {
+  compactDisabledInputText: {
     color: '#94A3B8',
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    textTransform: 'uppercase',
   },
   hoursInputsRow: {
     flexDirection: 'row',
@@ -1032,5 +1429,61 @@ const styles = StyleSheet.create({
     color: '#050505',
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  successModalCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  successIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  successModalTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    marginBottom: 8,
+  },
+  successModalMessage: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  successModalBtn: {
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successModalBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
 });
