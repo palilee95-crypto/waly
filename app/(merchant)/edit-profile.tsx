@@ -20,7 +20,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
-import * as ImagePicker from 'expo-image-picker';
 
 export default function EditProfileScreen() {
   const { user } = useAuth();
@@ -150,56 +149,111 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handlePickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selected = result.assets[0];
-        setLogoPreview(selected.uri);
-        
-        // Convert URI to form data file object
-        const uriParts = selected.uri.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        setLogoFile({
-          uri: selected.uri,
-          name: `logo.${fileType}`,
-          type: `image/${fileType}`,
-        } as any);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to pick store logo.');
+  const handlePickImage = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 200;
+              const MAX_HEIGHT = 200;
+              let width = img.width;
+              let height = img.height;
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width;
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height;
+                  height = MAX_HEIGHT;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(img, 0, 0, width, height);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  setLogoFile(compressedFile);
+                  setLogoPreview(URL.createObjectURL(compressedFile));
+                }
+              }, 'image/jpeg', 0.75);
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert('Not Supported', 'Image upload is currently web-only in this demo.');
     }
   };
 
-  const handlePickBanner = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selected = result.assets[0];
-        setBannerPreview(selected.uri);
-        
-        const uriParts = selected.uri.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        setBannerFile({
-          uri: selected.uri,
-          name: `banner.${fileType}`,
-          type: `image/${fileType}`,
-        } as any);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to pick background banner.');
+  const handlePickBanner = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 800;
+              const MAX_HEIGHT = 450;
+              let width = img.width;
+              let height = img.height;
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width;
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height;
+                  height = MAX_HEIGHT;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(img, 0, 0, width, height);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_banner.jpg", {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  setBannerFile(compressedFile);
+                  setBannerPreview(URL.createObjectURL(compressedFile));
+                }
+              }, 'image/jpeg', 0.8);
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert('Not Supported', 'Image upload is currently web-only in this demo.');
     }
   };
 
