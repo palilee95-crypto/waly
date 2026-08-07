@@ -11,7 +11,9 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
         {/* PWA Manifest Link */}
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#1C1340" />
+        <meta name="theme-color" content="#050505" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
