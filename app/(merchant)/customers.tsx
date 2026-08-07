@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -58,6 +58,7 @@ export default function CustomersScreen() {
   const { t, locale } = useLanguage();
   const params = useLocalSearchParams<{ customerId?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Purchase' | 'Redemption' | 'Adjustment'>('All');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -581,13 +582,17 @@ export default function CustomersScreen() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: 16 + insets.top },
+          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Standard Dark Background */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, backgroundColor: '#050505', zIndex: 0 }} />
+        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, backgroundColor: '#050505', zIndex: 0 }} />
 
         {/* Profile Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingTop: 16, marginBottom: 20, zIndex: 10 }}>

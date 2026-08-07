@@ -15,7 +15,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
@@ -41,6 +41,7 @@ export default function MerchantDashboard() {
   const { user, refreshSession } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState<'Today' | 'This Week' | 'This Month'>('Today');
   const [merchant, setMerchant] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -430,16 +431,20 @@ export default function MerchantDashboard() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
       <StatusBar style="light" />
       {/* Scrollable Dashboard View */}
       <ScrollView
         style={{ backgroundColor: '#FFFFFF' }}
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: 16 + insets.top },
+          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Dark Background - full black */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0, backgroundColor: '#050505' }} />
+        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
         {/* Header Content */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 20 }}>

@@ -23,8 +23,10 @@ function fetchAllRecords(collectionName, filter, sort) {
 // Meta WhatsApp Business Cloud API sendTemplateMessage function
 function sendTemplateMessage(merchantId, recipientPhone, templateName, languageCode, parameters) {
   // Support developer testing: redirect all messages to test number if specified in environment
-  const testNumber = $os.getenv("WHATSAPP_TEST_NUMBER");
+  // (DISABLED - Now using real customer numbers)
+  // const testNumber = $os.getenv("WHATSAPP_TEST_NUMBER");
   let finalRecipient = recipientPhone.replace(/[^\d]/g, '');
+  /*
   if (testNumber) {
     const cleanTest = testNumber.replace(/[^\d]/g, '');
     if (cleanTest) {
@@ -32,6 +34,7 @@ function sendTemplateMessage(merchantId, recipientPhone, templateName, languageC
       finalRecipient = cleanTest;
     }
   }
+  */
 
   // Normalize phone number to include country code (defaulting to +60 if Malaysian number without code)
   if (finalRecipient.indexOf("0") === 0) {
@@ -56,6 +59,33 @@ function sendTemplateMessage(merchantId, recipientPhone, templateName, languageC
     }
   } catch (err) {
     // Collection or records not found
+  }
+
+  // 1b. Fallback to official platform settings ONLY for development/test merchant (bp6beunui7eq1il)
+  if (!config && merchantId === "bp6beunui7eq1il") {
+    try {
+      const sysSettings = $app.findRecordById("system_settings", "settingsglobal");
+      if (sysSettings) {
+        const sysToken = sysSettings.getString("official_access_token");
+        const sysPhoneId = sysSettings.getString("official_phone_number_id");
+        const sysWabaId = sysSettings.getString("official_waba_id");
+        
+        if (sysToken && sysPhoneId) {
+          // Construct a dynamic configuration object matching WABA schema
+          config = {
+            getString: function(key) {
+              if (key === "access_token") return sysToken;
+              if (key === "phone_number_id") return sysPhoneId;
+              if (key === "waba_id") return sysWabaId;
+              return "";
+            }
+          };
+          console.log(`[META API DEV FALLBACK] Using official platform settings for developer merchant ${merchantId}`);
+        }
+      }
+    } catch (err) {
+      // system_settings not configured or not found
+    }
   }
 
   // 2. If no configuration found, run in sandbox/mock mode

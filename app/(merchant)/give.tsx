@@ -12,7 +12,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuth } from '@/context/AuthContext';
@@ -22,6 +22,7 @@ import { pb } from '@/lib/pocketbase';
 export default function GiveStampsScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
@@ -173,14 +174,18 @@ export default function GiveStampsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: 16 + insets.top },
+          isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFC700" />}
       >
         {/* Dark Background - true black */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 280, zIndex: 0, backgroundColor: '#050505' }} />
+        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 280 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
         {/* Header Content */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, marginBottom: 24, paddingTop: 10 }}>

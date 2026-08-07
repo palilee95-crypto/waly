@@ -15,7 +15,7 @@ import {
   Modal,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -89,6 +89,7 @@ export default function MarketingScreen() {
   const isFocused = pathname.includes('marketing');
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const insets = useSafeAreaInsets();
   
   const [merchant, setMerchant] = useState<any>(null);
   const [programId, setProgramId] = useState<string | null>(null);
@@ -775,7 +776,7 @@ export default function MarketingScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
         visible={isFocused && merchant !== null && merchant.owner !== user?.id}
@@ -803,11 +804,15 @@ export default function MarketingScreen() {
       </Modal>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: 16 + insets.top },
+          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Dark Background - true black */}
-        <View style={{ position: 'absolute', top: -16, left: -20, right: -20, height: 180, zIndex: 0, backgroundColor: '#050505' }} />
+        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
         {/* Welcome Merchant Profile Header */}
         <View style={styles.profileHeader}>

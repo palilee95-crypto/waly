@@ -17,7 +17,7 @@ import {
   Linking,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -89,6 +89,7 @@ export default function ProfileScreen() {
   const { logout, user, switchRole, updateProfile } = useAuth();
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [merchant, setMerchant] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -783,13 +784,17 @@ export default function ProfileScreen() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: 20 + insets.top },
+          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Premium Dark Header Background */}
-        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 260, backgroundColor: '#050505', zIndex: 0 }} />
+        <View style={{ position: 'absolute', top: -(30 + insets.top), left: -20, right: -20, height: 260 + insets.top, backgroundColor: '#050505', zIndex: 0 }} />
 
         {/* Header Row: Title & Logo aligned */}
         <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between', paddingHorizontal: 0, marginTop: 8, marginBottom: 12 }]}>
