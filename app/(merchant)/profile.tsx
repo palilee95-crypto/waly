@@ -81,7 +81,7 @@ const BentoSquareItem = ({
       )}
     </View>
     <Text style={styles.settingTitle} numberOfLines={1}>{title}</Text>
-    <Text style={styles.settingSubtitle} numberOfLines={2} style={{ marginTop: 4, color: '#737686', fontSize: 11 }}>{subtitle}</Text>
+    <Text style={[styles.settingSubtitle, { marginTop: 4, color: '#737686', fontSize: 11 }]} numberOfLines={2}>{subtitle}</Text>
   </TouchableOpacity>
 );
 
