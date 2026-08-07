@@ -940,7 +940,7 @@ export default function ProfileScreen() {
               subtitle={locale === 'en' ? 'Explore NFC stand marketplace' : 'Teroka pasaran stand NFC'}
               iconBgColor="#F1F5F9"
               iconColor="#050505"
-              onPress={() => router.push('/(merchant)/nfc-marketplace')}
+              onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
             />
             <BentoSquareItem
               iconName="shield-checkmark-outline"
