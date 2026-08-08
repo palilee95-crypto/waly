@@ -618,18 +618,16 @@ export default function CustomerDashboard() {
                     flexDirection: 'row', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    backgroundColor: '#FFFBEA', 
+                    backgroundColor: '#1A1400', 
                     borderRadius: 16, 
                     paddingVertical: 12, 
-                    borderWidth: 1, 
-                    borderColor: '#FFE38F',
                     gap: 8
                   }}
                   onPress={() => setQrModalVisible(true)}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="qr-code-outline" size={16} color="#806400" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>My QR</Text>
+                  <Ionicons name="qr-code-outline" size={16} color="#FFC700" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>My QR</Text>
                 </TouchableOpacity>
 
                 {/* My Vouchers Button */}
@@ -639,18 +637,16 @@ export default function CustomerDashboard() {
                     flexDirection: 'row', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    backgroundColor: '#F8FAFC', 
+                    backgroundColor: '#111111', 
                     borderRadius: 16, 
                     paddingVertical: 12, 
-                    borderWidth: 1, 
-                    borderColor: '#E2E8F0',
                     gap: 8
                   }}
                   onPress={() => router.push('/(customer)/vouchers')}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="ticket-outline" size={16} color="#475569" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>My Voucher</Text>
+                  <Ionicons name="ticket-outline" size={16} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>My Voucher</Text>
                 </TouchableOpacity>
               </View>
             </View>
