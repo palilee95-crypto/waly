@@ -108,29 +108,34 @@ export default function SubscriptionScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Sticky Header with Logo & Tagline */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Image 
-              source={require('../../assets/risev logo.png')}
-              style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-            />
-          </View>
-          <View style={styles.headerUpsell}>
-            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-              <Ionicons name="sparkles" size={14} color="#FFC700" />
-              <Text style={styles.headerUpsellTitle}>Grow Your Shop on Autopilot</Text>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          style={{ backgroundColor: '#050505' }}
+          contentContainerStyle={{ paddingBottom: 180 }}
+        >
+          {/* Sticky Header with Logo & Tagline */}
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Image 
+                source={require('../../assets/risev logo.png')}
+                style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+              />
             </View>
-            <Text style={styles.headerUpsellDesc}>
-              Turn one-time walk-ins into lifetime regular customers. Unlock automated WhatsApp alerts, custom loyalty programs, and detailed analytics to scale repeat sales without extra effort.
-            </Text>
+            <View style={styles.headerUpsell}>
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <Ionicons name="sparkles" size={14} color="#FFC700" />
+                <Text style={styles.headerUpsellTitle}>Grow Your Shop on Autopilot</Text>
+              </View>
+              <Text style={styles.headerUpsellDesc}>
+                Turn one-time walk-ins into lifetime regular customers. Unlock automated WhatsApp alerts, custom loyalty programs, and detailed analytics to scale repeat sales without extra effort.
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.scrollContent}>
 
           {/* 2. Billing Toggle (Monthly / Annual) */}
           <View style={styles.billingToggleWrapper}>
@@ -255,9 +260,10 @@ export default function SubscriptionScreen() {
                 </View>
               );
             })}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+           </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
 
       {/* 6. Sticky IAP Action Footer */}
       <View style={styles.stickyFooter}>
@@ -301,9 +307,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
     backgroundColor: '#050505',
   },
   headerTop: {
@@ -312,37 +318,39 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   headerUpsell: {
-    marginTop: 18,
+    marginTop: 24,
     width: '100%',
   },
   headerUpsellTitle: {
-    fontSize: 15,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: -0.4,
   },
   headerUpsellDesc: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 6,
-    lineHeight: 16,
+    color: '#CBD5E1',
+    marginTop: 8,
+    lineHeight: 18,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 180, // High bottom padding to avoid overlapping the sticky footer!
     backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 24,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 28,
+    marginTop: -24,
     minHeight: '100%',
   },
   upsellSparkle: {

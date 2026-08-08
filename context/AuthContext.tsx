@@ -147,14 +147,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedRole = await storage.getItem('risev_active_role');
       if (pb.authStore.isValid && pb.authStore.record) {
-        const refreshResult = await pb.collection('users').authRefresh().catch(() => null);
-        const record = refreshResult?.record || pb.authStore.record;
+        const record = pb.authStore.record;
         let role = (storedRole as UserRole) || record.role || 'customer';
         if (role === 'both') {
           role = 'customer';
         }
-        const merchantData = await ensureMerchantProfile(record);
         
+        // 🚀 Optimistic loading: Set user details instantly from cache
         setUser({
           id: record.id,
           phone: record.phone || '',
@@ -163,17 +162,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           avatar: record.avatar || undefined,
           role: record.role,
           activeRole: role,
-          merchant_id: merchantData.id,
-          merchant_status: merchantData.status,
-          merchant_created: merchantData.created,
+          merchant_id: record.merchant_id,
+          merchant_status: record.merchant_status || 'active',
           tier: record.tier || undefined,
           total_points: record.total_points || 0,
         });
         setActiveRole(role);
+        setIsLoading(false); // Instantly bypass spinner!
+
+        // Asynchronously refresh user session & profile in the background
+        try {
+          const refreshResult = await pb.collection('users').authRefresh().catch(() => null);
+          const freshRecord = refreshResult?.record || pb.authStore.record;
+          const merchantData = await ensureMerchantProfile(freshRecord);
+          
+          setUser({
+            id: freshRecord.id,
+            phone: freshRecord.phone || '',
+            name: freshRecord.name || '',
+            email: freshRecord.email || '',
+            avatar: freshRecord.avatar || undefined,
+            role: freshRecord.role,
+            activeRole: role,
+            merchant_id: merchantData.id,
+            merchant_status: merchantData.status,
+            merchant_created: merchantData.created,
+            tier: freshRecord.tier || undefined,
+            total_points: freshRecord.total_points || 0,
+          });
+        } catch (bgErr) {
+          console.warn('[AuthContext] Background session refresh failed:', bgErr);
+        }
+      } else {
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('Auth init error:', e);
-    } finally {
       setIsLoading(false);
     }
   };
