@@ -150,55 +150,56 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           return (
             <React.Fragment key={route.key}>
               {route.name === 'vouchers' && (
-                <TouchableOpacity
-                  onPress={() => setStampModalVisible(true)}
-                  activeOpacity={0.8}
-                  style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginTop: -14,
-                    marginHorizontal: 8,
-                  }}
-                >
-                  <View style={{
-                    width: 54,
-                    height: 54,
-                    borderRadius: 27,
-                    shadowColor: '#FF4A6B',
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 10,
-                    elevation: 6,
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 2.5,
-                    borderColor: '#FFFFFF',
-                    overflow: 'hidden',
-                  }}>
-                    <LinearGradient
-                      colors={['#FF6B8B', '#FF2A55']}
-                      style={{
-                        flex: 1,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {/* Glass Highlight */}
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <TouchableOpacity
+                    onPress={() => setStampModalVisible(true)}
+                    activeOpacity={0.8}
+                    style={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: -22, // Slightly higher to look floated
+                    }}
+                  >
+                    <View style={{
+                      width: 54,
+                      height: 54,
+                      borderRadius: 27,
+                      shadowColor: '#FF4A6B',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 0.4,
+                      shadowRadius: 10,
+                      elevation: 6,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 2.5,
+                      borderColor: '#FFFFFF',
+                      overflow: 'hidden',
+                    }}>
                       <LinearGradient
-                        colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0)']}
-                        start={{ x: 0.5, y: 0 }}
-                        end={{ x: 0.5, y: 0.5 }}
+                        colors={['#FF6B8B', '#FF2A55']}
                         style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: 22,
+                          flex: 1,
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
-                      />
-                      <Ionicons name="scan" size={24} color="#FFFFFF" />
-                    </LinearGradient>
-                  </View>
-                </TouchableOpacity>
+                      >
+                        {/* Glass Highlight */}
+                        <LinearGradient
+                          colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0)']}
+                          start={{ x: 0.5, y: 0 }}
+                          end={{ x: 0.5, y: 0.5 }}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 22,
+                          }}
+                        />
+                        <Ionicons name="scan" size={24} color="#FFFFFF" />
+                      </LinearGradient>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               )}
               <AnimatedTabButton 
                 isFocused={isFocused}
@@ -233,12 +234,7 @@ const AnimatedTabButton = ({ isFocused, onPress, iconName, label }: any) => {
 
   const width = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [40, 95]
-  });
-
-  const backgroundColor = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255, 199, 0, 0)', 'rgba(255, 199, 0, 1)']
+    outputRange: [40, 82]
   });
   
   const labelOpacity = anim.interpolate({
@@ -257,26 +253,41 @@ const AnimatedTabButton = ({ isFocused, onPress, iconName, label }: any) => {
           flexDirection: 'row', 
           alignItems: 'center', 
           justifyContent: 'center', 
-          height: 40, 
-          borderRadius: 20, 
+          height: 38, 
+          borderRadius: 19, 
           width,
-          backgroundColor 
+          overflow: 'hidden'
         }
       ]}>
-        <Ionicons name={isFocused ? iconName : `${iconName}-outline` as any} size={isFocused ? 18 : 22} color={isFocused ? '#1A1400' : '#0F172A'} />
-        {isFocused && (
-          <Animated.Text 
-            style={{ 
-              marginLeft: 6, 
-              fontSize: 13, 
-              fontFamily: 'PlusJakartaSans_700Bold', 
-              color: '#1A1400',
-              opacity: labelOpacity
-            }} 
-            numberOfLines={1}
+        {isFocused ? (
+          <LinearGradient
+            colors={['#FFDF6D', '#FFC700']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              ...StyleSheet.absoluteFill,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 10,
+            }}
           >
-            {label}
-          </Animated.Text>
+            <Ionicons name={iconName} size={16} color="#1A1400" />
+            <Animated.Text 
+              style={{ 
+                marginLeft: 4, 
+                fontSize: 11.5, 
+                fontFamily: 'PlusJakartaSans_700Bold', 
+                color: '#1A1400',
+                opacity: labelOpacity
+              }} 
+              numberOfLines={1}
+            >
+              {label}
+            </Animated.Text>
+          </LinearGradient>
+        ) : (
+          <Ionicons name={`${iconName}-outline` as any} size={22} color="#475569" />
         )}
       </Animated.View>
     </TouchableOpacity>
@@ -560,7 +571,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 16,
     elevation: 4,
-    overflow: 'hidden',
   },
   tabBarInner: {
     flex: 1,

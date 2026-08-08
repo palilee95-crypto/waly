@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -25,6 +26,46 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
   // 'menu' | 'nfc' | 'qr'
   const [scanMode, setScanMode] = useState<'menu' | 'nfc' | 'qr'>('menu');
   const [isScanning, setIsScanning] = useState(false);
+
+  // Pulse animation for NFC scanning radar ripples
+  const pulseAnim1 = useRef(new Animated.Value(0)).current;
+  const pulseAnim2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (scanMode === 'nfc') {
+      pulseAnim1.setValue(0);
+      pulseAnim2.setValue(0);
+
+      // Pulse 1: Starts immediately
+      const anim1 = Animated.loop(
+        Animated.timing(pulseAnim1, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse 2: Starts with a delay
+      const anim2 = Animated.loop(
+        Animated.sequence([
+          Animated.delay(1100),
+          Animated.timing(pulseAnim2, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          })
+        ])
+      );
+
+      anim1.start();
+      anim2.start();
+
+      return () => {
+        anim1.stop();
+        anim2.stop();
+      };
+    }
+  }, [scanMode]);
 
   const startQrScanner = async () => {
     if (!permission?.granted) {
@@ -69,17 +110,27 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <View style={[styles.bottomSheet, { maxWidth: width > 600 ? 500 : '100%', alignSelf: 'center' }]}>
+        <View style={[
+          styles.bottomSheet, 
+          { 
+            maxWidth: width > 600 ? 500 : '100%', 
+            alignSelf: 'center',
+            backgroundColor: scanMode === 'nfc' ? '#09090B' : '#FFFFFF'
+          }
+        ]}>
           
           {/* Header */}
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>
+            <Text style={[styles.sheetTitle, { color: scanMode === 'nfc' ? '#FFFFFF' : '#0F172A' }]}>
               {scanMode === 'menu' && 'Stamp Your Card'}
               {scanMode === 'nfc' && 'Ready to Scan NFC'}
               {scanMode === 'qr' && 'Scan Store QR'}
             </Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color="#1E293B" />
+            <TouchableOpacity 
+              onPress={handleClose} 
+              style={[styles.closeBtn, { backgroundColor: scanMode === 'nfc' ? '#27272A' : '#F1F5F9' }]}
+            >
+              <Ionicons name="close" size={22} color={scanMode === 'nfc' ? '#FFFFFF' : '#1E293B'} />
             </TouchableOpacity>
           </View>
 
@@ -125,29 +176,80 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
           )}
 
           {/* NFC Radar Scanning Mode */}
-          {scanMode === 'nfc' && (
-            <View style={styles.scanContainer}>
-              <View style={styles.nfcVisualOuter}>
-                <View style={styles.nfcVisualMiddle}>
-                  <View style={styles.nfcVisualInner}>
-                    <Ionicons name="phone-portrait-outline" size={48} color="#FFC700" />
+          {scanMode === 'nfc' && (() => {
+            const scale1 = pulseAnim1.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.9, 1.8],
+            });
+            const opacity1 = pulseAnim1.interpolate({
+              inputRange: [0, 0.8, 1],
+              outputRange: [0.6, 0.4, 0],
+            });
+
+            const scale2 = pulseAnim2.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.9, 1.8],
+            });
+            const opacity2 = pulseAnim2.interpolate({
+              inputRange: [0, 0.8, 1],
+              outputRange: [0.6, 0.4, 0],
+            });
+
+            return (
+              <View style={styles.scanContainer}>
+                <View style={{ width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
+                  {/* Glowing Radar Ripple 1 */}
+                  <Animated.View style={{
+                    position: 'absolute',
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    borderWidth: 1.5,
+                    borderColor: '#FFC700',
+                    shadowColor: '#FFC700',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 12,
+                    transform: [{ scale: scale1 }],
+                    opacity: opacity1,
+                  }} />
+
+                  {/* Glowing Radar Ripple 2 */}
+                  <Animated.View style={{
+                    position: 'absolute',
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    borderWidth: 1.5,
+                    borderColor: '#FFC700',
+                    shadowColor: '#FFC700',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 12,
+                    transform: [{ scale: scale2 }],
+                    opacity: opacity2,
+                  }} />
+
+                  {/* Static Center Phone Hub */}
+                  <View style={[styles.nfcVisualInner, { backgroundColor: '#1A1400', borderWidth: 1.5, borderColor: '#FFC700' }]}>
+                    <Ionicons name="phone-portrait-outline" size={42} color="#FFC700" />
                   </View>
                 </View>
+
+                <Text style={[styles.scanPrompt, { color: '#FFFFFF' }]}>Hold phone near NFC tag</Text>
+                <Text style={[styles.scanInstructions, { color: '#94A3B8' }]}>
+                  Place the top back corner of your device close to the counter sticker to load store stamps.
+                </Text>
+
+                <TouchableOpacity 
+                  style={styles.backBtn}
+                  onPress={() => setScanMode('menu')}
+                >
+                  <Text style={[styles.backBtnText, { color: '#FFC700' }]}>Choose another method</Text>
+                </TouchableOpacity>
               </View>
-
-              <Text style={styles.scanPrompt}>Hold phone near NFC tag</Text>
-              <Text style={styles.scanInstructions}>
-                Place the top back corner of your device close to the counter sticker to load store stamps.
-              </Text>
-
-              <TouchableOpacity 
-                style={styles.backBtn}
-                onPress={() => setScanMode('menu')}
-              >
-                <Text style={styles.backBtnText}>Choose another method</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          );
+        })()}
 
           {/* QR Camera Scanner Mode */}
           {scanMode === 'qr' && (
@@ -155,7 +257,7 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
               {permission?.granted ? (
                 <View style={styles.cameraBox}>
                   <CameraView
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     facing="back"
                     onBarcodeScanned={handleBarCodeScanned}
                   >
