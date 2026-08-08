@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import CustomerStampModal from '@/components/CustomerStampModal';
 
 // Custom Bottom Tab Bar / Sidebar to match the clean minimalist black/white design
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -18,6 +19,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const { width } = useWindowDimensions();
   const { t } = useLanguage();
   const isDesktop = width >= 768;
+  const [stampModalVisible, setStampModalVisible] = useState(false);
 
   useEffect(() => {
     // A bouncy spring animation gives a nice "bubble" effect when switching tabs
@@ -145,16 +147,46 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
 
           return (
-            <AnimatedTabButton 
-              key={route.key}
-              isFocused={isFocused}
-              onPress={onPress}
-              iconName={iconName}
-              label={label}
-            />
+            <React.Fragment key={route.key}>
+              {route.name === 'vouchers' && (
+                <TouchableOpacity
+                  onPress={() => setStampModalVisible(true)}
+                  activeOpacity={0.8}
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#FF4A6B',
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
+                    marginTop: -12,
+                    shadowColor: '#FF4A6B',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 10,
+                    elevation: 6,
+                    borderWidth: 2.5,
+                    borderColor: '#FFFFFF',
+                  }}
+                >
+                  <Ionicons name="scan" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              <AnimatedTabButton 
+                isFocused={isFocused}
+                onPress={onPress}
+                iconName={iconName}
+                label={label}
+              />
+            </React.Fragment>
           );
         })}
       </View>
+
+      <CustomerStampModal 
+        visible={stampModalVisible}
+        onClose={() => setStampModalVisible(false)}
+      />
     </View>
   );
 }
