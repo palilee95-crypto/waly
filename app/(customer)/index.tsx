@@ -122,6 +122,7 @@ export default function CustomerDashboard() {
   const [transitionTarget, setTransitionTarget] = useState<number>(1);
   const cycleAnim = useRef(new Animated.Value(0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
@@ -478,7 +479,7 @@ export default function CustomerDashboard() {
   };
 
   const highestCard = loyaltyCards.length > 0 ? loyaltyCards.reduce((prev, current) => (prev.collectedStamps > current.collectedStamps) ? prev : current) : null;
-  const currentStamps = highestCard ? highestCard.collectedStamps : 8;
+  const currentStamps = highestCard ? highestCard.collectedStamps : 0;
   const maxStamps = highestCard ? highestCard.totalStamps : 10;
   const progressArray = Array.from({ length: 10 }, (_, i) => i < Math.round((currentStamps / maxStamps) * 10));
 
@@ -489,6 +490,7 @@ export default function CustomerDashboard() {
         <View style={{ flex: 1, backgroundColor: '#FFFFFF', maxWidth: 800, alignSelf: 'center', width: '100%' }}>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
@@ -541,11 +543,27 @@ export default function CustomerDashboard() {
             <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, shadowColor: '#B38B00', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 4 }}>
               {/* Header Row: Title & Total Stamps Badge */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE38F', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="gift-outline" size={18} color="#806400" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
+                  {highestCard?.logo ? (
+                    <Image 
+                      source={{ uri: highestCard.logo }} 
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF5D6', flexShrink: 0 }} 
+                    />
+                  ) : (
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE38F', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Ionicons name="gift-outline" size={18} color="#806400" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
+                      {highestCard ? highestCard.merchantName : 'Next Reward'}
+                    </Text>
+                    {highestCard ? (
+                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400', marginTop: 1 }} numberOfLines={1}>
+                        {highestCard.rewardName}
+                      </Text>
+                    ) : null}
                   </View>
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Next Reward</Text>
                 </View>
                 
                 {/* Sleek Total Stamps Badge */}
@@ -563,7 +581,6 @@ export default function CustomerDashboard() {
                   <View key={index} style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: isFilled ? '#FFC700' : '#FFF1C5' }} />
                 ))}
               </View>
-              
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -0.5 }}>
@@ -573,44 +590,93 @@ export default function CustomerDashboard() {
                     {maxStamps - currentStamps > 0 ? `${maxStamps - currentStamps} more to unlock reward` : 'Reward unlocked!'}
                   </Text>
                 </View>
-                
-                {/* Integrated QR Code Button */}
+
+                {/* Integrated View Card Button */}
                 <TouchableOpacity 
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEA', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#FFE38F' }}
+                  onPress={() => {
+                    if (highestCard) {
+                      setSelectedCard(highestCard);
+                      setDetailModalVisible(true);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="card-outline" size={16} color="#806400" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>View Card</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* ⚡ QUICK ACTIONS ROW (INSIDE CARD) ⚡ */}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 18, paddingTop: 18, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                {/* My QR Button */}
+                <TouchableOpacity 
+                  style={{ 
+                    flex: 1, 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    backgroundColor: '#FFFBEA', 
+                    borderRadius: 16, 
+                    paddingVertical: 12, 
+                    borderWidth: 1, 
+                    borderColor: '#FFE38F',
+                    gap: 8
+                  }}
                   onPress={() => setQrModalVisible(true)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="qr-code-outline" size={16} color="#806400" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>My QR</Text>
+                  <Ionicons name="qr-code-outline" size={16} color="#806400" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>My QR</Text>
+                </TouchableOpacity>
+
+                {/* My Vouchers Button */}
+                <TouchableOpacity 
+                  style={{ 
+                    flex: 1, 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    backgroundColor: '#F8FAFC', 
+                    borderRadius: 16, 
+                    paddingVertical: 12, 
+                    borderWidth: 1, 
+                    borderColor: '#E2E8F0',
+                    gap: 8
+                  }}
+                  onPress={() => router.push('/(customer)/vouchers')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="ticket-outline" size={16} color="#475569" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>My Voucher</Text>
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
 
-            {/* Promo Banner inside Supercard */}
-            <View style={{ backgroundColor: '#1A1400', borderRadius: 24, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#1A1400', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6, overflow: 'hidden' }}>
-              <View style={{ position: 'absolute', right: -20, top: -20, width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.1)', borderStyle: 'dashed' }} />
+          {/* Promo Banner inside Supercard (moved outside/below) */}
+          <View style={{ backgroundColor: '#1A1400', borderRadius: 24, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#1A1400', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6, overflow: 'hidden', marginBottom: 20 }}>
+            <View style={{ position: 'absolute', right: -20, top: -20, width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.1)', borderStyle: 'dashed' }} />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFC700', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF1C5', shadowColor: '#FFC700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 }}>
-                  <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#E6B300', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFD352' }}>
-                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>2x</Text>
-                  </View>
-                </View>
-                
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>2X STAMPS</Text>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700', letterSpacing: 0.5, marginBottom: 2 }}>WEEKEND SPECIAL</Text>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', lineHeight: 12 }}>
-                    Visit any partner shop & earn double stamps!
-                  </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFC700', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF1C5', shadowColor: '#FFC700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 }}>
+                <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#E6B300', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFD352' }}>
+                  <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>2x</Text>
                 </View>
               </View>
-
-              <TouchableOpacity style={{ backgroundColor: '#FFC700', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => router.push('/(customer)/explore')}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Collect Now</Text>
-                <Ionicons name="chevron-forward" size={12} color="#1A1400" />
-              </TouchableOpacity>
+              
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>2X STAMPS</Text>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700', letterSpacing: 0.5, marginBottom: 2 }}>WEEKEND SPECIAL</Text>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', lineHeight: 12 }}>
+                  Visit any partner shop & earn double stamps!
+                </Text>
+              </View>
             </View>
+            <TouchableOpacity style={{ backgroundColor: '#FFC700', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => router.push('/(customer)/explore')}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Collect Now</Text>
+              <Ionicons name="chevron-forward" size={12} color="#1A1400" />
+            </TouchableOpacity>
           </View>
 
           {/* My Stamp Cards Header */}
