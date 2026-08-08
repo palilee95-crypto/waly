@@ -2113,8 +2113,8 @@ const styles = StyleSheet.create({
     height: 32,
     width: 128,
     alignSelf: 'center',
-    marginTop: 64,
-    marginBottom: 48,
+    marginTop: 120,
+    marginBottom: 32,
     tintColor: '#FFFFFF',
   },
 });
