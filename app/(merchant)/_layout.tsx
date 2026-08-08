@@ -1091,7 +1091,7 @@ export default function MerchantLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#050505',
   },
   mobileTabBarWrap: {
     position: 'absolute',
