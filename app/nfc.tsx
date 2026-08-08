@@ -2110,11 +2110,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   fakeRisevLogoPhoneBg: {
-    height: 22,
-    width: 88,
+    height: 32,
+    width: 128,
     alignSelf: 'center',
-    marginTop: 36,
-    marginBottom: 28,
+    marginTop: 64,
+    marginBottom: 48,
     tintColor: '#FFFFFF',
   },
 });
