@@ -494,8 +494,10 @@ export default function CustomerDashboard() {
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* 🌟 SUPERCARD V2 🌟 */}
-          <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 0 }}>
+          {/* Group container to bypass scrollContent gap: 20 and join cards */}
+          <View>
+            {/* 🌟 SUPERCARD V2 🌟 */}
+            <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 0 }}>
             
             {/* Absolute Folder Tab Background Layer */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderRadius: 32 }}>
@@ -678,8 +680,9 @@ export default function CustomerDashboard() {
               <Ionicons name="chevron-forward" size={12} color="#1A1400" />
             </TouchableOpacity>
           </View>
+        </View>
 
-          {/* My Stamp Cards Header */}
+        {/* My Stamp Cards Header */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{t('my_stamp_cards')}</Text>
             <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
