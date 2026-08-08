@@ -97,7 +97,6 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         card.set("status", "active");
         card.set("opt_in_marketing", true);
         card.set("completions", 0);
-        $app.save(card);
       }
 
       const currentStamps = parseInt(card.get("stamps_collected")) || parseInt(card.get("stamps")) || 0;

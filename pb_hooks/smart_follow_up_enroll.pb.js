@@ -4,13 +4,13 @@
 onRecordCreate((e) => {
   try {
     const card = e.record;
-    if (!card) return;
+    if (!card) return e.next();
     const merchantId = card.getString("merchant");
     const customerId = card.getString("customer");
-    if (!merchantId || !customerId) return;
+    if (!merchantId || !customerId) return e.next();
 
     const activeGroups = $app.findRecordsByFilter("follow_up_groups", `merchant = "${merchantId}" && status = 'active'`, "-created", 100, 0);
-    if (activeGroups.length === 0) return;
+    if (activeGroups.length === 0) return e.next();
 
     const memCol = $app.findCollectionByNameOrId("follow_up_members");
     for (let i = 0; i < activeGroups.length; i++) {
@@ -30,4 +30,5 @@ onRecordCreate((e) => {
   } catch (err) {
     console.log("[Follow-Up Hook Error]", err.message || err);
   }
+  return e.next();
 }, "loyalty_cards");
