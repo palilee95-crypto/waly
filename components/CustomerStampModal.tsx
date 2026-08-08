@@ -36,31 +36,31 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
       pulseAnim1.setValue(0);
       pulseAnim2.setValue(0);
 
-      // Pulse 1: Starts immediately
       const anim1 = Animated.loop(
         Animated.timing(pulseAnim1, {
           toValue: 1,
-          duration: 2200,
+          duration: 2400,
           useNativeDriver: true,
         })
       );
 
-      // Pulse 2: Starts with a delay
       const anim2 = Animated.loop(
-        Animated.sequence([
-          Animated.delay(1100),
-          Animated.timing(pulseAnim2, {
-            toValue: 1,
-            duration: 2200,
-            useNativeDriver: true,
-          })
-        ])
+        Animated.timing(pulseAnim2, {
+          toValue: 1,
+          duration: 2400,
+          useNativeDriver: true,
+        })
       );
 
       anim1.start();
-      anim2.start();
+      
+      // Start the second ripple exactly half-cycle later to keep them alternating infinitely
+      const timeoutId = setTimeout(() => {
+        anim2.start();
+      }, 1200);
 
       return () => {
+        clearTimeout(timeoutId);
         anim1.stop();
         anim2.stop();
       };
