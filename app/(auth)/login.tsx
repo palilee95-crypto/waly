@@ -128,9 +128,18 @@ export default function LoginScreen() {
     setErrorMsg('');
 
     if (isNfcFlow) {
-      // NFC simplified flow: only name + password required
-      if (!name || !password || !confirmPassword) {
-        setErrorMsg('Please enter your name and create a password.');
+      // NFC registration flow: name, email, password, and confirm password required
+      if (!name || !email || !password || !confirmPassword) {
+        setErrorMsg('Please fill in all fields.');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setErrorMsg('Please enter a valid email address.');
+        return;
+      }
+      if (email.trim().endsWith('@risev.app')) {
+        setErrorMsg('Please use your personal email address.');
         return;
       }
       if (password !== confirmPassword) {
@@ -141,12 +150,10 @@ export default function LoginScreen() {
         setErrorMsg('Password must be at least 8 characters.');
         return;
       }
-      // Auto-generate a placeholder email from phone for the account
-      const autoEmail = `customer_${phone}@risev.app`;
       setIsLoading(true);
       try {
         // Pass dummy birthday 2000-01-01 to satisfy backend required field
-        await register(getFullPhone(), autoEmail, name, password, 'customer', '2000-01-01');
+        await register(getFullPhone(), email.trim().toLowerCase(), name, password, 'customer', '2000-01-01');
         router.replace('/(customer)');
       } catch (e: any) {
         setErrorMsg(e?.message || 'Failed to create account. Please try again.');
@@ -412,6 +419,21 @@ export default function LoginScreen() {
                           />
                         </View>
 
+                        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                        <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="user@example.com"
+                            placeholderTextColor="#BEC6E0"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            onFocus={() => setEmailFocused(true)}
+                            onBlur={() => setEmailFocused(false)}
+                          />
+                        </View>
+
                         <Text style={styles.inputLabel}>CREATE PASSWORD</Text>
                         <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
                           <TextInput
@@ -559,9 +581,9 @@ export default function LoginScreen() {
                   <>
                     {/* Primary Action Button for Registration */}
                     <TouchableOpacity
-                      style={[styles.primaryBtn, (params.prefill_phone ? (!name || !password || !confirmPassword) : (!email || !name || !password || !confirmPassword)) && styles.primaryBtnDisabled]}
+                      style={[styles.primaryBtn, (!email || !name || !password || !confirmPassword) && styles.primaryBtnDisabled]}
                       onPress={handleRegister}
-                      disabled={(params.prefill_phone ? (!name || !password || !confirmPassword) : (!email || !name || !password || !confirmPassword)) || isLoading}
+                      disabled={(!email || !name || !password || !confirmPassword) || isLoading}
                       activeOpacity={0.9}
                     >
                       {isLoading ? (
