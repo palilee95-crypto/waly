@@ -55,7 +55,7 @@ routerAdd("POST", "/api/risev/qr/quick-register", (e) => {
       const secret = user.tokenKey() + user.collection().authToken.secret;
       token = $security.createJWT(
         {
-          id: user.id,
+          id: user.getId(),
           type: "auth",
           collectionId: user.collection().id,
         },

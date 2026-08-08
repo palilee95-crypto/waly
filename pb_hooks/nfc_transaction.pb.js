@@ -49,9 +49,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
           customer.set("name", customerName);
           customer.set("role", "customer");
           customer.set("birthday", "2000-01-01 00:00:00.000Z");
+          customer.setPassword($security.randomString(20));
           $app.save(customer);
         } catch (custErr) {
           console.log("[NFC COMPLETE] Failed to auto-create customer user:", custErr.message || custErr);
+          customer = null;
         }
       }
     }
@@ -73,14 +75,14 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       $app.save(program);
     }
 
-    const programId = program.id;
+    const programId = program.getId();
     const goal = parseInt(program.get("stamp_goal")) || 10;
 
     // 3. Find or create loyalty card & add stamps
     let card = null;
     if (customer) {
       try {
-        const cards = $app.findRecordsByFilter("loyalty_cards", `program = '${programId}' && customer = '${customer.id}'`, "created", 1, 0);
+        const cards = $app.findRecordsByFilter("loyalty_cards", `program = '${programId}' && customer = '${customer.getId()}'`, "created", 1, 0);
         if (cards.length > 0) card = cards[0];
       } catch (err) { /* no card yet */ }
 
@@ -89,7 +91,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         card = new Record(cardCol);
         card.set("id", $security.randomString(15).toLowerCase());
         card.set("program", programId);
-        card.set("customer", customer.id);
+        card.set("customer", customer.getId());
         card.set("merchant", merchantId);
         card.set("stamps_collected", 0);
         card.set("status", "active");
@@ -112,9 +114,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         txn.set("type", "earn");
         txn.set("stamps", stampAmount);
         txn.set("bill_amount", billAmount);
-        txn.set("customer", customer.id);
+        txn.set("customer", customer.getId());
         txn.set("merchant", merchantId);
-        txn.set("loyalty_card", card.id);
+        txn.set("loyalty_card", card.getId());
         txn.set("metadata", JSON.stringify({ source: "nfc_claim", claim_id: claimId }));
         $app.save(txn);
       } catch (txnErr) {
@@ -125,7 +127,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       claim.set("status", "completed");
       claim.set("bill_amount", billAmount);
       claim.set("stamp_amount", stampAmount);
-      if (customer) claim.set("customer", customer.id);
+      if (customer) claim.set("customer", customer.getId());
       claim.set("completed_at", new Date().toISOString().replace('T', ' ').substring(0, 19));
       $app.save(claim);
 

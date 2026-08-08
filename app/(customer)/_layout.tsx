@@ -228,6 +228,8 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
   const initialName = user?.name && !user.name.startsWith('User ') ? user.name : '';
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { width } = useWindowDimensions();
@@ -258,6 +260,19 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
       return;
     }
 
+    if (!password) {
+      setError('Please set a password.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // 1. Update the user profile via secure onboarding endpoint
@@ -266,6 +281,7 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
         body: {
           name: trimmedName,
           email: trimmedEmail,
+          password: password,
         },
       });
 
@@ -339,6 +355,38 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
               />
             </View>
             <Text style={styles.inputHint}>This email will be used for account recovery and rewards notification.</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>SET PASSWORD</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.textInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Min. 8 characters"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.textInput}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm password"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
           </View>
 
           {/* Validation Error Message Box */}

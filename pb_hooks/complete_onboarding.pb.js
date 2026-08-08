@@ -9,7 +9,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   const data = e.requestInfo().body;
   const name = data.name || '';
   const email = data.email || '';
-
+  const password = data.password || '';
 
   const trimmedName = name.trim();
   const trimmedEmail = email.trim().toLowerCase();
@@ -19,6 +19,12 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   }
   if (!trimmedEmail) {
     return e.json(400, { message: "Please enter your Email Address." });
+  }
+  if (!password) {
+    return e.json(400, { message: "Please set a password." });
+  }
+  if (password.length < 8) {
+    return e.json(400, { message: "Password must be at least 8 characters." });
   }
 
   // Simple email format check
@@ -33,7 +39,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   // Check if the email is already registered by another user
   try {
     const existingUser = $app.findFirstRecordByData("users", "email", trimmedEmail);
-    if (existingUser.id !== authRecord.id) {
+    if (existingUser.getId() !== authRecord.getId()) {
       return e.json(400, { message: "EMAIL: Email address is already registered." });
     }
   } catch (err) {
@@ -43,6 +49,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   try {
     authRecord.set("name", trimmedName);
     authRecord.set("email", trimmedEmail);
+    authRecord.setPassword(password);
     authRecord.set("verified", true); // Auto-verify the user's email since we're setting it directly
 
     $app.save(authRecord);
@@ -51,7 +58,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
     const secret = authRecord.tokenKey() + authRecord.collection().authToken.secret;
     const token = $security.createJWT(
       {
-        id: authRecord.id,
+        id: authRecord.getId(),
         type: "auth",
         collectionId: authRecord.collection().id,
       },
