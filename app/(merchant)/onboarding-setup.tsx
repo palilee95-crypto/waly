@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   TextInput,
   ActivityIndicator,
+  useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,11 +27,15 @@ export default function OnboardingSetupScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [merchant, setMerchant] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
+
+  const webColorInputRef = useRef<any>(null);
 
   // Form States
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#050505');
@@ -134,14 +140,13 @@ export default function OnboardingSetupScreen() {
       const formData = new FormData();
       formData.append('onboarding_primary_color', brandingPrimaryColor);
       formData.append('onboarding_welcome_text', brandingWelcomeText);
-      formData.append('onboarding_logo_url', brandingLogoUrl);
       formData.append('onboarding_bg_url', brandingBgUrl);
 
-      if (brandingLogoFile) {
-        formData.append('logo', brandingLogoFile);
-      }
       if (brandingBgFile) {
         formData.append('background_image', brandingBgFile);
+      } else if (brandingBgPreview === null && brandingBgUrl === '') {
+        formData.append('background_image', '');
+        formData.append('onboarding_bg_url', '');
       }
 
       await pb.collection('merchants').update(user.merchant_id, formData);
@@ -158,30 +163,41 @@ export default function OnboardingSetupScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#050505" />
+        <ActivityIndicator size="large" color="#FFC700" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#050505" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Onboarding Setup</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top', 'left', 'right']}>
+      {/* Scrollable Dashboard View */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.subtitle}>
-          Customize your storefront. Make your loyalty program look and feel like your own brand.
-        </Text>
+        {/* Dark Background Header Block */}
+        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 220, backgroundColor: '#050505', borderBottomLeftRadius: 65, borderBottomRightRadius: 65, zIndex: 0 }} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Onboarding Setup</Text>
+          <View style={{ width: 42 }} />
+        </View>
+
+        {/* Editorial styled subtitle box */}
+        <View style={styles.subtitleContainer}>
+          <Text style={styles.subtitle}>
+            Customize your storefront. Make your loyalty program look and feel like your own brand.
+          </Text>
+        </View>
 
         {/* LIVE PREVIEW SMARTPHONE MOCKUP */}
         <View style={styles.previewContainer}>
-          <Text style={styles.previewLabel}>Live Customer Preview</Text>
+          <View style={styles.previewLabelRow}>
+            <View style={styles.previewLine} />
+            <Text style={styles.previewLabel}>LIVE CUSTOMER PREVIEW</Text>
+            <View style={styles.previewLine} />
+          </View>
           
           {/* Phone Frame */}
           <View style={styles.phoneFrame}>
@@ -226,51 +242,121 @@ export default function OnboardingSetupScreen() {
               </View>
 
               {/* Bottom Sheet Claim Form */}
-              <View style={styles.fakeFormCard}>
-                <View style={styles.fakeScanBadge}>
-                  <Ionicons name="wifi" size={10} color="#B45309" style={{ transform: [{ rotate: '90deg' }] }} />
-                  <Text style={styles.fakeScanText}>NFC CARD SCANNED</Text>
-                </View>
+              {(() => {
+                const getIsLight = (color: string) => {
+                  const hex = (color || '#ffffff').replace('#', '');
+                  if (hex.length === 3) {
+                    const r = parseInt(hex[0] + hex[0], 16);
+                    const g = parseInt(hex[1] + hex[1], 16);
+                    const b = parseInt(hex[2] + hex[2], 16);
+                    return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                  }
+                  if (hex.length === 6) {
+                    const r = parseInt(hex.substring(0, 2), 16);
+                    const g = parseInt(hex.substring(2, 4), 16);
+                    const b = parseInt(hex.substring(4, 6), 16);
+                    return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                  }
+                  return true;
+                };
 
-                <Text style={styles.fakeFormTitle}>
-                  Claim Your Stamps
-                </Text>
-                <Text style={styles.fakeFormDesc} numberOfLines={2}>
-                  {brandingWelcomeText || 'Welcome to our loyalty program! Scan to earn stamps.'}
-                </Text>
+                const isLightBrandColor = getIsLight(brandingPrimaryColor);
+                const brandTextColor = isLightBrandColor ? '#0F172A' : '#FFFFFF';
+                const brandSubtextColor = isLightBrandColor ? '#475569' : 'rgba(255, 255, 255, 0.75)';
+                const brandInputBorderColor = isLightBrandColor ? '#CBD5E1' : 'rgba(255, 255, 255, 0.25)';
+                const brandInputBgColor = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
 
-                <Text style={styles.fakeInputLabel}>PHONE NUMBER</Text>
-                <View style={styles.fakeInput}>
-                  <Text style={{ fontSize: 12 }}>🇲🇾</Text>
-                  <Text style={styles.fakeCountryCode}>+60</Text>
-                  <View style={styles.fakeDivider} />
-                  <Text style={styles.fakeInputPlaceholder}>11 234 5678</Text>
-                </View>
+                return (
+                  <>
+                  <View style={[styles.fakeFormCard, { backgroundColor: brandingPrimaryColor }]}>
+                    <View style={[styles.fakeScanBadge, { backgroundColor: isLightBrandColor ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.15)' }]}>
+                      <View style={[styles.fakeScanDot, { backgroundColor: isLightBrandColor ? '#10B981' : '#FFFFFF' }]} />
+                      <Text style={[styles.fakeScanText, { color: isLightBrandColor ? '#10B981' : '#FFFFFF' }]}>VERIFIED NFC SCAN</Text>
+                    </View>
 
-                <View style={styles.fakeButton}>
-                  <Ionicons name="paper-plane-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.fakeButtonText}>Claim Stamps Now</Text>
-                </View>
-              </View>
+                    <Text style={[styles.fakeFormTitle, { color: brandTextColor }]}>
+                      Claim Your Stamps
+                    </Text>
+
+
+                    <Text style={[styles.fakeInputLabel, { color: brandSubtextColor }]}>PHONE NUMBER</Text>
+                    <View style={[styles.fakeInputCapsule, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor }]}>
+                      <View style={[styles.fakeFlagPocket, { borderColor: brandInputBorderColor }]}>
+                        <Text style={{ fontSize: 13 }}>🇲🇾</Text>
+                        <Text style={styles.fakeCountryCode}>+60</Text>
+                      </View>
+                      <Text style={[styles.fakeInputPlaceholder, { color: brandSubtextColor }]}>11-234 5678</Text>
+                    </View>
+
+                    <View style={[styles.fakeButton, { backgroundColor: isLightBrandColor ? '#050505' : '#FFFFFF' }]}>
+                      <Text style={[styles.fakeButtonText, { color: isLightBrandColor ? '#FFFFFF' : '#0F172A' }]}>
+                        Claim Stamps Now
+                      </Text>
+                      <Ionicons 
+                        name="arrow-forward" 
+                        size={14} 
+                        color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} 
+                      />
+                    </View>
+
+                    {/* Trust Footer */}
+                    <View style={styles.fakeTrustFooter}>
+                      <Ionicons name="lock-closed" size={10} color={brandSubtextColor} />
+                      <Text style={[styles.fakeTrustText, { color: brandSubtextColor }]}>Secure connection by risev.app</Text>
+                    </View>
+                  </View>
+
+                  {/* Risev Logo below the sheet card */}
+                  <Image 
+                    source={require('../../assets/risev logo.png')}
+                    style={styles.fakeRisevLogoPhoneBg}
+                    resizeMode="contain"
+                  />
+                  </>
+                );
+              })()}
             </View>
           </View>
         </View>
 
+        {/* 3. NFC Stand Preview Button Only */}
+        <TouchableOpacity
+          style={[styles.copyBtnGold, { marginBottom: 24 }]}
+          onPress={async () => {
+            const appUrl = __DEV__ ? 'http://localhost:8081' : 'https://risev.app';
+            const url = `${appUrl}/nfc?m=${user?.merchant_id}`;
+            await Clipboard.setStringAsync(url);
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+              await Linking.openURL(url);
+            } else {
+              Alert.alert('Error', "Don't know how to open this URL: " + url);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="open-outline" size={16} color="#050505" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
+            Open Live Preview
+          </Text>
+        </TouchableOpacity>
+
         {/* 1. Brand Identity Card */}
         <View style={styles.settingsCard}>
           <View style={styles.cardHeader}>
-            <Ionicons name="color-palette" size={20} color="#3B82F6" />
+            <Ionicons name="color-palette-outline" size={20} color="#050505" />
             <Text style={styles.cardHeaderTitle}>Brand Identity</Text>
           </View>
 
           {/* Primary Color */}
-          <View style={{ marginBottom: 20 }}>
-            <Text style={styles.fieldLabel}>PRIMARY COLOR</Text>
+          <View style={{ marginBottom: 24 }}>
+            <Text style={styles.fieldLabel}>PRIMARY BRAND COLOR</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={[styles.colorPickerTrigger, { backgroundColor: brandingPrimaryColor, shadowColor: brandingPrimaryColor }]}>
+            <View style={styles.colorCapsule}>
+              <View style={[styles.colorIndicator, { backgroundColor: brandingPrimaryColor }]}>
                 {Platform.OS === 'web' && (
                   <input
+                    ref={webColorInputRef}
                     type="color"
                     value={brandingPrimaryColor}
                     onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
@@ -278,21 +364,19 @@ export default function OnboardingSetupScreen() {
                   />
                 )}
               </View>
-              <View style={styles.colorTextInputContainer}>
-                <Text style={styles.hexSymbol}>#</Text>
-                <TextInput
-                  style={styles.hexInput}
-                  value={brandingPrimaryColor.replace('#', '')}
-                  onChangeText={(text) => setBrandingPrimaryColor(text.startsWith('#') ? text : `#${text}`)}
-                  placeholder="050505"
-                  placeholderTextColor="#94A3B8"
-                  autoCapitalize="none"
-                  maxLength={7}
-                />
-              </View>
+              <Text style={styles.hexSymbol}>#</Text>
+              <TextInput
+                style={styles.hexInput}
+                value={brandingPrimaryColor.replace('#', '')}
+                onChangeText={(text) => setBrandingPrimaryColor(text.startsWith('#') ? text : `#${text}`)}
+                placeholder="050505"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                maxLength={7}
+              />
             </View>
 
-            {/* Preset Swatches */}
+            {/* Preset Swatches with Checkmarks */}
             <View style={styles.swatchesRow}>
               {['#050505', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
                 <TouchableOpacity
@@ -304,78 +388,97 @@ export default function OnboardingSetupScreen() {
                   ]}
                   onPress={() => setBrandingPrimaryColor(c)}
                   activeOpacity={0.8}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Store Logo */}
-          <View style={{ marginBottom: 20 }}>
-            <Text style={styles.fieldLabel}>STORE LOGO (SQUARE)</Text>
-            
-            <View style={styles.logoPickerBox}>
-              {!!(brandingLogoPreview || brandingLogoUrl) ? (
-                <>
-                  <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={handlePickBrandingLogo} activeOpacity={0.9}>
-                    <Image
-                      source={{ uri: brandingLogoPreview || brandingLogoUrl }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
+                >
+                  {brandingPrimaryColor.toLowerCase() === c.toLowerCase() && (
+                    <Ionicons 
+                      name="checkmark" 
+                      size={14} 
+                      color={c.toLowerCase() === '#ffffff' || c.toLowerCase() === '#ffc700' ? '#050505' : '#FFFFFF'} 
                     />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.trashBtn}
-                    onPress={() => { setBrandingLogoFile(null); setBrandingLogoPreview(null); setBrandingLogoUrl(''); }}
-                  >
-                    <Ionicons name="trash" size={14} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickBrandingLogo}>
-                  <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                  <Text style={styles.uploadText}>Upload Logo</Text>
+                  )}
                 </TouchableOpacity>
-              )}
-            </View>
-            
-            <View style={styles.urlInputBox}>
-              <Ionicons name="link-outline" size={16} color="#94A3B8" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.urlInput}
-                value={brandingLogoUrl}
-                onChangeText={setBrandingLogoUrl}
-                placeholder="or enter image URL..."
-                placeholderTextColor="#94A3B8"
-                autoCapitalize="none"
-              />
+              ))}
+              
+              {/* Color Wheel Swatch */}
+              {(() => {
+                const isCustomColor = !['#050505', '#f97316', '#10b981', '#5c3bcc', '#d97706', '#dc2626', '#0284c7'].includes(brandingPrimaryColor.toLowerCase());
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.swatch,
+                      Platform.OS === 'web' 
+                        ? { 
+                            backgroundImage: 'conic-gradient(from 0deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #7f00ff, #ff00ff, #ff0000)',
+                            boxShadow: isCustomColor 
+                              ? 'inset 0 0 0 2px rgba(255,255,255,1), 0 4px 10px rgba(255, 199, 0, 0.3)' 
+                              : 'inset 0 0 0 1.5px rgba(255,255,255,0.85), 0 2px 5px rgba(0,0,0,0.1)',
+                            borderWidth: 0
+                          } as any
+                        : { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: isCustomColor ? '#FFC700' : '#CBD5E1' },
+                      isCustomColor && styles.swatchActive
+                    ]}
+                    onPress={() => {
+                      if (Platform.OS === 'web') {
+                        webColorInputRef.current?.click();
+                      } else {
+                        Alert.alert('Custom Color', 'Type your custom hex code in the input box above!');
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {isCustomColor ? (
+                      <Ionicons 
+                        name="checkmark" 
+                        size={14} 
+                        color="#FFFFFF" 
+                        style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+                      />
+                    ) : (
+                      <Ionicons 
+                        name="aperture-outline" 
+                        size={16} 
+                        color={Platform.OS === 'web' ? '#FFFFFF' : '#64748B'} 
+                        style={Platform.OS === 'web' ? { textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
           </View>
 
-          {/* Background Image */}
-          <View>
+          {/* Background Image with Dropzone Layout */}
+          <View style={{ marginBottom: 8 }}>
             <Text style={styles.fieldLabel}>BACKGROUND IMAGE (9:16)</Text>
             
             <View style={styles.bannerPickerBox}>
               {!!(brandingBgPreview || brandingBgUrl) ? (
-                <>
-                  <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={handlePickBrandingBg} activeOpacity={0.9}>
-                    <Image
-                      source={{ uri: brandingBgPreview || brandingBgUrl }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
+                <View style={{ flex: 1, position: 'relative' }}>
+                  <Image
+                    source={{ uri: brandingBgPreview || brandingBgUrl }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    style={styles.imageOverlay}
+                    onPress={handlePickBrandingBg}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="camera" size={20} color="#FFFFFF" />
+                    <Text style={styles.overlayText}>Change Background</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.trashBtn}
+                    style={styles.deleteOverlayBtn}
                     onPress={() => { setBrandingBgFile(null); setBrandingBgPreview(null); setBrandingBgUrl(''); }}
                   >
-                    <Ionicons name="trash" size={16} color="#FFFFFF" />
+                    <Ionicons name="trash" size={14} color="#FFFFFF" />
                   </TouchableOpacity>
-                </>
+                </View>
               ) : (
-                <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickBrandingBg}>
+                <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickBrandingBg} activeOpacity={0.8}>
                   <Ionicons name="images-outline" size={32} color="#64748B" />
-                  <Text style={styles.uploadText}>Upload Background (9:16)</Text>
+                  <Text style={styles.uploadTextBold}>Tap to Select Image</Text>
+                  <Text style={styles.uploadTextSub}>Portrait aspect ratio (9:16) recommended</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -394,62 +497,7 @@ export default function OnboardingSetupScreen() {
           </View>
         </View>
 
-        {/* 2. Messaging Card */}
-        <View style={styles.settingsCard}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="chatbubble-ellipses" size={20} color="#F59E0B" />
-            <Text style={styles.cardHeaderTitle}>Messaging</Text>
-          </View>
 
-          <Text style={styles.fieldLabel}>WELCOME TEXT</Text>
-          <View style={styles.textAreaBox}>
-            <TextInput
-              style={styles.textArea}
-              value={brandingWelcomeText}
-              onChangeText={setBrandingWelcomeText}
-              placeholder="Welcome to our loyalty program! Scan to earn stamps."
-              placeholderTextColor="#94A3B8"
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-        </View>
-
-        {/* 3. NFC Setup Link */}
-        <View style={styles.nfcCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <View style={{ backgroundColor: '#1E293B', padding: 6, borderRadius: 8 }}>
-              <Ionicons name="wifi" size={16} color="#38BDF8" style={{ transform: [{ rotate: '90deg' }] }} />
-            </View>
-            <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#F8FAFC' }}>
-              NFC Hardware Link
-            </Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18, marginBottom: 16 }}>
-            Copy this unique link and write it to your physical NFC tags so customers can tap to claim stamps.
-          </Text>
-          
-          <View style={styles.nfcUrlBox}>
-            <Text style={styles.nfcUrlText} selectable>
-              https://risev.app/nfc?m={user?.merchant_id}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.copyBtn}
-            onPress={async () => {
-              const url = `https://risev.app/nfc?m=${user?.merchant_id}`;
-              await Clipboard.setStringAsync(url);
-              Alert.alert('Copied', 'NFC Claim URL copied to clipboard!');
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="copy-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-              Copy NFC Link
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Save Button */}
         <TouchableOpacity
@@ -485,48 +533,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    height: 56,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
+    height: 64,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    padding: 4,
+    marginRight: 12,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#FFFFFF',
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 120,
+  },
+  subtitleContainer: {
+    marginVertical: 4,
+    marginBottom: 24,
+    zIndex: 1,
+    paddingHorizontal: 12,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-    marginBottom: 20,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    lineHeight: 20,
+    textAlign: 'center',
   },
   previewContainer: {
-    marginBottom: 24,
+    marginTop: 65,
+    marginBottom: 28,
     alignSelf: 'center',
     width: '100%',
     alignItems: 'center',
   },
+  previewLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  previewLine: {
+    flex: 0.15,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    maxWidth: 60,
+  },
   previewLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#94A3B8',
-    textTransform: 'uppercase',
-    marginBottom: 12,
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,
+    textAlign: 'center',
   },
   phoneFrame: {
     width: 260,
@@ -537,10 +601,10 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
     overflow: 'hidden',
     position: 'relative',
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
     elevation: 10,
   },
   notch: {
@@ -590,17 +654,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     marginBottom: 12,
   },
+  fakeScanDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
   fakeScanText: {
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#B45309',
+    color: '#10B981',
   },
   fakeFormTitle: {
     fontSize: 16,
@@ -620,59 +690,92 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 4,
   },
-  fakeInput: {
+  fakeInputCapsule: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    height: 36,
-    paddingHorizontal: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    height: 38,
+    paddingHorizontal: 6,
     marginBottom: 12,
   },
-  fakeCountryCode: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0F172A',
-    marginLeft: 4,
+  fakeFlagPocket: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 4,
   },
-  fakeDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 8,
+  fakeCountryCode: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   fakeInputPlaceholder: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#94A3B8',
+    marginLeft: 8,
   },
   fakeButton: {
-    backgroundColor: '#050505',
-    borderRadius: 10,
+    borderRadius: 12,
     height: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   fakeButtonText: {
-    color: '#FFFFFF',
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  fakeTrustFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 10,
+  },
+  fakeTrustText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+  },
+  fakeRisevLogo: {
+    height: 11,
+    width: 44,
+    alignSelf: 'center',
+    marginTop: 8,
+    opacity: 0.55,
+  },
+  fakeRisevLogoPhoneBg: {
+    height: 16,
+    width: 64,
+    alignSelf: 'center',
+    marginTop: 12,
+    tintColor: '#FFFFFF',
   },
   settingsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -691,50 +794,47 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 8,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  colorPickerTrigger: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  webColorInput: {
-    position: 'absolute',
-    top: -10,
-    left: -10,
-    width: 68,
-    height: 68,
-    opacity: 0,
-    cursor: 'pointer',
-  },
-  colorTextInputContainer: {
-    flex: 1,
+  colorCapsule: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderRadius: 24,
     height: 48,
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
+    width: 180,
+  },
+  colorIndicator: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  webColorInput: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    width: 56,
+    height: 56,
+    opacity: 0,
+    cursor: 'pointer',
   },
   hexSymbol: {
     color: '#94A3B8',
     fontFamily: 'PlusJakartaSans_700Bold',
-    marginRight: 4,
+    marginLeft: 12,
+    marginRight: 2,
+    fontSize: 15,
   },
   hexInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#1E293B',
     ...Platform.select({
@@ -744,54 +844,86 @@ const styles = StyleSheet.create({
   swatchesRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 12,
+    marginTop: 14,
     flexWrap: 'wrap',
     alignItems: 'center',
   },
   swatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderColor: '#1E293B',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   swatchActive: {
     borderWidth: 2,
+    transform: [{ scale: 1.1 }],
   },
   logoPickerBox: {
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderStyle: 'dashed',
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: '#F8FAFC',
     overflow: 'hidden',
-    height: 120,
-    width: 120,
+    height: 140,
+    width: 140,
     alignSelf: 'center',
     marginBottom: 12,
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  trashBtn: {
+  imageOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+    opacity: 0.85,
+  },
+  overlayText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  deleteOverlayBtn: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   uploadTrigger: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    padding: 16,
   },
-  uploadText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+  uploadTextBold: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1E293B',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  uploadTextSub: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
   },
   urlInputBox: {
     flexDirection: 'row',
@@ -850,7 +982,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -865,7 +997,7 @@ const styles = StyleSheet.create({
   },
   nfcUrlText: {
     fontSize: 12,
-    color: '#F8FAFC',
+    color: '#38BDF8',
     fontFamily: 'PlusJakartaSans_600SemiBold',
     padding: 12,
     textAlign: 'center',
@@ -887,11 +1019,74 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   saveBtnText: {
     color: '#FFFFFF',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 15,
     letterSpacing: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  statusText: {
+    color: '#10B981',
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.5,
+  },
+  statusBadgeGold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 199, 0, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  statusDotGold: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFC700',
+  },
+  statusTextGold: {
+    color: '#D97706',
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.5,
+  },
+  copyBtnGold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FFC700',
+    paddingVertical: 12,
+    borderRadius: 14,
+    width: '100%',
+    marginTop: 20,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });

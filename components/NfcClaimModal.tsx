@@ -34,6 +34,19 @@ export default function NfcClaimModal() {
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [merchantColor, setMerchantColor] = useState('#5C3BCC');
+
+  useEffect(() => {
+    if (!merchantId) return;
+    (async () => {
+      try {
+        const m = await pb.collection('merchants').getOne(merchantId);
+        if (m?.onboarding_primary_color) {
+          setMerchantColor(m.onboarding_primary_color);
+        }
+      } catch (e) {}
+    })();
+  }, [merchantId]);
 
   useEffect(() => {
     if (!merchantId) return;
@@ -173,93 +186,125 @@ export default function NfcClaimModal() {
             </View>
           ) : (
             // ── Main Claim Form View ──────────────────────────────
-            <>
-              {/* Header */}
-              <View style={styles.headerRow}>
-                <View style={styles.iconBg}>
-                  <Ionicons name="wifi" size={22} color="#B45309" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>NFC Stamp Claim!</Text>
-                  <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
-                </View>
-                <TouchableOpacity onPress={handleDismiss} style={styles.closeBtn}>
-                  <Ionicons name="close" size={20} color="#64748B" />
-                </TouchableOpacity>
-              </View>
+            (() => {
+              const getIsLight = (color: string) => {
+                const hex = (color || '#ffffff').replace('#', '');
+                if (hex.length === 3) {
+                  const r = parseInt(hex[0] + hex[0], 16);
+                  const g = parseInt(hex[1] + hex[1], 16);
+                  const b = parseInt(hex[2] + hex[2], 16);
+                  return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                }
+                if (hex.length === 6) {
+                  const r = parseInt(hex.substring(0, 2), 16);
+                  const g = parseInt(hex.substring(2, 4), 16);
+                  const b = parseInt(hex.substring(4, 6), 16);
+                  return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                }
+                return true;
+              };
 
-              {/* Error Banner */}
-              {errorMsg ? (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={18} color="#EF4444" />
-                  <Text style={styles.errorText}>{errorMsg}</Text>
-                </View>
-              ) : null}
+              const isLightColor = getIsLight(merchantColor);
+              const contrastTextColor = isLightColor ? '#050505' : '#FFFFFF';
+              const iconBgColor = merchantColor + '10'; // 10% opacity
+              const boxBgColor = merchantColor + '07'; // 7% opacity
+              const boxBorderColor = merchantColor + '15'; // 13% opacity
 
-              {/* Customer Details Box as VIP Pass */}
-              <View style={styles.customerBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' }}>
-                  <View style={styles.initialsBadge}>
-                    <Text style={styles.initialsText}>
-                      {getInitials(claim.customer_name || 'Customer')}
-                    </Text>
+              return (
+                <>
+                  {/* Header */}
+                  <View style={styles.headerRow}>
+                    <View style={[styles.iconBg, { backgroundColor: iconBgColor, borderColor: boxBorderColor }]}>
+                      <Ionicons name="wifi" size={22} color={merchantColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.title}>NFC Stamp Claim!</Text>
+                      <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
+                    </View>
+                    <TouchableOpacity onPress={handleDismiss} style={styles.closeBtn}>
+                      <Ionicons name="close" size={20} color="#64748B" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
-                    <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
-                  </View>
-                  <View style={styles.sessionBadge}>
-                    <Text style={styles.sessionText}>{claim.session_code}</Text>
-                  </View>
-                </View>
-              </View>
 
-              {/* Inputs */}
-              <View style={styles.inputRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
-                  <View style={styles.inputContainer}>
-                    <Ionicons name="cash-outline" size={16} color="#FFC700" style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
-                      keyboardType="numeric"
-                      value={billAmount}
-                      onChangeText={setBillAmount}
-                      placeholder="10"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
-                  <View style={styles.inputContainer}>
-                    <Ionicons name="star-outline" size={16} color="#FFC700" style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
-                      keyboardType="numeric"
-                      value={stampAmount}
-                      onChangeText={setStampAmount}
-                      placeholder="1"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
-              </View>
+                  {/* Error Banner */}
+                  {errorMsg ? (
+                    <View style={styles.errorBanner}>
+                      <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
 
-              {/* Action Buttons */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={handleDismiss} disabled={isLoading}>
-                  <Text style={styles.cancelBtnText}>Dismiss</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} disabled={isLoading} activeOpacity={0.85}>
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFC700" />
-                  ) : (
-                    <Text style={styles.confirmBtnText}>Issue Stamps & Confirm</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </>
+                  {/* Customer Details Box as VIP Pass */}
+                  <View style={[styles.customerBox, { backgroundColor: boxBgColor, borderColor: boxBorderColor }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' }}>
+                      <View style={[styles.initialsBadge, { backgroundColor: merchantColor, borderColor: 'transparent' }]}>
+                        <Text style={[styles.initialsText, { color: contrastTextColor }]}>
+                          {getInitials(claim.customer_name || 'Customer')}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
+                        <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
+                      </View>
+                      <View style={[styles.sessionBadge, { backgroundColor: iconBgColor, borderColor: boxBorderColor }]}>
+                        <Text style={[styles.sessionText, { color: merchantColor }]}>{claim.session_code}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Inputs */}
+                  <View style={styles.inputRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="cash-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                          keyboardType="numeric"
+                          value={billAmount}
+                          onChangeText={setBillAmount}
+                          placeholder="10"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="star-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                          keyboardType="numeric"
+                          value={stampAmount}
+                          onChangeText={setStampAmount}
+                          placeholder="1"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Action Buttons */}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={handleDismiss} disabled={isLoading}>
+                      <Text style={styles.cancelBtnText}>Dismiss</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.confirmBtn, { backgroundColor: merchantColor, borderColor: merchantColor }]} 
+                      onPress={handleConfirm} 
+                      disabled={isLoading} 
+                      activeOpacity={0.85}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color={contrastTextColor} />
+                      ) : (
+                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps & Confirm</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()
           )}
         </View>
       </View>

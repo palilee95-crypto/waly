@@ -395,7 +395,11 @@ export default function CustomerLayout() {
     return <Redirect href="/(merchant)" />;
   }
 
-  const isShadowUser = user?.email?.startsWith('user_') && user?.email?.endsWith('@risev.app');
+  const isShadowUser = user?.email?.endsWith('@risev.app') && (
+    user.email.startsWith('user_') || 
+    user.email.startsWith('quick_') || 
+    user.email.startsWith('customer_')
+  );
   if (isShadowUser) {
     return <CustomerOnboardingGate user={user} refreshSession={refreshSession} logout={logout} />;
   }

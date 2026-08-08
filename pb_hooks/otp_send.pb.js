@@ -41,7 +41,12 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
 
   const user = lookupFn(phone);
   if (user) {
-    return e.json(200, { exists: true, name: user.getString("name"), email: user.getString("email") });
+    return e.json(200, { 
+      exists: true, 
+      name: user.getString("name"), 
+      email: user.getString("email"),
+      verified: user.getBool("verified")
+    });
   } else {
     return e.json(200, { exists: false });
   }

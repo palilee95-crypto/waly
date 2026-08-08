@@ -32,7 +32,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  const params = useLocalSearchParams<{ ref?: string }>();
+  const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string }>();
 
   useEffect(() => {
     if (params.ref) {
@@ -45,6 +45,38 @@ export default function LoginScreen() {
         });
     }
   }, [params.ref]);
+
+  // Pre-fill phone from NFC claim redirect and auto-advance past phone step
+  useEffect(() => {
+    if (!params.prefill_phone || params.prefill_phone.length < 9) return;
+    const formatted = params.prefill_phone.replace(/\D/g, '').slice(0, 10);
+    setPhone(formatted);
+    // Pre-fill name if passed from NFC page
+    if (params.prefill_name && params.prefill_name.trim()) {
+      setName(params.prefill_name.trim());
+    }
+    // Directly check the pre-filled phone (don't rely on stale state)
+    const fullPhone = `${COUNTRY_CODE}${formatted}`;
+    setIsLoading(true);
+    checkPhone(fullPhone)
+      .then((res) => {
+        if (res.exists) {
+          const isFullyRegistered = res.verified === true || (res.email && res.email.trim() && !res.email.includes('@risev.app'));
+          if (isFullyRegistered) {
+            setEmail(res.email || '');
+            setStep('password');
+          } else {
+            setStep('register');
+          }
+        } else {
+          setStep('register');
+        }
+      })
+      .catch((e: any) => {
+        console.warn('[Login] prefill phone check failed:', e?.message);
+      })
+      .finally(() => setIsLoading(false));
+  }, [params.prefill_phone, params.prefill_name]);
   
   // New Registration fields and state machine steps
   const [step, setStep] = useState<'phone' | 'register' | 'password'>('phone');
@@ -72,9 +104,9 @@ export default function LoginScreen() {
       const fullPhone = getFullPhone();
       const res = await checkPhone(fullPhone);
       if (res.exists) {
-        // Check if user has completed profile setup (has email set)
-        if (res.email && res.email.trim() && !res.email.includes('@risev.app')) {
-          setEmail(res.email);
+        const isFullyRegistered = res.verified === true || (res.email && res.email.trim() && !res.email.includes('@risev.app'));
+        if (isFullyRegistered) {
+          setEmail(res.email || '');
           setStep('password');
         } else {
           // Quick-registered QR user returning to complete account setup!
@@ -92,6 +124,40 @@ export default function LoginScreen() {
   };
 
   const handleRegister = async () => {
+    const isNfcFlow = !!params.prefill_phone;
+    setErrorMsg('');
+
+    if (isNfcFlow) {
+      // NFC simplified flow: only name + password required
+      if (!name || !password || !confirmPassword) {
+        setErrorMsg('Please enter your name and create a password.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setErrorMsg('Passwords do not match.');
+        return;
+      }
+      if (password.length < 8) {
+        setErrorMsg('Password must be at least 8 characters.');
+        return;
+      }
+      // Auto-generate a placeholder email from phone for the account
+      const autoEmail = `customer_${phone}@risev.app`;
+      setIsLoading(true);
+      try {
+        // Pass dummy birthday 2000-01-01 to satisfy backend required field
+        await register(getFullPhone(), autoEmail, name, password, 'customer', '2000-01-01');
+        router.replace('/(customer)');
+      } catch (e: any) {
+        setErrorMsg(e?.message || 'Failed to create account. Please try again.');
+        Alert.alert('Registration Error', e?.message || 'Failed to create account. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Standard flow: all fields required
     if (!email || !name || !password || !confirmPassword || !birthday) {
       Alert.alert('Error', 'Please fill in all fields including birthday.');
       return;
@@ -209,6 +275,16 @@ export default function LoginScreen() {
               {/* Input Form */}
               <View style={styles.form}>
 
+                {/* NFC Pre-fill Banner */}
+                {params.prefill_phone && step !== 'phone' && (
+                  <View style={styles.nfcPrefillBanner}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                    <Text style={styles.nfcPrefillText}>
+                      📱 +60 {params.prefill_phone} — confirmed from your visit
+                    </Text>
+                  </View>
+                )}
+
                 {step !== 'password' && (
                   <>
                     <Text style={styles.inputLabel}>PHONE NUMBER</Text>
@@ -317,105 +393,139 @@ export default function LoginScreen() {
 
                 {step === 'register' && (
                   <>
-                    <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
-                    <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
-                        placeholderTextColor="#BEC6E0"
-                        value={name}
-                        onChangeText={setName}
-                        onFocus={() => setNameFocused(true)}
-                        onBlur={() => setNameFocused(false)}
-                      />
-                    </View>
+                    {/* NFC simplified form: name + password only */}
+                    {params.prefill_phone ? (
+                      <>
+                        <Text style={styles.registerHint}>Create your account to start collecting stamps 🎉</Text>
 
-                    <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                    <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused]}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder="user@example.com"
-                        placeholderTextColor="#BEC6E0"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        onFocus={() => setEmailFocused(true)}
-                        onBlur={() => setEmailFocused(false)}
-                      />
-                    </View>
+                        <Text style={styles.inputLabel}>YOUR NAME</Text>
+                        <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="e.g. Ahmad Rizal"
+                            placeholderTextColor="#BEC6E0"
+                            value={name}
+                            onChangeText={setName}
+                            autoFocus
+                            onFocus={() => setNameFocused(true)}
+                            onBlur={() => setNameFocused(false)}
+                          />
+                        </View>
 
-                    <Text style={styles.inputLabel}>DATE OF BIRTH</Text>
-                    <View style={[styles.inputGroup, birthdayFocused && styles.inputGroupFocused]}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor="#BEC6E0"
-                        value={birthday}
-                        onChangeText={(text) => {
-                          // Auto-format as user types: YYYY-MM-DD
-                          let cleaned = text.replace(/[^0-9]/g, '');
-                          let formatted = cleaned;
-                          if (cleaned.length >= 4) {
-                            formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-                          }
-                          if (cleaned.length >= 6) {
-                            formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
-                          }
-                          setBirthday(formatted.slice(0, 10));
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={10}
-                        autoCapitalize="none"
-                        onFocus={() => setBirthdayFocused(true)}
-                        onBlur={() => setBirthdayFocused(false)}
-                      />
-                    </View>
+                        <Text style={styles.inputLabel}>CREATE PASSWORD</Text>
+                        <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="Min. 8 characters"
+                            placeholderTextColor="#BEC6E0"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            onFocus={() => setPasswordFocused(true)}
+                            onBlur={() => setPasswordFocused(false)}
+                          />
+                        </View>
 
-                    <Text style={styles.inputLabel}>PASSWORD</Text>
-                    <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder="••••••••"
-                        placeholderTextColor="#BEC6E0"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        onFocus={() => setPasswordFocused(true)}
-                        onBlur={() => setPasswordFocused(false)}
-                      />
-                    </View>
+                        <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                        <View style={[styles.inputGroup, confirmPasswordFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="••••••••"
+                            placeholderTextColor="#BEC6E0"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            onFocus={() => setConfirmPasswordFocused(true)}
+                            onBlur={() => setConfirmPasswordFocused(false)}
+                          />
+                        </View>
+                      </>
+                    ) : (
+                      // Standard full registration form
+                      <>
+                        <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
+                        <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
+                            placeholderTextColor="#BEC6E0"
+                            value={name}
+                            onChangeText={setName}
+                            onFocus={() => setNameFocused(true)}
+                            onBlur={() => setNameFocused(false)}
+                          />
+                        </View>
 
-                    <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                    <View style={[styles.inputGroup, confirmPasswordFocused && styles.inputGroupFocused]}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder="••••••••"
-                        placeholderTextColor="#BEC6E0"
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        onFocus={() => setConfirmPasswordFocused(true)}
-                        onBlur={() => setConfirmPasswordFocused(false)}
-                      />
-                    </View>
+                        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                        <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="user@example.com"
+                            placeholderTextColor="#BEC6E0"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            onFocus={() => setEmailFocused(true)}
+                            onBlur={() => setEmailFocused(false)}
+                          />
+                        </View>
+
+                        <Text style={styles.inputLabel}>DATE OF BIRTH</Text>
+                        <View style={[styles.inputGroup, birthdayFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#BEC6E0"
+                            value={birthday}
+                            onChangeText={(text) => {
+                              let cleaned = text.replace(/[^0-9]/g, '');
+                              let formatted = cleaned;
+                              if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+                              if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
+                              setBirthday(formatted.slice(0, 10));
+                            }}
+                            keyboardType="number-pad"
+                            maxLength={10}
+                            autoCapitalize="none"
+                            onFocus={() => setBirthdayFocused(true)}
+                            onBlur={() => setBirthdayFocused(false)}
+                          />
+                        </View>
+
+                        <Text style={styles.inputLabel}>PASSWORD</Text>
+                        <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="••••••••"
+                            placeholderTextColor="#BEC6E0"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            onFocus={() => setPasswordFocused(true)}
+                            onBlur={() => setPasswordFocused(false)}
+                          />
+                        </View>
+
+                        <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                        <View style={[styles.inputGroup, confirmPasswordFocused && styles.inputGroupFocused]}>
+                          <TextInput
+                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            placeholder="••••••••"
+                            placeholderTextColor="#BEC6E0"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            onFocus={() => setConfirmPasswordFocused(true)}
+                            onBlur={() => setConfirmPasswordFocused(false)}
+                          />
+                        </View>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -449,9 +559,9 @@ export default function LoginScreen() {
                   <>
                     {/* Primary Action Button for Registration */}
                     <TouchableOpacity
-                      style={[styles.primaryBtn, (!email || !name || !password || !confirmPassword) && styles.primaryBtnDisabled]}
+                      style={[styles.primaryBtn, (params.prefill_phone ? (!name || !password || !confirmPassword) : (!email || !name || !password || !confirmPassword)) && styles.primaryBtnDisabled]}
                       onPress={handleRegister}
-                      disabled={!email || !name || !password || !confirmPassword || isLoading}
+                      disabled={(params.prefill_phone ? (!name || !password || !confirmPassword) : (!email || !name || !password || !confirmPassword)) || isLoading}
                       activeOpacity={0.9}
                     >
                       {isLoading ? (
@@ -762,6 +872,31 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_400Regular',
     color: '#434655',
     lineHeight: 16,
+  },
+  nfcPrefillBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 16,
+  },
+  nfcPrefillText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#065F46',
+  },
+  registerHint: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
   },
   linkText: {
     color: '#000000',

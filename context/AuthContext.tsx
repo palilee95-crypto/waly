@@ -46,7 +46,7 @@ interface AuthContextType {
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
   resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
-  checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string }>;
+  checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string; verified?: boolean }>;
   register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
   quickRegister: (name: string, phone: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -209,9 +209,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return res.otpId;
   };
 
-  const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string }> => {
+  const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string; verified?: boolean }> => {
     try {
-      const res = await pb.send<{ exists: boolean; email?: string }>('/api/risev/check-phone', {
+      const res = await pb.send<{ exists: boolean; email?: string; verified?: boolean }>('/api/risev/check-phone', {
         method: 'GET',
         params: { phone }
       });
@@ -225,6 +225,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string): Promise<void> => {
     const body: any = { phone, email, name, password, role };
     if (birthday) body.birthday = birthday;
+    
+    // Clear old auth state before registering to prevent mixed authorization headers
+    pb.authStore.clear();
+
     await pb.send('/api/risev/register', {
       method: 'POST',
       body,

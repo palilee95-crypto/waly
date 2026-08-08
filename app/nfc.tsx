@@ -231,23 +231,21 @@ export default function NfcLandingScreen() {
   });
 
   const handleViewStampCard = () => {
-    const authRecord = pb.authStore.record;
-    const isFullyRegistered = user?.email && !user.email.startsWith('customer_') && !user.email.endsWith('@risev.app');
-
-    if (isFullyRegistered || (authRecord?.email && !authRecord.email.startsWith('customer_') && !authRecord.email.endsWith('@risev.app'))) {
-      // Fully registered customer -> view live stamp card
-      setStep('card');
-    } else {
-      // Guest or quick-register user -> proceed to onboarding/registration to complete password & profile
-      router.push({
-        pathname: '/join' as any,
-        params: {
-          m: merchant?.id || (params.m as string) || '',
-          phone: phoneInput || user?.phone || '',
-          name: nameInput || user?.name || '',
-        },
-      });
-    }
+    // Always redirect to login page with phone pre-filled
+    // Registered users will see password step; new users will see register step
+    const rawPhone = phoneInput || user?.phone || '';
+    // Strip country code prefix — login page prepends +60 itself
+    const strippedPhone = rawPhone.startsWith('+60')
+      ? rawPhone.slice(3)
+      : rawPhone.startsWith('60')
+      ? rawPhone.slice(2)
+      : rawPhone;
+    // Also pass the name they typed on the NFC page (if any)
+    const prefillName = nameInput.trim() || '';
+    router.push({
+      pathname: '/(auth)/login' as any,
+      params: { prefill_phone: strippedPhone, prefill_name: prefillName },
+    });
   };
 
   const handleSendWhatsapp = async () => {
@@ -591,7 +589,13 @@ export default function NfcLandingScreen() {
     try {
       let finalName = nameInput.trim();
 
-      if (!showNameField && !user) {
+      // Always check the entered phone against DB unless:
+      // 1. Name field is already showing (user already filled it in), OR
+      // 2. The entered phone matches the currently logged-in user's own phone
+      const enteredPhoneMatchesUser = user?.phone && (user.phone === cleanPhone || user.phone === cleanPhone.replace('+', ''));
+      const shouldCheckPhone = !showNameField && !enteredPhoneMatchesUser;
+
+      if (shouldCheckPhone) {
         setIsCheckingPhone(true);
         try {
           const res = await pb.send<{ exists: boolean; name?: string }>('/api/risev/check-phone', {
@@ -603,7 +607,9 @@ export default function NfcLandingScreen() {
           if (res.exists && res.name) {
             finalName = res.name;
           } else if (!res.exists) {
+            // New customer — ask for their name
             setShowNameField(true);
+            setNameInput(''); // clear any pre-filled name from logged-in user
             setIsLoading(false);
             setIsCheckingPhone(false);
             return;
@@ -613,18 +619,28 @@ export default function NfcLandingScreen() {
         } finally {
           setIsCheckingPhone(false);
         }
+      } else if (enteredPhoneMatchesUser && user?.name) {
+        // Phone matches logged-in user — use their name
+        finalName = user.name;
       }
 
+      // Fallback name if still empty
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
 
-      // Quick register or retrieve account (only if not already logged in)
-      if (!pb.authStore.isValid || !pb.authStore.record) {
+      // Quick register or retrieve account:
+      // Run if nobody is logged in, OR if the entered phone doesn't match the logged-in user
+      const loggedInPhone = pb.authStore.record?.phone || '';
+      const isLoggedInUsersPhone = loggedInPhone === cleanPhone || loggedInPhone === cleanPhone.replace('+', '');
+      if (!pb.authStore.isValid || !pb.authStore.record || !isLoggedInUsersPhone) {
         await quickRegister(finalName, cleanPhone);
       }
 
       const authRecord = pb.authStore.record;
-      const displayName = (authRecord?.name && !authRecord.name.startsWith('Customer '))
-        ? authRecord.name
+      // Only use logged-in user's name if the entered phone is THEIR OWN phone
+      const enteredPhoneIsOwnPhone = authRecord?.phone &&
+        (authRecord.phone === cleanPhone || authRecord.phone === cleanPhone.replace('+', ''));
+      const displayName = enteredPhoneIsOwnPhone
+        ? (authRecord?.name || finalName || ('Customer ' + digits.slice(-4)))
         : (finalName || ('Customer ' + digits.slice(-4)));
 
       // 1. Send Direct API Request to PocketBase (INSTANT & FAIL-SAFE)
@@ -753,9 +769,11 @@ export default function NfcLandingScreen() {
                 {/* Header: Shop Name & Logo */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 2 }}>
                   <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
-                    {merchantLogoUrl ? (
+                    {merchantLogoUrl && !merchantLogoUrl.includes('placeholder') ? (
                       <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
-                    ) : null}
+                    ) : (
+                      <Ionicons name="storefront" size={20} color="#64748B" />
+                    )}
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }} numberOfLines={1}>
@@ -986,168 +1004,285 @@ export default function NfcLandingScreen() {
           {/* ───────────────────────────────────────────────────────── */}
           {/* STEP 1: Phone Input Form */}
           {/* ───────────────────────────────────────────────────────── */}
-          {step === 'form' && (
-            <View style={styles.innerFormCard}>
-              <View style={styles.nfcBadgeRow}>
-                <Ionicons name="wifi" size={14} color="#B45309" />
-                <Text style={styles.nfcBadgeTitle}>NFC CARD SCANNED</Text>
-              </View>
+          {step === 'form' && (() => {
+            const getIsLight = (color: string) => {
+              const hex = (color || '#ffffff').replace('#', '');
+              if (hex.length === 3) {
+                const r = parseInt(hex[0] + hex[0], 16);
+                const g = parseInt(hex[1] + hex[1], 16);
+                const b = parseInt(hex[2] + hex[2], 16);
+                return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+              }
+              if (hex.length === 6) {
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+              }
+              return true;
+            };
 
-              <Text style={styles.formWelcomeTitle}>Claim Your Stamps</Text>
+            const isLightBrandColor = getIsLight(primaryColor);
+            const brandTextColor = isLightBrandColor ? '#0F172A' : '#FFFFFF';
+            const brandSubtextColor = isLightBrandColor ? '#475569' : 'rgba(255, 255, 255, 0.75)';
+            const brandInputBorderColor = isLightBrandColor ? '#E2E8F0' : 'rgba(255, 255, 255, 0.2)';
+            const brandInputBgColor = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
 
-
-              {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-              {/* Phone Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>PHONE NUMBER</Text>
-                <View style={styles.inputGroup}>
-                  <View style={styles.prefixBox}>
-                    <Text style={styles.flag}>🇲🇾</Text>
-                    <Text style={styles.prefixCode}>+60</Text>
-                    <View style={styles.prefixDivider} />
+            return (
+              <>
+                <View style={[styles.innerFormCard, { backgroundColor: primaryColor, borderColor: brandInputBorderColor, borderWidth: isLightBrandColor ? 1 : 0 }]}>
+                  <View style={[styles.nfcBadgeRow, { backgroundColor: isLightBrandColor ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.15)' }]}>
+                    <View style={[styles.nfcBadgeDot, { backgroundColor: isLightBrandColor ? '#10B981' : '#FFFFFF' }]} />
+                    <Text style={[styles.nfcBadgeTitle, { color: isLightBrandColor ? '#10B981' : '#FFFFFF' }]}>VERIFIED NFC SCAN</Text>
                   </View>
-                  <TextInput
-                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    placeholder="11 234 5678"
-                    placeholderTextColor="#94A3B8"
-                    value={phoneInput}
-                    onChangeText={(text) => {
-                      setPhoneInput(text);
-                      setErrorMsg('');
-                    }}
-                    keyboardType="phone-pad"
-                  />
+
+                  <Text style={[styles.formWelcomeTitle, { color: brandTextColor }]}>Claim Your Stamps</Text>
+
+                  {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+                  {/* Phone Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: brandSubtextColor }]}>PHONE NUMBER</Text>
+                    <View style={[styles.inputGroup, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor, paddingLeft: 6 }]}>
+                      <View style={[styles.prefixBox, { borderColor: brandInputBorderColor, backgroundColor: '#FFFFFF', borderRadius: 8, height: 30, paddingHorizontal: 6, marginVertical: 3 }]}>
+                        <Text style={styles.flag}>🇲🇾</Text>
+                        <Text style={styles.prefixCode}>+60</Text>
+                      </View>
+                      <TextInput
+                        style={[
+                          styles.input, 
+                          { color: brandTextColor, fontSize: 13, marginLeft: 8 },
+                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
+                        ]}
+                        placeholder="11-234 5678"
+                        placeholderTextColor={brandSubtextColor}
+                        value={phoneInput}
+                        onChangeText={(text) => {
+                          setPhoneInput(text);
+                          setErrorMsg('');
+                        }}
+                        keyboardType="phone-pad"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Full Name Input (New Customer) */}
+                  {showNameField && (
+                    <View style={{ marginTop: 4 }}>
+                      {/* Welcome hint banner */}
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isLightBrandColor ? 'rgba(99, 102, 241, 0.07)' : 'rgba(255,255,255,0.10)',
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: isLightBrandColor ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.15)',
+                      }}>
+                        <Text style={{ fontSize: 16, marginRight: 8 }}>👋</Text>
+                        <Text style={{ flex: 1, fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: brandSubtextColor, lineHeight: 17 }}>
+                          Looks like you're new here! Just tell us your name to claim.
+                        </Text>
+                      </View>
+
+                      <Text style={[styles.inputLabel, { color: brandSubtextColor }]}>YOUR NAME</Text>
+                      <View style={[styles.inputGroup, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor, paddingLeft: 12 }]}>
+                        <Ionicons name="person-outline" size={16} color={brandSubtextColor} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={[
+                            styles.input,
+                            { color: brandTextColor, fontSize: 13 },
+                            Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
+                          ]}
+                          placeholder="e.g. Ahmad Rizal"
+                          placeholderTextColor={brandSubtextColor}
+                          value={nameInput}
+                          onChangeText={setNameInput}
+                          autoFocus
+                          autoCapitalize="words"
+                        />
+                      </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryActionBtn,
+                      { backgroundColor: isLightBrandColor ? '#050505' : '#FFFFFF', borderRadius: 12, height: 40 },
+                      (isLoading || isCheckingPhone) && { opacity: 0.5 }
+                    ]}
+                    onPress={handleNfcSubmit}
+                    disabled={isLoading || isCheckingPhone}
+                    activeOpacity={0.85}
+                  >
+                    {isLoading || isCheckingPhone ? (
+                      <ActivityIndicator color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} />
+                    ) : (
+                      <>
+                        <Text style={[styles.primaryActionBtnText, { color: isLightBrandColor ? '#FFFFFF' : '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, marginRight: 6 }]}>
+                          {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
+                        </Text>
+                        <Ionicons 
+                          name="arrow-forward" 
+                          size={15} 
+                          color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} 
+                        />
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Trust Footer */}
+                  <View style={styles.fakeTrustFooter}>
+                    <Ionicons name="lock-closed" size={10} color={brandSubtextColor} />
+                    <Text style={[styles.fakeTrustText, { color: brandSubtextColor }]}>Secure connection by risev.app</Text>
+                  </View>
                 </View>
 
-              </View>
-
-              {/* Full Name Input (New Customer) */}
-              {showNameField && (
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>FULL NAME (NEW CUSTOMER)</Text>
-                  <TextInput
-                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    placeholder="Enter your full name"
-                    placeholderTextColor="#94A3B8"
-                    value={nameInput}
-                    onChangeText={setNameInput}
-                  />
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.primaryActionBtn,
-                  { backgroundColor: '#050505' },
-                  (isLoading || isCheckingPhone) && { opacity: 0.5 }
-                ]}
-                onPress={handleNfcSubmit}
-                disabled={isLoading || isCheckingPhone}
-                activeOpacity={0.85}
-              >
-                {isLoading || isCheckingPhone ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF' }]}>
-                      {showNameField ? 'Complete Stamp Claim' : 'Claim Stamps Now'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+                {/* Risev Logo below the card */}
+                <Image 
+                  source={require('../assets/risev logo.png')}
+                  style={styles.fakeRisevLogoPhoneBg}
+                  resizeMode="contain"
+                />
+              </>
+            );
+          })()}
 
           {/* ───────────────────────────────────────────────────────── */}
           {/* STEP 2: Real-Time Store Approval View */}
           {/* ───────────────────────────────────────────────────────── */}
-          {step === 'sent' && (
-            <View style={styles.innerFormCard}>
-              {/* Header Status Row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isApproved ? '#DEF7EC' : '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons
-                    name={isApproved ? "checkmark-circle" : "sync-outline"}
-                    size={18}
-                    color={isApproved ? "#10B981" : "#D97706"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                    {isApproved ? 'Claim Approved!' : 'Stamp Request Sent'}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                    {isApproved ? 'Stamps credited successfully.' : 'Waiting for cashier confirmation...'}
-                  </Text>
-                </View>
-              </View>
+          {step === 'sent' && (() => {
+            const getIsLight = (color: string) => {
+              const hex = (color || '#ffffff').replace('#', '');
+              if (hex.length === 3) {
+                const r = parseInt(hex[0] + hex[0], 16);
+                const g = parseInt(hex[1] + hex[1], 16);
+                const b = parseInt(hex[2] + hex[2], 16);
+                return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+              }
+              if (hex.length === 6) {
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+              }
+              return true;
+            };
 
-              {/* Status Indicator Banner (Only if pending) */}
-              {!isApproved && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: '#FEF9C3',
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#FEF08A',
-                    marginBottom: 12,
-                  }}
-                >
-                  <ActivityIndicator size="small" color="#A16207" />
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#854D0E', flex: 1 }}>
-                    Keep this screen open for real-time sync
-                  </Text>
-                </View>
-              )}
+            const isLightBrandColor = getIsLight(primaryColor);
+            const brandTextColor = isLightBrandColor ? '#0F172A' : '#FFFFFF';
+            const brandSubtextColor = isLightBrandColor ? '#475569' : 'rgba(255, 255, 255, 0.75)';
+            const brandInputBorderColor = isLightBrandColor ? '#E2E8F0' : 'rgba(255, 255, 255, 0.2)';
+            
+            const badgeBg = isApproved 
+              ? (isLightBrandColor ? '#DEF7EC' : 'rgba(16, 185, 129, 0.15)') 
+              : (isLightBrandColor ? '#FEF3C7' : 'rgba(245, 158, 11, 0.15)');
+              
+            const badgeColor = isApproved 
+              ? '#10B981' 
+              : (isLightBrandColor ? '#D97706' : '#FFC700');
 
-              {/* Cashier/Staff Instruction Card (Only if pending) */}
-              {!isApproved && (
-                <View
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    padding: 12,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Ionicons name="storefront" size={14} color="#64748B" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#475569', letterSpacing: 0.5 }}>
-                      CASHIER INSTRUCTION
+            const syncBg = isLightBrandColor ? '#FEF9C3' : 'rgba(254, 240, 138, 0.12)';
+            const syncBorder = isLightBrandColor ? '#FEF08A' : 'rgba(254, 240, 138, 0.25)';
+            const syncText = isLightBrandColor ? '#854D0E' : '#FEF08A';
+            const syncSpinner = isLightBrandColor ? '#A16207' : '#FFC700';
+
+            const instructionBg = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
+            const instructionBorder = isLightBrandColor ? '#E2E8F0' : 'rgba(255, 255, 255, 0.15)';
+
+            return (
+              <View style={[styles.innerFormCard, { backgroundColor: primaryColor, borderColor: brandInputBorderColor, borderWidth: isLightBrandColor ? 1 : 0 }]}>
+                {/* Header Status Row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: badgeBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons
+                      name={isApproved ? "checkmark-circle" : "sync-outline"}
+                      size={18}
+                      color={badgeColor}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor }}>
+                      {isApproved ? 'Claim Approved!' : 'Stamp Request Sent'}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: brandSubtextColor }}>
+                      {isApproved ? 'Stamps credited successfully.' : 'Waiting for cashier confirmation...'}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16 }}>
-                    Ask staff to approve your pending stamp claim on their merchant dashboard.
-                  </Text>
                 </View>
-              )}
 
-              {/* Action Button (If approved) */}
-              {isApproved && (
-                <TouchableOpacity
-                  style={[
-                    styles.primaryActionBtn,
-                    { backgroundColor: '#050505', marginTop: 4 },
-                  ]}
-                  onPress={handleViewStampCard}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF' }]}>
-                    View My Stamp Card
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                {/* Status Indicator Banner (Only if pending) */}
+                {!isApproved && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      backgroundColor: syncBg,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: syncBorder,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <ActivityIndicator size="small" color={syncSpinner} />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: syncText, flex: 1 }}>
+                      Keep this screen open for real-time sync
+                    </Text>
+                  </View>
+                )}
+
+                {/* Cashier/Staff Instruction Card (Only if pending) */}
+                {!isApproved && (
+                  <View
+                    style={{
+                      backgroundColor: instructionBg,
+                      padding: 12,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: instructionBorder,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Ionicons name="storefront" size={14} color={brandSubtextColor} />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandSubtextColor, letterSpacing: 0.5 }}>
+                        CASHIER INSTRUCTION
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: brandSubtextColor, lineHeight: 16 }}>
+                      Ask staff to approve your pending stamp claim on their merchant dashboard.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Action Button (If approved) */}
+                {isApproved && (
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryActionBtn,
+                      { backgroundColor: isLightBrandColor ? '#050505' : '#FFFFFF', marginTop: 4, borderRadius: 12, height: 40 },
+                    ]}
+                    onPress={handleViewStampCard}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons 
+                      name="card" 
+                      size={18} 
+                      color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} 
+                      style={{ marginRight: 8 }} 
+                    />
+                    <Text style={[styles.primaryActionBtnText, { color: isLightBrandColor ? '#FFFFFF' : '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 }]}>
+                      View My Stamp Card
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })()}
 
           {/* ───────────────────────────────────────────────────────── */}
           {/* STEP 3: 1:1 CUSTOMER VIEW LOYALTY CARD */}
@@ -1953,5 +2088,31 @@ const styles = StyleSheet.create({
   unlockBtnText: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  nfcBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  fakeTrustFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 14,
+  },
+  fakeTrustText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+  },
+  fakeRisevLogoPhoneBg: {
+    height: 22,
+    width: 88,
+    alignSelf: 'center',
+    marginTop: 36,
+    marginBottom: 28,
+    tintColor: '#FFFFFF',
   },
 });

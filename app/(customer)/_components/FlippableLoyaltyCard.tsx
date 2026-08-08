@@ -185,7 +185,11 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
             <View style={styles.cardContentPadding}>
               <View style={styles.largeCardHeader}>
                 <View style={styles.shopLogoBg}>
-                  <Image source={{ uri: card.logo }} style={styles.shopLogo} />
+                  {card.logo && !card.logo.includes('placeholder') ? (
+                    <Image source={{ uri: card.logo }} style={styles.shopLogo} />
+                  ) : (
+                    <Ionicons name="storefront" size={20} color="#64748B" />
+                  )}
                 </View>
                 <View style={{ flex: 1, marginLeft: 0, gap: 2 }}>
                   <Text style={[styles.largeCardMerchant, card.fontColor && { color: card.fontColor }]} numberOfLines={1}>
