@@ -235,6 +235,8 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
+  const needsPassword = user?.email?.startsWith('quick_') || user?.email?.startsWith('shadow_');
+
   const handleSubmit = async () => {
     setError('');
     const trimmedName = name.trim();
@@ -260,17 +262,19 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
       return;
     }
 
-    if (!password) {
-      setError('Please set a password.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
+    if (needsPassword) {
+      if (!password) {
+        setError('Please set a password.');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -281,7 +285,7 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
         body: {
           name: trimmedName,
           email: trimmedEmail,
-          password: password,
+          ...(needsPassword ? { password } : {}),
         },
       });
 
@@ -357,37 +361,41 @@ function CustomerOnboardingGate({ user, refreshSession, logout }: { user: any; r
             <Text style={styles.inputHint}>This email will be used for account recovery and rewards notification.</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>SET PASSWORD</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
-              <TextInput
-                style={styles.textInput}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Min. 8 characters"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
+          {needsPassword && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>SET PASSWORD</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+                  <TextInput
+                    style={styles.textInput}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Min. 8 characters"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
-              <TextInput
-                style={styles.textInput}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Confirm password"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+                  <TextInput
+                    style={styles.textInput}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm password"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Validation Error Message Box */}
           {error ? (
@@ -446,7 +454,8 @@ export default function CustomerLayout() {
   const isShadowUser = user?.email?.endsWith('@risev.app') && (
     user.email.startsWith('user_') || 
     user.email.startsWith('quick_') || 
-    user.email.startsWith('customer_')
+    user.email.startsWith('customer_') ||
+    user.email.startsWith('shadow_')
   );
   if (isShadowUser) {
     return <CustomerOnboardingGate user={user} refreshSession={refreshSession} logout={logout} />;

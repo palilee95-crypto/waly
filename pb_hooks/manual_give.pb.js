@@ -48,7 +48,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       customer = new Record(userCol);
       customer.set("id", $security.randomString(15).toLowerCase());
       customer.set("phone", cleanPhone);
-      customer.set("email", `customer_${digits}@risev.app`);
+      customer.set("email", `shadow_cust_${digits}@risev.app`);
       customer.set("name", customerNameInput || ("Customer " + digits.slice(-4)));
       customer.set("role", "customer");
       customer.set("birthday", "2000-01-01 00:00:00.000Z");

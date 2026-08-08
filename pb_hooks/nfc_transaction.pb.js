@@ -45,7 +45,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
           customer = new Record(userCol);
           customer.set("id", $security.randomString(15).toLowerCase());
           customer.set("phone", cleanPhone);
-          customer.set("email", `customer_${cleanPhone.replace(/[^\d]/g, '')}@risev.app`);
+          customer.set("email", `shadow_cust_${cleanPhone.replace(/[^\d]/g, '')}@risev.app`);
           customer.set("name", customerName);
           customer.set("role", "customer");
           customer.set("birthday", "2000-01-01 00:00:00.000Z");

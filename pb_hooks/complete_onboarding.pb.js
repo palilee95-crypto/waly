@@ -20,11 +20,18 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   if (!trimmedEmail) {
     return e.json(400, { message: "Please enter your Email Address." });
   }
-  if (!password) {
-    return e.json(400, { message: "Please set a password." });
-  }
-  if (password.length < 8) {
-    return e.json(400, { message: "Password must be at least 8 characters." });
+
+  // Only require password if the current email starts with shadow_ or quick_ (meaning they haven't set a password yet)
+  const currentEmail = authRecord.getString("email") || "";
+  const needsPassword = currentEmail.startsWith("quick_") || currentEmail.startsWith("shadow_");
+
+  if (needsPassword) {
+    if (!password) {
+      return e.json(400, { message: "Please set a password." });
+    }
+    if (password.length < 8) {
+      return e.json(400, { message: "Password must be at least 8 characters." });
+    }
   }
 
   // Simple email format check
@@ -49,7 +56,9 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   try {
     authRecord.set("name", trimmedName);
     authRecord.set("email", trimmedEmail);
-    authRecord.setPassword(password);
+    if (needsPassword) {
+      authRecord.setPassword(password);
+    }
     authRecord.set("verified", true); // Auto-verify the user's email since we're setting it directly
 
     $app.save(authRecord);
