@@ -32,40 +32,59 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
   const pulseAnim2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (scanMode === 'nfc') {
+    let timeoutId: any;
+    let isMounted = true;
+
+    // Reset and stop animations when mode changes or modal closes
+    pulseAnim1.stopAnimation();
+    pulseAnim2.stopAnimation();
+
+    if (visible && scanMode === 'nfc') {
       pulseAnim1.setValue(0);
       pulseAnim2.setValue(0);
 
-      const anim1 = Animated.loop(
+      const runAnim1 = () => {
+        if (!isMounted) return;
+        pulseAnim1.setValue(0);
         Animated.timing(pulseAnim1, {
           toValue: 1,
           duration: 2400,
           useNativeDriver: true,
-        })
-      );
+        }).start(({ finished }) => {
+          if (finished && isMounted) {
+            runAnim1();
+          }
+        });
+      };
 
-      const anim2 = Animated.loop(
+      const runAnim2 = () => {
+        if (!isMounted) return;
+        pulseAnim2.setValue(0);
         Animated.timing(pulseAnim2, {
           toValue: 1,
           duration: 2400,
           useNativeDriver: true,
-        })
-      );
-
-      anim1.start();
-      
-      // Start the second ripple exactly half-cycle later to keep them alternating infinitely
-      const timeoutId = setTimeout(() => {
-        anim2.start();
-      }, 1200);
-
-      return () => {
-        clearTimeout(timeoutId);
-        anim1.stop();
-        anim2.stop();
+        }).start(({ finished }) => {
+          if (finished && isMounted) {
+            runAnim2();
+          }
+        });
       };
+
+      runAnim1();
+
+      timeoutId = setTimeout(() => {
+        runAnim2();
+      }, 1200);
     }
-  }, [scanMode]);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      pulseAnim1.stopAnimation();
+      pulseAnim2.stopAnimation();
+    };
+  }, [scanMode, visible]);
 
   const startQrScanner = async () => {
     if (!permission?.granted) {
