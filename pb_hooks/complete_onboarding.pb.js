@@ -39,7 +39,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
   // Check if the email is already registered by another user
   try {
     const existingUser = $app.findFirstRecordByData("users", "email", trimmedEmail);
-    if (existingUser.getId() !== authRecord.getId()) {
+    if (existingUser.id !== authRecord.id) {
       return e.json(400, { message: "EMAIL: Email address is already registered." });
     }
   } catch (err) {
@@ -58,7 +58,7 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
     const secret = authRecord.tokenKey() + authRecord.collection().authToken.secret;
     const token = $security.createJWT(
       {
-        id: authRecord.getId(),
+        id: authRecord.id,
         type: "auth",
         collectionId: authRecord.collection().id,
       },

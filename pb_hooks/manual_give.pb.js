@@ -73,13 +73,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       $app.save(program);
     }
 
-    const programId = program.getId();
+    const programId = program.id;
     const goal = parseInt(program.get("stamp_goal")) || 10;
 
     // 3. Find or create loyalty card & add stamps
     let card = null;
     try {
-      const cards = $app.findRecordsByFilter("loyalty_cards", `program = '${programId}' && customer = '${customer.getId()}'`, "created", 1, 0);
+      const cards = $app.findRecordsByFilter("loyalty_cards", `program = '${programId}' && customer = '${customer.id}'`, "created", 1, 0);
       if (cards.length > 0) card = cards[0];
     } catch (err) { /* no card yet */ }
 
@@ -88,7 +88,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       card = new Record(cardCol);
       card.set("id", $security.randomString(15).toLowerCase());
       card.set("program", programId);
-      card.set("customer", customer.getId());
+      card.set("customer", customer.id);
       card.set("merchant", merchantId);
       card.set("stamps_collected", 0);
       card.set("status", "active");
@@ -110,9 +110,9 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("type", "earn");
     txn.set("stamps", stampAmount);
     txn.set("bill_amount", billAmount);
-    txn.set("customer", customer.getId());
+    txn.set("customer", customer.id);
     txn.set("merchant", merchantId);
-    txn.set("loyalty_card", card.getId());
+    txn.set("loyalty_card", card.id);
     txn.set("metadata", JSON.stringify({ source: "manual_give" }));
     $app.save(txn);
 
