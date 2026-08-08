@@ -282,7 +282,10 @@ export default function EditProfileScreen() {
   };
 
   const fetchProfileData = async () => {
-    if (!user?.merchant_id) return;
+    if (!user?.merchant_id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       // 1. Fetch merchant

@@ -431,7 +431,7 @@ export default function MerchantDashboard() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="light" />
       {/* Scrollable Dashboard View */}
       <ScrollView
