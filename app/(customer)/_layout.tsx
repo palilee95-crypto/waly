@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import CustomerStampModal from '@/components/CustomerStampModal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Custom Bottom Tab Bar / Sidebar to match the clean minimalist black/white design
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -155,21 +156,48 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                   style={{
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#FF4A6B',
-                    width: 50,
-                    height: 50,
-                    borderRadius: 25,
-                    marginTop: -12,
-                    shadowColor: '#FF4A6B',
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 10,
-                    elevation: 6,
-                    borderWidth: 2.5,
-                    borderColor: '#FFFFFF',
+                    marginTop: -14,
+                    marginHorizontal: 8,
                   }}
                 >
-                  <Ionicons name="scan" size={24} color="#FFFFFF" />
+                  <View style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 27,
+                    shadowColor: '#FF4A6B',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 10,
+                    elevation: 6,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 2.5,
+                    borderColor: '#FFFFFF',
+                    overflow: 'hidden',
+                  }}>
+                    <LinearGradient
+                      colors={['#FF6B8B', '#FF2A55']}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {/* Glass Highlight */}
+                      <LinearGradient
+                        colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0)']}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 0.5 }}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 22,
+                        }}
+                      />
+                      <Ionicons name="scan" size={24} color="#FFFFFF" />
+                    </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               )}
               <AnimatedTabButton 
