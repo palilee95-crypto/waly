@@ -15,6 +15,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
@@ -1545,6 +1546,7 @@ export default function NfcLandingScreen() {
 
   return (
     <View style={[styles.fullPageContainer, !merchantBgUrl && { backgroundColor: primaryColor }]}>
+      <StatusBar style="light" />
       {merchantBgUrl ? (
         <ImageBackground
           source={{ uri: merchantBgUrl }}
