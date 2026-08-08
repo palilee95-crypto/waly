@@ -153,7 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role = 'customer';
         }
         
-        // 🚀 Optimistic loading: Set user details instantly from cache
+        // 🚀 Set initial cache state
         setUser({
           id: record.id,
           phone: record.phone || '',
@@ -162,8 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           avatar: record.avatar || undefined,
           role: record.role,
           activeRole: role,
-          merchant_id: record.merchant_id,
-          merchant_status: record.merchant_status || 'active',
+          merchant_status: 'active',
           tier: record.tier || undefined,
           total_points: record.total_points || 0,
         });

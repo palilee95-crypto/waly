@@ -23,12 +23,6 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
   const { t } = useLanguage();
   const isDesktop = width >= 768;
 
-  const currentRoute = state.routes[state.index]?.name;
-  // Hide tab bar on sub-screens like subscription paywall or nfc-marketplace
-  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace') {
-    return null;
-  }
-
   if (isDesktop) {
     return (
       <View style={styles.desktopSidebar}>
