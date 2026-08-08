@@ -495,7 +495,7 @@ export default function CustomerDashboard() {
           showsVerticalScrollIndicator={false}
         >
           {/* 🌟 SUPERCARD V2 🌟 */}
-          <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 20 }}>
+          <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 10 }}>
             
             {/* Absolute Folder Tab Background Layer */}
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderRadius: 32 }}>
