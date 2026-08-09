@@ -2,7 +2,6 @@
 // Endpoint for sales agents to create a prospect and auto-send WhatsApp referral link.
 
 routerAdd("POST", "/api/risev/agent/create-prospect", (e) => {
-  const { callEvo, sendTextMessage } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -78,19 +77,12 @@ routerAdd("POST", "/api/risev/agent/create-prospect", (e) => {
     const defaultMessage = `Hey! I'm ${agentName} from RISEV. Deploy Loyalty Stamps for your shop to boost your repeat customer rates. Register here: ${referralLink}`;
     const messageText = customMessage || defaultMessage;
 
-    const sendResult = sendTextMessage(instanceName, normalizedPhone, messageText, instanceToken);
-
-    if (!sendResult.success) {
-      return e.json(500, {
-        success: false,
-        message: "Prospect created but failed to send WhatsApp message: " + (sendResult.error || "Unknown error"),
-        prospect: { id: prospect.id, phone: normalizedPhone, status: prospect.get("status") }
-      });
-    }
+    // WhatsApp sending skipped because Evolution Go is decommissioned.
+    console.log(`[MOCK CREATE PROSPECT WHATSAPP] Simulating message dispatch to ${normalizedPhone}: "${messageText}"`);
 
     return e.json(200, {
       success: true,
-      message: "Prospect created and WhatsApp message sent successfully.",
+      message: "Prospect created successfully (WhatsApp notification simulated).",
       prospect: {
         id: prospect.id,
         phone: normalizedPhone,

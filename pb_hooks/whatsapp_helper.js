@@ -1,8 +1,7 @@
 // pb_hooks/whatsapp_helper.js
 // Official Meta Cloud API helper and Evolution Go mock fallback.
 
-const evolutionUrl = 'http://localhost:8080';
-const evolutionKey = 'risev_dev_api_key';
+// Evolution Go configurations removed
 
 // Pagination helper: fetch all records matching a filter by looping 500-record pages.
 // PocketBase's findRecordsByFilter caps at perPage records per call — this loops until exhausted.
@@ -149,29 +148,7 @@ function sendTemplateMessage(merchantId, recipientPhone, templateName, languageC
   }
 }
 
-// Mock WhatsApp functions for Evolution Go backwards compatibility
-function callEvo(method, path, body) {
-  console.log(`[MOCK WHATSAPP] callEvo: ${method} ${path} (skipped)`);
-  return { status: 404, data: null, message: "Evolution Go disabled" };
-}
-
-function getInstances() {
-  return [];
-}
-
-function getInstanceToken(instanceName, forceRefresh = false) {
-  return null;
-}
-
-function sendTextMessage(instanceName, number, text, options) {
-  console.log(`[MOCK WHATSAPP] sendTextMessage to ${number} via ${instanceName}: "${text.replace(/\n/g, ' ')}" (skipped)`);
-  return { success: true, mock: true };
-}
-
-function pairInstance(instanceName, phone) {
-  console.log(`[MOCK WHATSAPP] pairInstance for ${phone} (skipped)`);
-  return { pairingCode: "DISABLED", pairing_code: "DISABLED", code: "DISABLED" };
-}
+// Legacy Evolution Go mock functions removed
 
 function registerAppTemplates(wabaId, accessToken) {
   const templates = [
@@ -229,14 +206,7 @@ function registerAppTemplates(wabaId, accessToken) {
 }
 
 module.exports = {
-  evolutionUrl,
-  evolutionKey,
-  callEvo,
-  getInstances,
-  getInstanceToken,
-  sendTextMessage,
   sendTemplateMessage,
   fetchAllRecords,
-  pairInstance,
   registerAppTemplates
 };

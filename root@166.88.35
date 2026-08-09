@@ -118,7 +118,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     // 5. Send automated WhatsApp receipt to customer
     const merchant = $app.findRecordById("merchants", merchantId);
     const storeName = merchant.getString("name") || "our store";
-    const appUrl = $os.getenv("APP_URL") || "https://waly-five.vercel.app";
+    const appUrl = $os.getenv("APP_URL") || "https://risev.app";
     const customerName = customer.getString("name") || "there";
     const nameSlug = (storeName || "").toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
     const instanceName = `merchant-${merchantId}-${nameSlug}`;
