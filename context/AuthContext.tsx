@@ -46,6 +46,7 @@ interface AuthContextType {
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
   resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
   checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string; verified?: boolean }>;
   register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
   quickRegister: (name: string, phone: string) => Promise<void>;
@@ -293,6 +294,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const requestPasswordReset = async (email: string) => {
+    await pb.collection('users').requestPasswordReset(email);
+  };
+
   const loginWithPassword = async (email: string, password: string) => {
     // Authenticate using the email and password
     const authData = await pb.collection('users').authWithPassword(email, password);
@@ -430,6 +435,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loginWithPassword,
       requestOTP,
       resetPassword,
+      requestPasswordReset,
       checkPhone,
       register,
       quickRegister,

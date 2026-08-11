@@ -119,9 +119,15 @@ routerAdd("POST", "/api/risev/register", (e) => {
     if (formattedBirthday) {
       user.set("birthday", formattedBirthday);
     }
-    user.set("verified", true);
+    user.set("verified", false); // Require email verification
     user.setPassword(password);
     $app.save(user);
+
+    try {
+      $mails.sendRecordVerification($app, user);
+    } catch (mailErr) {
+      console.log("[Register Mail Error] Failed to send verification email:", mailErr.message || mailErr);
+    }
 
     // Auto-provision merchant if role is merchant or both
     if (role === 'merchant' || role === 'both') {

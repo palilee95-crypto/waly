@@ -59,9 +59,15 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
     if (needsPassword) {
       authRecord.setPassword(password);
     }
-    authRecord.set("verified", true); // Auto-verify the user's email since we're setting it directly
+    authRecord.set("verified", false); // Require email verification
 
     $app.save(authRecord);
+
+    try {
+      $mails.sendRecordVerification($app, authRecord);
+    } catch (mailErr) {
+      console.log("[Onboarding Mail Error] Failed to send verification email:", mailErr.message || mailErr);
+    }
 
     const duration = authRecord.collection().authToken.duration || 604800;
     const secret = authRecord.tokenKey() + authRecord.collection().authToken.secret;

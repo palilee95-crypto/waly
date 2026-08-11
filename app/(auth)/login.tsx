@@ -26,7 +26,7 @@ const COUNTRY_CODE = '+60';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { checkPhone, register, requestOTP, loginWithIdentifier } = useAuth();
+  const { checkPhone, register, loginWithIdentifier, requestPasswordReset } = useAuth();
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
@@ -376,15 +376,24 @@ export default function LoginScreen() {
                           setStep('phone');
                           return;
                         }
+                        if (!email || email.trim() === '') {
+                          Alert.alert('Error', 'No email address found for this account. Please contact support.');
+                          return;
+                        }
+                        if (email.endsWith('@risev.app') || email.includes('shadow_') || email.includes('quick_')) {
+                          Alert.alert('Info', 'This account was created without a personal email. Please contact support or register a new account.');
+                          return;
+                        }
                         try {
                           setIsLoading(true);
-                          const otpId = await requestOTP(getFullPhone());
-                          router.push({
-                            pathname: '/(auth)/otp',
-                            params: { phone: getFullPhone(), otpId: otpId, role: role }
-                          });
+                          await requestPasswordReset(email.trim());
+                          if (Platform.OS === 'web') {
+                            alert(`A password reset link has been sent to ${email}. Please check your inbox.`);
+                          } else {
+                            Alert.alert('Reset Sent', `A password reset link has been sent to ${email}. Please check your inbox.`);
+                          }
                         } catch (e: any) {
-                          Alert.alert('Error', e?.message || 'Failed to send OTP.');
+                          Alert.alert('Error', e?.message || 'Failed to send password reset email.');
                         } finally {
                           setIsLoading(false);
                         }
