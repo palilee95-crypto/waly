@@ -32,7 +32,7 @@ const responsiveBackground = `
     overflow: hidden;
     position: fixed;
     overscroll-behavior: none;
-    background-color: #F8FAFC;
+    background-color: #FFFFFF;
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
