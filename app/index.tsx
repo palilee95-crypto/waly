@@ -387,7 +387,7 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
         </Text>
       </View>
 
-      <View style={[styles.pricingGrid, isMobile && { flexDirection: 'column' }]}>
+      <View style={[styles.pricingGrid, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
         
         {/* STARTER */}
         <View style={[styles.pricingCard, isMobile && { order: 2, marginBottom: 24 } as any]}>
@@ -473,7 +473,7 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
         </Text>
       </View>
 
-      <View style={[styles.wygGrid, isMobile && { flexDirection: 'column' }]}>
+      <View style={[styles.wygGrid, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
         
         {/* Connection Line */}
         <View style={[
@@ -615,21 +615,7 @@ function FaqSection({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-function FinalCtaSection({ isMobile }: { isMobile: boolean }) {
-  return (
-    <View style={styles.finalCtaSection}>
-      <Text style={[styles.heroHeadline, { fontSize: 40, lineHeight: 48, color: '#FFFFFF', textAlign: 'center', marginBottom: 16 }]}>
-        Stop Letting Customers Walk Away.
-      </Text>
-      <Text style={[styles.heroSub, { color: '#9CA3AF', marginBottom: 40, textAlign: 'center' }]}>
-        Give them a reason to come back.
-      </Text>
-      <TouchableOpacity style={[styles.ctaButton, { paddingHorizontal: 40, paddingVertical: 20 }]}>
-        <Text style={[styles.ctaButtonText, { fontSize: 18 }]}>Get Your Risev Stand →</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+
 
 function FooterSection({ isMobile }: { isMobile: boolean }) {
   const FooterLink = ({ text }: { text: string }) => (
@@ -702,7 +688,7 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
 export default function LandingPage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const isMobile = width < 1024;
 
   return (
     <View style={styles.container}>
@@ -806,8 +792,6 @@ export default function LandingPage() {
         {/* SECTION 7: FAQ */}
         <FaqSection isMobile={isMobile} />
 
-        {/* FINAL CTA */}
-        <FinalCtaSection isMobile={isMobile} />
 
         {/* FOOTER */}
         <FooterSection isMobile={isMobile} />
@@ -907,7 +891,7 @@ const styles = StyleSheet.create({
   /* Hero Content Styles */
   scrollContent: {
     paddingTop: 120, // Space for navbar
-    paddingBottom: 100,
+    paddingBottom: 0,
     alignItems: 'center',
   },
   heroSection: {
@@ -1780,14 +1764,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  /* Final CTA Section */
-  finalCtaSection: {
-    width: '100%',
-    backgroundColor: '#111827', // slightly lighter than black for separation if needed, or stick to black
-    paddingVertical: 120,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
 
   /* Footer Section */
   footerSection: {
