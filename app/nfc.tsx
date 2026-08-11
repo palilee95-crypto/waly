@@ -786,7 +786,7 @@ export default function NfcLandingScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: cardFontColor }}>
-                      0/{program?.stamp_goal || 10}
+                      {currentStamps}/{program?.stamp_goal || 10}
                     </Text>
                     <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: cardFontColor, opacity: 0.75 }}>
                       STAMPS
