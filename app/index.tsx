@@ -339,7 +339,7 @@ function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
   ];
 
   return (
-    <View style={styles.meetSection} ref={containerRef}>
+    <View style={styles.meetSection} ref={containerRef} nativeID="how-it-works">
       <View style={styles.meetHeader}>
         <View style={styles.heroTag}>
           <Text style={styles.heroTagText}>MEET RISEV</Text>
@@ -469,7 +469,7 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
   ];
 
   return (
-    <View style={styles.pricingSection}>
+    <View style={styles.pricingSection} nativeID="pricing">
       <View style={styles.pricingHeader}>
         <View style={styles.heroTag}>
           <Text style={styles.heroTagText}>PRICING</Text>
@@ -694,7 +694,7 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
   );
 
   return (
-    <View style={styles.wygSection}>
+    <View style={styles.wygSection} nativeID="features">
       <View style={styles.wygHeader}>
         <View style={styles.heroTag}>
           <Text style={styles.heroTagText}>WHAT YOU GET</Text>
@@ -759,7 +759,7 @@ function FaqSection({ isMobile }: { isMobile: boolean }) {
   const [openIndex, setOpenIndex] = React.useState<number | null>(0);
 
   return (
-    <View style={styles.faqSection}>
+    <View style={styles.faqSection} nativeID="faq">
       <View style={styles.faqHeader}>
         <View style={styles.heroTag}>
           <Text style={styles.heroTagText}>FAQ</Text>
@@ -909,6 +909,14 @@ export default function LandingPage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 1024;
+  const [isSidebarOpen, setSidebarOpen] = React.useState(false);
+
+  const scrollToSection = (id: string) => {
+    if (Platform.OS === 'web') {
+      const el = window.document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -929,9 +937,14 @@ export default function LandingPage() {
           {/* Center: Links (Hidden on Mobile) */}
           {!isMobile && (
             <View style={styles.navLinks}>
-              {['Features', 'How it Works', 'Pricing', 'FAQ'].map((link) => (
-                <TouchableOpacity key={link}>
-                  <Text style={styles.navLinkText}>{link}</Text>
+              {[
+                { label: 'Features', id: 'features' }, 
+                { label: 'How it Works', id: 'how-it-works' }, 
+                { label: 'Pricing', id: 'pricing' }, 
+                { label: 'FAQ', id: 'faq' }
+              ].map((link) => (
+                <TouchableOpacity key={link.id} onPress={() => scrollToSection(link.id)}>
+                  <Text style={styles.navLinkText}>{link.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -950,9 +963,64 @@ export default function LandingPage() {
             >
               <Text style={styles.ctaText}>Get Your Stand</Text>
             </TouchableOpacity>
+            {/* Mobile Sidebar Toggle */}
+            {isMobile && (
+              <TouchableOpacity 
+                style={{ marginLeft: 8 }}
+                onPress={() => setSidebarOpen(true)}
+              >
+                <Feather name="menu" size={28} color="#000" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
+
+      {/* ─── MOBILE SIDEBAR ─── */}
+      {isMobile && isSidebarOpen && (
+        <View style={styles.sidebarOverlay}>
+          <View style={styles.sidebarContent}>
+            <View style={styles.sidebarHeader}>
+              <Image source={LOGO_IMG} style={[styles.logo, { tintColor: '#000000', width: 90, height: 28 }]} />
+              <TouchableOpacity onPress={() => setSidebarOpen(false)}>
+                <Feather name="x" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.sidebarLinks}>
+              {[
+                { label: 'Features', id: 'features' }, 
+                { label: 'How it Works', id: 'how-it-works' }, 
+                { label: 'Pricing', id: 'pricing' }, 
+                { label: 'FAQ', id: 'faq' }
+              ].map((link) => (
+                <TouchableOpacity 
+                  key={link.id} 
+                  style={styles.sidebarLink}
+                  onPress={() => {
+                    setSidebarOpen(false);
+                    setTimeout(() => scrollToSection(link.id), 100);
+                  }}
+                >
+                  <Text style={styles.sidebarLinkText}>{link.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.sidebarFooter}>
+              <TouchableOpacity 
+                style={styles.sidebarLoginBtn}
+                onPress={() => {
+                  setSidebarOpen(false);
+                  router.push('/(auth)/login');
+                }}
+              >
+                <Text style={styles.sidebarLoginText}>Login</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* ─── CONTENT AREA ─── */}
       <ScrollView contentContainerStyle={[styles.scrollContent, isMobile && { paddingTop: 100 }]}>
@@ -1301,6 +1369,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 24,
   },
+  navActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+  },
   loginText: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 14,
@@ -1316,6 +1389,63 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     color: '#FFFFFF',
+  },
+
+  /* Sidebar Styles */
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 9999,
+  },
+  sidebarContent: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 280,
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  sidebarLinks: {
+    gap: 24,
+  },
+  sidebarLink: {
+    paddingVertical: 8,
+  },
+  sidebarLinkText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 20,
+    color: '#000000',
+  },
+  sidebarFooter: {
+    marginTop: 'auto',
+    paddingTop: 40,
+  },
+  sidebarLoginBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  sidebarLoginText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 16,
+    color: '#000000',
   },
   
   /* Hero Content Styles */
