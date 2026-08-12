@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Feather from '@expo/vector-icons/Feather';
@@ -246,8 +246,100 @@ function RetentionGapSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
+  const [activeStep, setActiveStep] = React.useState(0);
+  const { width } = useWindowDimensions();
+  const scrollRef = React.useRef<ScrollView>(null);
+  const containerRef = React.useRef<View>(null);
+  const [hasPeeked, setHasPeeked] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isMobile || hasPeeked || Platform.OS !== 'web') return;
+
+    const node = containerRef.current as any;
+    if (!node) return;
+
+    // Use IntersectionObserver only on web to detect when section is in view
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setHasPeeked(true);
+          // Trigger peek & bounce animation
+          setTimeout(() => {
+            scrollRef.current?.scrollTo({ x: 120, animated: true });
+            setTimeout(() => {
+              scrollRef.current?.scrollTo({ x: 0, animated: true });
+            }, 1000); // slide back slowly (wait 1 second before bouncing back)
+          }, 1200); // wait slightly longer after coming into view
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isMobile, hasPeeked]);
+
+  const steps = [
+    {
+      id: 0,
+      label: '01 — TAP & CAPTURE',
+      desc: 'Customer taps Risev & joins via phone number.',
+      visual: (
+        <Image 
+          source={require('../assets/landing page image/step1_visual_final.png')} 
+          style={{ width: '100%', height: '100%', borderRadius: isMobile ? 0 : 40, resizeMode: 'cover' }} 
+        />
+      )
+    },
+    {
+      id: 1,
+      label: '02 — AUTO-SYNC TO CRM',
+      desc: 'Data flows instantly into your customer database.',
+      visual: (
+        <Image 
+          source={require('../assets/landing page image/step2_visual.png')} 
+          style={{ width: '100%', height: '100%', borderRadius: isMobile ? 0 : 40, resizeMode: 'cover' }} 
+        />
+      )
+    },
+    {
+      id: 2,
+      label: '03 — SMART TRIGGERS',
+      desc: 'System detects inactivity and prepares a win-back offer.',
+      visual: (
+        <Image 
+          source={require('../assets/landing page image/step3_visual.png')} 
+          style={{ width: '100%', height: '100%', borderRadius: isMobile ? 0 : 40, resizeMode: 'cover' }} 
+        />
+      )
+    },
+    {
+      id: 3,
+      label: '04 — META WHATSAPP API',
+      desc: 'Automated, personalized WhatsApp message sent directly.',
+      visual: (
+        <Image 
+          source={require('../assets/landing page image/step4_visual.png')} 
+          style={{ width: '100%', height: '100%', borderRadius: isMobile ? 0 : 40, resizeMode: 'cover' }} 
+        />
+      )
+    },
+    {
+      id: 4,
+      label: '05 — EFFORTLESS RETENTION',
+      desc: 'Customer returns to claim the offer. You drive repeat sales.',
+      visual: (
+        <Image 
+          source={require('../assets/landing page image/step5_visual.png')} 
+          style={{ width: '100%', height: '100%', borderRadius: isMobile ? 0 : 40, resizeMode: 'cover' }} 
+        />
+      )
+    }
+  ];
+
   return (
-    <View style={styles.meetSection}>
+    <View style={styles.meetSection} ref={containerRef}>
       <View style={styles.meetHeader}>
         <View style={styles.heroTag}>
           <Text style={styles.heroTagText}>MEET RISEV</Text>
@@ -260,88 +352,63 @@ function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
         </Text>
       </View>
 
-      {/* Visual Ecosystem */}
-      <View style={[styles.ecosystemContainer, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
+      {/* Interactive Stepper Ecosystem */}
+      <View style={[styles.stepperContainer, isMobile && { flexDirection: 'column' }]}>
         
-        {/* Connection Line */}
-        <View style={[
-          styles.connectionLine,
-          isMobile ? { width: 2, height: '100%', left: '50%', marginLeft: -1, top: 0 } : { height: 2, width: '100%', top: '35%', left: 0 }
-        ]} />
-
-        {/* Stage 1: TAP */}
-        <View style={[styles.ecoStage, isMobile && { marginBottom: 40 }]}>
-          <View style={styles.ecoVisualBox}>
-            <View style={styles.mockNfcStand}>
-              <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 16}}>TAP HERE</Text>
-            </View>
-          </View>
-          <View style={styles.ecoLabelBox}>
-            <Text style={styles.ecoLabel}>01 — TAP</Text>
-            <Text style={styles.ecoDesc}>Customer taps Risev.</Text>
-          </View>
-        </View>
-
-        {/* Stage 2: CAPTURE */}
-        <View style={[styles.ecoStage, isMobile && { marginBottom: 40 }]}>
-          <View style={styles.ecoVisualBox}>
-            <View style={styles.mockMobileUI}>
-              <Text style={styles.mockUITitle}>Welcome to Risev</Text>
-              <View style={styles.mockUIBtn}>
-                <Text style={styles.mockUIBtnText}>Join Loyalty</Text>
+        {/* Left: Steps List (Desktop) or Carousel (Mobile) */}
+        {isMobile ? (
+          <ScrollView 
+            ref={scrollRef}
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={width - 48 + 16}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            style={{ width: '100%', marginBottom: 32 }}
+            contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}
+          >
+            {steps.map((step) => (
+              <View key={step.id} style={[styles.onboardingCard, { width: width - 48 }]}>
+                <View style={styles.onboardingVisual}>
+                   {step.visual}
+                </View>
+                <View style={styles.onboardingTextContainer}>
+                  <Text style={styles.onboardingLabel}>{step.label}</Text>
+                  <Text style={styles.onboardingDesc}>{step.desc}</Text>
+                </View>
               </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <>
+            <View style={styles.stepperList}>
+              {steps.map((step, index) => {
+                const isActive = activeStep === index;
+                return (
+                  <TouchableOpacity 
+                    key={step.id} 
+                    style={[styles.stepperItem, isActive && styles.stepperItemActive]}
+                    onPress={() => setActiveStep(index)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.stepperIcon, isActive && styles.stepperIconActive]}>
+                      <Text style={[styles.stepperIconText, isActive && { color: '#000' }]}>{index + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.stepperLabel, isActive && styles.stepperLabelActive]}>{step.label}</Text>
+                      <Text style={[styles.stepperDesc, isActive && { color: '#4B5563' }]}>{step.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </View>
-          <View style={styles.ecoLabelBox}>
-            <Text style={styles.ecoLabel}>02 — CAPTURE</Text>
-            <Text style={styles.ecoDesc}>Customer joins instantly.</Text>
-          </View>
-        </View>
 
-        {/* Stage 3: CONNECT */}
-        <View style={[styles.ecoStage, isMobile && { marginBottom: 40 }]}>
-          <View style={styles.ecoVisualBox}>
-            <View style={styles.mockDashboardUI}>
-              <Text style={styles.mockUITitle}>Customer Profile</Text>
-              <View style={styles.mockCRMRow}><Feather name="user" size={14}/><Text style={styles.mockCRMText}>Aiman</Text></View>
-              <View style={styles.mockCRMRow}><Feather name="phone" size={14}/><Text style={styles.mockCRMText}>+60 12 XXX XXXX</Text></View>
-              <View style={styles.mockCRMRow}><Feather name="star" size={14} color="#FFC700"/><Text style={styles.mockCRMText}>Visits: 1</Text></View>
+            {/* Right: Active Visual (Desktop only) */}
+            <View style={styles.stepperVisualBox}>
+              {steps[activeStep].visual}
             </View>
-          </View>
-          <View style={styles.ecoLabelBox}>
-            <Text style={styles.ecoLabel}>03 — CONNECT</Text>
-            <Text style={styles.ecoDesc}>Build your customer database.</Text>
-          </View>
-        </View>
-
-        {/* Stage 4: ENGAGE */}
-        <View style={[styles.ecoStage, isMobile && { marginBottom: 40 }]}>
-          <View style={styles.ecoVisualBox}>
-            <View style={styles.mockChatUI}>
-              <View style={styles.chatBubble}>
-                <Text style={styles.chatText}>Thanks for visiting us, Aiman 👋 Here’s a reward for your next visit.</Text>
-              </View>
-              <View style={styles.chatRewardCard}><Text style={{fontSize: 10, color: '#fff', fontFamily: 'Outfit_700Bold'}}>10% OFF REWARD</Text></View>
-            </View>
-          </View>
-          <View style={styles.ecoLabelBox}>
-            <Text style={styles.ecoLabel}>04 — ENGAGE</Text>
-            <Text style={styles.ecoDesc}>Stay connected automatically.</Text>
-          </View>
-        </View>
-
-        {/* Stage 5: RETURN */}
-        <View style={styles.ecoStage}>
-          <View style={styles.ecoVisualBox}>
-            <View style={styles.mockReturnUI}>
-              <Feather name="repeat" size={40} color="#000000" />
-            </View>
-          </View>
-          <View style={styles.ecoLabelBox}>
-            <Text style={styles.ecoLabel}>05 — RETURN</Text>
-            <Text style={styles.ecoDesc}>Give them a reason to come back.</Text>
-          </View>
-        </View>
+          </>
+        )}
 
       </View>
 
@@ -370,9 +437,37 @@ function TransitionBlock() {
 }
 
 function PricingSection({ isMobile }: { isMobile: boolean }) {
-  // Mobile order trick: 
-  // We want Growth (index 1) to be first, then Starter (0), then Pro (2).
-  // Using flex order: Starter=2, Growth=1, Pro=3
+  const [billing, setBilling] = React.useState<'monthly'|'yearly'>('monthly');
+  const [activePlan, setActivePlan] = React.useState('growth');
+
+  const mobilePlans = [
+    { 
+      id: 'starter', 
+      name: 'Starter', 
+      price: 'RM49', 
+      desc: 'Perfect for new businesses.', 
+      icon: 'wind', 
+      features: ['Risev NFC Stand', 'Customer DB', 'Loyalty', 'Basic WhatsApp', 'Dashboard'] 
+    },
+    { 
+      id: 'growth', 
+      name: 'Growth', 
+      badge: 'Most Popular ★', 
+      price: 'RM99', 
+      desc: 'Everything you need to grow.', 
+      icon: 'trending-up', 
+      features: ['Membership', 'WhatsApp', 'CRM', 'Campaigns', 'Analytics', '... And more'] 
+    },
+    { 
+      id: 'pro', 
+      name: 'Multi-Outlet', 
+      price: 'Custom', 
+      desc: 'For businesses with multiple branches.', 
+      icon: 'home', 
+      features: ['Advanced Auto', 'Multi Campaigns', 'Priority Support', 'Custom Integration'] 
+    }
+  ];
+
   return (
     <View style={styles.pricingSection}>
       <View style={styles.pricingHeader}>
@@ -387,7 +482,93 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
         </Text>
       </View>
 
-      <View style={[styles.pricingGrid, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
+      {isMobile ? (
+        <View style={{ width: '100%', maxWidth: 500 }}>
+          {/* Billing Toggle */}
+          <View style={{ alignItems: 'center', marginBottom: 32 }}>
+            <View style={styles.billingToggleWrapper}>
+              <TouchableOpacity onPress={() => setBilling('monthly')} style={[styles.billingToggleBtn, billing === 'monthly' && styles.billingToggleBtnActive]}>
+                <Text style={[styles.billingToggleText, billing === 'monthly' && styles.billingToggleTextActive]}>Monthly</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setBilling('yearly')} style={[styles.billingToggleBtn, billing === 'yearly' && styles.billingToggleBtnActive]}>
+                <View style={styles.saveBadge}><Text style={styles.saveBadgeText}>Save 20%</Text></View>
+                <Text style={[styles.billingToggleText, billing === 'yearly' && styles.billingToggleTextActive]}>Yearly</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.billingSubText}>Save more with yearly billing</Text>
+          </View>
+
+          {/* Accordion Cards */}
+          <View style={{ gap: 16 }}>
+            {mobilePlans.map(p => {
+              const isActive = activePlan === p.id;
+              return (
+                <TouchableOpacity 
+                   key={p.id} 
+                   onPress={() => setActivePlan(p.id)}
+                   style={[styles.accordionCard, isActive && styles.accordionCardActive]}
+                   activeOpacity={0.9}
+                >
+                  <View style={styles.accordionHeader}>
+                    <View style={[styles.accordionIconBox, isActive && { backgroundColor: '#FFC700' }]}>
+                      <Feather name={p.icon as any} size={20} color={isActive ? "#000" : "#4B5563"} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Text style={styles.accordionPlanName}>{p.name}</Text>
+                        {p.badge && <View style={styles.accordionBadge}><Text style={styles.accordionBadgeText}>{p.badge}</Text></View>}
+                      </View>
+                      <Text style={styles.accordionPlanDesc}>{p.desc}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 12, justifyContent: 'center' }}>
+                      {isActive ? (
+                         <Text style={styles.accordionPriceCompact}>{p.price}</Text>
+                      ) : (
+                         <View style={{ alignItems: 'flex-end' }}>
+                           <Text style={styles.accordionPriceCompact}>{p.price}</Text>
+                           <Text style={styles.accordionPeriodCompact}>{p.price !== 'Custom' ? '/month' : ''}</Text>
+                         </View>
+                      )}
+                      
+                      {/* Custom Radio Button */}
+                      <View style={{ marginTop: 12 }}>
+                        {isActive ? (
+                          <View style={styles.radioActive}>
+                            <View style={styles.radioActiveInner} />
+                          </View>
+                        ) : (
+                          <View style={styles.radioInactive} />
+                        )}
+                      </View>
+                    </View>
+                  </View>
+
+                  {isActive && (
+                    <View style={styles.accordionBody}>
+                       <Text style={styles.accordionPrice}>{p.price}<Text style={styles.accordionPeriod}>{p.price !== 'Custom' ? ' / month' : ''}</Text></Text>
+                       
+                       <View style={styles.accordionChips}>
+                         {p.features.map(f => (
+                            <View key={f} style={styles.featureChip}>
+                              <Feather name="check" size={14} color="#10B981" />
+                              <Text style={styles.featureChipText}>{f}</Text>
+                            </View>
+                         ))}
+                       </View>
+
+                       <TouchableOpacity style={styles.accordionBtn}>
+                         <Text style={styles.accordionBtnText}>{p.price === 'Custom' ? 'Contact Sales →' : 'Start 7-Day Free Trial →'}</Text>
+                       </TouchableOpacity>
+                       <Text style={styles.accordionNoCC}>No credit card required</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.pricingGrid}>
         
         {/* STARTER */}
         <View style={[styles.pricingCard, isMobile && { order: 2, marginBottom: 24 } as any]}>
@@ -442,7 +623,8 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
           </TouchableOpacity>
         </View>
 
-      </View>
+        </View>
+      )}
 
       <Text style={styles.trustLine}>No complicated contracts. Start simple. Upgrade when you’re ready.</Text>
 
@@ -459,6 +641,58 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
+  const { width } = useWindowDimensions();
+  const cardWidth = width - 48;
+
+  const Card1 = (
+    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
+      <View style={styles.wygVisualContainer}>
+        <View style={styles.mockNfcStandLarge}>
+          <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 24}}>TAP HERE</Text>
+        </View>
+      </View>
+      <Text style={styles.wygCardTitle}>RISEV NFC STAND</Text>
+      <Text style={styles.wygCardDesc}>Your physical customer touchpoint.</Text>
+      <Text style={styles.wygCardSub}>Customers simply tap their phone to get started.</Text>
+    </View>
+  );
+
+  const Card2 = (
+    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
+      <View style={styles.wygVisualContainer}>
+        <View style={styles.mockDashboardUILarge}>
+          <View style={styles.mockDashboardHeader}>
+            <Text style={styles.mockUITitle}>CRM Dashboard</Text>
+            <View style={{flexDirection: 'row', gap: 8}}>
+              <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>+12 Today</Text></View>
+              <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>154 Total</Text></View>
+            </View>
+          </View>
+          <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Aiman</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>Just now</Text></View>
+          <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Sarah</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>2 hrs ago</Text></View>
+        </View>
+      </View>
+      <Text style={styles.wygCardTitle}>CUSTOMER SYSTEM</Text>
+      <Text style={styles.wygCardDesc}>Build your own customer database.</Text>
+      <Text style={styles.wygCardSub}>See customers, loyalty activity, visits, and rewards in one place.</Text>
+    </View>
+  );
+
+  const Card3 = (
+    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0 }]}>
+      <View style={styles.wygVisualContainer}>
+         <View style={styles.mockChatUILarge}>
+          <View style={styles.chatBubbleLarge}>
+            <Text style={styles.chatTextLarge}>Hey Aiman 👋 You’re one visit away from your next reward.</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={styles.wygCardTitle}>WHATSAPP AUTOMATION</Text>
+      <Text style={styles.wygCardDesc}>Bring customers back automatically.</Text>
+      <Text style={styles.wygCardSub}>Stay connected without manually following up.</Text>
+    </View>
+  );
+
   return (
     <View style={styles.wygSection}>
       <View style={styles.wygHeader}>
@@ -473,61 +707,28 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
         </Text>
       </View>
 
-      <View style={[styles.wygGrid, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
-        
-        {/* Connection Line */}
-        <View style={[
-          styles.wygConnectionLine,
-          isMobile ? { width: 2, height: '100%', left: '50%', marginLeft: -1, top: 0 } : { height: 2, width: '100%', top: '35%', left: 0 }
-        ]} />
-
-        {/* Card 1: NFC Stand */}
-        <View style={[styles.wygCard, isMobile && { marginBottom: 32 }]}>
-          <View style={styles.wygVisualContainer}>
-            <View style={styles.mockNfcStandLarge}>
-              <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 24}}>TAP HERE</Text>
-            </View>
-          </View>
-          <Text style={styles.wygCardTitle}>RISEV NFC STAND</Text>
-          <Text style={styles.wygCardDesc}>Your physical customer touchpoint.</Text>
-          <Text style={styles.wygCardSub}>Customers simply tap their phone to get started.</Text>
+      {isMobile ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={cardWidth + 16}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          style={{ width: '100%' }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+        >
+          {Card1}
+          {Card2}
+          {Card3}
+        </ScrollView>
+      ) : (
+        <View style={styles.wygGrid}>
+          <View style={[styles.wygConnectionLine, { height: 2, width: '100%', top: '35%', left: 0 }]} />
+          {Card1}
+          {Card2}
+          {Card3}
         </View>
-
-        {/* Card 2: Customer System */}
-        <View style={[styles.wygCard, isMobile && { marginBottom: 32 }]}>
-          <View style={styles.wygVisualContainer}>
-            <View style={styles.mockDashboardUILarge}>
-              <View style={styles.mockDashboardHeader}>
-                <Text style={styles.mockUITitle}>CRM Dashboard</Text>
-                <View style={{flexDirection: 'row', gap: 8}}>
-                  <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>+12 Today</Text></View>
-                  <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>154 Total</Text></View>
-                </View>
-              </View>
-              <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Aiman</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>Just now</Text></View>
-              <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Sarah</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>2 hrs ago</Text></View>
-            </View>
-          </View>
-          <Text style={styles.wygCardTitle}>CUSTOMER SYSTEM</Text>
-          <Text style={styles.wygCardDesc}>Build your own customer database.</Text>
-          <Text style={styles.wygCardSub}>See customers, loyalty activity, visits, and rewards in one place.</Text>
-        </View>
-
-        {/* Card 3: WhatsApp Automation */}
-        <View style={styles.wygCard}>
-          <View style={styles.wygVisualContainer}>
-             <View style={styles.mockChatUILarge}>
-              <View style={styles.chatBubbleLarge}>
-                <Text style={styles.chatTextLarge}>Hey Aiman 👋 You’re one visit away from your next reward.</Text>
-              </View>
-            </View>
-          </View>
-          <Text style={styles.wygCardTitle}>WHATSAPP AUTOMATION</Text>
-          <Text style={styles.wygCardDesc}>Bring customers back automatically.</Text>
-          <Text style={styles.wygCardSub}>Stay connected without manually following up.</Text>
-        </View>
-
-      </View>
+      )}
 
       <View style={{ marginTop: 80, alignItems: 'center' }}>
         <Text style={[styles.heroHeadline, { fontSize: 32, lineHeight: 40, maxWidth: 600, marginBottom: 32 }]}>
@@ -624,12 +825,31 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
     </TouchableOpacity>
   );
 
-  const FooterCol = ({ title, links }: { title: string, links: string[] }) => (
-    <View style={[styles.footerCol, isMobile && { marginBottom: 32 }]}>
-      <Text style={styles.footerColTitle}>{title}</Text>
-      {links.map(l => <FooterLink key={l} text={l} />)}
-    </View>
-  );
+  const FooterCol = ({ title, links }: { title: string, links: string[] }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    return (
+      <View style={[styles.footerCol, isMobile && { marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#1F2937', paddingBottom: 16 }]}>
+        {isMobile ? (
+          <TouchableOpacity 
+            onPress={() => setIsOpen(!isOpen)} 
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.footerColTitle, { marginBottom: 0 }]}>{title}</Text>
+            <Feather name={isOpen ? 'minus' : 'plus'} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.footerColTitle}>{title}</Text>
+        )}
+        
+        {(!isMobile || isOpen) && (
+          <View style={isMobile && { marginTop: 16 }}>
+            {links.map(l => <FooterLink key={l} text={l} />)}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.footerSection}>
@@ -862,9 +1082,219 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     color: '#000000',
-    letterSpacing: -0.2,
+    letterSpacing: -0.5,
   },
-  navActions: {
+
+  /* Accordion Pricing Styles */
+  billingToggleWrapper: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 100,
+    padding: 4,
+    marginBottom: 12,
+  },
+  billingToggleBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 100,
+    position: 'relative',
+  },
+  billingToggleBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  billingToggleText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  billingToggleTextActive: {
+    color: '#000000',
+  },
+  saveBadge: {
+    position: 'absolute',
+    top: -12,
+    right: -12,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 100,
+    zIndex: 10,
+  },
+  saveBadgeText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 10,
+    color: '#000000',
+  },
+  billingSubText: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  accordionCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  accordionCardActive: {
+    borderColor: '#FFC700',
+    borderWidth: 2,
+    backgroundColor: '#FFFCF2', // very subtle pale yellow
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  accordionIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6', // default subtle gray
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accordionPlanName: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    color: '#000000',
+  },
+  accordionBadge: {
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  accordionBadgeText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 9,
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  accordionPlanDesc: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  accordionPriceCompact: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 20,
+    color: '#000000',
+    letterSpacing: -0.5,
+  },
+  accordionPeriodCompact: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  radioInactive: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+  },
+  radioActive: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioActiveInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFC700',
+  },
+  accordionBody: {
+    marginTop: 20,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 199, 0, 0.3)',
+    alignItems: 'center',
+  },
+  accordionPrice: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 48,
+    color: '#000000',
+    marginBottom: 24,
+    letterSpacing: -1.5,
+  },
+  accordionPeriod: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 16,
+    color: '#9CA3AF',
+    letterSpacing: 0,
+  },
+  accordionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  featureChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 100,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  featureChipText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: '#374151',
+  },
+  accordionBtn: {
+    backgroundColor: '#000000',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 100,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  accordionBtnText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  accordionNoCC: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 12,
+    color: '#6B7280',
+  },
+
+  trustLine: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -1226,40 +1656,122 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 80,
   },
-  ecosystemContainer: {
+  /* Stepper Styles */
+  stepperContainer: {
     flexDirection: 'row',
     width: '100%',
-    maxWidth: 1200,
-    justifyContent: 'space-between',
-    position: 'relative',
-    paddingVertical: 24,
-  },
-  connectionLine: {
-    position: 'absolute',
-    backgroundColor: '#FFC700',
-    opacity: 0.3,
-    zIndex: 0,
-  },
-  ecoStage: {
-    flex: 1,
+    maxWidth: 1000,
+    gap: 40,
     alignItems: 'center',
-    zIndex: 1,
+    justifyContent: 'center',
   },
-  ecoVisualBox: {
-    width: 140,
-    height: 140,
-    backgroundColor: '#FFFFFF',
+  stepperList: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 12,
+  },
+  stepperItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 20,
     borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 16,
+  },
+  stepperItemActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  stepperIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperIconActive: {
+    backgroundColor: '#FFC700',
+  },
+  stepperIconText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  stepperLabel: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  stepperLabelActive: {
+    color: '#000000',
+  },
+  stepperDesc: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  stepperVisualBox: {
+    flex: 1.5,
+    height: 480,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.08,
+    shadowRadius: 48,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  /* Onboarding Styles (Mobile Meet Risev) */
+  onboardingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.05,
     shadowRadius: 24,
     elevation: 4,
-    marginBottom: 24,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  onboardingVisual: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#FAFAFA',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  onboardingTextContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  onboardingLabel: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 24,
+    color: '#000000',
+    marginBottom: 8,
+  },
+  onboardingDesc: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
   },
   ecoLabelBox: {
     alignItems: 'center',
