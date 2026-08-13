@@ -152,14 +152,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Synchronize pb.authStore changes directly to cross-platform storage
+    console.log('[AuthContext] Registering pb.authStore.onChange subscriber');
     const unsubscribe = pb.authStore.onChange(async (token, model) => {
+      console.log('[AuthContext] pb.authStore.onChange fired, token:', token ? 'present' : 'empty');
       try {
         if (token) {
           await storage.setItem('risev_token', token);
           await storage.setItem('risev_record', JSON.stringify(model));
+          console.log('[AuthContext] Successfully saved token and record to storage');
         } else {
           await storage.deleteItem('risev_token');
           await storage.deleteItem('risev_record');
+          console.log('[AuthContext] Successfully cleared token and record from storage');
         }
       } catch (err) {
         console.error('[AuthContext] Failed to save auth to storage:', err);
@@ -236,19 +240,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const initAuth = async () => {
     try {
+      console.log('[AuthContext] initAuth started');
       // Restore auth state from our cross-platform storage (SecureStore on native, localStorage on web)
       const token = await storage.getItem('risev_token');
       const recordStr = await storage.getItem('risev_record');
+      console.log('[AuthContext] initAuth read storage - risev_token:', token ? 'present' : 'empty', 'risev_record:', recordStr ? 'present' : 'empty');
       if (token && recordStr) {
         try {
           const record = JSON.parse(recordStr);
           pb.authStore.save(token, record);
+          console.log('[AuthContext] initAuth successfully restored pb.authStore from storage');
         } catch (e) {
           console.error('[AuthContext] Failed to parse stored PocketBase auth record:', e);
         }
       }
 
       const storedRole = await storage.getItem('risev_active_role');
+      console.log('[AuthContext] initAuth read storage - active role:', storedRole);
+      console.log('[AuthContext] initAuth checking pb.authStore - isValid:', pb.authStore.isValid, 'record:', pb.authStore.record ? 'present' : 'empty');
       if (pb.authStore.isValid && pb.authStore.record) {
         const record = pb.authStore.record;
         let role = (storedRole as UserRole) || record.role || 'customer';
