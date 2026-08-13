@@ -26,13 +26,21 @@ const COUNTRY_CODE = '+60';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { checkPhone, register, loginWithIdentifier, requestPasswordReset } = useAuth();
+  const { checkPhone, register, loginWithIdentifier, requestPasswordReset, isAuthenticated, isLoading: isAuthLoading, activeRole } = useAuth();
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string }>();
+
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      setTimeout(() => {
+        router.replace(activeRole === 'merchant' ? '/(merchant)' : '/(customer)');
+      }, 0);
+    }
+  }, [isAuthLoading, isAuthenticated, activeRole]);
 
   useEffect(() => {
     if (params.ref) {
@@ -239,6 +247,14 @@ export default function LoginScreen() {
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+
+  if (isAuthLoading || isAuthenticated) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#09090B' }}>
+        <ActivityIndicator size="large" color="#FFC700" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

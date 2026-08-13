@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '@/context/AuthContext';
 import Feather from '@expo/vector-icons/Feather';
 import Slider from '@react-native-community/slider';
 
@@ -907,9 +908,30 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
 
 export default function LandingPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading, activeRole } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 1024;
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      setTimeout(() => {
+        if (activeRole === 'merchant') {
+          router.replace('/(merchant)');
+        } else {
+          router.replace('/(customer)');
+        }
+      }, 0);
+    }
+  }, [isLoading, isAuthenticated, activeRole]);
+
+  if (isLoading || isAuthenticated) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#000000" />
+      </View>
+    );
+  }
 
   const scrollToSection = (id: string) => {
     if (Platform.OS === 'web') {
