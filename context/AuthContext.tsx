@@ -80,7 +80,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [params.ref]);
 
   useEffect(() => {
+    // Synchronize pb.authStore changes directly to cross-platform storage
+    const unsubscribe = pb.authStore.onChange(async (token, model) => {
+      try {
+        if (token) {
+          await storage.setItem('risev_token', token);
+          await storage.setItem('risev_record', JSON.stringify(model));
+        } else {
+          await storage.deleteItem('risev_token');
+          await storage.deleteItem('risev_record');
+        }
+      } catch (err) {
+        console.error('[AuthContext] Failed to save auth to storage:', err);
+      }
+    });
+
     initAuth();
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const ensureMerchantProfile = async (record: any): Promise<{ id?: string; status?: 'active' | 'suspended' | 'pending'; created?: string }> => {
@@ -146,6 +165,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const initAuth = async () => {
     try {
+      // Restore auth state from our cross-platform storage (SecureStore on native, localStorage on web)
+      const token = await storage.getItem('risev_token');
+      const recordStr = await storage.getItem('risev_record');
+      if (token && recordStr) {
+        try {
+          const record = JSON.parse(recordStr);
+          pb.authStore.save(token, record);
+        } catch (e) {
+          console.error('[AuthContext] Failed to parse stored PocketBase auth record:', e);
+        }
+      }
+
       const storedRole = await storage.getItem('risev_active_role');
       if (pb.authStore.isValid && pb.authStore.record) {
         const record = pb.authStore.record;

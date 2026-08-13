@@ -107,7 +107,7 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
       // Close scan sheet and navigate to NFC claim page
       onClose();
       resetModal();
-      router.push(`/nfc?m=${merchantId}`);
+      router.push(`/nfc?m=${merchantId}` as any);
     }
   };
 
