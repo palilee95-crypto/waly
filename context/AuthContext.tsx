@@ -4,18 +4,89 @@ import * as SecureStore from 'expo-secure-store';
 import { pb } from '@/lib/pocketbase';
 import { useLocalSearchParams } from 'expo-router';
 
-// Cross-platform storage (SecureStore on native, localStorage on web)
+// Lightweight IndexedDB storage wrapper for Web/PWA persistence
+const initIndexedDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB is not supported in this environment.'));
+      return;
+    }
+    const request = indexedDB.open('risev_storage', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('keyvalue')) {
+        db.createObjectStore('keyvalue');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const idbStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      const db = await initIndexedDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('keyvalue', 'readonly');
+        const store = transaction.objectStore('keyvalue');
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.warn('[idbStorage] getItem failed, falling back to localStorage:', e);
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      const db = await initIndexedDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('keyvalue', 'readwrite');
+        const store = transaction.objectStore('keyvalue');
+        const req = store.put(value, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.warn('[idbStorage] setItem failed, falling back to localStorage:', e);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
+    }
+  },
+  deleteItem: async (key: string): Promise<void> => {
+    try {
+      const db = await initIndexedDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('keyvalue', 'readwrite');
+        const store = transaction.objectStore('keyvalue');
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.warn('[idbStorage] deleteItem failed, falling back to localStorage:', e);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    }
+  }
+};
+
+// Cross-platform storage (SecureStore on native, IndexedDB on web with localStorage fallback)
 export const storage = {
   getItem: async (key: string): Promise<string | null> => {
-    if (Platform.OS === 'web') return localStorage.getItem(key);
+    if (Platform.OS === 'web') return idbStorage.getItem(key);
     return SecureStore.getItemAsync(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
-    if (Platform.OS === 'web') { localStorage.setItem(key, value); return; }
+    if (Platform.OS === 'web') return idbStorage.setItem(key, value);
     return SecureStore.setItemAsync(key, value);
   },
   deleteItem: async (key: string): Promise<void> => {
-    if (Platform.OS === 'web') { localStorage.removeItem(key); return; }
+    if (Platform.OS === 'web') return idbStorage.deleteItem(key);
     return SecureStore.deleteItemAsync(key);
   },
 };

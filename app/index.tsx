@@ -113,7 +113,7 @@ function LossCalculator({ isMobile }: { isMobile: boolean }) {
   const lostMonthlyRevenue = lostRepeatCustomers * averageSpend;
 
   return (
-    <View style={[styles.statsCard, isMobile && { width: '100%', flex: 'none' }]}>
+    <View style={[styles.statsCard, isMobile && ({ width: '100%', flex: 'none' } as any)]}>
       <Text style={[styles.statsCardTitle, { marginBottom: 32 }]}>CALCULATE YOUR LOSS</Text>
       
       {/* Customers Slider */}
@@ -218,7 +218,7 @@ function RetentionGapSection({ isMobile }: { isMobile: boolean }) {
       <View style={[styles.retentionColumns, isMobile && { flexDirection: 'column' }]}>
         
         {/* Left/Center Visual */}
-        <View style={[styles.retentionVisual, isMobile && { width: '100%', marginBottom: 24, flex: 'none' }]}>
+        <View style={[styles.retentionVisual, isMobile && ({ width: '100%', marginBottom: 24, flex: 'none' } as any)]}>
           <Image 
             source={require('../assets/landing page image/ChatGPT Image Aug 12, 2026, 12_56_48 AM.png')}
             style={styles.retentionVisualImage}
@@ -1362,7 +1362,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 
-  trustLine: {
+  trustLineLayout: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
