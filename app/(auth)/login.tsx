@@ -93,6 +93,9 @@ export default function LoginScreen() {
   const [birthday, setBirthday] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   const [emailFocused, setEmailFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
@@ -364,6 +367,7 @@ export default function LoginScreen() {
                       <TextInput
                         style={[
                           styles.input,
+                          styles.inputWithEye,
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
                         placeholder="••••••••"
@@ -373,12 +377,23 @@ export default function LoginScreen() {
                           setPassword(t);
                           setErrorMsg('');
                         }}
-                        secureTextEntry
+                        secureTextEntry={!showLoginPassword}
                         autoCapitalize="none"
                         autoFocus={step === 'password'}
                         onFocus={() => setPasswordFocused(true)}
                         onBlur={() => setPasswordFocused(false)}
                       />
+                      <TouchableOpacity
+                        onPress={() => setShowLoginPassword(prev => !prev)}
+                        style={styles.eyeBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons
+                          name={showLoginPassword ? 'eye-off-outline' : 'eye-outline'}
+                          size={22}
+                          color="#64748B"
+                        />
+                      </TouchableOpacity>
                     </View>
 
                     {/* Forgot Password Link */}
@@ -472,7 +487,7 @@ export default function LoginScreen() {
                       password.length > 0 && password.length < 8 && styles.inputGroupWarning
                     ]}>
                       <TextInput
-                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        style={[styles.input, styles.inputWithEye, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                         placeholder="Min. 8 characters"
                         placeholderTextColor="#94A3B8"
                         value={password}
@@ -480,11 +495,22 @@ export default function LoginScreen() {
                           setPassword(t);
                           setErrorMsg('');
                         }}
-                        secureTextEntry
+                        secureTextEntry={!showPassword}
                         autoCapitalize="none"
                         onFocus={() => setPasswordFocused(true)}
                         onBlur={() => setPasswordFocused(false)}
                       />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(prev => !prev)}
+                        style={styles.eyeBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons
+                          name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                          size={22}
+                          color="#64748B"
+                        />
+                      </TouchableOpacity>
                     </View>
                     {password.length > 0 && password.length < 8 && (
                       <Text style={styles.fieldHelperError}>⚠️ Must be at least 8 characters ({password.length}/8)</Text>
@@ -497,7 +523,7 @@ export default function LoginScreen() {
                       confirmPassword.length > 0 && password !== confirmPassword && styles.inputGroupWarning
                     ]}>
                       <TextInput
-                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        style={[styles.input, styles.inputWithEye, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
                         placeholder="••••••••"
                         placeholderTextColor="#94A3B8"
                         value={confirmPassword}
@@ -505,11 +531,22 @@ export default function LoginScreen() {
                           setConfirmPassword(t);
                           setErrorMsg('');
                         }}
-                        secureTextEntry
+                        secureTextEntry={!showConfirmPassword}
                         autoCapitalize="none"
                         onFocus={() => setConfirmPasswordFocused(true)}
                         onBlur={() => setConfirmPasswordFocused(false)}
                       />
+                      <TouchableOpacity
+                        onPress={() => setShowConfirmPassword(prev => !prev)}
+                        style={styles.eyeBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons
+                          name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                          size={22}
+                          color="#64748B"
+                        />
+                      </TouchableOpacity>
                     </View>
                     {confirmPassword.length > 0 && password !== confirmPassword && (
                       <Text style={styles.fieldHelperError}>⚠️ Passwords do not match</Text>
@@ -754,7 +791,7 @@ const styles = StyleSheet.create({
     height: 50,
     paddingRight: 10,
     paddingLeft: 2,
-    overflow: 'hidden',
+    position: 'relative',
   },
   inputGroupDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
@@ -785,6 +822,25 @@ const styles = StyleSheet.create({
         boxShadow: '0 0 0 3px rgba(0, 0, 0, 0.12)',
       } as any,
     }),
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 4,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+        userSelect: 'none',
+      } as any,
+    }),
+  },
+  inputWithEye: {
+    paddingRight: 44,
   },
   prefixBox: {
     flexDirection: 'row',
