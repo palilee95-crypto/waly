@@ -1,17 +1,17 @@
 // pb_hooks/smart_follow_up_api.pb.js
 // Dedicated backend endpoints for 1-Click Autopilot Recipes
 
-function genId() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let id = '';
-  for (let i = 0; i < 15; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return id;
-}
-
 // 1. POST Toggle Autopilot Recipe
 routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
+  const makeId = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let res = '';
+    for (let i = 0; i < 15; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return res;
+  };
+
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -76,7 +76,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
       // 2. Create new group
       const groupsCol = $app.findCollectionByNameOrId("follow_up_groups");
       const newGroup = new Record(groupsCol, {
-        id: genId(),
+        id: makeId(),
         merchant: merchantId,
         name: title,
         status: "active",
@@ -90,7 +90,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
       // 3. Create sequence
       const seqCol = $app.findCollectionByNameOrId("follow_up_sequences");
       const newSeq = new Record(seqCol, {
-        id: genId(),
+        id: makeId(),
         group: newGroup.id,
         title: title,
         status: "active",
@@ -105,7 +105,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
       // 4. Create message
       const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
       const newMsg = new Record(msgCol, {
-        id: genId(),
+        id: makeId(),
         sequence: newSeq.id,
         message_body: defaultBody,
         order: 0,
@@ -121,7 +121,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
           if (customerId) {
             try {
               const mem = new Record(memCol, {
-                id: genId(),
+                id: makeId(),
                 group: newGroup.id,
                 customer: customerId,
                 status: "enrolled",
@@ -148,6 +148,15 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
 
 // 2. POST Save / Customize Autopilot Recipe
 routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
+  const makeId = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let res = '';
+    for (let i = 0; i < 15; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return res;
+  };
+
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -189,7 +198,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
     if (!group) {
       const groupsCol = $app.findCollectionByNameOrId("follow_up_groups");
       group = new Record(groupsCol, {
-        id: genId(),
+        id: makeId(),
         merchant: merchantId,
         name: title,
         status: "active",
@@ -215,7 +224,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
     if (!seq) {
       const seqCol = $app.findCollectionByNameOrId("follow_up_sequences");
       seq = new Record(seqCol, {
-        id: genId(),
+        id: makeId(),
         group: group.id,
         title: title,
         status: group.getString("status") === "active" ? "active" : "inactive",
@@ -242,7 +251,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
     if (!msg) {
       const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
       const newMsg = new Record(msgCol, {
-        id: genId(),
+        id: makeId(),
         sequence: seq.id,
         message_body: customBody,
         order: 0,
