@@ -660,7 +660,7 @@ export default function CustomerProfile() {
           </View>
         </View>
       </Modal>
-      {/* Premium Subscription Onboarding Modal */}
+      {/* Premium Subscription Bento Modal */}
       <Modal
         visible={subscribeModalVisible}
         transparent
@@ -668,55 +668,85 @@ export default function CustomerProfile() {
         onRequestClose={() => setSubscribeModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { height: 'auto', paddingBottom: 32 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Upgrade to Merchant Pro</Text>
-              <TouchableOpacity onPress={() => setSubscribeModalVisible(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#000000" />
+          <View style={[styles.modalCard, { height: 'auto', padding: 22, maxWidth: 440, borderRadius: 28 }]}>
+            {/* Top Bar: Badge + Close */}
+            <View style={styles.bentoHeaderRow}>
+              <View style={styles.bentoProBadge}>
+                <Ionicons name="sparkles" size={12} color="#B45309" />
+                <Text style={styles.bentoProBadgeText}>MERCHANT PRO</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSubscribeModalVisible(false)} style={styles.bentoCloseBtn} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.pricingCard}>
-              <Text style={styles.pricingLabel}>PRO PLAN</Text>
-              <View style={styles.pricingRow}>
-                <Text style={styles.currencySymbol}>RM</Text>
-                <Text style={styles.priceText}>79</Text>
-                <Text style={styles.billingPeriod}>/month</Text>
+            {/* Bento Hero Box: The Offer */}
+            <View style={styles.bentoHeroBox}>
+              <View style={styles.bentoHeroTop}>
+                <Text style={styles.bentoHeroTag}>7-DAY TRIAL</Text>
+                <View style={styles.bentoPriceTag}>
+                  <Text style={styles.bentoPriceTagText}>RM 0 TODAY</Text>
+                </View>
               </View>
-              <Text style={styles.pricingDesc}>7-day free trial, then RM79/month billed manually.</Text>
+              <Text style={styles.bentoHeroTitle}>Turn Visitors Into Loyal Regulars.</Text>
+              <Text style={styles.bentoHeroSubtitle}>Then RM79/month billed manually  •  Cancel anytime</Text>
             </View>
 
-            <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.featureText}>Unlimited loyalty active members</Text>
+            {/* Bento Feature Grid */}
+            <View style={styles.bentoGrid}>
+              {/* Feature 1: Wide Bento Tile */}
+              <View style={styles.bentoWideTile}>
+                <View style={styles.bentoIconCircle}>
+                  <Ionicons name="flash" size={18} color="#B45309" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bentoTileTitle}>Instant 2-Sec NFC Magic</Text>
+                  <Text style={styles.bentoTileDesc}>Award stamps at your counter with zero app install needed.</Text>
+                </View>
               </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.featureText}>Launch points & stamps campaigns</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.featureText}>Scan stamp cards & redeem vouchers</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.featureText}>Customer analytics & behavior logs</Text>
+
+              {/* Feature 2 & 3: 2-Column Bento Tiles */}
+              <View style={styles.bentoRow}>
+                <View style={styles.bentoHalfTile}>
+                  <View style={styles.bentoIconCircle}>
+                    <Ionicons name="chatbubbles" size={16} color="#B45309" />
+                  </View>
+                  <Text style={styles.bentoTileTitle}>WhatsApp Auto</Text>
+                  <Text style={styles.bentoTileDesc}>Auto-send stamp alerts & rewards.</Text>
+                </View>
+
+                <View style={styles.bentoHalfTile}>
+                  <View style={styles.bentoIconCircle}>
+                    <Ionicons name="bar-chart" size={16} color="#B45309" />
+                  </View>
+                  <Text style={styles.bentoTileTitle}>Live Analytics</Text>
+                  <Text style={styles.bentoTileDesc}>Track repeat visits & insights.</Text>
+                </View>
               </View>
             </View>
 
+            {/* Bento CTA Action */}
             <TouchableOpacity 
-              style={[styles.subscribeBtn, { marginTop: 8 }]}
+              style={styles.bentoCtaBtn}
               onPress={handleSubscribe}
               disabled={isSubscribing}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {isSubscribing ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.subscribeBtnText}>Start 7-Day Free Trial</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.bentoCtaBtnText}>START 7-DAY FREE TRIAL</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </View>
               )}
             </TouchableOpacity>
+
+            {/* Reassurance text */}
+            <View style={styles.bentoTrustRow}>
+              <Ionicons name="shield-checkmark" size={12} color="#94A3B8" />
+              <Text style={styles.bentoTrustText}>100% Risk-Free  •  No Credit Card Required</Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1192,83 +1222,161 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  // Subscription Pricing Styles
-  pricingCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    padding: 20,
+  // Bento-Style Upgrade Modal Styles
+  bentoHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    gap: 8,
-    marginVertical: 4,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  pricingLabel: {
+  bentoProBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  bentoProBadgeText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.8,
+  },
+  bentoCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoHeroBox: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    marginBottom: 10,
+  },
+  bentoHeroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  bentoHeroTag: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.primary.DEFAULT,
-    letterSpacing: 1.0,
+    color: '#B45309',
+    letterSpacing: 0.6,
   },
-  pricingRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  bentoPriceTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
-  currencySymbol: {
+  bentoPriceTagText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+    letterSpacing: 0.5,
+  },
+  bentoHeroTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
-    marginRight: 2,
+    letterSpacing: -0.4,
+    lineHeight: 23,
+    marginBottom: 4,
   },
-  priceText: {
-    fontSize: 42,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-    letterSpacing: -1.0,
-  },
-  billingPeriod: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    marginLeft: 4,
-  },
-  pricingDesc: {
-    fontSize: 11,
+  bentoHeroSubtitle: {
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    color: '#78350F',
   },
-  featuresList: {
-    gap: 12,
-    marginVertical: 16,
-    paddingHorizontal: 8,
+  bentoGrid: {
+    gap: 8,
+    marginBottom: 14,
   },
-  featureItem: {
+  bentoWideTile: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  bentoRow: {
+    flexDirection: 'row',
     gap: 8,
   },
-  featureText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#334155',
+  bentoHalfTile: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 4,
   },
-  // Subscription Pricing Button Styles
-  subscribeBtn: {
+  bentoIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  bentoTileTitle: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  bentoTileDesc: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 14,
+  },
+  bentoCtaBtn: {
     width: '100%',
     height: 52,
     borderRadius: 16,
-    backgroundColor: '#000000',
+    backgroundColor: '#050505',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 4,
   },
-  subscribeBtnText: {
-    fontSize: 14,
+  bentoCtaBtnText: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+  },
+  bentoTrustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 10,
+  },
+  bentoTrustText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
   },
 });

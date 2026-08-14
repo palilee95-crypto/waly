@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, ScrollView, Platform, ActivityIndicator, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/context/AuthContext';
@@ -641,26 +641,53 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
   );
 }
 
+function HoverInteractiveCard({ children, style }: { children: React.ReactNode, style: any }) {
+  const [isHovered, setIsHovered] = React.useState(false);
+  return (
+    <Pressable
+      onHoverIn={() => setIsHovered(true)}
+      onHoverOut={() => setIsHovered(false)}
+      style={[
+        style,
+        {
+          transition: 'all 0.3s ease',
+          transform: isHovered ? [{ translateY: -10 }] : [{ translateY: 0 }],
+          shadowColor: isHovered ? '#FFC700' : '#000000',
+          shadowOffset: { width: 0, height: isHovered ? 16 : 8 },
+          shadowOpacity: isHovered ? 0.2 : 0.05,
+          shadowRadius: isHovered ? 32 : 16,
+          elevation: isHovered ? 10 : 4,
+          borderColor: isHovered ? '#FFC700' : '#E5E7EB',
+        }
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
   const { width } = useWindowDimensions();
   const cardWidth = width - 48;
 
   const Card1 = (
-    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
-      <View style={styles.wygVisualContainer}>
+    <HoverInteractiveCard style={[styles.wygHoverCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
+      <View style={styles.wygHoverVisual}>
         <View style={styles.mockNfcStandLarge}>
           <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 24}}>TAP HERE</Text>
         </View>
       </View>
-      <Text style={styles.wygCardTitle}>RISEV NFC STAND</Text>
-      <Text style={styles.wygCardDesc}>Your physical customer touchpoint.</Text>
-      <Text style={styles.wygCardSub}>Customers simply tap their phone to get started.</Text>
-    </View>
+      <View style={styles.wygHoverTextContent}>
+        <Text style={styles.wygCardTitle}>RISEV NFC STAND</Text>
+        <Text style={styles.wygCardDesc}>Your physical customer touchpoint.</Text>
+        <Text style={styles.wygCardSub}>Customers simply tap their phone to get started.</Text>
+      </View>
+    </HoverInteractiveCard>
   );
 
   const Card2 = (
-    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
-      <View style={styles.wygVisualContainer}>
+    <HoverInteractiveCard style={[styles.wygHoverCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
+      <View style={styles.wygHoverVisual}>
         <View style={styles.mockDashboardUILarge}>
           <View style={styles.mockDashboardHeader}>
             <Text style={styles.mockUITitle}>CRM Dashboard</Text>
@@ -673,25 +700,29 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
           <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Sarah</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>2 hrs ago</Text></View>
         </View>
       </View>
-      <Text style={styles.wygCardTitle}>CUSTOMER SYSTEM</Text>
-      <Text style={styles.wygCardDesc}>Build your own customer database.</Text>
-      <Text style={styles.wygCardSub}>See customers, loyalty activity, visits, and rewards in one place.</Text>
-    </View>
+      <View style={styles.wygHoverTextContent}>
+        <Text style={styles.wygCardTitle}>CUSTOMER SYSTEM</Text>
+        <Text style={styles.wygCardDesc}>Build your own customer database.</Text>
+        <Text style={styles.wygCardSub}>See customers, loyalty activity, visits, and rewards in one place.</Text>
+      </View>
+    </HoverInteractiveCard>
   );
 
   const Card3 = (
-    <View style={[styles.wygCard, isMobile && { width: cardWidth, flexShrink: 0 }]}>
-      <View style={styles.wygVisualContainer}>
+    <HoverInteractiveCard style={[styles.wygHoverCard, isMobile && { width: cardWidth, flexShrink: 0 }]}>
+      <View style={styles.wygHoverVisual}>
          <View style={styles.mockChatUILarge}>
           <View style={styles.chatBubbleLarge}>
             <Text style={styles.chatTextLarge}>Hey Aiman 👋 You’re one visit away from your next reward.</Text>
           </View>
         </View>
       </View>
-      <Text style={styles.wygCardTitle}>WHATSAPP AUTOMATION</Text>
-      <Text style={styles.wygCardDesc}>Bring customers back automatically.</Text>
-      <Text style={styles.wygCardSub}>Stay connected without manually following up.</Text>
-    </View>
+      <View style={styles.wygHoverTextContent}>
+        <Text style={styles.wygCardTitle}>WHATSAPP AUTOMATION</Text>
+        <Text style={styles.wygCardDesc}>Bring customers back automatically.</Text>
+        <Text style={styles.wygCardSub}>Stay connected without manually following up.</Text>
+      </View>
+    </HoverInteractiveCard>
   );
 
   return (
@@ -2221,48 +2252,48 @@ const styles = StyleSheet.create({
     opacity: 0.3,
     zIndex: 0,
   },
-  wygCard: {
+  wygHoverCard: {
     flex: 1,
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  wygVisualContainer: {
-    width: '100%',
-    height: 220,
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.05,
-    shadowRadius: 24,
-    elevation: 4,
-    marginBottom: 32,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#F3F4F6', // Will be overridden by hover state
+    overflow: 'hidden',
+  },
+  wygHoverVisual: {
+    width: '100%',
+    height: 240,
+    backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  wygHoverTextContent: {
+    padding: 32,
+    alignItems: 'flex-start',
   },
   wygCardTitle: {
     fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 18,
+    fontSize: 16,
     color: '#000000',
     letterSpacing: 1,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   wygCardDesc: {
     fontFamily: 'Outfit_700Bold',
-    fontSize: 16,
+    fontSize: 20,
     color: '#111827',
-    textAlign: 'center',
-    marginBottom: 8,
+    textAlign: 'left',
+    marginBottom: 12,
+    lineHeight: 28,
   },
   wygCardSub: {
     fontFamily: 'Outfit_500Medium',
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
+    textAlign: 'left',
+    lineHeight: 24,
   },
   wygTrustRow: {
     flexDirection: 'row',

@@ -58,7 +58,7 @@ export default function JoinScreen() {
       try {
         const res = await pb.send<{ valid: boolean; reason?: string; merchantName?: string; merchantPhone?: string; billAmount?: number; stampAmount?: number }>(
           '/api/risev/qr/validate',
-          { method: 'GET', params: { t: params.t, m: params.m }, requestKey: null }
+          { method: 'GET', query: { t: params.t, m: params.m }, requestKey: null }
         );
 
         if (!res.valid) {

@@ -132,93 +132,55 @@ export default function LoginScreen() {
   };
 
   const handleRegister = async () => {
-    const isNfcFlow = !!params.prefill_phone;
     setErrorMsg('');
 
-    if (isNfcFlow) {
-      // NFC registration flow: name, email, password, and confirm password required
-      if (!name || !email || !password || !confirmPassword) {
-        setErrorMsg('Please fill in all fields.');
-        return;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        setErrorMsg('Please enter a valid email address.');
-        return;
-      }
-      if (email.trim().endsWith('@risev.app')) {
-        setErrorMsg('Please use your personal email address.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setErrorMsg('Passwords do not match.');
-        return;
-      }
-      if (password.length < 8) {
-        setErrorMsg('Password must be at least 8 characters.');
-        return;
-      }
-      setIsLoading(true);
-      try {
-        // Pass dummy birthday 2000-01-01 to satisfy backend required field
-        await register(getFullPhone(), email.trim().toLowerCase(), name, password, 'customer', '2000-01-01');
-        router.replace('/(customer)');
-      } catch (e: any) {
-        setErrorMsg(e?.message || 'Failed to create account. Please try again.');
-        Alert.alert('Registration Error', e?.message || 'Failed to create account. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
+    if (!name || !name.trim()) {
+      setErrorMsg('Please enter your name.');
       return;
     }
-
-    // Standard flow: all fields required
-    if (!email || !name || !password || !confirmPassword || !birthday) {
-      Alert.alert('Error', 'Please fill in all fields including birthday.');
+    if (!email || !email.trim()) {
+      setErrorMsg('Please enter your email address.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setErrorMsg('Please enter a valid email address (e.g. user@gmail.com).');
+      return;
+    }
+    if (email.trim().endsWith('@risev.app')) {
+      setErrorMsg('Please use your personal email address.');
+      return;
+    }
+    if (!password) {
+      setErrorMsg('Please create a password.');
+      return;
+    }
+    if (password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      setErrorMsg('Passwords do not match. Please verify your password.');
       return;
     }
-    // Validate birthday format YYYY-MM-DD and reasonable age
-    const birthdayRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!birthdayRegex.test(birthday)) {
-      Alert.alert('Error', 'Please enter birthday as YYYY-MM-DD.');
-      return;
-    }
-    const [year, month, day] = birthday.split('-').map(Number);
-    const birthDate = new Date(year, month - 1, day);
-    if (
-      birthDate.getFullYear() !== year ||
-      birthDate.getMonth() !== month - 1 ||
-      birthDate.getDate() !== day
-    ) {
-      Alert.alert('Error', 'Please enter a valid birthday date.');
-      return;
-    }
-    const today = new Date();
-    let age = today.getFullYear() - year;
-    if (today.getMonth() < month - 1 || (today.getMonth() === month - 1 && today.getDate() < day)) {
-      age--;
-    }
-    if (age < 13) {
-      Alert.alert('Error', 'You must be at least 13 years old to use Risev.');
-      return;
-    }
-    if (year < 1900 || age > 120) {
-      Alert.alert('Error', 'Please enter a valid birthday.');
-      return;
-    }
+
     setIsLoading(true);
     try {
-      await register(getFullPhone(), email, name, password, role, birthday);
-      // Auto-login happens inside register() — redirect based on role
+      const birthDateToUse = birthday && birthday.trim() ? birthday.trim() : '2000-01-01';
+      await register(getFullPhone(), email.trim().toLowerCase(), name.trim(), password, role, birthDateToUse);
+      
       const record = pb.authStore.record;
-      const userRole = record?.role || 'customer';
+      const userRole = record?.role || role || 'customer';
       router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
     } catch (e: any) {
-      Alert.alert('Registration Error', e?.message || 'Failed to register user. Please try again.');
+      const rawMsg = e?.message || '';
+      if (rawMsg.toLowerCase().includes('email') || rawMsg.toLowerCase().includes('unique')) {
+        setErrorMsg('This email address is already registered to another account.');
+      } else if (rawMsg.toLowerCase().includes('phone')) {
+        setErrorMsg('This phone number is already registered.');
+      } else {
+        setErrorMsg(rawMsg || 'Failed to create account. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -258,10 +220,9 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background Ambient Blur Blobs */}
-      <View style={styles.ambientContainer}>
-        <View style={styles.blob1} />
-        <View style={styles.blob2} />
+      {/* Background Ambient Warm Gold Glow */}
+      <View style={styles.ambientContainer} pointerEvents="none">
+        <View style={styles.goldGlowCenter} />
       </View>
 
       <KeyboardAvoidingView
@@ -269,35 +230,56 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={[styles.scroll, isDesktop && { maxWidth: 520, alignSelf: 'center', width: '100%' }]}
+          contentContainerStyle={[styles.scroll, isDesktop && { maxWidth: 480, alignSelf: 'center', width: '100%' }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            {/* Main Card Container with decorative overlapping layers behind it */}
-          <View style={styles.cardWrapper}>
-            {/* Back Layer 2 (Rotated slightly) */}
-            <View style={[styles.backLayer, styles.backLayer2]} />
-            {/* Back Layer 1 (Rotated slightly) */}
-            <View style={[styles.backLayer, styles.backLayer1]} />
-
-            {/* Main Glass-panel Form Card */}
+            {/* Main Clean Elevated Card */}
             <View style={styles.mainCard}>
               {/* Card Header */}
               <View style={styles.cardHeader}>
+                {/* Risev Logo */}
                 <Image
-                  source={require('@/assets/logo.png')}
+                  source={require('@/assets/risev logo.png')}
                   style={styles.logoImage}
                   resizeMode="contain"
                 />
+
                 <Text style={styles.cardSubtitle}>
-                  Every visit, rewarded.
+                  {step === 'password'
+                    ? 'Enter your password to access your account.'
+                    : step === 'register'
+                    ? 'Complete your profile to start earning rewards.'
+                    : 'Every visit, rewarded.'}
                 </Text>
               </View>
 
+              {/* Role Switcher Pill (Phone Step Only) */}
+              {step === 'phone' && (
+                <View style={styles.roleSwitcher}>
+                  <TouchableOpacity
+                    style={[styles.roleTab, role === 'customer' && styles.roleTabActive]}
+                    onPress={() => setRole('customer')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="person" size={13} color={role === 'customer' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.roleTabText, role === 'customer' && styles.roleTabTextActive]}>Customer</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.roleTab, role === 'merchant' && styles.roleTabActive]}
+                    onPress={() => setRole('merchant')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="storefront" size={13} color={role === 'merchant' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.roleTabText, role === 'merchant' && styles.roleTabTextActive]}>Merchant</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Input Form */}
               <View style={styles.form}>
-
                 {/* NFC Pre-fill Banner */}
                 {params.prefill_phone && step !== 'phone' && (
                   <View style={styles.nfcPrefillBanner}>
@@ -311,7 +293,11 @@ export default function LoginScreen() {
                 {step !== 'password' && (
                   <>
                     <Text style={styles.inputLabel}>PHONE NUMBER</Text>
-                    <View style={[styles.inputGroup, isFocused && styles.inputGroupFocused, step === 'register' && { backgroundColor: '#F1F5F9', opacity: 0.8 }]}>
+                    <View style={[
+                      styles.inputGroup,
+                      isFocused && styles.inputGroupFocused,
+                      step === 'register' && styles.inputGroupDisabled
+                    ]}>
                       <View style={styles.prefixBox}>
                         <Text style={styles.flag}>🇲🇾</Text>
                         <Text style={styles.prefixCode}>+60</Text>
@@ -324,7 +310,7 @@ export default function LoginScreen() {
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
                         placeholder="11 234 5678"
-                        placeholderTextColor="#BEC6E0"
+                        placeholderTextColor="#94A3B8"
                         value={phone}
                         onChangeText={(t) => setPhone(formatPhone(t))}
                         keyboardType="phone-pad"
@@ -335,6 +321,17 @@ export default function LoginScreen() {
                         onFocus={() => setIsFocused(true)}
                         onBlur={() => setIsFocused(false)}
                       />
+
+                      {step === 'register' ? (
+                        <View style={styles.verifiedChip}>
+                          <Ionicons name="checkmark-circle" size={13} color="#15803D" />
+                          <Text style={styles.verifiedChipText}>Verified</Text>
+                        </View>
+                      ) : isValid ? (
+                        <View style={{ paddingRight: 4 }}>
+                          <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                        </View>
+                      ) : null}
                     </View>
                   </>
                 )}
@@ -349,7 +346,7 @@ export default function LoginScreen() {
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
                         placeholder="user@example.com"
-                        placeholderTextColor="#BEC6E0"
+                        placeholderTextColor="#94A3B8"
                         value={email}
                         onChangeText={(t) => {
                           setEmail(t);
@@ -370,7 +367,7 @@ export default function LoginScreen() {
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
                         placeholder="••••••••"
-                        placeholderTextColor="#BEC6E0"
+                        placeholderTextColor="#94A3B8"
                         value={password}
                         onChangeText={(t) => {
                           setPassword(t);
@@ -414,7 +411,7 @@ export default function LoginScreen() {
                           setIsLoading(false);
                         }
                       }}
-                      style={{ alignSelf: 'flex-end', marginTop: 8 }}
+                      style={{ alignSelf: 'flex-end', marginTop: 4 }}
                     >
                       <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
                         Forgot Password?
@@ -425,153 +422,100 @@ export default function LoginScreen() {
 
                 {step === 'register' && (
                   <>
-                    {/* NFC simplified form: name + password only */}
-                    {params.prefill_phone ? (
-                      <>
-                        <Text style={styles.registerHint}>Create your account to start collecting stamps 🎉</Text>
+                    {/* Simplified registration form */}
+                    <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
+                    <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
+                      <TextInput
+                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
+                        placeholderTextColor="#94A3B8"
+                        value={name}
+                        onChangeText={(t) => {
+                          setName(t);
+                          setErrorMsg('');
+                        }}
+                        autoFocus
+                        onFocus={() => setNameFocused(true)}
+                        onBlur={() => setNameFocused(false)}
+                      />
+                    </View>
 
-                        <Text style={styles.inputLabel}>YOUR NAME</Text>
-                        <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="e.g. Ahmad Rizal"
-                            placeholderTextColor="#BEC6E0"
-                            value={name}
-                            onChangeText={setName}
-                            autoFocus
-                            onFocus={() => setNameFocused(true)}
-                            onBlur={() => setNameFocused(false)}
-                          />
-                        </View>
+                    <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                    <View style={[
+                      styles.inputGroup,
+                      emailFocused && styles.inputGroupFocused,
+                      email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && styles.inputGroupWarning
+                    ]}>
+                      <TextInput
+                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        placeholder="user@example.com"
+                        placeholderTextColor="#94A3B8"
+                        value={email}
+                        onChangeText={(t) => {
+                          setEmail(t);
+                          setErrorMsg('');
+                        }}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        onFocus={() => setEmailFocused(true)}
+                        onBlur={() => setEmailFocused(false)}
+                      />
+                    </View>
+                    {email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (
+                      <Text style={styles.fieldHelperError}>⚠️ Please enter a valid email format</Text>
+                    )}
 
-                        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                        <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="user@example.com"
-                            placeholderTextColor="#BEC6E0"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            onFocus={() => setEmailFocused(true)}
-                            onBlur={() => setEmailFocused(false)}
-                          />
-                        </View>
+                    <Text style={styles.inputLabel}>PASSWORD</Text>
+                    <View style={[
+                      styles.inputGroup,
+                      passwordFocused && styles.inputGroupFocused,
+                      password.length > 0 && password.length < 8 && styles.inputGroupWarning
+                    ]}>
+                      <TextInput
+                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        placeholder="Min. 8 characters"
+                        placeholderTextColor="#94A3B8"
+                        value={password}
+                        onChangeText={(t) => {
+                          setPassword(t);
+                          setErrorMsg('');
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        onFocus={() => setPasswordFocused(true)}
+                        onBlur={() => setPasswordFocused(false)}
+                      />
+                    </View>
+                    {password.length > 0 && password.length < 8 && (
+                      <Text style={styles.fieldHelperError}>⚠️ Must be at least 8 characters ({password.length}/8)</Text>
+                    )}
 
-                        <Text style={styles.inputLabel}>CREATE PASSWORD</Text>
-                        <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="Min. 8 characters"
-                            placeholderTextColor="#BEC6E0"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            onFocus={() => setPasswordFocused(true)}
-                            onBlur={() => setPasswordFocused(false)}
-                          />
-                        </View>
-
-                        <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                        <View style={[styles.inputGroup, confirmPasswordFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="••••••••"
-                            placeholderTextColor="#BEC6E0"
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            onFocus={() => setConfirmPasswordFocused(true)}
-                            onBlur={() => setConfirmPasswordFocused(false)}
-                          />
-                        </View>
-                      </>
-                    ) : (
-                      // Standard full registration form
-                      <>
-                        <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
-                        <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
-                            placeholderTextColor="#BEC6E0"
-                            value={name}
-                            onChangeText={setName}
-                            onFocus={() => setNameFocused(true)}
-                            onBlur={() => setNameFocused(false)}
-                          />
-                        </View>
-
-                        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                        <View style={[styles.inputGroup, emailFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="user@example.com"
-                            placeholderTextColor="#BEC6E0"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            onFocus={() => setEmailFocused(true)}
-                            onBlur={() => setEmailFocused(false)}
-                          />
-                        </View>
-
-                        <Text style={styles.inputLabel}>DATE OF BIRTH</Text>
-                        <View style={[styles.inputGroup, birthdayFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor="#BEC6E0"
-                            value={birthday}
-                            onChangeText={(text) => {
-                              let cleaned = text.replace(/[^0-9]/g, '');
-                              let formatted = cleaned;
-                              if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-                              if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
-                              setBirthday(formatted.slice(0, 10));
-                            }}
-                            keyboardType="number-pad"
-                            maxLength={10}
-                            autoCapitalize="none"
-                            onFocus={() => setBirthdayFocused(true)}
-                            onBlur={() => setBirthdayFocused(false)}
-                          />
-                        </View>
-
-                        <Text style={styles.inputLabel}>PASSWORD</Text>
-                        <View style={[styles.inputGroup, passwordFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="••••••••"
-                            placeholderTextColor="#BEC6E0"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            onFocus={() => setPasswordFocused(true)}
-                            onBlur={() => setPasswordFocused(false)}
-                          />
-                        </View>
-
-                        <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                        <View style={[styles.inputGroup, confirmPasswordFocused && styles.inputGroupFocused]}>
-                          <TextInput
-                            style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                            placeholder="••••••••"
-                            placeholderTextColor="#BEC6E0"
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            onFocus={() => setConfirmPasswordFocused(true)}
-                            onBlur={() => setConfirmPasswordFocused(false)}
-                          />
-                        </View>
-                      </>
+                    <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                    <View style={[
+                      styles.inputGroup,
+                      confirmPasswordFocused && styles.inputGroupFocused,
+                      confirmPassword.length > 0 && password !== confirmPassword && styles.inputGroupWarning
+                    ]}>
+                      <TextInput
+                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        placeholder="••••••••"
+                        placeholderTextColor="#94A3B8"
+                        value={confirmPassword}
+                        onChangeText={(t) => {
+                          setConfirmPassword(t);
+                          setErrorMsg('');
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        onFocus={() => setConfirmPasswordFocused(true)}
+                        onBlur={() => setConfirmPasswordFocused(false)}
+                      />
+                    </View>
+                    {confirmPassword.length > 0 && password !== confirmPassword && (
+                      <Text style={styles.fieldHelperError}>⚠️ Passwords do not match</Text>
+                    )}
+                    {confirmPassword.length > 0 && password === confirmPassword && (
+                      <Text style={styles.fieldHelperSuccess}>✓ Passwords match</Text>
                     )}
                   </>
                 )}
@@ -579,8 +523,8 @@ export default function LoginScreen() {
                 {step === 'phone' && (
                   <>
                     {/* Clean Privacy Notice */}
-                    <Text style={[styles.consentText, { textAlign: 'center', marginBottom: 16 }]}>
-                      By continuing, you agree to our Terms & Privacy Policy.
+                    <Text style={[styles.consentText, { textAlign: 'center', marginVertical: 14 }]}>
+                      By continuing, you agree to our <Text style={styles.consentLink}>Terms</Text> & <Text style={styles.consentLink}>Privacy Policy</Text>.
                     </Text>
 
                     {/* Primary Action Button */}
@@ -594,8 +538,8 @@ export default function LoginScreen() {
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <View style={styles.btnContent}>
-                          <Text style={styles.primaryBtnText}>GET STARTED</Text>
-                          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                          <Text style={[styles.primaryBtnText, !isValid && styles.primaryBtnTextDisabled]}>GET STARTED</Text>
+                          <Ionicons name="arrow-forward" size={16} color={isValid ? '#FFFFFF' : 'rgba(255,255,255,0.45)'} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -604,19 +548,27 @@ export default function LoginScreen() {
 
                 {step === 'register' && (
                   <>
+                    {/* Error Banner on Register Step */}
+                    {errorMsg ? (
+                      <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                        <Text style={styles.errorText}>{errorMsg}</Text>
+                      </View>
+                    ) : null}
+
                     {/* Primary Action Button for Registration */}
                     <TouchableOpacity
-                      style={[styles.primaryBtn, (!email || !name || !password || !confirmPassword) && styles.primaryBtnDisabled]}
+                      style={[styles.primaryBtn, (!email || !name || !password || !confirmPassword || password !== confirmPassword || password.length < 8) && styles.primaryBtnDisabled]}
                       onPress={handleRegister}
-                      disabled={(!email || !name || !password || !confirmPassword) || isLoading}
+                      disabled={(!email || !name || !password || !confirmPassword || password !== confirmPassword || password.length < 8) || isLoading}
                       activeOpacity={0.9}
                     >
                       {isLoading ? (
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <View style={styles.btnContent}>
-                          <Text style={styles.primaryBtnText}>REGISTER & VERIFY</Text>
-                          <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
+                          <Text style={[styles.primaryBtnText, (!email || !name || !password || !confirmPassword || password !== confirmPassword || password.length < 8) && styles.primaryBtnTextDisabled]}>CREATE ACCOUNT</Text>
+                          <Ionicons name="shield-checkmark" size={16} color={(!email || !name || !password || !confirmPassword || password !== confirmPassword || password.length < 8) ? 'rgba(255,255,255,0.45)' : '#FFFFFF'} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -624,10 +576,10 @@ export default function LoginScreen() {
                     {/* Back to Phone Step */}
                     <TouchableOpacity 
                       onPress={() => setStep('phone')} 
-                      style={{ alignItems: 'center', marginTop: 4, padding: 8 }}
+                      style={{ alignItems: 'center', marginTop: 8, padding: 8 }}
                     >
-                      <Text style={{ fontSize: 13, color: '#6B7280', textDecorationLine: 'underline' }}>
-                        Back to Phone Input
+                      <Text style={{ fontSize: 13, color: '#451A03', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                        ← Back to Phone Input
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -653,8 +605,8 @@ export default function LoginScreen() {
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <View style={styles.btnContent}>
-                          <Text style={styles.primaryBtnText}>SECURE LOGIN</Text>
-                          <Ionicons name="lock-closed" size={16} color="#FFFFFF" />
+                          <Text style={[styles.primaryBtnText, (!email || !password) && styles.primaryBtnTextDisabled]}>SECURE LOGIN</Text>
+                          <Ionicons name="lock-closed" size={16} color={(!email || !password) ? 'rgba(255,255,255,0.45)' : '#FFFFFF'} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -662,10 +614,10 @@ export default function LoginScreen() {
                     {/* Back to Phone Step */}
                     <TouchableOpacity 
                       onPress={() => setStep('phone')} 
-                      style={{ alignItems: 'center', marginTop: 4, padding: 8 }}
+                      style={{ alignItems: 'center', marginTop: 8, padding: 8 }}
                     >
-                      <Text style={{ fontSize: 13, color: '#6B7280', textDecorationLine: 'underline' }}>
-                        Back to Phone Input
+                      <Text style={{ fontSize: 13, color: '#451A03', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                        ← Back to Phone Input
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -673,12 +625,11 @@ export default function LoginScreen() {
               </View>
             </View>
           </View>
-          </View>
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              © 2026 RISEV SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
-            </Text>
+
+          {/* Security & Protocol Badge */}
+          <View style={styles.securityBadge}>
+            <Ionicons name="shield-checkmark" size={13} color="#FFC700" />
+            <Text style={styles.securityBadgeText}>256-BIT ENCRYPTED • OFFICIAL RISEV PROTOCOL</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -689,213 +640,177 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Clean pure white surface
+    backgroundColor: '#000000',
   },
   ambientContainer: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
     zIndex: 0,
+    backgroundColor: '#000000',
   },
-  blob1: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'transparent',
-    top: '10%',
-    left: -100,
-  },
-  blob2: {
-    position: 'absolute',
-    width: 350,
-    height: 350,
-    borderRadius: 175,
-    backgroundColor: 'transparent',
-    bottom: '20%',
-    right: -100,
+  goldGlowCenter: {
+    display: 'none',
   },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 24,
     paddingBottom: 32,
-    gap: 24,
+    justifyContent: 'center',
     zIndex: 1,
   },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 48,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9', // Minimalist light gray
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandText: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black text
-    letterSpacing: -0.5,
-  },
-  supportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  supportText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
-  },
-  cardWrapper: {
-    position: 'relative',
-    marginTop: 8,
-  },
-  backLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  backLayer2: {
-    transform: [{ rotate: '2.5deg' }],
-    opacity: 0.3,
-    top: -6,
-    right: -6,
-  },
-  backLayer1: {
-    transform: [{ rotate: '-1.5deg' }],
-    opacity: 0.2,
-    bottom: -4,
-    left: -4,
-  },
   mainCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Neo-glass layout fill
-    borderRadius: 32,
-    padding: 24,
+    backgroundColor: '#FFC700',
+    borderRadius: 30,
+    paddingHorizontal: 26,
+    paddingTop: 36,
+    paddingBottom: 30,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#0b1c30',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 8,
+    borderColor: '#FFE066',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 36,
+    elevation: 10,
   },
   cardHeader: {
     alignItems: 'center',
-    marginBottom: 24,
-    gap: 8,
+    marginBottom: 22,
+    marginTop: 2,
   },
   logoImage: {
-    width: 200,
-    height: 64,
-    marginBottom: 6,
+    width: 150,
+    height: 44,
+    marginBottom: 8,
     alignSelf: 'center',
   },
   cardSubtitle: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#434655',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#3B1700',
     textAlign: 'center',
     lineHeight: 20,
-    paddingHorizontal: 16,
+    letterSpacing: -0.2,
   },
-  form: {
-    gap: 12,
-  },
-  segmentedContainer: {
+  roleSwitcher: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9', // Gray slate background
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 4,
     height: 46,
-    marginBottom: 8,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
   },
-  segmentBtn: {
+  roleTab: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    gap: 6,
+    borderRadius: 12,
   },
-  segmentBtnActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0b1c30',
+  roleTabActive: {
+    backgroundColor: '#050505',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
     elevation: 2,
   },
-  segmentText: {
+  roleTabText: {
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#565e74',
-  },
-  segmentTextActive: {
-    color: '#000000', // Active black text
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  roleTabTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  form: {
+    gap: 10,
   },
   inputLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#434655',
-    letterSpacing: 1,
-    paddingLeft: 4,
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#3B1700',
+    letterSpacing: 0.6,
+    paddingLeft: 2,
+    marginTop: 1,
   },
   inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    height: 50,
+    paddingRight: 10,
+    paddingLeft: 2,
+    overflow: 'hidden',
+  },
+  inputGroupDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  verifiedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#c3c6d7',
-    height: 52,
-    paddingRight: 16,
+    borderColor: '#BBF7D0',
+    flexShrink: 0,
+  },
+  verifiedChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
   },
   inputGroupFocused: {
-    borderColor: '#000000', // Solid black focused border
-    borderWidth: 2,
+    borderColor: '#050505',
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 0 0 3px rgba(0, 0, 0, 0.12)',
+      } as any,
+    }),
   },
   prefixBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     gap: 6,
+    flexShrink: 0,
   },
   flag: {
     fontSize: 18,
   },
   prefixCode: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0b1c30',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   prefixDivider: {
     width: 1,
-    height: 18,
-    backgroundColor: '#c3c6d7',
+    height: 20,
+    backgroundColor: '#E2E8F0',
     marginLeft: 6,
   },
   input: {
     flex: 1,
+    minWidth: 0,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#0b1c30',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
     paddingLeft: 8,
+    paddingRight: 6,
     letterSpacing: 0.5,
     ...Platform.select({
       web: {
@@ -903,182 +818,100 @@ const styles = StyleSheet.create({
       } as any,
     }),
   },
-  consentRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-    marginVertical: 4,
-    paddingHorizontal: 4,
-  },
-  checkboxActive: {
-    marginTop: 1,
-  },
   consentText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#434655',
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#451A03',
     lineHeight: 16,
+    paddingHorizontal: 6,
   },
-  nfcPrefillBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginBottom: 16,
-  },
-  nfcPrefillText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#065F46',
-  },
-  registerHint: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#374151',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  linkText: {
-    color: '#000000',
-    fontFamily: 'PlusJakartaSans_700Bold',
+  consentLink: {
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     textDecorationLine: 'underline',
   },
   primaryBtn: {
-    height: 56,
-    backgroundColor: '#000000', // Solid black button
+    height: 54,
+    backgroundColor: '#050505',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 4,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 4,
   },
   primaryBtnDisabled: {
-    backgroundColor: '#E2E8F0', // Disabled slate gray
+    backgroundColor: 'rgba(5, 5, 5, 0.4)',
     shadowOpacity: 0,
     elevation: 0,
   },
   btnContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    letterSpacing: 1.5,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 1.2,
   },
-  socialDivider: {
+  primaryBtnTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  nfcPrefillBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginVertical: 18,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(195, 198, 215, 0.3)',
-  },
-  dividerText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#737686',
-    letterSpacing: 0.5,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialCardBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
     borderRadius: 12,
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#c3c6d7',
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
   },
-  socialBtnText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0b1c30',
-  },
-  alternativeLinkWrap: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  alternativeLinkText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#434655',
-  },
-  boldLink: {
-    color: '#000000', // Black link
-    fontFamily: 'PlusJakartaSans_700Bold',
-    textDecorationLine: 'underline',
-  },
-  bentoGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  bentoCard: {
+  nfcPrefillText: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
   },
-  bentoIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  securityBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    marginTop: 24,
   },
-  bentoLabel: {
+  securityBadgeText: {
     fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#565e74',
-    letterSpacing: 0.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.6,
   },
-  bentoValue: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
-  },
-  bentoUnit: {
+  fieldHelperError: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#565e74',
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 'auto',
-    paddingVertical: 12,
-  },
-  footerText: {
-    fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#737686',
-    opacity: 0.6,
+    color: '#7F1D1D',
+    paddingLeft: 4,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  fieldHelperSuccess: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#14532D',
+    paddingLeft: 4,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  inputGroupWarning: {
+    borderColor: '#DC2626',
+    borderWidth: 1.5,
   },
   errorContainer: {
     flexDirection: 'row',
