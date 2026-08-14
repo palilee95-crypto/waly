@@ -21,8 +21,8 @@ onBootstrap((e) => {
       
       const sender = $os.getenv("SMTP_SENDER") || username;
       if (sender) {
-        settings.smtp.senderAddress = sender;
-        settings.smtp.senderName = $os.getenv("SMTP_SENDER_NAME") || "RISEV";
+        settings.meta.senderAddress = sender;
+        settings.meta.senderName = $os.getenv("SMTP_SENDER_NAME") || "RISEV";
       }
 
       try {
