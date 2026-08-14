@@ -98,7 +98,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
         send_after_hours: defaultHours,
         send_after_minutes: defaultMinutes,
         conversation_type: "last_sequence",
-        order: 0,
+        order: 1,
       });
       $app.save(newSeq);
 
@@ -108,7 +108,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
         id: makeId(),
         sequence: newSeq.id,
         message_body: defaultBody,
-        order: 0,
+        order: 1,
       });
       $app.save(newMsg);
 
@@ -232,7 +232,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
         send_after_hours: defaultHours,
         send_after_minutes: defaultMinutes,
         conversation_type: "last_sequence",
-        order: 0,
+        order: 1,
       });
       $app.save(seq);
     }
@@ -254,7 +254,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
         id: makeId(),
         sequence: seq.id,
         message_body: customBody,
-        order: 0,
+        order: 1,
       });
       $app.save(newMsg);
     }
