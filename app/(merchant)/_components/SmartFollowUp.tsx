@@ -298,31 +298,64 @@ export default function SmartFollowUp({ styles: s }: Props) {
             <Ionicons name="sparkles" size={12} color="#D97706" />
             <Text style={styles.heroBadgeText}>MARKETING AUTOPILOT</Text>
           </View>
-          <View style={styles.modeTabs}>
-            <TouchableOpacity
-              style={[styles.modeTab, activeTab === 'autopilot' && styles.modeTabActive]}
-              onPress={() => setActiveTab('autopilot')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="flash" size={13} color={activeTab === 'autopilot' ? '#050505' : '#64748B'} />
-              <Text style={[styles.modeTabText, activeTab === 'autopilot' && styles.modeTabTextActive]}>Quick Recipes</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modeTab, activeTab === 'advanced' && styles.modeTabActive]}
-              onPress={() => setActiveTab('advanced')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="settings-outline" size={13} color={activeTab === 'advanced' ? '#050505' : '#64748B'} />
-              <Text style={[styles.modeTabText, activeTab === 'advanced' && styles.modeTabTextActive]}>Advanced Engine</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={fetchGroups} style={{ padding: 6 }}>
+            <Ionicons name="refresh" size={16} color="#64748B" />
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.heroTitle}>Automate Your Customer Retention.</Text>
         <Text style={styles.heroSubtitle}>
           Set-and-forget WhatsApp automations that bring customers back automatically. No manual broadcasting required.
         </Text>
+
+        {/* iOS-Style Full-Width Segmented Tab Navigation */}
+        <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 2, borderRadius: 12, marginBottom: 18 }}>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: activeTab === 'autopilot' ? '#FFFFFF' : 'transparent',
+              shadowColor: activeTab === 'autopilot' ? '#000000' : 'transparent',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08,
+              shadowRadius: 2,
+              elevation: activeTab === 'autopilot' ? 1.5 : 0
+            }}
+            onPress={() => setActiveTab('autopilot')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flash" size={13} color={activeTab === 'autopilot' ? '#050505' : '#64748B'} />
+            <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: activeTab === 'autopilot' ? '#050505' : '#64748B' }}>Quick Recipes</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: activeTab === 'advanced' ? '#FFFFFF' : 'transparent',
+              shadowColor: activeTab === 'advanced' ? '#000000' : 'transparent',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.08,
+              shadowRadius: 2,
+              elevation: activeTab === 'advanced' ? 1.5 : 0
+            }}
+            onPress={() => setActiveTab('advanced')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="settings-outline" size={13} color={activeTab === 'advanced' ? '#050505' : '#64748B'} />
+            <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: activeTab === 'advanced' ? '#050505' : '#64748B' }}>Advanced Engine</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Live Quick Metrics */}
         <View style={styles.metricsRow}>
@@ -350,9 +383,6 @@ export default function SmartFollowUp({ styles: s }: Props) {
         <View style={styles.recipesSection}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>1-CLICK AUTOPILOT RECIPES</Text>
-            <TouchableOpacity onPress={fetchGroups} style={{ padding: 4 }}>
-              <Ionicons name="refresh" size={16} color="#64748B" />
-            </TouchableOpacity>
           </View>
 
           {isLoading ? (
@@ -367,17 +397,30 @@ export default function SmartFollowUp({ styles: s }: Props) {
                 const isToggling = togglingRecipeId === recipe.id;
 
                 return (
-                  <View key={recipe.id} style={[styles.recipeCard, isActive && styles.recipeCardActive]}>
+                  <View 
+                    key={recipe.id} 
+                    style={[
+                      styles.recipeCard, 
+                      { 
+                        borderRadius: 22, 
+                        borderWidth: 1.5, 
+                        borderColor: isActive ? '#FFC700' : '#F1F5F9',
+                        padding: 16
+                      }
+                    ]}
+                  >
                     {/* Top Status & Badge */}
                     <View style={styles.recipeTopRow}>
                       <View style={styles.recipeIconWrap}>
-                        <View style={[styles.recipeIconBox, { backgroundColor: recipe.iconBg }]}>
-                          <Ionicons name={recipe.icon} size={20} color={recipe.iconColor} />
+                        <View style={[styles.recipeIconBox, { backgroundColor: recipe.iconBg, width: 36, height: 36, borderRadius: 18 }]}>
+                          <Ionicons name={recipe.icon} size={18} color={recipe.iconColor} />
                         </View>
-                        <View>
-                          <Text style={styles.recipeTitle}>{recipe.title}</Text>
-                          <View style={styles.recipeBadgePill}>
-                            <Text style={styles.recipeBadgeText}>{recipe.badge}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.recipeTitle, { fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold' }]} numberOfLines={1}>{recipe.title}</Text>
+                          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 3 }}>
+                            <View style={[styles.recipeBadgePill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
+                              <Text style={[styles.recipeBadgeText, { color: '#475569', fontSize: 8 }]}>{recipe.badge}</Text>
+                            </View>
                           </View>
                         </View>
                       </View>
@@ -390,7 +433,7 @@ export default function SmartFollowUp({ styles: s }: Props) {
                           <Switch
                             value={isActive}
                             onValueChange={() => handleToggleRecipe(recipe)}
-                            trackColor={{ false: '#E2E8F0', true: '#22C55E' }}
+                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
                             thumbColor="#FFFFFF"
                             ios_backgroundColor="#E2E8F0"
                           />
@@ -399,37 +442,89 @@ export default function SmartFollowUp({ styles: s }: Props) {
                     </View>
 
                     {/* Trigger Info */}
-                    <View style={styles.triggerInfoBox}>
-                      <Ionicons name="time-outline" size={14} color="#64748B" />
-                      <Text style={styles.triggerInfoText}>{recipe.triggerDescription}</Text>
+                    <View style={[styles.triggerInfoBox, { backgroundColor: '#F8FAFC', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, marginVertical: 12 }]}>
+                      <Ionicons name="time-outline" size={13} color="#64748B" />
+                      <Text style={[styles.triggerInfoText, { fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginLeft: 6 }]}>{recipe.triggerDescription}</Text>
                     </View>
 
-                    {/* Live WhatsApp Bubble Preview */}
-                    <View style={styles.whatsappBubbleCard}>
-                      <View style={styles.whatsappBubbleTop}>
-                        <Ionicons name="logo-whatsapp" size={12} color="#16A34A" />
-                        <Text style={styles.whatsappSenderText}>{merchantName}</Text>
-                        <Text style={styles.whatsappTimeText}>Automated</Text>
+                    {/* High-Fidelity WhatsApp Device Message Preview Mockup */}
+                    <View style={{ 
+                      backgroundColor: '#E5DDD5', 
+                      borderRadius: 14, 
+                      borderWidth: 1, 
+                      borderColor: '#E2E8F0',
+                      overflow: 'hidden',
+                      marginBottom: 12
+                    }}>
+                      {/* WhatsApp Mockup Phone Top Header */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        backgroundColor: '#075E54', 
+                        paddingHorizontal: 10, 
+                        paddingVertical: 6 
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Ionicons name="arrow-back" size={12} color="#FFFFFF" />
+                          {/* Circle avatar */}
+                          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#128C7E', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                              {(merchantName || 'K').substring(0, 1).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ gap: 0.5 }}>
+                            <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
+                              {merchantName || 'Kedai Kami'}
+                            </Text>
+                            <Text style={{ fontSize: 6.5, color: '#A7F3D0', fontFamily: 'PlusJakartaSans_600SemiBold' }}>online</Text>
+                          </View>
+                        </View>
+                        <Ionicons name="ellipsis-vertical" size={12} color="#FFFFFF" />
                       </View>
-                      <Text style={styles.whatsappBodyText}>{getLivePreview(recipe.defaultBody)}</Text>
+
+                      {/* Mockup Chat Body */}
+                      <View style={{ padding: 8 }}>
+                        <View style={{ 
+                          backgroundColor: '#DCF8C6', 
+                          borderRadius: 8, 
+                          padding: 8, 
+                          maxWidth: '85%', 
+                          alignSelf: 'flex-start', 
+                          shadowColor: '#000000', 
+                          shadowOffset: { width: 0, height: 1 }, 
+                          shadowOpacity: 0.05, 
+                          shadowRadius: 0.5, 
+                          elevation: 0.5 
+                        }}>
+                          <Text style={{ fontSize: 10.5, color: '#0F172A', lineHeight: 14, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            {getLivePreview(recipe.defaultBody)}
+                          </Text>
+                          {/* Time tick inside bubble */}
+                          <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center', gap: 2, marginTop: 3 }}>
+                            <Text style={{ fontSize: 7, color: '#738A75', fontFamily: 'PlusJakartaSans_500Medium' }}>Automated</Text>
+                            <Ionicons name="checkmark-done" size={9} color="#34B7F1" />
+                          </View>
+                        </View>
+                      </View>
                     </View>
 
                     {/* Action Bar */}
                     <View style={styles.recipeFooter}>
                       <View style={styles.activeStatusRow}>
-                        <View style={[styles.statusDot, { backgroundColor: isActive ? '#22C55E' : '#94A3B8' }]} />
-                        <Text style={[styles.statusLabel, { color: isActive ? '#15803D' : '#64748B' }]}>
-                          {isActive ? 'Active • Running' : 'Paused'}
+                        <View style={[styles.statusDot, { backgroundColor: isActive ? '#10B981' : '#94A3B8' }]} />
+                        <Text style={[styles.statusLabel, { color: isActive ? '#059669' : '#64748B', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                          {isActive ? 'Active' : 'Paused'}
                         </Text>
                       </View>
 
                       <TouchableOpacity
-                        style={styles.editBtn}
+                        style={[styles.editBtn, { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 }]}
                         onPress={() => handleOpenCustomize(recipe)}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="pencil" size={13} color="#0F172A" />
-                        <Text style={styles.editBtnText}>Customize</Text>
+                        <Ionicons name="pencil-outline" size={12} color="#0F172A" />
+                        <Text style={[styles.editBtnText, { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold' }]}>Customize</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -452,18 +547,45 @@ export default function SmartFollowUp({ styles: s }: Props) {
               </Text>
             </View>
           ) : (
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: 12 }}>
               {smartGroups.map((grp) => (
-                <View key={grp.id} style={styles.advancedGroupCard}>
+                <View 
+                  key={grp.id} 
+                  style={[
+                    styles.advancedGroupCard, 
+                    { 
+                      borderRadius: 16, 
+                      borderWidth: 1, 
+                      borderColor: grp.status === 'active' ? '#FFC700' : '#E2E8F0',
+                      padding: 14,
+                      backgroundColor: '#FFFFFF'
+                    }
+                  ]}
+                >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ gap: 2 }}>
-                      <Text style={styles.advancedGroupName}>{grp.name}</Text>
-                      <Text style={styles.advancedGroupMeta}>
+                    <View style={{ gap: 4, flex: 1, marginRight: 12 }}>
+                      <Text style={[styles.advancedGroupName, { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }]}>{grp.name}</Text>
+                      <Text style={[styles.advancedGroupMeta, { fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }]}>
                         Interval: {grp.interval_minutes || 5} mins • Created: {new Date(grp.created).toLocaleDateString()}
                       </Text>
                     </View>
-                    <View style={[styles.advStatusPill, { backgroundColor: grp.status === 'active' ? '#DCFCE7' : '#F1F5F9' }]}>
-                      <Text style={[styles.advStatusText, { color: grp.status === 'active' ? '#15803D' : '#64748B' }]}>
+                    <View style={[
+                      styles.advStatusPill, 
+                      { 
+                        backgroundColor: grp.status === 'active' ? '#D1FAE5' : '#F1F5F9',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 8
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.advStatusText, 
+                        { 
+                          color: grp.status === 'active' ? '#065F46' : '#64748B', 
+                          fontSize: 9, 
+                          fontFamily: 'PlusJakartaSans_800ExtraBold' 
+                        }
+                      ]}>
                         {grp.status.toUpperCase()}
                       </Text>
                     </View>
@@ -479,95 +601,165 @@ export default function SmartFollowUp({ styles: s }: Props) {
       {editingRecipe && (
         <Modal visible={!!editingRecipe} transparent animationType="slide" onRequestClose={() => setEditingRecipe(null)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, isDesktop && { maxWidth: 520 }]}>
+            <View style={[styles.modalCard, isDesktop && { maxWidth: 520 }, { borderRadius: 24, padding: 20 }]}>
               {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={[styles.recipeIconBox, { width: 32, height: 32, backgroundColor: editingRecipe.iconBg }]}>
+              <View style={[styles.modalHeader, { borderBottomWidth: 0, paddingBottom: 0, marginBottom: 16 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <View style={[styles.recipeIconBox, { width: 36, height: 36, borderRadius: 18, backgroundColor: editingRecipe.iconBg }]}>
                     <Ionicons name={editingRecipe.icon} size={18} color={editingRecipe.iconColor} />
                   </View>
-                  <View>
-                    <Text style={styles.modalTitle}>{editingRecipe.title}</Text>
-                    <Text style={styles.modalSubtitle}>Customize trigger and message wording</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.modalTitle, { fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }]} numberOfLines={1}>{editingRecipe.title}</Text>
+                    <Text style={[styles.modalSubtitle, { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }]}>Customize trigger and message wording</Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setEditingRecipe(null)} style={styles.modalCloseBtn}>
-                  <Ionicons name="close" size={18} color="#64748B" />
+                <TouchableOpacity onPress={() => setEditingRecipe(null)} style={[styles.modalCloseBtn, { backgroundColor: '#F1F5F9', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="close" size={16} color="#475569" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
                 {/* Trigger Days Setting */}
-                <Text style={styles.inputLabel}>TRIGGER DELAY (DAYS)</Text>
-                <View style={styles.daysInputBox}>
-                  <TextInput
-                    style={[styles.daysInput, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                    value={customDays}
-                    onChangeText={setCustomDays}
-                    keyboardType="number-pad"
-                    placeholder="14"
-                  />
-                  <Text style={styles.daysInputUnit}>Days with no counter visit</Text>
+                <View style={{ marginBottom: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <Ionicons name="time-outline" size={14} color="#64748B" />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>TRIGGER DELAY (DAYS)</Text>
+                  </View>
+                  <View style={[styles.daysInputBox, { height: 48, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 12 }]}>
+                    <TextInput
+                      style={[styles.daysInput, { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', flex: 0, minWidth: 40 }, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
+                      value={customDays}
+                      onChangeText={setCustomDays}
+                      keyboardType="number-pad"
+                      placeholder="14"
+                    />
+                    <Text style={[styles.daysInputUnit, { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }]}>Days with no counter visit</Text>
+                  </View>
                 </View>
 
                 {/* Message Body */}
-                <Text style={[styles.inputLabel, { marginTop: 16 }]}>WHATSAPP MESSAGE TEXT</Text>
-                <TextInput
-                  style={[styles.messageInput, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                  value={customBody}
-                  onChangeText={setCustomBody}
-                  multiline
-                  numberOfLines={5}
-                  placeholder="Enter message..."
-                />
-
-                {/* Placeholders Chip Helpers */}
-                <Text style={styles.chipsLabel}>INSERT SMART VARIABLES:</Text>
-                <View style={styles.chipsRow}>
-                  {['{Customer Name}', '{Store Name}', '{Stamp Balance}', '{Reward Item}'].map((tag) => (
-                    <TouchableOpacity
-                      key={tag}
-                      style={styles.chip}
-                      onPress={() => setCustomBody(prev => `${prev} ${tag}`)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.chipText}>{tag}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={14} color="#64748B" />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>WHATSAPP MESSAGE TEXT</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.messageInput, { minHeight: 100, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', padding: 12, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#0F172A' }, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
+                    value={customBody}
+                    onChangeText={setCustomBody}
+                    multiline
+                    numberOfLines={5}
+                    placeholder="Enter message..."
+                  />
                 </View>
 
-                {/* Live Preview Inside Modal */}
-                <Text style={[styles.inputLabel, { marginTop: 16 }]}>LIVE PREVIEW FOR CUSTOMERS</Text>
-                <View style={styles.whatsappBubbleCard}>
-                  <View style={styles.whatsappBubbleTop}>
-                    <Ionicons name="logo-whatsapp" size={12} color="#16A34A" />
-                    <Text style={styles.whatsappSenderText}>{merchantName}</Text>
-                    <Text style={styles.whatsappTimeText}>Just now</Text>
+                {/* Placeholders Chip Helpers */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 8 }}>INSERT VARIABLE TAG:</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {['{Customer Name}', '{Store Name}', '{Stamp Balance}', '{Reward Item}'].map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={{ 
+                          backgroundColor: '#F1F5F9', 
+                          paddingHorizontal: 10, 
+                          paddingVertical: 5, 
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                        }}
+                        onPress={() => setCustomBody(prev => `${prev} ${tag}`)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="add" size={11} color="#475569" style={{ marginRight: 2 }} />
+                        <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>{tag.replace(/[\{\}]/g, '')}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <Text style={styles.whatsappBodyText}>{getLivePreview(customBody)}</Text>
+                </View>
+
+                {/* Live Preview Inside Modal Mockup */}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 10 }}>LIVE CUSTOMER PREVIEW</Text>
+                <View style={{ 
+                  backgroundColor: '#E5DDD5', 
+                  borderRadius: 16, 
+                  borderWidth: 1, 
+                  borderColor: '#E2E8F0',
+                  overflow: 'hidden',
+                  marginBottom: 16
+                }}>
+                  {/* WhatsApp Mockup Phone Top Header */}
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    backgroundColor: '#075E54', 
+                    paddingHorizontal: 10, 
+                    paddingVertical: 6 
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Ionicons name="arrow-back" size={12} color="#FFFFFF" />
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#128C7E', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                          {(merchantName || 'K').substring(0, 1).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ gap: 0.5 }}>
+                        <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
+                          {merchantName || 'Kedai Kami'}
+                        </Text>
+                        <Text style={{ fontSize: 6.5, color: '#A7F3D0', fontFamily: 'PlusJakartaSans_600SemiBold' }}>online</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="ellipsis-vertical" size={12} color="#FFFFFF" />
+                  </View>
+
+                  {/* Mockup Chat Body */}
+                  <View style={{ padding: 10 }}>
+                    <View style={{ 
+                      backgroundColor: '#DCF8C6', 
+                      borderRadius: 8, 
+                      padding: 8, 
+                      maxWidth: '85%', 
+                      alignSelf: 'flex-start', 
+                      shadowColor: '#000000', 
+                      shadowOffset: { width: 0, height: 1 }, 
+                      shadowOpacity: 0.05, 
+                      shadowRadius: 0.5, 
+                      elevation: 0.5 
+                    }}>
+                      <Text style={{ fontSize: 11, color: '#0F172A', lineHeight: 15, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                        {getLivePreview(customBody)}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center', gap: 2, marginTop: 3 }}>
+                        <Text style={{ fontSize: 7.5, color: '#738A75', fontFamily: 'PlusJakartaSans_500Medium' }}>Automated</Text>
+                        <Ionicons name="checkmark-done" size={10} color="#34B7F1" />
+                      </View>
+                    </View>
+                  </View>
                 </View>
               </ScrollView>
 
               {/* Actions */}
-              <View style={styles.modalFooter}>
+              <View style={[styles.modalFooter, { borderTopWidth: 0, paddingTop: 10 }]}>
                 <TouchableOpacity
-                  style={styles.modalCancelBtn}
+                  style={[styles.modalCancelBtn, { backgroundColor: '#F1F5F9', borderRadius: 12, paddingVertical: 12 }]}
                   onPress={() => setEditingRecipe(null)}
                   disabled={isSavingCustom}
                 >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                  <Text style={[styles.modalCancelText, { color: '#475569', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }]}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.modalSaveBtn}
+                  style={[styles.modalSaveBtn, { backgroundColor: '#FFC700', borderRadius: 12, paddingVertical: 12 }]}
                   onPress={handleSaveCustomize}
                   disabled={isSavingCustom}
                   activeOpacity={0.85}
                 >
                   {isSavingCustom ? (
-                    <ActivityIndicator size="small" color="#050505" />
+                    <ActivityIndicator size="small" color="#0F172A" />
                   ) : (
-                    <Text style={styles.modalSaveText}>Save & Update</Text>
+                    <Text style={[styles.modalSaveText, { color: '#0F172A', fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>Save & Update</Text>
                   )}
                 </TouchableOpacity>
               </View>

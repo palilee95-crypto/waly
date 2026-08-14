@@ -13,6 +13,7 @@ import {
   Platform,
   useWindowDimensions,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
@@ -126,7 +127,14 @@ export default function CustomersScreen() {
   const [customerCard, setCustomerCard] = useState<any>(null);
   const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
   const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
+  const [txPage, setTxPage] = useState(0);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showAllSpenders, setShowAllSpenders] = useState(false);
+  const [spendersPage, setSpendersPage] = useState(0);
+  const [showAllInactive, setShowAllInactive] = useState(false);
+  const [mainPage, setMainPage] = useState(0);
+  const [detailsOrigin, setDetailsOrigin] = useState<'main' | 'spenders' | 'inactive'>('main');
+  const [leaderboardRankBy, setLeaderboardRankBy] = useState<'spend' | 'visits'>('spend');
 
   // Edit Info & Stamp Adjustment & Delete states
   const [editInfoModalVisible, setEditInfoModalVisible] = useState(false);
@@ -143,6 +151,10 @@ export default function CustomersScreen() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+
+  useEffect(() => {
+    setMainPage(0);
+  }, [activeTab, searchQuery, dateFilter, sortBy]);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -152,6 +164,13 @@ export default function CustomersScreen() {
     setEditInfoModalVisible(false);
     setAdjustStampsModalVisible(false);
     router.setParams({ customerId: undefined } as any);
+
+    if (detailsOrigin === 'spenders') {
+      setShowAllSpenders(true);
+    } else if (detailsOrigin === 'inactive') {
+      setShowAllInactive(true);
+    }
+    setDetailsOrigin('main');
   };
 
   const handleSaveEditInfo = async () => {
@@ -313,8 +332,9 @@ export default function CustomersScreen() {
     }
   }, [params.customerId, transactions, selectedCustomer]);
 
-  const openCustomerDetails = async (tx: TransactionItem) => {
+  const openCustomerDetails = async (tx: TransactionItem, origin: 'main' | 'spenders' | 'inactive' = 'main') => {
     if (!tx.customerId) return;
+    setDetailsOrigin(origin);
     setSelectedCustomer(tx);
     setCustomerModalVisible(true);
     setLoadingDetails(true);
@@ -340,6 +360,7 @@ export default function CustomersScreen() {
         sort: '-created'
       });
       setCustomerTransactions(transactionsList);
+      setTxPage(0);
     } catch (err) {
       console.warn('Failed to fetch customer details:', err);
     } finally {
@@ -565,42 +586,51 @@ export default function CustomersScreen() {
   // Calculate top spenders (by sum of bill_amount from PURCHASE transactions)
   // and map the rest of unique customers
   const activeCustomersList = React.useMemo(() => {
-    // 1. Group by customer and compute total purchase amount
-    const customerMap: Record<string, { id: string; name: string; initials: string; avatar: string | null; bgCircleColor: string; totalPurchase: number }> = {};
+    // 1. Group by customer and compute total purchase amount and visit count
+    const customerMap: Record<string, { id: string; customerId: string; name: string; initials: string; avatar: string | null; bgCircleColor: string; totalPurchase: number; totalVisits: number; customerPhone: string; memberId: string }> = {};
     
     transactions.forEach(t => {
       if (!t.customerId) return;
       if (!customerMap[t.customerId]) {
         customerMap[t.customerId] = {
           id: t.customerId,
+          customerId: t.customerId,
           name: t.name,
           initials: t.initials,
           avatar: t.avatar,
           bgCircleColor: t.bgCircleColor,
           totalPurchase: 0,
+          totalVisits: 0,
+          customerPhone: t.customerPhone || '',
+          memberId: t.memberId || '',
         };
       }
-      if (t.type === 'PURCHASE' && t.bill_amount) {
+      customerMap[t.customerId].totalVisits += 1;
+      if ((t.type === 'PURCHASE' || t.type === 'earn') && t.bill_amount) {
         customerMap[t.customerId].totalPurchase += Number(t.bill_amount);
       }
     });
 
     const list = Object.values(customerMap);
     
-    // Sort descending by total purchase amount to rank top spenders
-    list.sort((a, b) => b.totalPurchase - a.totalPurchase);
+    // Sort descending by total purchase amount or visit count based on preference
+    if (leaderboardRankBy === 'spend') {
+      list.sort((a, b) => b.totalPurchase - a.totalPurchase);
+    } else {
+      list.sort((a, b) => b.totalVisits - a.totalVisits);
+    }
 
     // Map ranks, numbers, and medals for top 3
     return list.map((cust, idx) => {
       let rankText = '';
       let medal = '';
-      if (idx === 0 && cust.totalPurchase > 0) {
+      if (idx === 0 && (leaderboardRankBy === 'spend' ? cust.totalPurchase > 0 : cust.totalVisits > 0)) {
         rankText = '1st';
         medal = '🥇';
-      } else if (idx === 1 && cust.totalPurchase > 0) {
+      } else if (idx === 1 && (leaderboardRankBy === 'spend' ? cust.totalPurchase > 0 : cust.totalVisits > 0)) {
         rankText = '2nd';
         medal = '🥈';
-      } else if (idx === 2 && cust.totalPurchase > 0) {
+      } else if (idx === 2 && (leaderboardRankBy === 'spend' ? cust.totalPurchase > 0 : cust.totalVisits > 0)) {
         rankText = '3rd';
         medal = '🥉';
       }
@@ -611,7 +641,7 @@ export default function CustomersScreen() {
         medal,
       };
     });
-  }, [transactions]);
+  }, [transactions, leaderboardRankBy]);
 
   // Stamps distributed this month (last 30 days) vs previous month (30-60 days ago)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
@@ -853,22 +883,68 @@ export default function CustomersScreen() {
           elevation: 3,
           marginVertical: 8,
         }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="trophy" size={20} color="#FFC700" />
               <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                Top Spenders Leaderboard
+                {leaderboardRankBy === 'spend' ? 'Top Spenders' : 'Top Visitors'}
               </Text>
             </View>
-            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706' }}>LIVE STATS</Text>
-            </View>
+            <TouchableOpacity onPress={() => {
+              setSpendersPage(0);
+              setShowAllSpenders(true);
+            }}>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B38B00' }}>View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Full-Width Segmented Toggle Bar */}
+          <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 3, borderRadius: 10, marginBottom: 16 }}>
+            <TouchableOpacity 
+              onPress={() => setLeaderboardRankBy('spend')}
+              style={{ 
+                flex: 1,
+                paddingVertical: 8, 
+                borderRadius: 8, 
+                alignItems: 'center',
+                backgroundColor: leaderboardRankBy === 'spend' ? '#FFFFFF' : 'transparent',
+                shadowColor: leaderboardRankBy === 'spend' ? '#000000' : 'transparent',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.08,
+                shadowRadius: 2,
+                elevation: leaderboardRankBy === 'spend' ? 2 : 0
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: leaderboardRankBy === 'spend' ? '#050505' : '#64748B' }}>By Spend</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setLeaderboardRankBy('visits')}
+              style={{ 
+                flex: 1,
+                paddingVertical: 8, 
+                borderRadius: 8, 
+                alignItems: 'center',
+                backgroundColor: leaderboardRankBy === 'visits' ? '#FFFFFF' : 'transparent',
+                shadowColor: leaderboardRankBy === 'visits' ? '#000000' : 'transparent',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.08,
+                shadowRadius: 2,
+                elevation: leaderboardRankBy === 'visits' ? 2 : 0
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: leaderboardRankBy === 'visits' ? '#050505' : '#64748B' }}>By Visits</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={{ gap: 8 }}>
             {activeCustomersList.slice(0, 3).map((cust, index) => {
-              const maxSpend = activeCustomersList[0]?.totalPurchase || 1;
-              const spendPercentage = Math.min((cust.totalPurchase / maxSpend) * 100, 100);
+              const maxVal = leaderboardRankBy === 'spend' 
+                ? (activeCustomersList[0]?.totalPurchase || 1)
+                : (activeCustomersList[0]?.totalVisits || 1);
+              const currentVal = leaderboardRankBy === 'spend' ? cust.totalPurchase : cust.totalVisits;
+              const fillPercentage = Math.min((currentVal / maxVal) * 100, 100);
 
               // Rank visual styling
               let rankBg = '#E2E8F0';
@@ -965,7 +1041,7 @@ export default function CustomersScreen() {
                         )}
                       </View>
                       <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                        RM {Math.round(cust.totalPurchase)}
+                        {leaderboardRankBy === 'spend' ? `RM ${Math.round(cust.totalPurchase)}` : `${cust.totalVisits} visits`}
                       </Text>
                     </View>
 
@@ -973,8 +1049,8 @@ export default function CustomersScreen() {
                     <View style={{ height: 3, backgroundColor: '#E2E8F0', borderRadius: 1.5, overflow: 'hidden', width: '100%' }}>
                       <View style={{ 
                         height: '100%', 
-                        backgroundColor: isFirst ? '#FFC700' : '#94A3B8', 
-                        width: `${spendPercentage}%`,
+                        backgroundColor: isFirst ? '#FFC700' : leaderboardRankBy === 'spend' ? '#94A3B8' : '#3B82F6', 
+                        width: `${fillPercentage}%`,
                         borderRadius: 1.5
                       }} />
                     </View>
@@ -1001,17 +1077,15 @@ export default function CustomersScreen() {
               <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 {"Inactive customers (>30 days)"}
               </Text>
-              <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
-                  {idleCustomers.length} at risk
-                </Text>
-              </View>
+              <TouchableOpacity onPress={() => setShowAllInactive(true)}>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>View All</Text>
+              </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
               {idleCustomers.map((cust) => (
                 <TouchableOpacity
                   key={cust.customerId}
-                  onPress={() => openCustomerDetails(cust as any)}
+                  onPress={() => openCustomerDetails(cust as any, 'inactive')}
                   style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, width: 140, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, alignItems: 'center' }}
                   activeOpacity={0.8}
                 >
@@ -1109,7 +1183,7 @@ export default function CustomersScreen() {
               </Text>
             </View>
           ) : (
-            filteredTransactions.map((tx) => (
+            filteredTransactions.slice(mainPage * 10, (mainPage + 1) * 10).map((tx) => (
               <TouchableOpacity 
                 key={tx.id} 
                 style={styles.tableRow}
@@ -1162,14 +1236,22 @@ export default function CustomersScreen() {
           <View style={styles.tableFooter}>
             <Text style={styles.paginationText}>
               {locale === 'en'
-                ? `Showing 1-${filteredTransactions.length} of ${transactions.length} transactions`
-                : `Menunjukkan 1-${filteredTransactions.length} daripada ${transactions.length} transaksi`}
+                ? `Showing ${filteredTransactions.length === 0 ? 0 : mainPage * 10 + 1}-${Math.min((mainPage + 1) * 10, filteredTransactions.length)} of ${filteredTransactions.length} transactions`
+                : `Menunjukkan ${filteredTransactions.length === 0 ? 0 : mainPage * 10 + 1}-${Math.min((mainPage + 1) * 10, filteredTransactions.length)} daripada ${filteredTransactions.length} transaksi`}
             </Text>
             <View style={styles.paginationArrows}>
-              <TouchableOpacity style={styles.arrowBtn}>
+              <TouchableOpacity 
+                disabled={mainPage === 0} 
+                onPress={() => setMainPage(prev => prev - 1)}
+                style={[styles.arrowBtn, mainPage === 0 && { opacity: 0.3 }]}
+              >
                 <Ionicons name="chevron-back" size={18} color="#737686" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.arrowBtn}>
+              <TouchableOpacity 
+                disabled={(mainPage + 1) * 10 >= filteredTransactions.length} 
+                onPress={() => setMainPage(prev => prev + 1)}
+                style={[styles.arrowBtn, (mainPage + 1) * 10 >= filteredTransactions.length && { opacity: 0.3 }]}
+              >
                 <Ionicons name="chevron-forward" size={18} color="#737686" />
               </TouchableOpacity>
             </View>
@@ -1188,28 +1270,47 @@ export default function CustomersScreen() {
             {/* Header info */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('customer_profile')}</Text>
-              <TouchableOpacity onPress={closeCustomerModal} style={styles.closeBtn}>
-                <Feather name="x" size={20} color="#050505" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <TouchableOpacity onPress={handleConfirmDeleteCustomer} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={closeCustomerModal} style={styles.closeBtn}>
+                  <Feather name="x" size={20} color="#050505" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {selectedCustomer && (
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
                 {/* Profile Header Card */}
-                <View style={styles.profileSection}>
-                  {selectedCustomer.avatar ? (
-                    <Image source={{ uri: selectedCustomer.avatar }} style={styles.detailAvatar} />
-                  ) : (
-                    <View style={[styles.detailInitialsCircle, { backgroundColor: selectedCustomer.bgCircleColor }]}>
-                      <Text style={styles.detailInitialsText}>{selectedCustomer.initials}</Text>
-                    </View>
-                  )}
-                  <Text style={styles.detailNameText}>{selectedCustomer.name}</Text>
-                  <Text style={styles.detailPhoneText}>{selectedCustomer.customerPhone}</Text>
-                  <Text style={styles.detailIdText}>{selectedCustomer.memberId}</Text>
+                <View style={[styles.profileSection, { paddingBottom: 24 }]}>
+                  <View style={{
+                    borderRadius: 50,
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#050505',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 12,
+                    elevation: 3,
+                    borderWidth: 2,
+                    borderColor: '#F1F5F9',
+                    marginBottom: 12,
+                    overflow: 'hidden'
+                  }}>
+                    {selectedCustomer.avatar ? (
+                      <Image source={{ uri: selectedCustomer.avatar }} style={styles.detailAvatar} />
+                    ) : (
+                      <View style={[styles.detailInitialsCircle, { backgroundColor: selectedCustomer.bgCircleColor }]}>
+                        <Text style={styles.detailInitialsText}>{selectedCustomer.initials}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.detailNameText, { marginBottom: 0 }]}>{selectedCustomer.name}</Text>
+                  </View>
 
                   {/* Quick Action Pills */}
-                  <View style={styles.profileActionPillsRow}>
+                  <View style={[styles.profileActionPillsRow, { marginTop: 16 }]}>
                     <TouchableOpacity
                       style={styles.actionPillBtn}
                       onPress={() => {
@@ -1224,7 +1325,7 @@ export default function CustomersScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.actionPillBtn}
+                      style={[styles.actionPillBtn, { backgroundColor: '#050505', borderColor: '#050505' }]}
                       onPress={() => {
                         setAdjustStampsCount(customerCard?.stamps_collected || 0);
                         setAdjustReason('');
@@ -1232,18 +1333,78 @@ export default function CustomersScreen() {
                       }}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="flash-outline" size={14} color="#D97706" />
-                      <Text style={styles.actionPillText}>Adjust Stamps</Text>
+                      <Ionicons name="flash" size={14} color="#FFC700" />
+                      <Text style={[styles.actionPillText, { color: '#FFFFFF' }]}>Adjust Stamps</Text>
                     </TouchableOpacity>
+                  </View>
 
-                    <TouchableOpacity
-                      style={[styles.actionPillBtn, styles.actionPillBtnDanger]}
-                      onPress={handleConfirmDeleteCustomer}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                      <Text style={[styles.actionPillText, { color: '#DC2626' }]}>Delete</Text>
-                    </TouchableOpacity>
+                  {/* Brand-Aligned Stats & Contact Card */}
+                  <View style={{ backgroundColor: '#FFFBEA', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: '#FFF1C5', marginTop: 20, width: '100%' }}>
+                    
+                    {/* 1. Total Spend Row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="wallet-outline" size={16} color="#B38B00" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>Total Spend</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        RM {customerTransactions.filter(tx => tx.type === 'PURCHASE' || tx.type === 'earn').reduce((sum, tx) => sum + (tx.bill_amount || 0), 0).toFixed(0)}
+                      </Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#FFF1C5' }} />
+
+                    {/* 2. Total Visits Row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="cart-outline" size={16} color="#B38B00" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>Total Visits</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {customerTransactions.length}
+                      </Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#FFF1C5' }} />
+
+                    {/* 3. Last Visit Row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="time-outline" size={16} color="#B38B00" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>Last Visit</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {customerTransactions.length > 0 ? new Date(customerTransactions[0].created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                      </Text>
+                    </View>
+
+                    {/* 4. Phone Row */}
+                    {selectedCustomer.customerPhone ? (
+                      <>
+                        <View style={{ height: 1, backgroundColor: '#FFF1C5' }} />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="call-outline" size={16} color="#B38B00" />
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>Phone Number</Text>
+                          </View>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {selectedCustomer.customerPhone}
+                          </Text>
+                        </View>
+                        
+                        <View style={{ height: 1, backgroundColor: '#FFF1C5' }} />
+                        
+                        {/* 5. WhatsApp Button Underneath */}
+                        <TouchableOpacity 
+                          style={{ backgroundColor: '#25D366', paddingVertical: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginVertical: 10 }}
+                          onPress={() => Linking.openURL(`https://wa.me/${selectedCustomer.customerPhone.replace(/[^0-9]/g, '')}`)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>WhatsApp Customer</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
                   </View>
                 </View>
 
@@ -1357,33 +1518,332 @@ export default function CustomersScreen() {
 
                     {/* Transaction History Section */}
                     <Text style={styles.sectionTitle}>{t('visit_history')}</Text>
-                    {customerTransactions.length > 0 ? (
-                      <View style={styles.txList}>
-                        {customerTransactions.map((tx) => (
-                          <View key={tx.id} style={styles.txRow}>
-                            <View>
-                              <Text style={styles.txTypeTitle}>
-                                {tx.type === 'earn' ? t('earned_stamp') : tx.type === 'redeem' ? t('redeemed_reward') : t('adjustment')}
-                              </Text>
-                              <Text style={styles.txDateText}>
-                                {new Date(tx.created).toLocaleDateString()} {locale === 'en' ? 'at' : 'pada'} {new Date(tx.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
-                            </View>
-                            <Text style={[styles.txStampsCount, tx.type === 'earn' ? { color: '#10B981' } : { color: '#EF4444' }]}>
-                              {tx.type === 'earn' ? `+${tx.stamps || 0}` : `-${tx.stamps || 0}`} {t('stamps_label')}
-                            </Text>
+                    {(() => {
+                      const earnTxs = customerTransactions.filter(tx => tx.type === 'earn' || tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT' || tx.type === 'adjust');
+                      return earnTxs.length > 0 ? (
+                        <View>
+                          <View style={styles.txList}>
+                            {earnTxs.slice(txPage * 5, (txPage + 1) * 5).map((tx) => (
+                              <View key={tx.id} style={styles.txRow}>
+                                <View>
+                                  <Text style={styles.txTypeTitle}>
+                                    {tx.type === 'earn' || tx.type === 'PURCHASE' ? t('earned_stamp') : t('adjustment')}
+                                  </Text>
+                                  <Text style={styles.txDateText}>
+                                    {new Date(tx.created).toLocaleDateString()} {locale === 'en' ? 'at' : 'pada'} {new Date(tx.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </Text>
+                                </View>
+                                <Text style={[styles.txStampsCount, { color: '#10B981' }]}>
+                                  {tx.type === 'earn' || tx.type === 'PURCHASE' ? `+${tx.stamps || 0}` : `+${tx.stamps || 0}`} {t('stamps_label')}
+                                </Text>
+                              </View>
+                            ))}
                           </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <View style={styles.noCardBox}>
-                        <Text style={styles.noCardText}>{t('no_visits_desc')}</Text>
-                      </View>
-                    )}
+
+                          {/* Visit History Pagination */}
+                          {earnTxs.length > 5 && (
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                                {locale === 'en' 
+                                  ? `Showing ${txPage * 5 + 1}-${Math.min((txPage + 1) * 5, earnTxs.length)} of ${earnTxs.length}` 
+                                  : `Menunjukkan ${txPage * 5 + 1}-${Math.min((txPage + 1) * 5, earnTxs.length)} daripada ${earnTxs.length}`}
+                              </Text>
+                              <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity 
+                                  disabled={txPage === 0} 
+                                  onPress={() => setTxPage(prev => prev - 1)}
+                                  style={{ opacity: txPage === 0 ? 0.3 : 1, padding: 6, backgroundColor: '#F1F5F9', borderRadius: 8 }}
+                                >
+                                  <Ionicons name="chevron-back" size={14} color="#050505" />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                  disabled={(txPage + 1) * 5 >= earnTxs.length} 
+                                  onPress={() => setTxPage(prev => prev + 1)}
+                                  style={{ opacity: (txPage + 1) * 5 >= earnTxs.length ? 0.3 : 1, padding: 6, backgroundColor: '#F1F5F9', borderRadius: 8 }}
+                                >
+                                  <Ionicons name="chevron-forward" size={14} color="#050505" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      ) : (
+                        <View style={styles.noCardBox}>
+                          <Text style={styles.noCardText}>{t('no_visits_desc')}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 )}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Spenders Leaderboard View All Modal */}
+      <Modal
+        visible={showAllSpenders}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAllSpenders(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '75%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                <Text style={[styles.modalTitle, { flexShrink: 1 }]} numberOfLines={1}>
+                  {leaderboardRankBy === 'spend' ? 'Top Spenders' : 'Top Visitors'}
+                </Text>
+                
+                {/* Spend / Visits Rank Toggle inside Modal */}
+                <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 2, borderRadius: 8, marginLeft: 6, shrink: 0 }}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSpendersPage(0);
+                      setLeaderboardRankBy('spend');
+                    }}
+                    style={{ 
+                      paddingHorizontal: 8, 
+                      paddingVertical: 3, 
+                      borderRadius: 6, 
+                      backgroundColor: leaderboardRankBy === 'spend' ? '#FFFFFF' : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: leaderboardRankBy === 'spend' ? '#050505' : '#64748B' }}>Spend</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSpendersPage(0);
+                      setLeaderboardRankBy('visits');
+                    }}
+                    style={{ 
+                      paddingHorizontal: 8, 
+                      paddingVertical: 3, 
+                      borderRadius: 6, 
+                      backgroundColor: leaderboardRankBy === 'visits' ? '#FFFFFF' : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: leaderboardRankBy === 'visits' ? '#050505' : '#64748B' }}>Visits</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAllSpenders(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 12 }}>
+              <View style={{ 
+                backgroundColor: '#FFFFFF', 
+                borderRadius: 20, 
+                borderWidth: 1, 
+                borderColor: '#F1F5F9', 
+                padding: 8,
+                shadowColor: '#050505',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.02,
+                shadowRadius: 10,
+                elevation: 2,
+                marginBottom: 20
+              }}>
+                {activeCustomersList.slice(spendersPage * 10, (spendersPage + 1) * 10).map((cust, index) => {
+                  const actualIndex = spendersPage * 10 + index;
+                  const maxVal = leaderboardRankBy === 'spend' 
+                    ? (activeCustomersList[0]?.totalPurchase || 1)
+                    : (activeCustomersList[0]?.totalVisits || 1);
+                  const currentVal = leaderboardRankBy === 'spend' ? cust.totalPurchase : cust.totalVisits;
+                  const fillPercentage = Math.min((currentVal / maxVal) * 100, 100);
+                  
+                  // Rank styling
+                  let rankBg = 'transparent';
+                  let rankTextColor = '#64748B';
+                  let isTopThree = false;
+                  
+                  if (actualIndex === 0) {
+                    rankBg = '#FEF3C7';
+                    rankTextColor = '#B45309';
+                    isTopThree = true;
+                  } else if (actualIndex === 1) {
+                    rankBg = '#E2E8F0';
+                    rankTextColor = '#475569';
+                    isTopThree = true;
+                  } else if (actualIndex === 2) {
+                    rankBg = '#FFEDD5';
+                    rankTextColor = '#C2410C';
+                    isTopThree = true;
+                  }
+
+                  const isFirst = actualIndex === 0;
+
+                  return (
+                    <View key={cust.id}>
+                      {index > 0 && <View style={{ height: 1, backgroundColor: '#F8FAFC', marginHorizontal: 12 }} />}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowAllSpenders(false);
+                          openCustomerDetails(cust as any, 'spenders');
+                        }}
+                        style={{ 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          backgroundColor: isFirst ? '#FFFBEB' : 'transparent',
+                          borderRadius: 14,
+                          padding: 12,
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        {/* Rank Badge Column */}
+                        <View style={{ 
+                          width: 24, 
+                          height: 24, 
+                          borderRadius: 12, 
+                          backgroundColor: rankBg, 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          marginRight: 12 
+                        }}>
+                          <Text style={{ 
+                            fontSize: 11, 
+                            fontFamily: 'PlusJakartaSans_800ExtraBold', 
+                            color: rankTextColor 
+                          }}>
+                            {actualIndex + 1}
+                          </Text>
+                        </View>
+
+                        {/* Avatar */}
+                        <View style={{ 
+                          width: 36, 
+                          height: 36, 
+                          borderRadius: 18, 
+                          backgroundColor: '#F1F5F9', 
+                          marginRight: 12, 
+                          overflow: 'hidden',
+                          borderWidth: isFirst ? 1.5 : 0,
+                          borderColor: '#FFC700'
+                        }}>
+                          {cust.avatar ? (
+                            <Image source={{ uri: cust.avatar }} style={{ width: '100%', height: '100%' }} />
+                          ) : (
+                            <View style={{ width: '100%', height: '100%', backgroundColor: cust.bgCircleColor || '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{cust.initials}</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Details */}
+                        <View style={{ flex: 1, marginRight: 12 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {cust.name}
+                            </Text>
+                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                              {leaderboardRankBy === 'spend' ? `RM ${Math.round(cust.totalPurchase)}` : `${cust.totalVisits} visits`}
+                            </Text>
+                          </View>
+                          
+                          {/* Progress line */}
+                          <View style={{ height: 3, backgroundColor: '#F1F5F9', borderRadius: 1.5, overflow: 'hidden', width: '100%' }}>
+                            <View style={{ 
+                              height: '100%', 
+                              backgroundColor: isFirst ? '#FFC700' : leaderboardRankBy === 'spend' ? '#3B82F6' : '#10B981', 
+                              width: `${fillPercentage}%`,
+                              borderRadius: 1.5 
+                            }} />
+                          </View>
+                        </View>
+
+                        <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Leaderboard Pagination controls */}
+              {activeCustomersList.length > 10 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingHorizontal: 4, paddingBottom: 20 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                    {locale === 'en' 
+                      ? `Showing ${spendersPage * 10 + 1}-${Math.min((spendersPage + 1) * 10, activeCustomersList.length)} of ${activeCustomersList.length}` 
+                      : `Menunjukkan ${spendersPage * 10 + 1}-${Math.min((spendersPage + 1) * 10, activeCustomersList.length)} daripada ${activeCustomersList.length}`}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity 
+                      disabled={spendersPage === 0} 
+                      onPress={() => setSpendersPage(prev => prev - 1)}
+                      style={{ opacity: spendersPage === 0 ? 0.3 : 1, padding: 6, backgroundColor: '#F1F5F9', borderRadius: 8 }}
+                    >
+                      <Ionicons name="chevron-back" size={14} color="#050505" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      disabled={(spendersPage + 1) * 10 >= activeCustomersList.length} 
+                      onPress={() => setSpendersPage(prev => prev + 1)}
+                      style={{ opacity: (spendersPage + 1) * 10 >= activeCustomersList.length ? 0.3 : 1, padding: 6, backgroundColor: '#F1F5F9', borderRadius: 8 }}
+                    >
+                      <Ionicons name="chevron-forward" size={14} color="#050505" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Inactive Customers View All Modal */}
+      <Modal
+        visible={showAllInactive}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAllInactive(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '75%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Inactive Customers</Text>
+              <TouchableOpacity onPress={() => setShowAllInactive(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 12 }}>
+              <View style={{ gap: 8, paddingBottom: 20 }}>
+                {idleCustomers.map((cust) => (
+                  <TouchableOpacity
+                    key={cust.customerId}
+                    onPress={() => {
+                      setShowAllInactive(false);
+                      openCustomerDetails(cust as any, 'inactive');
+                    }}
+                    style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', marginRight: 12 }}>
+                      {cust.avatar ? (
+                        <Image source={{ uri: cust.avatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                      ) : (
+                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: cust.bgCircleColor || '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{cust.initials}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{cust.name}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444', marginTop: 2 }}>{cust.daysIdle} days idle</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1766,7 +2226,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 48,
+    paddingBottom: 110,
     gap: 16,
   },
   metricCard: {
@@ -2206,14 +2666,19 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#94A3B8',
     letterSpacing: 1.0,
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 10,
   },
   progCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderWidth: 0,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
     gap: 12,
   },
   progHeader: {
@@ -2239,7 +2704,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#050505',
+    backgroundColor: '#F59E0B',
     borderRadius: 4,
   },
   progFooter: {
@@ -2285,8 +2750,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderWidth: 0,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
     borderRadius: 16,
     padding: 12,
   },

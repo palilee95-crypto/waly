@@ -460,6 +460,7 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     const title = body.title || "";
     const messageTemplate = body.message || "";
     const campaignId = body.campaignId || "";
+    const targetCustomerIds = body.targetCustomerIds || null; // Optional list of user IDs to filter
     const hasMetaConfig = $app.findRecordsByFilter("whatsapp_configurations", `merchant = "${merchantId}" && status = "connected"`).length > 0;
     const sendWhatsApp = hasMetaConfig;
 
@@ -490,6 +491,11 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
         if (optIn === false) {
           optedOutIds.add(customerId);
         } else {
+          // If filtering by specific target customers
+          if (targetCustomerIds && targetCustomerIds.indexOf(customerId) === -1) {
+            continue;
+          }
+
           if (!customerIds.has(customerId)) {
             customerIds.add(customerId);
             try {
@@ -510,6 +516,11 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
     for (let i = 0; i < txs.length; i++) {
       const customerId = txs[i].get("customer");
       if (customerId && !customerIds.has(customerId) && !optedOutIds.has(customerId)) {
+        // If filtering by specific target customers
+        if (targetCustomerIds && targetCustomerIds.indexOf(customerId) === -1) {
+          continue;
+        }
+
         customerIds.add(customerId);
         try {
           const cust = $app.findRecordById("users", customerId);
