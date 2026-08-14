@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 
@@ -75,10 +76,12 @@ const STARTER_PRESETS = [
 ];
 
 export default function TemplateStudio({ onSelectTemplateForBroadcast }: TemplateStudioProps) {
+  const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -111,6 +114,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         { method: 'GET', requestKey: null }
       );
       setTemplates(res.templates || []);
+      setIsConnected(res.connected !== false);
     } catch (err: any) {
       console.warn('[TemplateStudio] Failed to load templates:', err?.message || err);
     } finally {
@@ -335,6 +339,31 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         </View>
       </View>
 
+      {/* ── NOT CONNECTED WARNING BANNER ── */}
+      {!isConnected && (
+        <View style={styles.notConnectedBanner}>
+          <View style={styles.notConnectedLeft}>
+            <View style={styles.notConnectedIconBox}>
+              <Ionicons name="warning" size={18} color="#B45309" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.notConnectedTitle}>WhatsApp Business Not Connected</Text>
+              <Text style={styles.notConnectedDesc}>
+                Connect your WhatsApp Business number in Settings to submit templates for instant 1–2 min Meta approval.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.connectMetaBtn}
+            onPress={() => router.push('/(merchant)/profile')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="logo-whatsapp" size={14} color="#050505" />
+            <Text style={styles.connectMetaBtnText}>Connect Number</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ── STARTER PRESETS BANNER ── */}
       <View style={styles.presetsSection}>
         <Text style={styles.presetSectionTitle}>1-CLICK STARTER PRESETS</Text>
@@ -466,6 +495,16 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
+
+            {/* Not connected notice in modal */}
+            {!isConnected && (
+              <View style={styles.modalNotConnectedNotice}>
+                <Ionicons name="alert-circle" size={16} color="#B45309" />
+                <Text style={styles.modalNotConnectedText}>
+                  WhatsApp is not connected yet. Connect your number in Settings to submit this template to Meta AI.
+                </Text>
+              </View>
+            )}
 
             {formError ? (
               <View style={styles.errorBanner}>
@@ -754,6 +793,76 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
+  },
+  notConnectedBanner: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    padding: 14,
+    marginBottom: 20,
+    gap: 12,
+  },
+  notConnectedLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  notConnectedIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  notConnectedTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  notConnectedDesc: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#78350F',
+    lineHeight: 17,
+  },
+  connectMetaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFC700',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    alignSelf: 'flex-start',
+  },
+  connectMetaBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  modalNotConnectedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  modalNotConnectedText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#92400E',
+    lineHeight: 16,
   },
   presetsSection: {
     marginBottom: 24,
