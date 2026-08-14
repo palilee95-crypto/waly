@@ -1,6 +1,15 @@
 // pb_hooks/smart_follow_up_api.pb.js
 // Dedicated backend endpoints for 1-Click Autopilot Recipes
 
+function genId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
+  for (let i = 0; i < 15; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+}
+
 // 1. POST Toggle Autopilot Recipe
 routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
   try {
@@ -11,9 +20,8 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
 
     let merchantId = authRecord.get("merchant_id");
     if (!merchantId) {
-      // Fallback: search merchant by owner
       try {
-        const merchants = $app.findRecordsByFilter("merchants", `owner = "${authRecord.id}"`, "-created", 1, 0);
+        const merchants = $app.findRecordsByFilter("merchants", `owner = '${authRecord.id}'`, "-created", 1, 0);
         if (merchants.length > 0) merchantId = merchants[0].id;
       } catch (_) {}
     }
@@ -35,10 +43,12 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
 
     // 1. Check if group already exists
     let group = null;
-    const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = "${merchantId}" && name = "${title}"`, "-created", 1, 0);
-    if (groups.length > 0) {
-      group = groups[0];
-    }
+    try {
+      const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${merchantId}' && name = '${title}'`, "-created", 1, 0);
+      if (groups.length > 0) {
+        group = groups[0];
+      }
+    } catch (_) {}
 
     if (group) {
       // Toggle existing
@@ -49,7 +59,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
 
       // Update child sequences
       try {
-        const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = "${group.id}"`, null, 100, 0);
+        const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${group.id}'`, null, 100, 0);
         for (const seq of sequences) {
           seq.set("status", newStatus === "active" ? "active" : "inactive");
           $app.save(seq);
@@ -65,50 +75,58 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
     } else {
       // 2. Create new group
       const groupsCol = $app.findCollectionByNameOrId("follow_up_groups");
-      const newGroup = new Record(groupsCol);
-      newGroup.set("merchant", merchantId);
-      newGroup.set("name", title);
-      newGroup.set("status", "active");
-      newGroup.set("interval_minutes", 5);
-      newGroup.set("archive_after_send", false);
-      newGroup.set("member_count", 0);
-      newGroup.set("sequence_count", 1);
+      const newGroup = new Record(groupsCol, {
+        id: genId(),
+        merchant: merchantId,
+        name: title,
+        status: "active",
+        interval_minutes: 5,
+        archive_after_send: false,
+        member_count: 0,
+        sequence_count: 1,
+      });
       $app.save(newGroup);
 
       // 3. Create sequence
       const seqCol = $app.findCollectionByNameOrId("follow_up_sequences");
-      const newSeq = new Record(seqCol);
-      newSeq.set("group", newGroup.id);
-      newSeq.set("title", title);
-      newSeq.set("status", "active");
-      newSeq.set("send_after_days", defaultDays);
-      newSeq.set("send_after_hours", defaultHours);
-      newSeq.set("send_after_minutes", defaultMinutes);
-      newSeq.set("conversation_type", "last_sequence");
-      newSeq.set("order", 0);
+      const newSeq = new Record(seqCol, {
+        id: genId(),
+        group: newGroup.id,
+        title: title,
+        status: "active",
+        send_after_days: defaultDays,
+        send_after_hours: defaultHours,
+        send_after_minutes: defaultMinutes,
+        conversation_type: "last_sequence",
+        order: 0,
+      });
       $app.save(newSeq);
 
       // 4. Create message
       const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
-      const newMsg = new Record(msgCol);
-      newMsg.set("sequence", newSeq.id);
-      newMsg.set("message_body", defaultBody);
-      newMsg.set("order", 0);
+      const newMsg = new Record(msgCol, {
+        id: genId(),
+        sequence: newSeq.id,
+        message_body: defaultBody,
+        order: 0,
+      });
       $app.save(newMsg);
 
       // 5. Auto-enroll active merchant customers
       try {
-        const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = "${merchantId}"`, "-created", 5000, 0);
+        const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = '${merchantId}'`, "-created", 5000, 0);
         const memCol = $app.findCollectionByNameOrId("follow_up_members");
         for (const card of cards) {
           const customerId = card.get("customer");
           if (customerId) {
             try {
-              const mem = new Record(memCol);
-              mem.set("group", newGroup.id);
-              mem.set("customer", customerId);
-              mem.set("status", "enrolled");
-              mem.set("sequence_completed", 0);
+              const mem = new Record(memCol, {
+                id: genId(),
+                group: newGroup.id,
+                customer: customerId,
+                status: "enrolled",
+                sequence_completed: 0,
+              });
               $app.save(mem);
             } catch (_) {}
           }
@@ -139,7 +157,7 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
     let merchantId = authRecord.get("merchant_id");
     if (!merchantId) {
       try {
-        const merchants = $app.findRecordsByFilter("merchants", `owner = "${authRecord.id}"`, "-created", 1, 0);
+        const merchants = $app.findRecordsByFilter("merchants", `owner = '${authRecord.id}'`, "-created", 1, 0);
         if (merchants.length > 0) merchantId = merchants[0].id;
       } catch (_) {}
     }
@@ -161,55 +179,74 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
 
     // 1. Find or create group
     let group = null;
-    const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = "${merchantId}" && name = "${title}"`, "-created", 1, 0);
-    if (groups.length > 0) {
-      group = groups[0];
-    } else {
+    try {
+      const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${merchantId}' && name = '${title}'`, "-created", 1, 0);
+      if (groups.length > 0) {
+        group = groups[0];
+      }
+    } catch (_) {}
+
+    if (!group) {
       const groupsCol = $app.findCollectionByNameOrId("follow_up_groups");
-      group = new Record(groupsCol);
-      group.set("merchant", merchantId);
-      group.set("name", title);
-      group.set("status", "active");
-      group.set("interval_minutes", 5);
-      group.set("archive_after_send", false);
-      group.set("member_count", 0);
-      group.set("sequence_count", 1);
+      group = new Record(groupsCol, {
+        id: genId(),
+        merchant: merchantId,
+        name: title,
+        status: "active",
+        interval_minutes: 5,
+        archive_after_send: false,
+        member_count: 0,
+        sequence_count: 1,
+      });
       $app.save(group);
     }
 
     // 2. Find or create sequence
     let seq = null;
-    const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = "${group.id}"`, "order", 1, 0);
-    if (sequences.length > 0) {
-      seq = sequences[0];
-      seq.set("send_after_days", days);
-      $app.save(seq);
-    } else {
+    try {
+      const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${group.id}'`, "order", 1, 0);
+      if (sequences.length > 0) {
+        seq = sequences[0];
+        seq.set("send_after_days", days);
+        $app.save(seq);
+      }
+    } catch (_) {}
+
+    if (!seq) {
       const seqCol = $app.findCollectionByNameOrId("follow_up_sequences");
-      seq = new Record(seqCol);
-      seq.set("group", group.id);
-      seq.set("title", title);
-      seq.set("status", group.getString("status") === "active" ? "active" : "inactive");
-      seq.set("send_after_days", days);
-      seq.set("send_after_hours", defaultHours);
-      seq.set("send_after_minutes", defaultMinutes);
-      seq.set("conversation_type", "last_sequence");
-      seq.set("order", 0);
+      seq = new Record(seqCol, {
+        id: genId(),
+        group: group.id,
+        title: title,
+        status: group.getString("status") === "active" ? "active" : "inactive",
+        send_after_days: days,
+        send_after_hours: defaultHours,
+        send_after_minutes: defaultMinutes,
+        conversation_type: "last_sequence",
+        order: 0,
+      });
       $app.save(seq);
     }
 
     // 3. Find or create message
-    const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
-    const messages = $app.findRecordsByFilter("follow_up_messages", `sequence = "${seq.id}"`, "order", 1, 0);
-    if (messages.length > 0) {
-      const msg = messages[0];
-      msg.set("message_body", customBody);
-      $app.save(msg);
-    } else {
-      const newMsg = new Record(msgCol);
-      newMsg.set("sequence", seq.id);
-      newMsg.set("message_body", customBody);
-      newMsg.set("order", 0);
+    let msg = null;
+    try {
+      const messages = $app.findRecordsByFilter("follow_up_messages", `sequence = '${seq.id}'`, "order", 1, 0);
+      if (messages.length > 0) {
+        msg = messages[0];
+        msg.set("message_body", customBody);
+        $app.save(msg);
+      }
+    } catch (_) {}
+
+    if (!msg) {
+      const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
+      const newMsg = new Record(msgCol, {
+        id: genId(),
+        sequence: seq.id,
+        message_body: customBody,
+        order: 0,
+      });
       $app.save(newMsg);
     }
 
