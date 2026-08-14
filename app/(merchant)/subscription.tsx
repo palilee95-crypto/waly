@@ -6,14 +6,16 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Switch, 
-  Dimensions,
-  Image,
-  Alert,
-  Platform
+  Dimensions, 
+  Image, 
+  Alert, 
+  Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ const BENEFITS = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
+  const { user, refreshSession } = useAuth();
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
@@ -62,12 +65,39 @@ export default function SubscriptionScreen() {
 
   const currentPrice = getPriceDetails();
 
-  const handlePurchase = () => {
-    Alert.alert(
-      'Processing Purchase',
-      `Initializing Google Play / App Store checkout for ${currentPrice.label} (${billingCycle}).`,
-      [{ text: 'OK' }]
-    );
+  const handlePurchase = async () => {
+    let merchantId = user?.merchant_id;
+    if (!merchantId) {
+      try {
+        await refreshSession();
+        if (user?.merchant_id) {
+          merchantId = user.merchant_id;
+        }
+      } catch (e) {
+        console.error("Session refresh failed:", e);
+      }
+    }
+
+    if (!merchantId) {
+      Alert.alert('Error', 'Could not find Merchant ID. Please log in again.');
+      return;
+    }
+
+    const months = billingCycle === 'annually' ? 12 : 1;
+    const cleanMerchantId = merchantId.replace('merchant-', '');
+    
+    // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
+    const telegramUrl = `https://t.me/RisevBilling_bot?start=${cleanMerchantId}_${months}_${selectedPlan}`;
+    
+    try {
+      if (Platform.OS === 'web') {
+        window.open(telegramUrl, '_blank');
+      } else {
+        await Linking.openURL(telegramUrl);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not open Telegram. Please open Telegram and search for @RisevBilling_bot.');
+    }
   };
 
   const getFeaturesList = () => {

@@ -493,21 +493,20 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
       return e.json(200, { success: true, count: 0, message: "No customers found to receive broadcasts." });
     }
 
-    // Anti-spam: build a Set of customer IDs who received a campaign notification
-    // from this merchant in the last 24 hours. Skip them in the send loop.
+    // Anti-spam: check if this merchant already sent a broadcast within the last 24 hours
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
     const cooldownStr = oneDayAgo.toISOString().replace('T', ' ').substring(0, 19);
 
-    const recentNotifs = fetchAllRecords(
+    const recentBroadcasts = fetchAllRecords(
       "broadcasts",
       `created >= "${cooldownStr}" && merchant = "${merchantId}"`,
       "-created"
     );
-    const recentlyNotifiedIds = new Set();
-    for (let n = 0; n < recentNotifs.length; n++) {
-      const r = recentNotifs[n].get("merchant");
-      if (r) recentlyNotifiedIds.add(r);
+    if (recentBroadcasts.length > 0) {
+      return e.json(429, {
+        message: "You have already sent a broadcast in the last 24 hours. Please wait before sending another broadcast to protect customer experience."
+      });
     }
 
     let sentCount = 0;
@@ -518,9 +517,6 @@ routerAdd("POST", "/api/risev/merchant/blast", (e) => {
       const customerItem = customerRecords[i];
       const customer = customerItem.record;
       const customerId = customer.id;
-
-      // Anti-spam: skip customers notified in the last 24h
-      if (recentlyNotifiedIds.has(customerId)) continue;
       const phone = customer.get("phone") || "";
       const customerName = customer.getString("name") || "Valued Customer";
       const customerStamps = customerItem.stamps;

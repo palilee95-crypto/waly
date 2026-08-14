@@ -12,8 +12,22 @@ onRecordUpdate((e) => {
       const rewardId = e.record.get('reward');
 
       // Fetch the reward to find the merchant
-      const reward = $app.findRecordById('rewards', rewardId);
-      const merchantId = reward.get('merchant');
+      let merchantId = e.record.get('merchant');
+      if (!merchantId && rewardId) {
+        try {
+          const reward = $app.findRecordById('rewards', rewardId);
+          merchantId = reward.get('merchant');
+        } catch (rErr) {}
+      }
+
+      // If updater is an authenticated merchant, verify they own the merchant
+      if (e.auth) {
+        const authRole = e.auth.getString('role');
+        const authMerchantId = e.auth.getString('merchant_id');
+        if ((authRole === 'merchant' || authRole === 'both') && authMerchantId && merchantId && authMerchantId !== merchantId) {
+          throw new ForbiddenError('You are not authorized to redeem a voucher for this store.');
+        }
+      }
 
       // Create transaction ledger record for the redemption
       const txCol = $app.findCollectionByNameOrId('transactions');
@@ -23,10 +37,11 @@ onRecordUpdate((e) => {
       tx.set('type', 'redeem');
       tx.set('stamps', 0);
       tx.set('points', 0);
-      tx.set('metadata', { voucher_id: e.record.id, reward_id: rewardId });
+      tx.set('metadata', JSON.stringify({ voucher_id: e.record.id, reward_id: rewardId }));
       
       $app.save(tx);
     } catch (err) {
+      if (err.name === 'ForbiddenError') throw err;
       console.log("Error logging voucher redemption transaction:", err.message || err);
     }
   }

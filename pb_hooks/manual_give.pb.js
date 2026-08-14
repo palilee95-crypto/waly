@@ -36,12 +36,15 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     }
 
     // 1. Find or auto-create customer user by phone
-    const last8 = digits.slice(-8);
     let customer = null;
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${last8}'`, "-created", 1, 0);
-      if (users.length > 0) customer = users[0];
-    } catch (err) { /* ignore */ }
+    if (digits) {
+      const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+      const phoneFilter = `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`;
+      try {
+        const users = $app.findRecordsByFilter("users", phoneFilter, "-created", 1, 0);
+        if (users.length > 0) customer = users[0];
+      } catch (err) { /* ignore */ }
+    }
 
     if (!customer) {
       const userCol = $app.findCollectionByNameOrId("users");

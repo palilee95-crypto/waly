@@ -6,25 +6,31 @@
 onRecordDelete((e) => {
     const userId = e.record.id;
 
-    // Helper: fetch + delete all records in `collection` where `field` = userId
+    // Helper: fetch + delete ALL records in `collection` where `field` = userId (looping in batches)
     const deleteByUser = (collection, field) => {
         try {
-            const records = $app.findRecordsByFilter(collection, `${field} = '${userId}'`);
-            for (const rec of records) {
-                $app.delete(rec);
-            }
+            let records;
+            do {
+                records = $app.findRecordsByFilter(collection, `${field} = '${userId}'`, "-created", 100, 0);
+                for (const rec of records) {
+                    try { $app.delete(rec); } catch (delErr) {}
+                }
+            } while (records && records.length > 0);
         } catch (err) {
             console.log(`Error deleting ${collection} (${field}=${userId}): ${err}`);
         }
     };
 
-    // Helper: fetch + delete all records in `collection` where `field` = merchantId
+    // Helper: fetch + delete ALL records in `collection` where `field` = merchantId (looping in batches)
     const deleteByMerchant = (collection, field, merchantId) => {
         try {
-            const records = $app.findRecordsByFilter(collection, `${field} = '${merchantId}'`);
-            for (const rec of records) {
-                $app.delete(rec);
-            }
+            let records;
+            do {
+                records = $app.findRecordsByFilter(collection, `${field} = '${merchantId}'`, "-created", 100, 0);
+                for (const rec of records) {
+                    try { $app.delete(rec); } catch (delErr) {}
+                }
+            } while (records && records.length > 0);
         } catch (err) {
             console.log(`Error deleting ${collection} (${field}=${merchantId}): ${err}`);
         }
@@ -33,7 +39,7 @@ onRecordDelete((e) => {
     // ---- Step 1: Find merchant(s) owned by this user ----
     let merchantIds = [];
     try {
-        const merchants = $app.findRecordsByFilter("merchants", `owner = '${userId}'`);
+        const merchants = $app.findRecordsByFilter("merchants", `owner = '${userId}'`, "-created", 100, 0);
         for (const m of merchants) {
             merchantIds.push(m.id);
         }

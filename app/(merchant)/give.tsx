@@ -88,7 +88,7 @@ export default function GiveStampsScreen() {
       const code = voucherCode.trim().toUpperCase();
       const vouchers = await pb.collection('vouchers').getFullList({
         filter: `code = "${code}" && status = "active"`,
-        expand: 'reward,customer',
+        expand: 'reward,customer,merchant',
       });
 
       if (vouchers.length === 0) {
@@ -98,6 +98,13 @@ export default function GiveStampsScreen() {
       }
 
       const v = vouchers[0];
+      const voucherMerchantId = v.merchant || v.expand?.reward?.merchant;
+      if (merchantId && voucherMerchantId && voucherMerchantId !== merchantId) {
+        setVoucherError('This voucher belongs to another store and cannot be redeemed here.');
+        setIsRedeemingVoucher(false);
+        return;
+      }
+
       await pb.collection('vouchers').update(v.id, {
         status: 'used',
       });

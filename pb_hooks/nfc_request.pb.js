@@ -35,10 +35,11 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
 
     // Check if customer user record already exists
     let customerUser = null;
-    const last8 = digits.slice(-8);
-    if (last8) {
+    if (digits) {
+      const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+      const phoneFilter = `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`;
       try {
-        const users = $app.findRecordsByFilter("users", `phone ~ '${last8}'`, "-created", 1, 0);
+        const users = $app.findRecordsByFilter("users", phoneFilter, "-created", 1, 0);
         if (users.length > 0) customerUser = users[0];
       } catch (err) { /* ignore */ }
     }

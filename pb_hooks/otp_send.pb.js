@@ -1,19 +1,27 @@
 // otp_send.pb.js
-// Registration (no OTP) + OTP for password reset only + phone login endpoint.
+// Registration + SMTP Password Reset & Phone Login helper.
 
-// Helper to find user by phone number using normalized digits matching
+// Helper to normalize phone numbers and build exact matching filter
+function normalizePhone(input) {
+  if (!input) return { cleanPhone: '', rawDigits: '', localDigits: '', filter: '' };
+  let digits = String(input).replace(/[^\d]/g, '');
+  if (!digits) return { cleanPhone: '', rawDigits: '', localDigits: '', filter: '' };
+  if (digits.startsWith('0')) digits = '6' + digits;
+  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+  const cleanPhone = '+' + digits;
+  const rawDigits = digits;
+  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+  const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
+  return { cleanPhone, rawDigits, localDigits, filter };
+}
+
+// Helper to find user by phone number using normalized exact matching
 function findUserByPhone(phoneInput) {
-  if (!phoneInput) return null;
-  const digits = phoneInput.replace(/[^\d]/g, '');
-  if (!digits) return null;
-  const last8 = digits.slice(-8);
-
+  const norm = normalizePhone(phoneInput);
+  if (!norm.cleanPhone) return null;
   try {
-    const users = $app.findRecordsByFilter("users", `phone ~ '${last8}'`, "-created", 5, 0);
-    for (let i = 0; i < users.length; i++) {
-      const uDigits = (users[i].getString("phone") || "").replace(/[^\d]/g, '');
-      if (uDigits.endsWith(last8)) return users[i];
-    }
+    const users = $app.findRecordsByFilter("users", norm.filter, "-created", 1, 0);
+    if (users.length > 0) return users[0];
   } catch (err) { /* not found */ }
   return null;
 }
@@ -26,20 +34,7 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
     return e.json(400, { message: "phone query parameter is required" });
   }
 
-  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
-    const d = (p || '').replace(/[^\d]/g, '');
-    if (!d) return null;
-    const l8 = d.slice(-8);
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
-      for (let i = 0; i < users.length; i++) {
-        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
-      }
-    } catch (err) {}
-    return null;
-  };
-
-  const user = lookupFn(phone);
+  const user = findUserByPhone(phone);
   if (user) {
     return e.json(200, { 
       exists: true, 
@@ -52,7 +47,7 @@ routerAdd("GET", "/api/risev/check-phone", (e) => {
   }
 });
 
-// ── Register (no OTP — direct account creation) ────────────────────
+// ── Register (no OTP — direct account creation + SMTP verification) ────────────────────
 routerAdd("POST", "/api/risev/register", (e) => {
   const body = e.requestInfo().body;
   const phone = body.phone || '';
@@ -69,21 +64,11 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
-    const d = (p || '').replace(/[^\d]/g, '');
-    if (!d) return null;
-    const l8 = d.slice(-8);
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
-      for (let i = 0; i < users.length; i++) {
-        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
-      }
-    } catch (err) {}
-    return null;
-  };
+  const norm = normalizePhone(phone);
+  const cleanPhone = norm.cleanPhone || phone;
 
   // Check phone uniqueness with normalized digits
-  const existingUser = lookupFn(phone);
+  const existingUser = findUserByPhone(phone);
   let isQuickUpgrade = false;
   if (existingUser) {
     const existingEmail = existingUser.getString("email") || "";
@@ -111,10 +96,10 @@ routerAdd("POST", "/api/risev/register", (e) => {
     } else {
       const collection = $app.findCollectionByNameOrId("users");
       user = new Record(collection);
-      user.set("phone", phone);
+      user.set("phone", cleanPhone);
     }
     user.set("email", email);
-    user.set("name", name || `User ${phone.slice(-4)}`);
+    user.set("name", name || `User ${cleanPhone.slice(-4)}`);
     user.set("role", role);
     if (formattedBirthday) {
       user.set("birthday", formattedBirthday);
@@ -182,25 +167,12 @@ routerAdd("POST", "/api/risev/login", (e) => {
     return e.json(400, { message: "Identifier and password are required" });
   }
 
-  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
-    const d = (p || '').replace(/[^\d]/g, '');
-    if (!d) return null;
-    const l8 = d.slice(-8);
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
-      for (let i = 0; i < users.length; i++) {
-        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
-      }
-    } catch (err) {}
-    return null;
-  };
-
   // Try email first, then phone
   let user = null;
   try {
     user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    user = lookupFn(identifier);
+    user = findUserByPhone(identifier);
   }
 
   if (!user || !user.validatePassword(password)) {
@@ -219,154 +191,31 @@ routerAdd("POST", "/api/risev/login", (e) => {
   });
 });
 
-// ── Request OTP (password reset only) ──────────────────────────────
-routerAdd("POST", "/api/risev/request-otp", (e) => {
-  const body = e.requestInfo().body;
-  const phone = body.phone || '';
-  if (!phone) {
-    return e.json(400, { message: "Phone number is required" });
+// ── Request Password Reset (via SMTP email) ────────────────────────
+routerAdd("POST", "/api/risev/request-password-reset", (e) => {
+  const body = e.requestInfo().body || {};
+  const identifier = (body.identifier || body.email || body.phone || "").trim();
+  if (!identifier) {
+    return e.json(400, { message: "Email or phone number is required" });
   }
 
-  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
-    const d = (p || '').replace(/[^\d]/g, '');
-    if (!d) return null;
-    const l8 = d.slice(-8);
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
-      for (let i = 0; i < users.length; i++) {
-        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
-      }
-    } catch (err) {}
-    return null;
-  };
-
-  const user = lookupFn(phone);
-  if (!user) {
-    return e.json(404, { message: "User not found with this phone number" });
-  }
-
-  const internalUrl = $os.getenv("PB_INTERNAL_URL") || "http://127.0.0.1:8090";
-
+  let user = null;
   try {
-    const res = $http.send({
-      url: `${internalUrl}/api/collections/users/request-otp`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user.getString("email") })
-    });
-
-    if (res.statusCode >= 400) {
-      return e.json(res.statusCode, JSON.parse(res.raw));
-    }
-
-    const resData = JSON.parse(res.raw);
-    return e.json(200, { message: "OTP sent successfully", otpId: resData.otpId, email: user.getString("email") });
-  } catch (otpErr) {
-    return e.json(500, { message: "Failed to send OTP: " + otpErr.message });
-  }
-});
-
-// ── Reset password with OTP ────────────────────────────────────────
-routerAdd("POST", "/api/risev/reset-password", (e) => {
-  const body = e.requestInfo().body;
-  const phone = body.phone || '';
-  const otpId = body.otpId || '';
-  const otpCode = body.otpCode || '';
-  const newPassword = body.newPassword || '';
-
-  if (!phone || !otpId || !otpCode || !newPassword) {
-    return e.json(400, { message: "All fields are required" });
-  }
-  if (newPassword.length < 8) {
-    return e.json(400, { message: "Password must be at least 8 characters" });
-  }
-
-  const lookupFn = typeof findUserByPhone !== 'undefined' ? findUserByPhone : function(p) {
-    const d = (p || '').replace(/[^\d]/g, '');
-    if (!d) return null;
-    const l8 = d.slice(-8);
-    try {
-      const users = $app.findRecordsByFilter("users", `phone ~ '${l8}'`, "-created", 5, 0);
-      for (let i = 0; i < users.length; i++) {
-        if ((users[i].getString("phone") || "").replace(/[^\d]/g, '').endsWith(l8)) return users[i];
-      }
-    } catch (err) {}
-    return null;
-  };
-
-  const resetUser = lookupFn(phone);
-  if (!resetUser) {
-    return e.json(404, { message: "User not found" });
-  }
-
-  const internalUrl = $os.getenv("PB_INTERNAL_URL") || "http://127.0.0.1:8090";
-
-  let otpValid = false;
-
-  // 1. Try built-in PocketBase auth-with-otp endpoint
-  try {
-    const res = $http.send({
-      url: `${internalUrl}/api/collections/users/auth-with-otp`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        otpId: otpId,
-        password: otpCode
-      })
-    });
-
-    if (res.statusCode < 400) {
-      otpValid = true;
-    } else {
-      console.log("auth-with-otp status: " + res.statusCode + ", raw: " + res.raw);
-    }
+    user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    console.log("auth-with-otp error: " + (err.message || err));
+    user = findUserByPhone(identifier);
   }
 
-  // 2. Fallback check: lookup _otps collection for this user and code
-  if (!otpValid) {
-    try {
-      const otps = $app.findRecordsByFilter("_otps", `recordRef = '${resetUser.id}'`, "-created", 10, 0);
-      for (let i = 0; i < otps.length; i++) {
-        if (otps[i].getString("password") === otpCode) {
-          otpValid = true;
-          try { $app.delete(otps[i]); } catch (delErr) {}
-          break;
-        }
-      }
-    } catch (fallbackErr) {
-      console.log("Fallback _otps check error: " + (fallbackErr.message || fallbackErr));
-    }
+  if (!user) {
+    // Avoid user enumeration
+    return e.json(200, { message: "If an account exists, a password reset link has been sent." });
   }
 
-  if (!otpValid) {
-    return e.json(400, { message: "Invalid or expired OTP code. Please request a new code." });
+  try {
+    $mails.sendRecordPasswordReset($app, user);
+    return e.json(200, { success: true, message: "Password reset link sent to your registered email address." });
+  } catch (mailErr) {
+    console.log("[SMTP Password Reset Error]:", mailErr.message || mailErr);
+    return e.json(500, { message: "Failed to send password reset email: " + (mailErr.message || mailErr) });
   }
-
-  // Reset password
-  if (!resetUser.get("birthday")) {
-    resetUser.set("birthday", "2000-01-01 00:00:00.000Z");
-  }
-  resetUser.setPassword(newPassword);
-  $app.save(resetUser);
-
-  return e.json(200, { success: true, message: "Password reset successful" });
-});
-
-// ── OTP delivery via WhatsApp (password reset) ─────────────────────
-onMailerRecordOTPSend((e) => {
-  const email = e.record.get('email') || '';
-  const phone = e.record.get('phone') || '';
-  const otp = e.meta.password;
-
-  const target = phone || email;
-  if (!target) return e.next();
-
-  const cleanPhone = target.replace(/[^\d]/g, '');
-
-  console.log("\n========================================");
-  console.log("🔑 [PASSWORD RESET OTP] Sent to: " + cleanPhone);
-  console.log("👉 OTP Code: " + otp);
-  console.log("========================================\n");
 });
