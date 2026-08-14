@@ -32,6 +32,7 @@ export default function OnboardingSetupScreen() {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [merchant, setMerchant] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
 
@@ -136,6 +137,7 @@ export default function OnboardingSetupScreen() {
   const handleSaveBranding = async () => {
     if (!user?.merchant_id) return;
     setIsSaving(true);
+    setIsSaved(false);
     try {
       const formData = new FormData();
       formData.append('onboarding_primary_color', brandingPrimaryColor);
@@ -150,9 +152,10 @@ export default function OnboardingSetupScreen() {
       }
 
       await pb.collection('merchants').update(user.merchant_id, formData);
-      Alert.alert('Saved', 'Onboarding branding updated successfully.', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      setIsSaved(true);
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3500);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to save branding.');
     } finally {
@@ -323,14 +326,19 @@ export default function OnboardingSetupScreen() {
         <TouchableOpacity
           style={[styles.copyBtnGold, { marginBottom: 24 }]}
           onPress={async () => {
-            const appUrl = __DEV__ ? 'http://localhost:8081' : 'https://risev.app';
-            const url = `${appUrl}/nfc?m=${user?.merchant_id}`;
-            await Clipboard.setStringAsync(url);
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-              await Linking.openURL(url);
+            const merchantId = user?.merchant_id || '';
+            const publicUrl = `https://risev.app/nfc?m=${merchantId}`;
+            await Clipboard.setStringAsync(publicUrl);
+
+            if (Platform.OS === 'web') {
+              const liveUrl = `${window.location.origin}/nfc?m=${merchantId}`;
+              window.open(liveUrl, '_blank');
             } else {
-              Alert.alert('Error', "Don't know how to open this URL: " + url);
+              // Open seamlessly inside the mobile app
+              router.push({
+                pathname: '/nfc',
+                params: { m: merchantId }
+              });
             }
           }}
           activeOpacity={0.8}
@@ -356,11 +364,22 @@ export default function OnboardingSetupScreen() {
               <View style={[styles.colorIndicator, { backgroundColor: brandingPrimaryColor }]}>
                 {Platform.OS === 'web' && (
                   <input
-                    ref={webColorInputRef}
                     type="color"
                     value={brandingPrimaryColor}
-                    onChange={(e: any) => setBrandingPrimaryColor(e.target.value)}
-                    style={styles.webColorInput}
+                    onChange={(e: any) => setBrandingPrimaryColor(e.target.value.toUpperCase())}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      cursor: 'pointer',
+                      zIndex: 10,
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                    } as any}
                   />
                 )}
               </View>
@@ -403,7 +422,7 @@ export default function OnboardingSetupScreen() {
               {(() => {
                 const isCustomColor = !['#050505', '#f97316', '#10b981', '#5c3bcc', '#d97706', '#dc2626', '#0284c7'].includes(brandingPrimaryColor.toLowerCase());
                 return (
-                  <TouchableOpacity
+                  <View
                     style={[
                       styles.swatch,
                       Platform.OS === 'web' 
@@ -412,20 +431,35 @@ export default function OnboardingSetupScreen() {
                             boxShadow: isCustomColor 
                               ? 'inset 0 0 0 2px rgba(255,255,255,1), 0 4px 10px rgba(255, 199, 0, 0.3)' 
                               : 'inset 0 0 0 1.5px rgba(255,255,255,0.85), 0 2px 5px rgba(0,0,0,0.1)',
-                            borderWidth: 0
+                            borderWidth: 0,
+                            position: 'relative',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
                           } as any
                         : { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: isCustomColor ? '#FFC700' : '#CBD5E1' },
                       isCustomColor && styles.swatchActive
                     ]}
-                    onPress={() => {
-                      if (Platform.OS === 'web') {
-                        webColorInputRef.current?.click();
-                      } else {
-                        Alert.alert('Custom Color', 'Type your custom hex code in the input box above!');
-                      }
-                    }}
-                    activeOpacity={0.8}
                   >
+                    {Platform.OS === 'web' && (
+                      <input
+                        type="color"
+                        value={brandingPrimaryColor}
+                        onChange={(e: any) => setBrandingPrimaryColor(e.target.value.toUpperCase())}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          opacity: 0,
+                          cursor: 'pointer',
+                          border: 'none',
+                          padding: 0,
+                          margin: 0,
+                          zIndex: 10,
+                        } as any}
+                      />
+                    )}
                     {isCustomColor ? (
                       <Ionicons 
                         name="checkmark" 
@@ -441,7 +475,7 @@ export default function OnboardingSetupScreen() {
                         style={Platform.OS === 'web' ? { textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}}
                       />
                     )}
-                  </TouchableOpacity>
+                  </View>
                 );
               })()}
             </View>
@@ -501,13 +535,25 @@ export default function OnboardingSetupScreen() {
 
         {/* Save Button */}
         <TouchableOpacity
-          style={[styles.saveBtn, isSaving && { opacity: 0.6 }]}
+          style={[
+            styles.saveBtn,
+            isSaving && { opacity: 0.7 },
+            isSaved && { backgroundColor: '#16A34A', borderColor: '#16A34A' }
+          ]}
           onPress={handleSaveBranding}
           disabled={isSaving}
           activeOpacity={0.8}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.saveBtnText}>SAVING...</Text>
+            </View>
+          ) : isSaved ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.saveBtnText}>SAVED</Text>
+            </View>
           ) : (
             <Text style={styles.saveBtnText}>SAVE BRANDING</Text>
           )}

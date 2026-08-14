@@ -128,6 +128,17 @@ export default function CustomersScreen() {
   const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Edit Info & Stamp Adjustment & Delete states
+  const [editInfoModalVisible, setEditInfoModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const [adjustStampsModalVisible, setAdjustStampsModalVisible] = useState(false);
+  const [adjustStampsCount, setAdjustStampsCount] = useState(0);
+  const [adjustReason, setAdjustReason] = useState('');
+  const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
+
   const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'Yesterday' | '7Days' | '30Days'>('All');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -138,7 +149,129 @@ export default function CustomersScreen() {
   const closeCustomerModal = () => {
     setCustomerModalVisible(false);
     setSelectedCustomer(null);
+    setEditInfoModalVisible(false);
+    setAdjustStampsModalVisible(false);
     router.setParams({ customerId: undefined } as any);
+  };
+
+  const handleSaveEditInfo = async () => {
+    if (!selectedCustomer?.customerId) return;
+    if (!editName.trim()) {
+      Alert.alert('Validation Error', 'Customer name cannot be empty.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await pb.collection('users').update(selectedCustomer.customerId, {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+      });
+
+      const updatedInitials = getInitials(editName.trim());
+      setSelectedCustomer(prev => prev ? {
+        ...prev,
+        name: editName.trim(),
+        customerPhone: editPhone.trim(),
+        initials: updatedInitials
+      } : null);
+
+      setTransactions(prev => prev.map(t => t.customerId === selectedCustomer.customerId ? {
+        ...t,
+        name: editName.trim(),
+        customerPhone: editPhone.trim(),
+        initials: updatedInitials
+      } : t));
+
+      setEditInfoModalVisible(false);
+      Alert.alert('Success', 'Customer information updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update customer info.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleSaveStampAdjustment = async () => {
+    if (!selectedCustomer?.customerId || !user?.merchant_id) return;
+    setIsSavingAdjustment(true);
+    try {
+      const newStamps = Math.max(0, Math.min(100, adjustStampsCount));
+      const oldStamps = customerCard?.stamps_collected || 0;
+      const delta = newStamps - oldStamps;
+
+      let updatedCard = null;
+      if (customerCard?.id) {
+        updatedCard = await pb.collection('loyalty_cards').update(customerCard.id, {
+          stamps_collected: newStamps
+        });
+      } else {
+        updatedCard = await pb.collection('loyalty_cards').create({
+          customer: selectedCustomer.customerId,
+          merchant: user.merchant_id,
+          stamps_collected: newStamps,
+          completions: 0,
+          status: 'active'
+        });
+      }
+      setCustomerCard(updatedCard);
+
+      if (delta !== 0) {
+        try {
+          const newTx = await pb.collection('transactions').create({
+            customer: selectedCustomer.customerId,
+            merchant: user.merchant_id,
+            type: 'adjustment',
+            stamps_earned: delta,
+            bill_amount: 0,
+            notes: adjustReason.trim() || 'Manual stamp adjustment by merchant'
+          });
+          setCustomerTransactions(prev => [newTx, ...prev]);
+        } catch (txErr) {}
+      }
+
+      setAdjustStampsModalVisible(false);
+      Alert.alert('Success', `Stamp balance updated to ${newStamps}.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to adjust stamps.');
+    } finally {
+      setIsSavingAdjustment(false);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = () => {
+    if (!selectedCustomer?.customerId || !user?.merchant_id) return;
+    const custName = selectedCustomer.name || 'Customer';
+
+    Alert.alert(
+      'Remove Customer?',
+      `Are you sure you want to remove ${custName} from your store? This will delete their active loyalty card and unused vouchers for your store.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Customer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (customerCard?.id) {
+                await pb.collection('loyalty_cards').delete(customerCard.id);
+              }
+              if (customerVouchers.length > 0) {
+                for (const v of customerVouchers) {
+                  try { await pb.collection('vouchers').delete(v.id); } catch (_) {}
+                }
+              }
+
+              closeCustomerModal();
+              fetchTransactions();
+              Alert.alert('Removed', `${custName} has been removed from your store.`);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to remove customer.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   useEffect(() => {
@@ -1074,6 +1207,44 @@ export default function CustomersScreen() {
                   <Text style={styles.detailNameText}>{selectedCustomer.name}</Text>
                   <Text style={styles.detailPhoneText}>{selectedCustomer.customerPhone}</Text>
                   <Text style={styles.detailIdText}>{selectedCustomer.memberId}</Text>
+
+                  {/* Quick Action Pills */}
+                  <View style={styles.profileActionPillsRow}>
+                    <TouchableOpacity
+                      style={styles.actionPillBtn}
+                      onPress={() => {
+                        setEditName(selectedCustomer.name);
+                        setEditPhone(selectedCustomer.customerPhone || '');
+                        setEditInfoModalVisible(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="create-outline" size={14} color="#0F172A" />
+                      <Text style={styles.actionPillText}>Edit Info</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionPillBtn}
+                      onPress={() => {
+                        setAdjustStampsCount(customerCard?.stamps_collected || 0);
+                        setAdjustReason('');
+                        setAdjustStampsModalVisible(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="flash-outline" size={14} color="#D97706" />
+                      <Text style={styles.actionPillText}>Adjust Stamps</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionPillBtn, styles.actionPillBtnDanger]}
+                      onPress={handleConfirmDeleteCustomer}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                      <Text style={[styles.actionPillText, { color: '#DC2626' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {loadingDetails ? (
@@ -1213,6 +1384,153 @@ export default function CustomersScreen() {
                 )}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Info Modal */}
+      <Modal
+        visible={editInfoModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setEditInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Customer Info</Text>
+              <TouchableOpacity onPress={() => setEditInfoModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 14 }}>
+              <View>
+                <Text style={styles.inputFieldLabel}>CUSTOMER NAME</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="e.g. Fizah"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.inputFieldLabel}>PHONE NUMBER</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  placeholder="e.g. +60123456789"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveActionBtn, isSavingEdit && { opacity: 0.7 }]}
+                onPress={handleSaveEditInfo}
+                disabled={isSavingEdit}
+                activeOpacity={0.85}
+              >
+                {isSavingEdit ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <Text style={styles.saveActionBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Adjust Stamps Modal */}
+      <Modal
+        visible={adjustStampsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAdjustStampsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Adjust Stamp Balance</Text>
+              <TouchableOpacity onPress={() => setAdjustStampsModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'center', gap: 16 }}>
+              {/* Stamp Counter Stepper */}
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustStampsCount(prev => Math.max(0, prev - 1))}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="remove" size={22} color="#0F172A" />
+                </TouchableOpacity>
+
+                <View style={styles.stepperValueBox}>
+                  <Text style={styles.stepperValueText}>{adjustStampsCount}</Text>
+                  <Text style={styles.stepperValueSub}>stamps</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustStampsCount(prev => prev + 1)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={22} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Increment Chips */}
+              <View style={styles.quickChipsRow}>
+                {['+1', '+2', '+5', '-1', 'Reset 0'].map((chip) => (
+                  <TouchableOpacity
+                    key={chip}
+                    style={styles.quickChipBtn}
+                    onPress={() => {
+                      if (chip === '+1') setAdjustStampsCount(c => c + 1);
+                      if (chip === '+2') setAdjustStampsCount(c => c + 2);
+                      if (chip === '+5') setAdjustStampsCount(c => c + 5);
+                      if (chip === '-1') setAdjustStampsCount(c => Math.max(0, c - 1));
+                      if (chip === 'Reset 0') setAdjustStampsCount(0);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.quickChipText}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Reason Input (Optional) */}
+              <View style={{ width: '100%' }}>
+                <Text style={styles.inputFieldLabel}>REASON / NOTE (OPTIONAL)</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={adjustReason}
+                  onChangeText={setAdjustReason}
+                  placeholder="e.g. Customer forgot phone, refund correction"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveActionBtn, { width: '100%' }, isSavingAdjustment && { opacity: 0.7 }]}
+                onPress={handleSaveStampAdjustment}
+                disabled={isSavingAdjustment}
+                activeOpacity={0.85}
+              >
+                {isSavingAdjustment ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <Text style={styles.saveActionBtnText}>Update Stamp Balance</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2134,5 +2452,115 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#9CA3AF',
+  },
+  profileActionPillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    flexWrap: 'wrap',
+  },
+  actionPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 5,
+  },
+  actionPillBtnDanger: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  actionPillText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  inputFieldLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  customTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  saveActionBtn: {
+    backgroundColor: '#FFC700',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  saveActionBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 18,
+    marginVertical: 6,
+  },
+  stepperBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValueBox: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  stepperValueText: {
+    fontSize: 32,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  stepperValueSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: -2,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  quickChipBtn: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  quickChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
   },
 });
