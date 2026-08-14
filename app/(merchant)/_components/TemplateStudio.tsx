@@ -448,9 +448,9 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
       )}
 
       {/* ── CREATE / EDIT TEMPLATE MODAL ── */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isDesktop && { maxWidth: 980, maxHeight: '90%' }]}>
+          <View style={[styles.modalCard, isDesktop && { maxWidth: 980 }]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -475,7 +475,13 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
             ) : null}
 
             {/* Split Content: Left Editor | Right Live WhatsApp Bubble */}
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+            <ScrollView 
+              style={{ flex: 1 }} 
+              showsVerticalScrollIndicator={true} 
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: 20, paddingBottom: 60, flexGrow: 1 }}
+            >
               <View style={[styles.splitEditorLayout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
                 {/* ── LEFT: FORM INPUTS ── */}
                 <View style={[styles.editorColumn, isDesktop && { flex: 1.2 }]}>
@@ -962,6 +968,10 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
+    height: '88%',
+    maxHeight: '90%',
+    display: 'flex',
+    flexDirection: 'column',
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     overflow: 'hidden',
