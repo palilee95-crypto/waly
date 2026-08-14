@@ -27,7 +27,7 @@ function findUserByPhone(phoneInput) {
 }
 
 // ── Check if phone exists ──────────────────────────────────────────
-routerAdd(["GET", "POST"], "/api/risev/check-phone", (e) => {
+const checkPhoneHandler = (e) => {
   const reqInfo = e.requestInfo() || {};
   const query = reqInfo.query || {};
   const body = reqInfo.body || {};
@@ -48,7 +48,10 @@ routerAdd(["GET", "POST"], "/api/risev/check-phone", (e) => {
   } else {
     return e.json(200, { exists: false });
   }
-});
+};
+
+routerAdd("GET", "/api/risev/check-phone", checkPhoneHandler);
+routerAdd("POST", "/api/risev/check-phone", checkPhoneHandler);
 
 // ── Register (no OTP — direct account creation + SMTP verification) ────────────────────
 routerAdd("POST", "/api/risev/register", (e) => {

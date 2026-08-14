@@ -1,7 +1,7 @@
 // pb_hooks/smtp_env.pb.js
 // Auto-configure SMTP settings from environment variables on bootstrap
 
-onAfterBootstrap((e) => {
+onBeforeServe((e) => {
   try {
     const host = $os.getenv("SMTP_HOST");
     const portStr = $os.getenv("SMTP_PORT") || "587";
