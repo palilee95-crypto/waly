@@ -27,11 +27,14 @@ function findUserByPhone(phoneInput) {
 }
 
 // ── Check if phone exists ──────────────────────────────────────────
-routerAdd("GET", "/api/risev/check-phone", (e) => {
-  const query = e.requestInfo().query;
-  const phone = query.phone || '';
+routerAdd(["GET", "POST"], "/api/risev/check-phone", (e) => {
+  const reqInfo = e.requestInfo() || {};
+  const query = reqInfo.query || {};
+  const body = reqInfo.body || {};
+  let phone = query.phone || body.phone || '';
+
   if (!phone) {
-    return e.json(400, { message: "phone query parameter is required" });
+    return e.json(400, { message: "phone parameter is required" });
   }
 
   const user = findUserByPhone(phone);

@@ -323,9 +323,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string; verified?: boolean }> => {
     try {
-      const res = await pb.send<{ exists: boolean; email?: string; verified?: boolean }>('/api/risev/check-phone', {
+      const cleanPhone = encodeURIComponent(phone.trim());
+      const res = await pb.send<{ exists: boolean; email?: string; verified?: boolean }>(`/api/risev/check-phone?phone=${cleanPhone}`, {
         method: 'GET',
-        params: { phone }
+        requestKey: null,
       });
       return res;
     } catch (e) {
@@ -386,9 +387,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Phone-based login: get email from phone, then auth
-    const res = await pb.send<{ exists: boolean; email?: string }>('/api/risev/check-phone', {
+    const cleanIdentifier = encodeURIComponent(identifier.trim());
+    const res = await pb.send<{ exists: boolean; email?: string }>(`/api/risev/check-phone?phone=${cleanIdentifier}`, {
       method: 'GET',
-      params: { phone: identifier },
       requestKey: null,
     });
     if (!res.exists || !res.email) {
