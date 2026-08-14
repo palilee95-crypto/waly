@@ -187,13 +187,15 @@ function runSmartFollowUp() {
 
           if (!isTemplateJson) {
             plainText = rawBody
-              .replace(/\{\{\s*name\s*\}\}/g, customerName)
-              .replace(/\{\{\s*stamps\s*\}\}/g, String(stampsCount))
-              .replace(/\{\{\s*points\s*\}\}/g, String(totalPoints))
-              .replace(/\{\{\s*points_expiry\s*\}\}/g, "N/A")
-              .replace(/\{\{\s*login_link\s*\}\}/g, appUrl);
+              .replace(/\{\{\s*name\s*\}\}|\{Customer Name\}/gi, customerName)
+              .replace(/\{\{\s*store\s*\}\}|\{Store Name\}/gi, merchantName)
+              .replace(/\{\{\s*stamps\s*\}\}|\{Stamp Balance\}/gi, String(stampsCount))
+              .replace(/\{\{\s*reward\s*\}\}|\{Reward Item\}/gi, "Free Reward")
+              .replace(/\{\{\s*points\s*\}\}/gi, String(totalPoints))
+              .replace(/\{\{\s*points_expiry\s*\}\}/gi, "N/A")
+              .replace(/\{\{\s*login_link\s*\}\}/gi, appUrl);
             
-            waParams = [merchantName, nextSeq.getString("title"), plainText];
+            waParams = [merchantName, nextSeq.getString("title") || "Follow Up", plainText];
           }
 
           // Create log record
@@ -283,9 +285,9 @@ function runSmartFollowUp() {
  * Calculate total delay in milliseconds from sequence config
  */
 function calcDelayMs(sequence) {
-  const days = sequence.get("send_after_days") || 0;
-  const hours = sequence.get("send_after_hours") || 0;
-  const minutes = sequence.get("send_after_minutes") || 0;
+  const days = sequence.get("delay_days") || sequence.get("send_after_days") || 0;
+  const hours = sequence.get("delay_hours") || sequence.get("send_after_hours") || 0;
+  const minutes = sequence.get("delay_minutes") || sequence.get("send_after_minutes") || 0;
   return ((days * 24 * 60) + (hours * 60) + minutes) * 60 * 1000;
 }
 

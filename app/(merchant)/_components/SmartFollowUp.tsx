@@ -1,2077 +1,1172 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
-  Switch, ActivityIndicator, Modal, Alert as RNAlert, Platform,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Switch,
+  ActivityIndicator,
+  Modal,
+  Alert,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 
 type Props = {
-  styles: any;
-  Alert: any;
+  styles?: any;
+  Alert?: any;
 };
 
-export default function SmartFollowUp({ styles: s, Alert }: Props) {
-  const { user } = useAuth();
-  const { width } = useWindowDimensions();
-  const isDesktop = width > 768;
+interface AutopilotRecipe {
+  id: string;
+  title: string;
+  badge: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconBg: string;
+  iconColor: string;
+  defaultDays: number;
+  defaultHours: number;
+  defaultMinutes: number;
+  triggerDescription: string;
+  defaultBody: string;
+}
 
+const AUTOPILOT_RECIPES: AutopilotRecipe[] = [
+  {
+    id: 'recipe_winback',
+    title: '14-Day Customer Win-Back',
+    badge: 'HIGH REVENUE',
+    icon: 'refresh-circle',
+    iconBg: '#FEF3C7',
+    iconColor: '#D97706',
+    defaultDays: 14,
+    defaultHours: 0,
+    defaultMinutes: 0,
+    triggerDescription: 'Triggers automatically after 14 days with no counter visit',
+    defaultBody: 'Hi {Customer Name}! 👋\n\nWe haven\'t seen you at {Store Name} in a while. Drop by this week to collect your next stamp and enjoy a special treat on us! ✨',
+  },
+  {
+    id: 'recipe_birthday',
+    title: 'Birthday Celebration Treat',
+    badge: 'CUSTOMER FAVORITE',
+    icon: 'gift',
+    iconBg: '#FCE7F3',
+    iconColor: '#DB2777',
+    defaultDays: 0,
+    defaultHours: 9,
+    defaultMinutes: 0,
+    triggerDescription: 'Sends on the morning of customer\'s birthday',
+    defaultBody: 'Happy Birthday, {Customer Name}! 🎂🎉\n\nTo celebrate your special day, enjoy a free birthday reward at {Store Name} this week! 🎁 Show this message to claim.',
+  },
+  {
+    id: 'recipe_almost_reward',
+    title: 'Close-to-Reward Reminder',
+    badge: 'RETENTION BOOSTER',
+    icon: 'trophy',
+    iconBg: '#DCFCE7',
+    iconColor: '#16A34A',
+    defaultDays: 3,
+    defaultHours: 0,
+    defaultMinutes: 0,
+    triggerDescription: 'Triggers 3 days after visit for customers 1–2 stamps away from a reward',
+    defaultBody: 'Hi {Customer Name}! 🎯\n\nYou are only a few stamps away from unlocking your free reward at {Store Name}! Drop by soon to claim it. ✨',
+  },
+  {
+    id: 'recipe_thankyou',
+    title: 'Post-Visit Gratitude & Review',
+    badge: 'RELATIONSHIP BUILDER',
+    icon: 'heart',
+    iconBg: '#E0E7FF',
+    iconColor: '#4F46E5',
+    defaultDays: 0,
+    defaultHours: 2,
+    defaultMinutes: 0,
+    triggerDescription: 'Triggers 2 hours after a stamp is collected at counter',
+    defaultBody: 'Thank you for visiting {Store Name} today, {Customer Name}! ✨\n\nWe hope you had a great time. Let us know how we did or see you on your next visit!',
+  },
+];
+
+export default function SmartFollowUp({ styles: s }: Props) {
+  const { user } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
+
+  const [activeTab, setActiveTab] = useState<'autopilot' | 'advanced'>('autopilot');
   const [smartGroups, setSmartGroups] = useState<any[]>([]);
   const [merchantName, setMerchantName] = useState('Your Shop');
-  const [loadingSmartGroups, setLoadingSmartGroups] = useState(false);
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
-  const [loadingEditGroupId, setLoadingEditGroupId] = useState<string | null>(null);
-  const [showSmartWizard, setShowSmartWizard] = useState(false);
-  const [smartWizardStep, setSmartWizardStep] = useState(1);
-  const [smartGroupName, setSmartGroupName] = useState('');
-  const [smartArchiveAfter, setSmartArchiveAfter] = useState(false);
-  const [smartActive, setSmartActive] = useState(true);
-  const [smartInterval, setSmartInterval] = useState('5');
-  const [smartSequences, setSmartSequences] = useState<any[]>([]);
-  const [editingSeqIndex, setEditingSeqIndex] = useState<number | null>(null);
-  const [showSeqModal, setShowSeqModal] = useState(false);
-  const [seqTitle, setSeqTitle] = useState('');
-  const [seqStatus, setSeqStatus] = useState('active');
-  const [seqDays, setSeqDays] = useState('0');
-  const [seqHours, setSeqHours] = useState('0');
-  const [seqMinutes, setSeqMinutes] = useState('0');
-  const [seqConvType, setSeqConvType] = useState('last_sequence');
-  const [seqMessages, setSeqMessages] = useState<any[]>([]);
-  const [editingMsgIndex, setEditingMsgIndex] = useState<number | null>(null);
-  const [showMsgModal, setShowMsgModal] = useState(false);
-  const [msgBody, setMsgBody] = useState('');
-  const [msgButtons, setMsgButtons] = useState<any[]>([]);
-  const [smartMembers, setSmartMembers] = useState<any[]>([]);
-  const [memberMethod, setMemberMethod] = useState<'all' | 'customer' | 'phone'>('all');
-  const [memberSearch, setMemberSearch] = useState('');
-  const [memberPhone, setMemberPhone] = useState('');
-  const [memberResults, setMemberResults] = useState<any[]>([]);
-  const [isSavingSmart, setIsSavingSmart] = useState(false);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState('');
-  const [metaTemplates, setMetaTemplates] = useState<any[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
-  const [mappedParams, setMappedParams] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [togglingRecipeId, setTogglingRecipeId] = useState<string | null>(null);
 
-  const [activeSmartTab, setActiveSmartTab] = useState<'campaigns' | 'analytics'>('campaigns');
-  const [activeAnalyticsSubTab, setActiveAnalyticsSubTab] = useState<'queue' | 'logs'>('queue');
-  const [queueList, setQueueList] = useState<any[]>([]);
-  const [logsList, setLogsList] = useState<any[]>([]);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
-  const [analyticsStats, setAnalyticsStats] = useState({ total: 0, active: 0, completed: 0, sent: 0 });
+  // Customization Modal State
+  const [editingRecipe, setEditingRecipe] = useState<AutopilotRecipe | null>(null);
+  const [customDays, setCustomDays] = useState('14');
+  const [customBody, setCustomBody] = useState('');
+  const [isSavingCustom, setIsSavingCustom] = useState(false);
 
+  // Advanced Mode State
+  const [queueCount, setQueueCount] = useState(0);
+  const [sentCount, setSentCount] = useState(0);
+
+  // Load Merchant Name
   useEffect(() => {
-    if (user && user.merchant_id) {
+    if (user?.merchant_id) {
       pb.collection('merchants').getOne(user.merchant_id)
         .then(rec => {
           if (rec?.name) setMerchantName(rec.name);
         })
-        .catch(err => console.warn('Failed to load merchant name for preview:', err));
+        .catch(() => {});
     }
   }, [user]);
 
-  const fetchTemplates = async () => {
+  // Fetch Existing Smart Groups
+  const fetchGroups = useCallback(async () => {
+    if (!user?.merchant_id) return;
     try {
-      setLoadingTemplates(true);
-      const res = await pb.send<{ templates: any[], sandbox: boolean }>('/api/risev/merchant/whatsapp/templates', {
-        method: 'GET'
-      });
-      setMetaTemplates(res.templates || []);
-    } catch (err) {
-      console.warn('Failed to fetch Meta templates:', err);
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user && user.merchant_id) {
-      fetchTemplates();
-    }
-  }, [user]);
-
-  const renderPreviewBody = (rawBody: string) => {
-    if (!rawBody) return '';
-    if (rawBody.startsWith('{') && rawBody.endsWith('}')) {
-      try {
-        const config = JSON.parse(rawBody);
-        let text = config.templateText || '';
-        if (Array.isArray(config.parameters)) {
-          config.parameters.forEach((param: string, index: number) => {
-            let displayVal = `[Param ${index + 1}]`;
-            if (param === '{{name}}') displayVal = 'Hashiff';
-            if (param === '{{stamps}}') displayVal = '5';
-            if (param === '{{store}}') displayVal = merchantName;
-            text = text.replace(new RegExp(`\\{\\{${index + 1}\\}\\}`, 'g'), displayVal);
-          });
-        }
-        return text;
-      } catch (_) {
-        return rawBody;
-      }
-    }
-    return rawBody;
-  };
-
-  useEffect(() => {
-    if (user) {
-      if (activeSmartTab === 'campaigns') {
-        fetchSmartGroups();
-      } else {
-        fetchAnalytics();
-      }
-    }
-  }, [user, activeSmartTab]);
-
-  const fetchSmartGroups = async () => {
-    if (!user || !user.merchant_id) return;
-    try {
-      setLoadingSmartGroups(true);
+      setIsLoading(true);
       const records = await pb.collection('follow_up_groups').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
+        filter: `merchant = "${user.merchant_id}"`,
         sort: '-created',
+        requestKey: null,
       });
       setSmartGroups(records);
+
+      // Fetch Quick Stats
+      try {
+        const queueRecs = await pb.collection('follow_up_members').getList(1, 1, {
+          filter: `group.merchant = "${user.merchant_id}" && status = "enrolled"`,
+          requestKey: null,
+        });
+        setQueueCount(queueRecs.totalItems);
+
+        const logsRecs = await pb.collection('follow_up_logs').getList(1, 1, {
+          filter: `group.merchant = "${user.merchant_id}" && status = "sent"`,
+          requestKey: null,
+        });
+        setSentCount(logsRecs.totalItems);
+      } catch (_) {}
     } catch (err) {
-      console.warn('Failed to fetch smart follow up groups:', err);
+      console.warn('[SmartFollowUp] Failed to fetch groups:', err);
     } finally {
-      setLoadingSmartGroups(false);
+      setIsLoading(false);
     }
+  }, [user]);
+
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  // Find associated group record for a recipe
+  const getRecipeGroup = (recipeId: string) => {
+    return smartGroups.find(g => {
+      const metaType = g.metadata?.recipe_type;
+      if (metaType && metaType === recipeId) return true;
+      const r = AUTOPILOT_RECIPES.find(x => x.id === recipeId);
+      return g.name === r?.title;
+    });
   };
 
-  const fetchAnalytics = async () => {
-    if (!user || !user.merchant_id) return;
+  // Is Recipe currently Active?
+  const isRecipeActive = (recipeId: string) => {
+    const grp = getRecipeGroup(recipeId);
+    return grp ? grp.status === 'active' : false;
+  };
+
+  // Toggle Recipe ON/OFF
+  const handleToggleRecipe = async (recipe: AutopilotRecipe) => {
+    if (!user?.merchant_id) return;
+    const existingGroup = getRecipeGroup(recipe.id);
+    const currentlyActive = existingGroup?.status === 'active';
+    const newStatus = currentlyActive ? 'paused' : 'active';
+
+    setTogglingRecipeId(recipe.id);
+
     try {
-      setLoadingAnalytics(true);
+      if (existingGroup) {
+        // 1. Update existing group status
+        await pb.collection('follow_up_groups').update(existingGroup.id, {
+          status: newStatus,
+        });
 
-      // 1. Fetch queue (follow_up_members)
-      const members = await pb.collection('follow_up_members').getFullList({
-        filter: `group.merchant = '${user.merchant_id}'`,
-        expand: 'customer,group',
-        sort: '-created',
-      });
-      setQueueList(members);
-
-      // 2. Fetch sent logs (follow_up_logs)
-      const logs = await pb.collection('follow_up_logs').getFullList({
-        filter: `group.merchant = '${user.merchant_id}'`,
-        expand: 'customer,group,sequence',
-        sort: '-created',
-      });
-      setLogsList(logs);
-
-      // 3. Compute stats
-      const total = members.length;
-      const active = members.filter((m: any) => m.status === 'enrolled' || m.status === 'in_progress').length;
-      const completed = members.filter((m: any) => m.status === 'completed').length;
-      const sent = logs.length;
-
-      setAnalyticsStats({ total, active, completed, sent });
-    } catch (err) {
-      console.warn('Failed to fetch smart follow up analytics:', err);
-    } finally {
-      setLoadingAnalytics(false);
-    }
-  };
-
-  const resetSmartWizard = () => {
-    setSmartGroupName('');
-    setSmartArchiveAfter(false);
-    setSmartActive(true);
-    setSmartInterval('5');
-    setSmartSequences([]);
-    setSmartMembers([]);
-    setSmartWizardStep(1);
-    setValidationError('');
-    setShowSmartWizard(false);
-    setEditingGroupId(null);
-  };
-
-  const openSeqModal = (index: number | null) => {
-    if (index !== null) {
-      const seq = smartSequences[index];
-      setSeqTitle(seq.title);
-      setSeqStatus(seq.status);
-      setSeqDays(String(seq.send_after_days));
-      setSeqHours(String(seq.send_after_hours));
-      setSeqMinutes(String(seq.send_after_minutes));
-      setSeqConvType(seq.conversation_type);
-      setSeqMessages(seq.messages || []);
-      setEditingSeqIndex(index);
-    } else {
-      setSeqTitle('');
-      setSeqStatus('active');
-      setSeqDays('0');
-      setSeqHours('0');
-      setSeqMinutes('0');
-      setSeqConvType('last_sequence');
-      setSeqMessages([]);
-      setEditingSeqIndex(null);
-    }
-    setShowSeqModal(true);
-  };
-
-  const saveSequence = () => {
-    if (!seqTitle.trim()) return;
-    const seq = {
-      title: seqTitle.trim(),
-      status: seqStatus,
-      send_after_days: parseInt(seqDays, 10) || 0,
-      send_after_hours: parseInt(seqHours, 10) || 0,
-      send_after_minutes: parseInt(seqMinutes, 10) || 0,
-      conversation_type: seqConvType,
-      messages: seqMessages,
-    };
-    if (editingSeqIndex !== null) {
-      const updated = [...smartSequences];
-      updated[editingSeqIndex] = seq;
-      setSmartSequences(updated);
-    } else {
-      setSmartSequences([...smartSequences, seq]);
-    }
-    setShowSeqModal(false);
-  };
-
-  const removeSequence = (index: number) => {
-    setSmartSequences(smartSequences.filter((_, i) => i !== index));
-  };
-
-  const openMsgModal = (index: number | null) => {
-    if (metaTemplates.length === 0) {
-      fetchTemplates();
-    }
-
-    if (index !== null) {
-      const msg = seqMessages[index];
-      const rawBody = msg.message_body || '';
-      
-      if (rawBody.startsWith('{') && rawBody.endsWith('}')) {
+        // 2. Also update child sequences
         try {
-          const config = JSON.parse(rawBody);
-          const found = metaTemplates.find(t => t.name === config.templateName);
-          if (found) {
-            setSelectedTemplate(found);
-            setMappedParams(config.parameters || []);
-          } else {
-            const skeleton = {
-              name: config.templateName,
-              components: [{ type: 'BODY', text: config.templateText || 'Meta Template (Selected)' }]
-            };
-            setSelectedTemplate(skeleton);
-            setMappedParams(config.parameters || []);
+          const sequences = await pb.collection('follow_up_sequences').getFullList({
+            filter: `group = "${existingGroup.id}"`,
+            requestKey: null,
+          });
+          for (const s of sequences) {
+            await pb.collection('follow_up_sequences').update(s.id, { status: newStatus }).catch(() => {});
           }
-        } catch (_) {
-          setSelectedTemplate(null);
-          setMappedParams([]);
-        }
+        } catch (_) {}
       } else {
-        setSelectedTemplate(null);
-        setMappedParams([]);
-      }
-      setMsgBody(rawBody);
-      setMsgButtons(msg.action_buttons || []);
-      setEditingMsgIndex(index);
-    } else {
-      setSelectedTemplate(null);
-      setMappedParams([]);
-      setMsgBody('');
-      setMsgButtons([]);
-      setEditingMsgIndex(null);
-    }
-    setShowMsgModal(true);
-  };
-
-  const saveMessage = () => {
-    if (!selectedTemplate) {
-      RNAlert.alert('Required', 'Please select a Meta Message Template.');
-      return;
-    }
-    
-    const bodyComp = selectedTemplate.components?.find((c: any) => c.type === 'BODY');
-    const templateText = bodyComp?.text || '';
-
-    const configObj = {
-      templateName: selectedTemplate.name,
-      languageCode: selectedTemplate.language || 'en_US',
-      parameters: mappedParams,
-      templateText: templateText
-    };
-    
-    const msg = { 
-      message_body: JSON.stringify(configObj), 
-      action_buttons: [] 
-    };
-
-    if (editingMsgIndex !== null) {
-      const updated = [...seqMessages];
-      updated[editingMsgIndex] = msg;
-      setSeqMessages(updated);
-    } else {
-      setSeqMessages([...seqMessages, msg]);
-    }
-    setShowMsgModal(false);
-  };
-
-  const removeMessage = (index: number) => {
-    setSeqMessages(seqMessages.filter((_, i) => i !== index));
-  };
-
-  const addActionButton = () => {
-    if (msgButtons.length >= 4) return;
-    setMsgButtons([...msgButtons, { type: 'url', label: '', url: '' }]);
-  };
-
-  const updateActionButton = (index: number, field: string, value: string) => {
-    const updated = [...msgButtons];
-    updated[index] = { ...updated[index], [field]: value };
-    setMsgButtons(updated);
-  };
-
-  const removeActionButton = (index: number) => {
-    setMsgButtons(msgButtons.filter((_, i) => i !== index));
-  };
-
-  const insertVariable = (variable: string) => {
-    setMsgBody(msgBody + ` {{${variable}}}`);
-  };
-
-  const searchCustomers = async () => {
-    if (!memberSearch.trim()) return;
-    try {
-      const records = await pb.collection('users').getList(1, 20, {
-        filter: `(name ~ "${memberSearch}" || phone ~ "${memberSearch}")`,
-      });
-      setMemberResults(records.items);
-    } catch (err) {
-      console.warn('Customer search failed:', err);
-    }
-  };
-
-  const addMemberByPhone = async () => {
-    if (!memberPhone.trim()) return;
-    try {
-      const record = await pb.collection('users').getFirstListItem(`phone ~ "${memberPhone}"`);
-      if (record && !smartMembers.find(m => m.id === record.id)) {
-        setSmartMembers([...smartMembers, record]);
-      }
-      setMemberPhone('');
-    } catch (err) {
-      Alert.alert('Not Found', 'No customer found with that phone number.');
-    }
-  };
-
-  const addAllMembers = async () => {
-    if (!user || !user.merchant_id) return;
-    try {
-      const cards = await pb.collection('loyalty_cards').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
-        expand: 'customer',
-      });
-      const customers = cards.map(c => c.expand?.customer).filter(Boolean);
-      const unique = customers.filter((c: any, i: number, arr: any[]) => arr.findIndex(x => x.id === c.id) === i);
-      setSmartMembers(unique);
-    } catch (err) {
-      console.warn('Failed to load all members:', err);
-    }
-  };
-
-  const handleSaveSmartGroup = async () => {
-    if (!user || !user.merchant_id) return;
-    if (!smartGroupName.trim()) { setValidationError('Group name is required.'); return; }
-    if (smartSequences.length === 0) { setValidationError('Add at least one sequence.'); return; }
-    if (smartMembers.length === 0) { setValidationError('Add at least one member.'); return; }
-
-    setIsSavingSmart(true);
-    try {
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      const genId = () => { let id = ''; for (let i = 0; i < 15; i++) id += chars.charAt(Math.floor(Math.random() * chars.length)); return id; };
-      const groupId = editingGroupId || genId();
-      const statusValue = smartActive ? 'active' : 'draft';
-
-      if (editingGroupId) {
-        await pb.collection('follow_up_groups').update(groupId, {
-          name: smartGroupName.trim(),
-          status: statusValue,
-          archive_after_send: smartArchiveAfter,
-          interval_minutes: parseInt(smartInterval, 10) || 5,
-          member_count: smartMembers.length,
-          sequence_count: smartSequences.length,
+        // 1. Create Group
+        const newGroup = await pb.collection('follow_up_groups').create({
+          merchant: user.merchant_id,
+          name: recipe.title,
+          status: 'active',
+          interval_minutes: 5,
+          archive_after_send: false,
+          metadata: {
+            recipe_type: recipe.id,
+            days: recipe.defaultDays,
+          },
         });
-      } else {
-        await pb.collection('follow_up_groups').create({
-          id: groupId, merchant: user.merchant_id, name: smartGroupName.trim(),
-          status: statusValue, archive_after_send: smartArchiveAfter,
-          interval_minutes: parseInt(smartInterval, 10) || 5,
-          member_count: smartMembers.length, sequence_count: smartSequences.length,
+
+        // 2. Create Sequence
+        const newSeq = await pb.collection('follow_up_sequences').create({
+          group: newGroup.id,
+          order: 0,
+          delay_days: recipe.defaultDays,
+          delay_hours: recipe.defaultHours,
+          delay_minutes: recipe.defaultMinutes,
+          conversation_type: 'last_sequence',
+          status: 'active',
         });
-      }
 
-      if (editingGroupId) {
-        // Delete sequences that are no longer in our list
-        const dbSeqs = await pb.collection('follow_up_sequences').getFullList({
-          filter: `group = '${groupId}'`,
+        // 3. Create Default Message
+        await pb.collection('follow_up_messages').create({
+          sequence: newSeq.id,
+          message_body: recipe.defaultBody,
+          buttons: [],
         });
-        const newSeqIds = smartSequences.map(s => s.id).filter(Boolean);
-        const seqsToDelete = dbSeqs.filter(ds => !newSeqIds.includes(ds.id));
-        for (const ds of seqsToDelete) {
-          await pb.collection('follow_up_sequences').delete(ds.id);
-        }
-      }
 
-      for (let i = 0; i < smartSequences.length; i++) {
-        const seq = smartSequences[i];
-        const seqId = seq.id || genId();
-
-        if (seq.id) {
-          await pb.collection('follow_up_sequences').update(seqId, {
-            title: seq.title,
-            status: seq.status,
-            send_after_days: seq.send_after_days,
-            send_after_hours: seq.send_after_hours,
-            send_after_minutes: seq.send_after_minutes,
-            conversation_type: seq.conversation_type,
-            order: i + 1,
+        // 4. Auto-enroll active merchant customers
+        try {
+          const cards = await pb.collection('loyalty_cards').getFullList({
+            filter: `merchant = "${user.merchant_id}"`,
+            requestKey: null,
           });
-
-          // Recreate messages for this sequence
-          const existingMsgs = await pb.collection('follow_up_messages').getFullList({
-            filter: `sequence = '${seqId}'`,
-          });
-          for (const em of existingMsgs) {
-            await pb.collection('follow_up_messages').delete(em.id);
+          for (const card of cards) {
+            if (card.customer) {
+              await pb.collection('follow_up_members').create({
+                group: newGroup.id,
+                customer: card.customer,
+                status: 'enrolled',
+                sequence_completed: 0,
+              }).catch(() => {});
+            }
           }
-        } else {
-          await pb.collection('follow_up_sequences').create({
-            id: seqId,
-            group: groupId,
-            title: seq.title,
-            status: seq.status,
-            send_after_days: seq.send_after_days,
-            send_after_hours: seq.send_after_hours,
-            send_after_minutes: seq.send_after_minutes,
-            conversation_type: seq.conversation_type,
-            order: i + 1,
-          });
-        }
-
-        for (let k = 0; k < (seq.messages || []).length; k++) {
-          const msg = seq.messages[k];
-          await pb.collection('follow_up_messages').create({
-            id: genId(), sequence: seqId, message_body: msg.message_body,
-            action_buttons: msg.action_buttons || [], order: k + 1,
-          });
-        }
+        } catch (_) {}
       }
 
-      const existingMembers = await pb.collection('follow_up_members').getFullList({
-        filter: `group = '${groupId}'`,
-      });
-      const existingCustIds = existingMembers.map(m => m.customer);
-      const newCustIds = smartMembers.map(m => m.id);
-
-      const membersToDelete = existingMembers.filter(em => !newCustIds.includes(em.customer));
-      for (const m of membersToDelete) {
-        await pb.collection('follow_up_members').delete(m.id);
-      }
-
-      const custIdsToAdd = newCustIds.filter(cid => !existingCustIds.includes(cid));
-      for (const cid of custIdsToAdd) {
-        await pb.collection('follow_up_members').create({
-          id: genId(), group: groupId, customer: cid, status: 'enrolled', sequence_completed: 0,
-        });
-      }
-
-      Alert.alert('Success', editingGroupId ? 'Smart Follow Up group updated!' : 'Smart Follow Up group created!');
-      resetSmartWizard();
-      fetchSmartGroups();
+      await fetchGroups();
+      Alert.alert(
+        newStatus === 'active' ? 'Autopilot Activated! 🚀' : 'Autopilot Paused ⏸️',
+        newStatus === 'active'
+          ? `"${recipe.title}" is now running automatically every 5 minutes.`
+          : `"${recipe.title}" has been paused.`
+      );
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save group.');
+      Alert.alert('Error', err?.message || 'Failed to update automation status.');
     } finally {
-      setIsSavingSmart(false);
+      setTogglingRecipeId(null);
     }
   };
 
-  const startEditSmartGroup = async (group: any) => {
-    try {
-      setLoadingEditGroupId(group.id);
-      setEditingGroupId(group.id);
-      setSmartGroupName(group.name);
-      setSmartActive(group.status === 'active');
-      setSmartArchiveAfter(group.archive_after_send);
-      setSmartInterval(String(group.interval_minutes));
+  // Open Customize Modal
+  const handleOpenCustomize = async (recipe: AutopilotRecipe) => {
+    setEditingRecipe(recipe);
+    const existingGroup = getRecipeGroup(recipe.id);
 
-      // Fetch sequences
-      const seqRecords = await pb.collection('follow_up_sequences').getFullList({
-        filter: `group = '${group.id}'`,
-        sort: 'order',
-      });
-
-      const parsedSequences = [];
-      for (const seq of seqRecords) {
-        // Fetch messages
-        const msgRecords = await pb.collection('follow_up_messages').getFullList({
-          filter: `sequence = '${seq.id}'`,
+    if (existingGroup) {
+      setCustomDays(String(existingGroup.metadata?.days ?? recipe.defaultDays));
+      try {
+        const sequences = await pb.collection('follow_up_sequences').getFullList({
+          filter: `group = "${existingGroup.id}"`,
           sort: 'order',
+          requestKey: null,
         });
-        parsedSequences.push({
-          id: seq.id,
-          title: seq.title,
-          status: seq.status,
-          send_after_days: seq.send_after_days,
-          send_after_hours: seq.send_after_hours,
-          send_after_minutes: seq.send_after_minutes,
-          conversation_type: seq.conversation_type,
-          messages: msgRecords.map(m => ({
-            id: m.id,
-            message_body: m.message_body,
-            action_buttons: m.action_buttons || [],
-          })),
+        if (sequences.length > 0) {
+          const messages = await pb.collection('follow_up_messages').getFullList({
+            filter: `sequence = "${sequences[0].id}"`,
+            requestKey: null,
+          });
+          if (messages.length > 0 && messages[0].message_body) {
+            setCustomBody(messages[0].message_body);
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
+    setCustomDays(String(recipe.defaultDays));
+    setCustomBody(recipe.defaultBody);
+  };
+
+  // Save Customization
+  const handleSaveCustomize = async () => {
+    if (!editingRecipe || !user?.merchant_id) return;
+    setIsSavingCustom(true);
+
+    try {
+      let group = getRecipeGroup(editingRecipe.id);
+      const daysNum = Math.max(0, parseInt(customDays, 10) || editingRecipe.defaultDays);
+
+      if (!group) {
+        // Create if didn't exist
+        group = await pb.collection('follow_up_groups').create({
+          merchant: user.merchant_id,
+          name: editingRecipe.title,
+          status: 'active',
+          interval_minutes: 5,
+          archive_after_send: false,
+          metadata: {
+            recipe_type: editingRecipe.id,
+            days: daysNum,
+          },
+        });
+      } else {
+        await pb.collection('follow_up_groups').update(group.id, {
+          metadata: {
+            ...(group.metadata || {}),
+            recipe_type: editingRecipe.id,
+            days: daysNum,
+          },
         });
       }
-      setSmartSequences(parsedSequences);
 
-      // Fetch members
-      const memberRecords = await pb.collection('follow_up_members').getFullList({
-        filter: `group = '${group.id}'`,
-        expand: 'customer',
+      // Ensure Sequence
+      let sequences = await pb.collection('follow_up_sequences').getFullList({
+        filter: `group = "${group.id}"`,
+        sort: 'order',
+        requestKey: null,
       });
-      const customers = memberRecords.map(m => m.expand?.customer).filter(Boolean);
-      setSmartMembers(customers);
 
-      setSmartWizardStep(1);
-      setShowSmartWizard(true);
+      let seqId = sequences.length > 0 ? sequences[0].id : null;
+      if (!seqId) {
+        const seq = await pb.collection('follow_up_sequences').create({
+          group: group.id,
+          order: 0,
+          delay_days: daysNum,
+          delay_hours: editingRecipe.defaultHours,
+          delay_minutes: editingRecipe.defaultMinutes,
+          conversation_type: 'last_sequence',
+          status: group.status || 'active',
+        });
+        seqId = seq.id;
+      } else {
+        await pb.collection('follow_up_sequences').update(seqId, {
+          delay_days: daysNum,
+        });
+      }
+
+      // Ensure Message
+      const messages = await pb.collection('follow_up_messages').getFullList({
+        filter: `sequence = "${seqId}"`,
+        requestKey: null,
+      });
+
+      if (messages.length > 0) {
+        await pb.collection('follow_up_messages').update(messages[0].id, {
+          message_body: customBody.trim(),
+        });
+      } else {
+        await pb.collection('follow_up_messages').create({
+          sequence: seqId,
+          message_body: customBody.trim(),
+          buttons: [],
+        });
+      }
+
+      await fetchGroups();
+      setEditingRecipe(null);
+      Alert.alert('Saved! ✨', `"${editingRecipe.title}" has been updated.`);
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to load group details: ' + err.message);
+      Alert.alert('Error', err?.message || 'Failed to save customized recipe.');
     } finally {
-      setLoadingEditGroupId(null);
+      setIsSavingCustom(false);
     }
   };
 
-  const toggleSmartGroupStatus = async (group: any) => {
-    const newStatus = group.status === 'active' ? 'paused' : 'active';
-    try {
-      await pb.collection('follow_up_groups').update(group.id, { status: newStatus });
-      fetchSmartGroups();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update group.');
-    }
-  };
-
-  const deleteSmartGroup = async (groupId: string) => {
-    Alert.alert('Confirm Delete', 'Delete this follow up group and all its sequences?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await pb.collection('follow_up_groups').delete(groupId); fetchSmartGroups(); }
-        catch (err: any) { Alert.alert('Error', err.message || 'Failed to delete group.'); }
-      }},
-    ]);
+  // Helper to render preview body
+  const getLivePreview = (text: string) => {
+    return text
+      .replace(/\{Customer Name\}/g, 'Shafiq')
+      .replace(/\{Store Name\}/g, merchantName || 'Kopitiam Risev')
+      .replace(/\{Stamp Balance\}/g, '8')
+      .replace(/\{Reward Item\}/g, 'Free Iced Latte');
   };
 
   return (
-    <View style={{ width: '100%' }}>
-      <View style={[s.campHeaderRow, { marginBottom: 20 }]}>
-        <View style={{ flex: 1, marginRight: 16 }}>
-          <Text style={s.campTitle}>Smart Follow Up</Text>
-          <Text style={s.campSubtitle}>Create multi-step automated follow-up sequences with smart triggers.</Text>
-        </View>
-        <TouchableOpacity 
-          style={s.createCampBtn} 
-          onPress={() => { resetSmartWizard(); setShowSmartWizard(true); }} 
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-          <Text style={s.createCampBtnText}>New Group</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Top Tab Bar: Campaigns vs Analytics */}
-      <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 14, padding: 4, gap: 4, marginBottom: 24 }}>
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            paddingVertical: 10,
-            borderRadius: 10,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: activeSmartTab === 'campaigns' ? '#FFFFFF' : 'transparent',
-            shadowColor: '#050505',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: activeSmartTab === 'campaigns' ? 0.05 : 0,
-            shadowRadius: 4,
-            elevation: activeSmartTab === 'campaigns' ? 2 : 0,
-          }}
-          onPress={() => setActiveSmartTab('campaigns')}
-          activeOpacity={0.8}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="git-branch-outline" size={16} color={activeSmartTab === 'campaigns' ? '#050505' : '#64748B'} />
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'campaigns' ? '#050505' : '#64748B' }}>
-              Campaigns
-            </Text>
+    <View style={styles.container}>
+      {/* ── TOP HERO BANNER & STATS ── */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <View style={styles.heroBadge}>
+            <Ionicons name="sparkles" size={12} color="#D97706" />
+            <Text style={styles.heroBadgeText}>MARKETING AUTOPILOT</Text>
           </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            paddingVertical: 10,
-            borderRadius: 10,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: activeSmartTab === 'analytics' ? '#FFFFFF' : 'transparent',
-            shadowColor: '#050505',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: activeSmartTab === 'analytics' ? 0.05 : 0,
-            shadowRadius: 4,
-            elevation: activeSmartTab === 'analytics' ? 2 : 0,
-          }}
-          onPress={() => setActiveSmartTab('analytics')}
-          activeOpacity={0.8}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="stats-chart-outline" size={16} color={activeSmartTab === 'analytics' ? '#050505' : '#64748B'} />
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: activeSmartTab === 'analytics' ? '#050505' : '#64748B' }}>
-              Analytics & Logs
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {activeSmartTab === 'campaigns' ? (
-        loadingSmartGroups ? (
-          <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
-        ) : smartGroups.length === 0 ? (
-          <View style={s.campEmptyState}>
-            <Ionicons name="git-branch-outline" size={48} color="#94A3B8" />
-            <Text style={s.campEmptyTitle}>No Smart Follow Up Groups</Text>
-            <Text style={s.campEmptySub}>Create your first multi-step follow-up sequence to engage customers automatically.</Text>
-            <TouchableOpacity 
-              style={s.campEmptyBtn}
-              onPress={() => { resetSmartWizard(); setShowSmartWizard(true); }}
+          <View style={styles.modeTabs}>
+            <TouchableOpacity
+              style={[styles.modeTab, activeTab === 'autopilot' && styles.modeTabActive]}
+              onPress={() => setActiveTab('autopilot')}
               activeOpacity={0.8}
             >
-              <Text style={s.campEmptyBtnText}>Create Smart Follow Up</Text>
+              <Ionicons name="flash" size={13} color={activeTab === 'autopilot' ? '#050505' : '#64748B'} />
+              <Text style={[styles.modeTabText, activeTab === 'autopilot' && styles.modeTabTextActive]}>Quick Recipes</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modeTab, activeTab === 'advanced' && styles.modeTabActive]}
+              onPress={() => setActiveTab('advanced')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="settings-outline" size={13} color={activeTab === 'advanced' ? '#050505' : '#64748B'} />
+              <Text style={[styles.modeTabText, activeTab === 'advanced' && styles.modeTabTextActive]}>Advanced Engine</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <View style={s.campList}>
-            {smartGroups.map((group) => (
-              <View key={group.id} style={[s.campCard, group.status !== 'active' && { opacity: 0.7 }]}>
-                <TouchableOpacity onPress={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} activeOpacity={0.8}>
-                  <View style={s.campCardHeader}>
-                    <View style={{ gap: 4, flex: 1 }}>
-                      <Text style={s.campCardName}>{group.name}</Text>
-                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <View 
-                          style={[
-                            s.statusDotBadge, 
-                            group.status === 'active' && { backgroundColor: '#ECFDF5' },
-                            group.status === 'paused' && { backgroundColor: '#FFFBEB' },
-                            group.status === 'draft' && { backgroundColor: '#F1F5F9' },
-                            group.status === 'archived' && { backgroundColor: '#F1F5F9' }
-                          ]}
-                        >
-                          <View 
-                            style={[
-                              s.statusDot, 
-                              { 
-                                backgroundColor: group.status === 'active' 
-                                  ? '#10B981' 
-                                  : group.status === 'paused' 
-                                  ? '#F59E0B' 
-                                  : '#64748B' 
-                              }
-                            ]} 
-                          />
-                          <Text 
-                            style={[
-                              s.statusDotText,
-                              { 
-                                color: group.status === 'active' 
-                                  ? '#047857' 
-                                  : group.status === 'paused' 
-                                  ? '#B45309' 
-                                  : '#475569' 
-                              }
-                            ]}
-                          >
-                            {group.status.toUpperCase()}
-                          </Text>
-                        </View>
-                        <Text style={{ fontSize: 11, color: '#6B7280', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                          {group.member_count} members · {group.sequence_count} sequences
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name={expandedGroup === group.id ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
-                  </View>
-                </TouchableOpacity>
-                {expandedGroup === group.id && (
-                  <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 }}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TouchableOpacity 
-                        style={[
-                          btnStyles.btn, 
-                          { 
-                            flex: 1, 
-                            backgroundColor: group.status === 'active' ? '#FFF7ED' : '#F0FDF4',
-                            borderWidth: 1,
-                            borderColor: group.status === 'active' ? '#FFEDD5' : '#DCFCE7'
-                          }
-                        ]} 
-                        onPress={() => toggleSmartGroupStatus(group)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[btnStyles.btnText, { color: group.status === 'active' ? '#D97706' : '#16A34A' }]}>
-                          {group.status === 'active' ? 'Pause' : 'Activate'}
-                        </Text>
-                      </TouchableOpacity>
+        </View>
 
-                      <TouchableOpacity 
-                        style={[
-                          btnStyles.btn, 
-                          { 
-                            flex: 1, 
-                            backgroundColor: '#F8FAFC',
-                            borderWidth: 1,
-                            borderColor: '#E2E8F0'
-                          }
-                        ]} 
-                        onPress={() => startEditSmartGroup(group)}
-                        disabled={loadingEditGroupId !== null}
-                        activeOpacity={0.8}
-                      >
-                        {loadingEditGroupId === group.id ? (
-                          <ActivityIndicator size="small" color="#050505" />
-                        ) : (
-                          <Text style={[btnStyles.btnText, { color: '#050505' }]}>Edit</Text>
-                        )}
-                      </TouchableOpacity>
+        <Text style={styles.heroTitle}>Automate Your Customer Retention.</Text>
+        <Text style={styles.heroSubtitle}>
+          Set-and-forget WhatsApp automations that bring customers back automatically. No manual broadcasting required.
+        </Text>
 
-                      <TouchableOpacity 
-                        style={[
-                          btnStyles.btn, 
-                          { 
-                            flex: 1, 
-                            backgroundColor: '#FEF2F2',
-                            borderWidth: 1,
-                            borderColor: '#FEE2E2'
-                          }
-                        ]} 
-                        onPress={() => deleteSmartGroup(group.id)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[btnStyles.btnText, { color: '#EF4444' }]}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-            ))}
+        {/* Live Quick Metrics */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>
+              {smartGroups.filter(g => g.status === 'active').length} / {AUTOPILOT_RECIPES.length}
+            </Text>
+            <Text style={styles.metricLabel}>Active Autopilots</Text>
           </View>
-        )
-      ) : (
-        /* ── Analytics & Logs View ── */
-        loadingAnalytics ? (
-          <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
-        ) : (
-          <View style={{ width: '100%', gap: 20 }}>
-            {/* Summary Cards */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Enrolled</Text>
-                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginTop: 4 }}>{analyticsStats.total}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Queue</Text>
-                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#5C3BCC', marginTop: 4 }}>{analyticsStats.active}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Completed</Text>
-                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981', marginTop: 4 }}>{analyticsStats.completed}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 140, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderColor: '#E2E8F0', borderWidth: 1 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Messages Sent</Text>
-                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#F59E0B', marginTop: 4 }}>{analyticsStats.sent}</Text>
-              </View>
-            </View>
-
-            {/* Sub-tab Pill Switcher */}
-            <View style={{ flexDirection: 'row', gap: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, alignItems: 'center' }}>
-              <TouchableOpacity 
-                onPress={() => setActiveAnalyticsSubTab('queue')}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: 99,
-                  backgroundColor: activeAnalyticsSubTab === 'queue' ? '#050505' : 'transparent',
-                }}
-              >
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'queue' ? '#FFFFFF' : '#475569' }}>
-                  Active Queue ({queueList.length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => setActiveAnalyticsSubTab('logs')}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: 99,
-                  backgroundColor: activeAnalyticsSubTab === 'logs' ? '#050505' : 'transparent',
-                }}
-              >
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: activeAnalyticsSubTab === 'logs' ? '#FFFFFF' : '#475569' }}>
-                  Dispatch History ({logsList.length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                onPress={fetchAnalytics}
-                style={{ marginLeft: 'auto', padding: 8, borderRadius: 10, backgroundColor: '#F1F5F9' }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="refresh" size={16} color="#475569" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Queue Tab content */}
-            {activeAnalyticsSubTab === 'queue' ? (
-              queueList.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 8 }}>
-                  <Ionicons name="people-outline" size={36} color="#94A3B8" />
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No Enrolled Members</Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', maxWidth: 280 }}>
-                    Customers will appear here once they are added or enrolled into active smart follow-up groups.
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ gap: 12 }}>
-                  {queueList.map((member) => {
-                    const customer = member.expand?.customer || {};
-                    const group = member.expand?.group || {};
-                    const stepText = `Step ${member.sequence_completed} of ${group.sequence_count || 0}`;
-                    
-                    return (
-                      <View key={member.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 12 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <View style={{ gap: 2 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                              {customer.name || customer.phone || 'Unnamed Customer'}
-                            </Text>
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                              {customer.phone || 'No phone'}
-                            </Text>
-                          </View>
-                          <View 
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 4,
-                              borderRadius: 8,
-                              backgroundColor: 
-                                member.status === 'completed' ? '#ECFDF5' :
-                                member.status === 'in_progress' ? '#EFF6FF' :
-                                member.status === 'enrolled' ? '#FFFBEB' : '#F1F5F9'
-                            }}
-                          >
-                            <Text 
-                              style={{ 
-                                fontSize: 10, 
-                                fontFamily: 'PlusJakartaSans_700Bold', 
-                                color: 
-                                  member.status === 'completed' ? '#047857' :
-                                  member.status === 'in_progress' ? '#1D4ED8' :
-                                  member.status === 'enrolled' ? '#B45309' : '#475569'
-                              }}
-                            >
-                              {(member.status || 'unknown').toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12 }}>
-                          <View style={{ gap: 2, flex: 1, minWidth: 120 }}>
-                            <Text style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', textTransform: 'uppercase' }}>Campaign Group</Text>
-                            <Text style={{ fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_700Bold' }}>{group.name || 'Unnamed Campaign'}</Text>
-                          </View>
-                          <View style={{ gap: 2, flex: 1, minWidth: 80, alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', textTransform: 'uppercase' }}>Current Progress</Text>
-                            <Text style={{ fontSize: 12, color: '#5C3BCC', fontFamily: 'PlusJakartaSans_700Bold' }}>{stepText}</Text>
-                          </View>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                            Enrolled: {new Date(member.created).toLocaleString()}
-                          </Text>
-                          {member.last_message_sent_at && (
-                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                              Last Sent: {new Date(member.last_message_sent_at).toLocaleString()}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )
-            ) : (
-              /* Logs Tab content */
-              logsList.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 8 }}>
-                  <Ionicons name="megaphone-outline" size={36} color="#94A3B8" />
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No Sent Messages</Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', maxWidth: 280 }}>
-                    Logs of automated follow-ups sent to customers will appear here.
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ gap: 12 }}>
-                  {logsList.map((log) => {
-                    const customer = log.expand?.customer || {};
-                    const group = log.expand?.group || {};
-                    const sequence = log.expand?.sequence || {};
-                    
-                    return (
-                      <View key={log.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', gap: 10 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                            {customer.name || customer.phone || 'Unnamed Customer'}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 6 }}>
-                            {/* Channel Badge */}
-                            <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
-                                {(log.channel || 'inapp').toUpperCase()}
-                              </Text>
-                            </View>
-                            {/* Status Badge */}
-                            <View style={{ backgroundColor: log.status === 'failed' ? '#FEF2F2' : '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: log.status === 'failed' ? '#EF4444' : '#047857' }}>
-                                {(log.status || 'sent').toUpperCase()}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={{ gap: 2 }}>
-                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#5C3BCC' }}>
-                            {sequence.title || 'Step'} ({group.name || 'Campaign'})
-                          </Text>
-                          <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>
-                            Sent on: {new Date(log.created).toLocaleString()}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )
-            )}
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>{queueCount}</Text>
+            <Text style={styles.metricLabel}>Queued Members</Text>
           </View>
-        )
-      )}
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>{sentCount}</Text>
+            <Text style={styles.metricLabel}>Messages Sent</Text>
+          </View>
+        </View>
+      </View>
 
-      {/* ── Wizard Modal ── */}
-      <Modal visible={showSmartWizard} transparent animationType="slide" onRequestClose={resetSmartWizard}>
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.card}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Text style={modalStyles.title}>{editingGroupId ? 'Edit Smart Follow Up' : 'Create Smart Follow Up'}</Text>
-              <TouchableOpacity onPress={resetSmartWizard} style={{ padding: 4 }} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
+      {/* ── AUTOPILOT RECIPES VIEW ── */}
+      {activeTab === 'autopilot' ? (
+        <View style={styles.recipesSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>1-CLICK AUTOPILOT RECIPES</Text>
+            <TouchableOpacity onPress={fetchGroups} style={{ padding: 4 }}>
+              <Ionicons name="refresh" size={16} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#FFC700" />
+              <Text style={styles.loadingText}>Loading smart follow up recipes...</Text>
             </View>
+          ) : (
+            <View style={[styles.recipeGrid, isDesktop && styles.recipeGridDesktop]}>
+              {AUTOPILOT_RECIPES.map((recipe) => {
+                const isActive = isRecipeActive(recipe.id);
+                const isToggling = togglingRecipeId === recipe.id;
 
-            {/* Premium Step Progress Indicator */}
-            <View style={{ flexDirection: 'row', marginBottom: 28, gap: 16, alignItems: 'center', paddingHorizontal: 4 }}>
-              {[1, 2, 3].map((step) => {
-                const isCompleted = step < smartWizardStep;
-                const isActive = step === smartWizardStep;
-                
                 return (
-                  <View key={step} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      <View 
-                        style={{ 
-                          width: 36, 
-                          height: 36, 
-                          borderRadius: 18, 
-                          backgroundColor: isCompleted ? '#ECFDF5' : isActive ? '#050505' : '#F1F5F9', 
-                          borderWidth: isActive ? 0 : 1,
-                          borderColor: isCompleted ? '#A7F3D0' : '#E2E8F0',
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          marginBottom: 6,
-                          shadowColor: isActive ? '#050505' : '#000',
-                          shadowOffset: { width: 0, height: isActive ? 3 : 0 },
-                          shadowOpacity: isActive ? 0.2 : 0,
-                          shadowRadius: isActive ? 5 : 0,
-                          elevation: isActive ? 4 : 0
-                        }}
-                      >
-                        {isCompleted ? (
-                          <Ionicons name="checkmark" size={18} color="#10B981" />
+                  <View key={recipe.id} style={[styles.recipeCard, isActive && styles.recipeCardActive]}>
+                    {/* Top Status & Badge */}
+                    <View style={styles.recipeTopRow}>
+                      <View style={styles.recipeIconWrap}>
+                        <View style={[styles.recipeIconBox, { backgroundColor: recipe.iconBg }]}>
+                          <Ionicons name={recipe.icon} size={20} color={recipe.iconColor} />
+                        </View>
+                        <View>
+                          <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                          <View style={styles.recipeBadgePill}>
+                            <Text style={styles.recipeBadgeText}>{recipe.badge}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Switch */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {isToggling ? (
+                          <ActivityIndicator size="small" color="#FFC700" />
                         ) : (
-                          <Text style={{ color: isActive ? '#FFFFFF' : '#64748B', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                            {step}
-                          </Text>
+                          <Switch
+                            value={isActive}
+                            onValueChange={() => handleToggleRecipe(recipe)}
+                            trackColor={{ false: '#E2E8F0', true: '#22C55E' }}
+                            thumbColor="#FFFFFF"
+                            ios_backgroundColor="#E2E8F0"
+                          />
                         )}
                       </View>
-                      <Text style={{ 
-                        fontSize: 11, 
-                        color: isActive ? '#050505' : '#64748B', 
-                        fontFamily: isActive ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_500Medium' 
-                      }}>
-                        {step === 1 ? 'Group Info' : step === 2 ? 'Sequences' : 'Members'}
-                      </Text>
                     </View>
-                    
-                    {step < 3 && (
-                      <View style={{ 
-                        width: '100%', 
-                        height: 2, 
-                        backgroundColor: isCompleted ? '#10B981' : '#E2E8F0',
-                        position: 'absolute',
-                        left: '70%',
-                        top: 18,
-                        zIndex: -1
-                      }} />
-                    )}
+
+                    {/* Trigger Info */}
+                    <View style={styles.triggerInfoBox}>
+                      <Ionicons name="time-outline" size={14} color="#64748B" />
+                      <Text style={styles.triggerInfoText}>{recipe.triggerDescription}</Text>
+                    </View>
+
+                    {/* Live WhatsApp Bubble Preview */}
+                    <View style={styles.whatsappBubbleCard}>
+                      <View style={styles.whatsappBubbleTop}>
+                        <Ionicons name="logo-whatsapp" size={12} color="#16A34A" />
+                        <Text style={styles.whatsappSenderText}>{merchantName}</Text>
+                        <Text style={styles.whatsappTimeText}>Automated</Text>
+                      </View>
+                      <Text style={styles.whatsappBodyText}>{getLivePreview(recipe.defaultBody)}</Text>
+                    </View>
+
+                    {/* Action Bar */}
+                    <View style={styles.recipeFooter}>
+                      <View style={styles.activeStatusRow}>
+                        <View style={[styles.statusDot, { backgroundColor: isActive ? '#22C55E' : '#94A3B8' }]} />
+                        <Text style={[styles.statusLabel, { color: isActive ? '#15803D' : '#64748B' }]}>
+                          {isActive ? 'Active • Running' : 'Paused'}
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        onPress={() => handleOpenCustomize(recipe)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="pencil" size={13} color="#0F172A" />
+                        <Text style={styles.editBtnText}>Customize</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })}
             </View>
+          )}
+        </View>
+      ) : (
+        /* ── ADVANCED ENGINE VIEW (FOR POWER USERS) ── */
+        <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>ACTIVE CUSTOM GROUPS & QUEUE</Text>
 
-            {validationError ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FEE2E2', marginBottom: 16, gap: 8 }}>
-                <Ionicons name="alert-circle" size={18} color="#EF4444" />
-                <Text style={{ flex: 1, fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{validationError}</Text>
-                <TouchableOpacity onPress={() => setValidationError('')} activeOpacity={0.7} style={{ padding: 2 }}>
-                  <Ionicons name="close" size={16} color="#EF4444" />
+          {smartGroups.length === 0 ? (
+            <View style={styles.emptyAdvancedBox}>
+              <Ionicons name="construct-outline" size={36} color="#94A3B8" />
+              <Text style={styles.emptyAdvancedTitle}>No Custom Sequences Found</Text>
+              <Text style={styles.emptyAdvancedDesc}>
+                All your automated follow-ups are managed cleanly through 1-Click Autopilot Recipes above.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {smartGroups.map((grp) => (
+                <View key={grp.id} style={styles.advancedGroupCard}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ gap: 2 }}>
+                      <Text style={styles.advancedGroupName}>{grp.name}</Text>
+                      <Text style={styles.advancedGroupMeta}>
+                        Interval: {grp.interval_minutes || 5} mins • Created: {new Date(grp.created).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={[styles.advStatusPill, { backgroundColor: grp.status === 'active' ? '#DCFCE7' : '#F1F5F9' }]}>
+                      <Text style={[styles.advStatusText, { color: grp.status === 'active' ? '#15803D' : '#64748B' }]}>
+                        {grp.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── CUSTOMIZE RECIPE MODAL ── */}
+      {editingRecipe && (
+        <Modal visible={!!editingRecipe} transparent animationType="slide" onRequestClose={() => setEditingRecipe(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, isDesktop && { maxWidth: 520 }]}>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.recipeIconBox, { width: 32, height: 32, backgroundColor: editingRecipe.iconBg }]}>
+                    <Ionicons name={editingRecipe.icon} size={18} color={editingRecipe.iconColor} />
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>{editingRecipe.title}</Text>
+                    <Text style={styles.modalSubtitle}>Customize trigger and message wording</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setEditingRecipe(null)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={18} color="#64748B" />
                 </TouchableOpacity>
               </View>
-            ) : null}
 
-            {/* Scrollable Container */}
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              {/* STEP 1: GROUP INFO */}
-              {smartWizardStep === 1 && (
-                <View style={{ gap: 20 }}>
-                  <View>
-                    <Text style={inputStyles.label}>
-                      Group Name <Text style={{ color: '#EF4444' }}>*</Text>
-                    </Text>
-                    <TextInput 
-                      style={inputStyles.input} 
-                      value={smartGroupName} 
-                      onChangeText={(v) => {
-                        setSmartGroupName(v);
-                        if (validationError) setValidationError('');
-                      }} 
-                      placeholder="e.g. 7-Day Winback Campaign" 
-                      placeholderTextColor="#BEC6E0" 
-                    />
-                  </View>
-                  
-                  <View style={s.switchRow}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={s.switchLabel}>Active Status</Text>
-                      <Text style={s.switchDesc}>Start sending messages immediately after creation</Text>
-                    </View>
-                    <Switch 
-                      value={smartActive} 
-                      onValueChange={setSmartActive} 
-                      trackColor={{ false: '#E2E8F0', true: '#10B981' }} 
-                      thumbColor="#FFFFFF"
-                    />
-                  </View>
-                  
-                  <View style={s.switchRow}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={s.switchLabel}>Archive After Complete</Text>
-                      <Text style={s.switchDesc}>Auto-archive the group when all members finish the sequence</Text>
-                    </View>
-                    <Switch 
-                      value={smartArchiveAfter} 
-                      onValueChange={setSmartArchiveAfter} 
-                      trackColor={{ false: '#E2E8F0', true: '#10B981' }} 
-                      thumbColor="#FFFFFF"
-                    />
-                  </View>
-                  
-                  <View>
-                    <Text style={inputStyles.label}>Interval Between Contacts (minutes)</Text>
-                    <TextInput 
-                      style={inputStyles.input} 
-                      value={smartInterval} 
-                      onChangeText={setSmartInterval} 
-                      keyboardType="numeric" 
-                      placeholder="5" 
-                      placeholderTextColor="#BEC6E0" 
-                    />
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
-                      Time gap between sending messages to each member in this campaign (staggered to prevent WhatsApp spam blocks).
-                    </Text>
-                  </View>
+              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                {/* Trigger Days Setting */}
+                <Text style={styles.inputLabel}>TRIGGER DELAY (DAYS)</Text>
+                <View style={styles.daysInputBox}>
+                  <TextInput
+                    style={[styles.daysInput, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
+                    value={customDays}
+                    onChangeText={setCustomDays}
+                    keyboardType="number-pad"
+                    placeholder="14"
+                  />
+                  <Text style={styles.daysInputUnit}>Days with no counter visit</Text>
                 </View>
-              )}
 
-              {/* STEP 2: SEQUENCES */}
-              {smartWizardStep === 2 && (
-                <View style={{ gap: 16 }}>
-                  <Text style={[s.cardSectionDesc, { marginBottom: 4 }]}>
-                    Build your automated funnel. Sequences will execute in order based on the set delay.
-                  </Text>
-                  
-                  {smartSequences.length === 0 ? (
-                    <View style={{ padding: 24, borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 8, marginVertical: 8 }}>
-                      <Ionicons name="git-commit-outline" size={32} color="#94A3B8" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>No sequences added yet</Text>
-                      <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', maxWidth: 240 }}>Add a sequence step to start drafting automated messages.</Text>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 10 }}>
-                      {smartSequences.map((seq, i) => (
-                        <View key={i} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#EEF2F6', alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="git-commit-outline" size={20} color="#475569" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{seq.title || 'Untitled Sequence'}</Text>
-                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
-                              Sends after: {seq.send_after_days}d {seq.send_after_hours}h {seq.send_after_minutes}m · {(seq.messages || []).length} message{(seq.messages || []).length !== 1 ? 's' : ''}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <TouchableOpacity onPress={() => openSeqModal(i)} style={{ padding: 4 }} activeOpacity={0.7}>
-                              <Feather name="edit-2" size={16} color="#475569" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => removeSequence(i)} style={{ padding: 4 }} activeOpacity={0.7}>
-                              <Feather name="trash-2" size={16} color="#EF4444" />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  
-                  <TouchableOpacity 
-                    style={[btnStyles.btn, { alignSelf: 'center', backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', width: '100%', marginTop: 8 }]} 
-                    onPress={() => openSeqModal(null)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="add" size={18} color="#050505" style={{ marginRight: 6 }} />
-                    <Text style={[btnStyles.btnText, { color: '#050505' }]}>Add Sequence Step</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                {/* Message Body */}
+                <Text style={[styles.inputLabel, { marginTop: 16 }]}>WHATSAPP MESSAGE TEXT</Text>
+                <TextInput
+                  style={[styles.messageInput, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
+                  value={customBody}
+                  onChangeText={setCustomBody}
+                  multiline
+                  numberOfLines={5}
+                  placeholder="Enter message..."
+                />
 
-              {/* STEP 3: MEMBERS */}
-              {smartWizardStep === 3 && (
-                <View style={{ gap: 16 }}>
-                  <Text style={s.cardSectionDesc}>Choose which customers should be enrolled in this follow-up loop.</Text>
-                  
-                  {/* Segmented Controller Tab Bar */}
-                  <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 14, padding: 4, gap: 4, marginBottom: 8 }}>
-                    {(['all', 'customer', 'phone'] as const).map((m) => {
-                      const isActive = memberMethod === m;
-                      return (
-                        <TouchableOpacity 
-                          key={m} 
-                          style={{ 
-                            flex: 1, 
-                            paddingVertical: 8, 
-                            borderRadius: 10, 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            backgroundColor: isActive ? '#050505' : 'transparent',
-                          }} 
-                          onPress={() => setMemberMethod(m)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={{ 
-                            fontSize: 12, 
-                            fontFamily: 'PlusJakartaSans_700Bold', 
-                            color: isActive ? '#FFFFFF' : '#64748B' 
-                          }}>
-                            {m === 'all' ? 'All Holders' : m === 'customer' ? 'Search' : 'By Phone'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {memberMethod === 'all' && (
-                    <TouchableOpacity 
-                      style={[btnStyles.btn, { width: '100%', backgroundColor: '#050505' }]} 
-                      onPress={addAllMembers}
-                      activeOpacity={0.8}
+                {/* Placeholders Chip Helpers */}
+                <Text style={styles.chipsLabel}>INSERT SMART VARIABLES:</Text>
+                <View style={styles.chipsRow}>
+                  {['{Customer Name}', '{Store Name}', '{Stamp Balance}', '{Reward Item}'].map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={styles.chip}
+                      onPress={() => setCustomBody(prev => `${prev} ${tag}`)}
+                      activeOpacity={0.7}
                     >
-                      <Ionicons name="people-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                      <Text style={btnStyles.btnText}>Load All Loyalty Card Holders</Text>
+                      <Text style={styles.chipText}>{tag}</Text>
                     </TouchableOpacity>
-                  )}
-
-                  {memberMethod === 'customer' && (
-                    <View style={{ gap: 10 }}>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TextInput 
-                          style={[inputStyles.input, { flex: 1 }]} 
-                          value={memberSearch} 
-                          onChangeText={setMemberSearch} 
-                          placeholder="Search by name or phone..." 
-                          placeholderTextColor="#BEC6E0" 
-                        />
-                        <TouchableOpacity 
-                          style={[btnStyles.btn, { paddingHorizontal: 16 }]} 
-                          onPress={searchCustomers}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={btnStyles.btnText}>Search</Text>
-                        </TouchableOpacity>
-                      </View>
-                      
-                      {memberResults.map((cust) => (
-                        <TouchableOpacity 
-                          key={cust.id} 
-                          style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'space-between', alignItems: 'center' }}
-                          onPress={() => { if (!smartMembers.find(m => m.id === cust.id)) setSmartMembers([...smartMembers, cust]); }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={{ gap: 2 }}>
-                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{cust.name || 'Unnamed Customer'}</Text>
-                            <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>{cust.phone}</Text>
-                          </View>
-                          <Ionicons name="add-circle" size={20} color="#5C3BCC" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {memberMethod === 'phone' && (
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TextInput 
-                        style={[inputStyles.input, { flex: 1 }]} 
-                        value={memberPhone} 
-                        onChangeText={setMemberPhone} 
-                        placeholder="+60123456789" 
-                        placeholderTextColor="#BEC6E0" 
-                        keyboardType="phone-pad" 
-                      />
-                      <TouchableOpacity 
-                        style={[btnStyles.btn, { paddingHorizontal: 20 }]} 
-                        onPress={addMemberByPhone}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={btnStyles.btnText}>Add</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {smartMembers.length > 0 && (
-                    <View style={{ marginTop: 12 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 6 }}>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                          Selected Target List ({smartMembers.length})
-                        </Text>
-                        <TouchableOpacity onPress={() => setSmartMembers([])}>
-                          <Text style={{ fontSize: 11, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Clear All</Text>
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <View style={{ gap: 6 }}>
-                        {smartMembers.slice(0, 10).map((m) => (
-                          <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#F8FAFC', borderRadius: 8, gap: 8 }}>
-                            <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }}>{m.name || m.phone}</Text>
-                            <TouchableOpacity onPress={() => setSmartMembers(smartMembers.filter(x => x.id !== m.id))} activeOpacity={0.7}>
-                              <Ionicons name="close-circle" size={16} color="#EF4444" />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                        {smartMembers.length > 10 && (
-                          <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 4 }}>
-                            + {smartMembers.length - 10} more customers...
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  )}
+                  ))}
                 </View>
-              )}
-            </ScrollView>
 
-            {/* Bottom Actions Row */}
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
-              {smartWizardStep > 1 && (
-                <TouchableOpacity 
-                  style={[
-                    btnStyles.btn, 
-                    { 
-                      flex: 1, 
-                      backgroundColor: '#FFFFFF', 
-                      borderWidth: 1.5, 
-                      borderColor: '#E2E8F0' 
-                    }
-                  ]} 
-                  onPress={() => setSmartWizardStep(smartWizardStep - 1)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[btnStyles.btnText, { color: '#475569' }]}>Back</Text>
-                </TouchableOpacity>
-              )}
-              {smartWizardStep < 3 ? (
-                <TouchableOpacity 
-                  style={[btnStyles.btn, { flex: 1 }]} 
-                  onPress={() => {
-                    setValidationError('');
-                    if (smartWizardStep === 1) {
-                      if (!smartGroupName.trim()) {
-                        setValidationError('Please enter a Group Name before proceeding.');
-                        return;
-                      }
-                    } else if (smartWizardStep === 2) {
-                      if (smartSequences.length === 0) {
-                        setValidationError('Please add at least one Sequence step before proceeding.');
-                        return;
-                      }
-                    }
-                    setSmartWizardStep(smartWizardStep + 1);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={btnStyles.btnText}>Next</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={[btnStyles.btn, { flex: 1 }]} 
-                  onPress={handleSaveSmartGroup} 
-                  disabled={isSavingSmart}
-                  activeOpacity={0.8}
-                >
-                  <Text style={btnStyles.btnText}>
-                    {isSavingSmart ? 'Saving...' : editingGroupId ? 'Save Changes' : 'Create Group'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Sequence Editor Modal ── */}
-      <Modal visible={showSeqModal} transparent animationType="slide" onRequestClose={() => setShowSeqModal(false)}>
-        <View style={modalStyles.overlay}>
-          <View style={[modalStyles.card, isDesktop && { maxWidth: 880, width: '95%' }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={modalStyles.title}>{editingSeqIndex !== null ? 'Edit Sequence Step' : 'New Sequence Step'}</Text>
-              <TouchableOpacity onPress={() => setShowSeqModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24, alignItems: isDesktop ? 'stretch' : 'center' }}>
-              {/* Left Column: Form Controls */}
-              <ScrollView 
-                style={{ flex: isDesktop ? 1.2 : undefined, width: '100%', maxHeight: 450 }} 
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={{ paddingRight: 16, paddingBottom: 16 }}
-              >
-                <View style={{ gap: 16 }}>
-                  <View>
-                    <Text style={inputStyles.label}>Step Title <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                    <TextInput 
-                      style={inputStyles.input} 
-                      value={seqTitle} 
-                      onChangeText={setSeqTitle} 
-                      placeholder="e.g. Day 1 — We Miss You" 
-                      placeholderTextColor="#BEC6E0" 
-                    />
+                {/* Live Preview Inside Modal */}
+                <Text style={[styles.inputLabel, { marginTop: 16 }]}>LIVE PREVIEW FOR CUSTOMERS</Text>
+                <View style={styles.whatsappBubbleCard}>
+                  <View style={styles.whatsappBubbleTop}>
+                    <Ionicons name="logo-whatsapp" size={12} color="#16A34A" />
+                    <Text style={styles.whatsappSenderText}>{merchantName}</Text>
+                    <Text style={styles.whatsappTimeText}>Just now</Text>
                   </View>
-                  
-                  <View>
-                    <Text style={inputStyles.label}>Step Status</Text>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 3, gap: 4 }}>
-                      {['active', 'inactive'].map((st) => {
-                        const isActive = seqStatus === st;
-                        return (
-                          <TouchableOpacity 
-                            key={st} 
-                            style={{ 
-                              flex: 1, 
-                              paddingVertical: 8, 
-                              borderRadius: 9, 
-                              alignItems: 'center', 
-                              backgroundColor: isActive ? '#050505' : 'transparent' 
-                            }} 
-                            onPress={() => setSeqStatus(st)}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#64748B' }}>
-                              {st === 'active' ? 'Active' : 'Paused/Inactive'}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
-                      Active steps send automatically when due. Paused/Inactive steps are temporarily paused and skipped entirely.
-                    </Text>
-                  </View>
-
-                  <View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={inputStyles.label}>Messages ({seqMessages.length})</Text>
-                      <TouchableOpacity onPress={() => openMsgModal(null)}>
-                        <Text style={{ fontSize: 12, color: '#050505', fontFamily: 'PlusJakartaSans_700Bold' }}>+ Add Message</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {seqMessages.length === 0 ? (
-                      <View style={{ padding: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
-                        <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>Create a template message for this sequence step.</Text>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 8 }}>
-                        {seqMessages.map((msg, i) => (
-                          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                            <Text style={{ flex: 1, fontSize: 12, color: '#334155', fontFamily: 'PlusJakartaSans_500Medium' }} numberOfLines={1}>
-                              {renderPreviewBody(msg.message_body)}
-                            </Text>
-                            <View style={{ flexDirection: 'row', gap: 10, marginLeft: 8 }}>
-                              <TouchableOpacity onPress={() => openMsgModal(i)} activeOpacity={0.7}>
-                                <Feather name="edit-2" size={14} color="#475569" />
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => removeMessage(i)} activeOpacity={0.7}>
-                                <Feather name="trash-2" size={14} color="#EF4444" />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                  
-                  <View>
-                    <Text style={inputStyles.label}>Delay Trigger Delay</Text>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {[{ label: 'Days', val: seqDays, set: setSeqDays }, { label: 'Hours', val: seqHours, set: setSeqHours }, { label: 'Minutes', val: seqMinutes, set: setSeqMinutes }].map((f) => (
-                        <View key={f.label} style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: 4 }}>{f.label}</Text>
-                          <TextInput 
-                            style={inputStyles.input} 
-                            value={f.val} 
-                            onChangeText={f.set} 
-                            keyboardType="numeric" 
-                            placeholder="0" 
-                            placeholderTextColor="#BEC6E0" 
-                          />
-                        </View>
-                      ))}
-                    </View>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 5, fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
-                       How long to wait before sending this message after the anchor event (selected in "Start Timeline From" below).
-                     </Text>
-                  </View>
-                  
-                  <View>
-                    <Text style={inputStyles.label}>Start Timeline From</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                      {[
-                        { v: 'last_sequence', l: 'Last Sequence Step' }, 
-                        { v: 'last_conversation', l: 'Last Active Chat' }, 
-                        { v: 'last_merchant_msg', l: 'Last Merchant Broadcast' }, 
-                        { v: 'last_customer_msg', l: 'Last Customer Visit' }
-                      ].map((ct) => {
-                        const isActive = seqConvType === ct.v;
-                        return (
-                          <TouchableOpacity 
-                            key={ct.v} 
-                            style={{ 
-                              paddingHorizontal: 12, 
-                              paddingVertical: 8, 
-                              borderRadius: 10, 
-                              borderWidth: 1, 
-                              borderColor: isActive ? '#050505' : '#E2E8F0', 
-                              backgroundColor: isActive ? '#050505' : '#FFFFFF',
-                              marginBottom: 4
-                            }} 
-                            onPress={() => setSeqConvType(ct.v)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
-                              {ct.l}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-
-                  {/* On Mobile: Render Preview Inline at the bottom of the form */}
-                  {!isDesktop && seqMessages.length > 0 && (
-                    <View style={{ marginTop: 24, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 24 }}>
-                      <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
-                      <WhatsAppPreview 
-                        title={seqTitle}
-                        body={renderPreviewBody(seqMessages[0]?.message_body || '')}
-                        buttons={seqMessages[0]?.buttons || []}
-                        merchantName={merchantName}
-                      />
-                    </View>
-                  )}
+                  <Text style={styles.whatsappBodyText}>{getLivePreview(customBody)}</Text>
                 </View>
               </ScrollView>
 
-              {/* Right Column: Live iPhone WhatsApp Preview (Desktop only) */}
-              {isDesktop && (
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' }}>
-                  <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview (First Message)</Text>
-                  <WhatsAppPreview 
-                    title={seqTitle}
-                    body={renderPreviewBody(seqMessages[0]?.message_body || '')}
-                    buttons={seqMessages[0]?.buttons || []}
-                    merchantName={merchantName}
-                  />
-                </View>
-              )}
-            </View>
-            
-            <TouchableOpacity 
-              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#050505' }]} 
-              onPress={saveSequence}
-              activeOpacity={0.8}
-            >
-              <Text style={btnStyles.btnText}>Save Sequence Step</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+              {/* Actions */}
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setEditingRecipe(null)}
+                  disabled={isSavingCustom}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
 
-      {/* ── Message Editor Modal ── */}
-      <Modal visible={showMsgModal} transparent animationType="slide" onRequestClose={() => setShowMsgModal(false)}>
-        <View style={modalStyles.overlay}>
-          <View style={[modalStyles.card, isDesktop && { maxWidth: 880, width: '95%' }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={modalStyles.title}>{editingMsgIndex !== null ? 'Edit Message Details' : 'New Message Details'}</Text>
-              <TouchableOpacity onPress={() => setShowMsgModal(false)} style={{ padding: 4 }} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 24, alignItems: isDesktop ? 'stretch' : 'center' }}>
-              {/* Left Column: Message Editor Form */}
-              <ScrollView 
-                style={{ flex: isDesktop ? 1.2 : undefined, width: '100%', maxHeight: 450 }} 
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={{ paddingRight: 16, paddingBottom: 16 }}
-              >
-                <View style={{ gap: 16 }}>
-                  {/* Meta Template Selector */}
-                  <View>
-                    <Text style={inputStyles.label}>Select Meta WhatsApp Template <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                    {loadingTemplates ? (
-                      <ActivityIndicator size="small" color="#4F46E5" style={{ marginVertical: 12 }} />
-                    ) : metaTemplates.length === 0 ? (
-                      <Text style={{ color: '#64748B', fontStyle: 'italic', fontSize: 13, marginTop: 4 }}>
-                        No approved Meta templates found. Using developer sandbox templates.
-                      </Text>
-                    ) : null}
-                    
-                    {!loadingTemplates && metaTemplates.length > 0 && (
-                      <View style={{ gap: 8, marginTop: 6 }}>
-                        {metaTemplates.map((t) => {
-                          const isSelected = selectedTemplate?.name === t.name;
-                          const bodyText = t.components?.find((c: any) => c.type === 'BODY')?.text || '';
-                          return (
-                            <TouchableOpacity
-                              key={t.name}
-                              style={{
-                                backgroundColor: isSelected ? '#EEF2FF' : '#FFFFFF',
-                                borderColor: isSelected ? '#4F46E5' : '#E2E8F0',
-                                borderWidth: isSelected ? 2 : 1,
-                                borderRadius: 12,
-                                padding: 12,
-                              }}
-                              onPress={() => {
-                                setSelectedTemplate(t);
-                                const placeholders = bodyText.match(/\{\{\d+\}\}/g) || [];
-                                const defaultParams = placeholders.map((_: string, idx: number) => {
-                                  if (idx === 0) return '{{name}}';
-                                  if (idx === 1) return '{{stamps}}';
-                                  return '{{store}}';
-                                });
-                                setMappedParams(defaultParams);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                <Text 
-                                  style={{ flex: 1, flexShrink: 1, marginRight: 8, fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isSelected ? '#4F46E5' : '#050505' }}
-                                  numberOfLines={1}
-                                >
-                                  {t.name}
-                                </Text>
-                                <View style={{
-                                  backgroundColor: t.category === 'MARKETING' ? '#FFFBEB' : '#EFF6FF',
-                                  borderRadius: 6,
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 2
-                                }}>
-                                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: t.category === 'MARKETING' ? '#D97706' : '#2563EB' }}>
-                                    {t.category}
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text style={{ fontSize: 11, color: '#64748B', marginTop: 4, lineHeight: 16 }} numberOfLines={2}>
-                                {bodyText}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Template Parameter Mapping */}
-                  {selectedTemplate && mappedParams.length > 0 && (
-                    <View style={{ gap: 10, marginTop: 4 }}>
-                      <Text style={inputStyles.label}>Configure Template Parameters</Text>
-                      {mappedParams.map((param, idx) => {
-                        const placeholderNum = idx + 1;
-                        return (
-                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#334155' }}>
-                              Parameter {`{{${placeholderNum}}}`}
-                            </Text>
-                            <View style={{ flexDirection: 'row', gap: 6 }}>
-                              {[
-                                { label: 'Name', value: '{{name}}' },
-                                { label: 'Stamps', value: '{{stamps}}' },
-                                { label: 'Store', value: '{{store}}' }
-                              ].map((choice) => {
-                                const isActive = param === choice.value;
-                                return (
-                                  <TouchableOpacity
-                                    key={choice.value}
-                                    style={{
-                                      backgroundColor: isActive ? '#4F46E5' : '#FFFFFF',
-                                      borderColor: isActive ? '#4F46E5' : '#CBD5E1',
-                                      borderWidth: 1,
-                                      borderRadius: 6,
-                                      paddingHorizontal: 8,
-                                      paddingVertical: 4,
-                                    }}
-                                    onPress={() => {
-                                      const updated = [...mappedParams];
-                                      updated[idx] = choice.value;
-                                      setMappedParams(updated);
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
-                                      {choice.label}
-                                    </Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
+                <TouchableOpacity
+                  style={styles.modalSaveBtn}
+                  onPress={handleSaveCustomize}
+                  disabled={isSavingCustom}
+                  activeOpacity={0.85}
+                >
+                  {isSavingCustom ? (
+                    <ActivityIndicator size="small" color="#050505" />
+                  ) : (
+                    <Text style={styles.modalSaveText}>Save & Update</Text>
                   )}
-
-                  {/* On Mobile: Render Preview Inline at the bottom of the form */}
-                  {!isDesktop && (
-                    <View style={{ marginTop: 24, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 24 }}>
-                      <Text style={[inputStyles.label, { marginBottom: 12, textAlign: 'center' }]}>Live Message Preview</Text>
-                      <WhatsAppPreview 
-                        title=""
-                        body={renderPreviewBody(selectedTemplate ? JSON.stringify({ templateName: selectedTemplate.name, templateText: selectedTemplate.components?.find((c: any) => c.type === 'BODY')?.text || '', parameters: mappedParams }) : '')}
-                        buttons={[]}
-                        merchantName={merchantName}
-                      />
-                    </View>
-                  )}
-                </View>
-              </ScrollView>
-
-              {/* Right Column: Live iPhone WhatsApp Preview (Desktop only) */}
-              {isDesktop && (
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' }}>
-                  <Text style={[inputStyles.label, { marginBottom: 12, fontSize: 11, color: '#64748B' }]}>Live Preview</Text>
-                  <WhatsAppPreview 
-                    title=""
-                    body={renderPreviewBody(selectedTemplate ? JSON.stringify({ templateName: selectedTemplate.name, templateText: selectedTemplate.components?.find((c: any) => c.type === 'BODY')?.text || '', parameters: mappedParams }) : '')}
-                    buttons={[]}
-                    merchantName={merchantName}
-                  />
-                </View>
-              )}
+                </TouchableOpacity>
+              </View>
             </View>
-            
-            <TouchableOpacity 
-              style={[btnStyles.btn, { marginTop: 20, backgroundColor: '#050505' }]} 
-              onPress={saveMessage}
-              activeOpacity={0.8}
-            >
-              <Text style={btnStyles.btnText}>Save Message Details</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }
 
-// ── PRESETS & HELPERS FOR LIVE PREVIEW ──
-
-const PRESETS = [
-  {
-    title: 'Milestone Reward',
-    body: '🎉 Tahniah {{name}}!\n\nAnda baru sahaja mengumpul *{{stamps}}* cop dan mendapat ganjaran baru! Tebus ganjaran anda pada kunjungan seterusnya.\n\nKlik pautan ini untuk melihat kad anda:\n{{login_link}}',
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    paddingVertical: 12,
   },
-  {
-    title: 'Win-Back Promo',
-    body: 'Kami merindui anda, {{name}}! 🥺\n\nDah lama anda tidak singgah ke kedai kami. Singgah minggu ini dan dapatkan *100 mata bonus* untuk kunjungan anda!\n\nLihat kad ganjaran anda di sini:\n{{login_link}}',
-  },
-  {
-    title: 'Milestone (EN)',
-    body: '🎉 Congrats {{name}}!\n\nYou have collected *{{stamps}}* stamps and unlocked a new reward voucher! Redeem it during your next visit.\n\nView your rewards here:\n{{login_link}}',
-  },
-  {
-    title: 'Win-Back (EN)',
-    body: 'We miss you, {{name}}! 🥺\n\nIt has been a while since your last visit. Come back this week to collect a stamp and get *100 bonus points*!\n\nCheck your card here:\n{{login_link}}',
-  },
-];
-
-const parseWhatsAppText = (text: string) => {
-  if (!text) return [];
-  
-  // Replace variables for preview representation
-  let parsed = text
-    .replace(/\{\{\s*name\s*\}\}/g, 'Fazli')
-    .replace(/\{\{\s*stamps\s*\}\}/g, '3')
-    .replace(/\{\{\s*points\s*\}\}/g, '120')
-    .replace(/\{\{\s*points_expiry\s*\}\}/g, '2026-12-31')
-    .replace(/\{\{\s*login_link\s*\}\}/g, 'risev.app');
-
-  const parts = [];
-  const regex = /(\*[^*]+\*|_[^_]+_)/g;
-  const tokens = parsed.split(regex);
-
-  return tokens.map((token, i) => {
-    if (token.startsWith('*') && token.endsWith('*')) {
-      return (
-        <Text key={i} style={{ fontWeight: 'bold' }}>
-          {token.slice(1, -1)}
-        </Text>
-      );
-    }
-    if (token.startsWith('_') && token.endsWith('_')) {
-      return (
-        <Text key={i} style={{ fontStyle: 'italic' }}>
-          {token.slice(1, -1)}
-        </Text>
-      );
-    }
-    return token;
-  });
-};
-
-const WhatsAppPreview = ({ title, body, buttons, merchantName }: { title: string, body: string, buttons: any[], merchantName: string }) => {
-  const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  return (
-    <View style={previewStyles.iphoneContainer}>
-      {/* iPhone Top Speaker / Island */}
-      <View style={previewStyles.iphoneTop}>
-        <View style={previewStyles.iphoneSpeaker} />
-        <View style={previewStyles.iphoneCamera} />
-      </View>
-      
-      {/* Screen container */}
-      <View style={previewStyles.screen}>
-        {/* WhatsApp Header */}
-        <View style={previewStyles.chatHeader}>
-          <Ionicons name="chevron-back" size={20} color="#FFFFFF" style={{ marginRight: 2 }} />
-          <View style={previewStyles.avatar}>
-            <Text style={previewStyles.avatarText}>
-              {merchantName ? merchantName.charAt(0).toUpperCase() : 'M'}
-            </Text>
-          </View>
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={previewStyles.headerTitle} numberOfLines={1}>
-              {merchantName || 'Your Shop'}
-            </Text>
-            <Text style={previewStyles.headerSub}>online</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <Ionicons name="videocam" size={18} color="#FFFFFF" />
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-            <Ionicons name="ellipsis-vertical" size={16} color="#FFFFFF" />
-          </View>
-        </View>
-        
-        {/* WhatsApp Wallpaper Area */}
-        <View style={previewStyles.chatBody}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10, gap: 8 }}>
-            
-            {/* System Encryption Banner */}
-            <View style={previewStyles.systemBadge}>
-              <Text style={previewStyles.systemBadgeText}>
-                🔒 Messages are end-to-end encrypted. No one outside of this chat can read them.
-              </Text>
-            </View>
-
-            {title ? (
-              <View style={[previewStyles.systemBadge, { backgroundColor: '#E0F2FE', alignSelf: 'center' }]}>
-                <Text style={[previewStyles.systemBadgeText, { color: '#0369A1' }]}>
-                  Campaign Step: {title}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Incoming WhatsApp Bubble */}
-            <View style={previewStyles.bubbleWrapper}>
-              <View style={previewStyles.bubble}>
-                <View style={previewStyles.bubbleTail} />
-                <Text style={previewStyles.bubbleSender}>
-                  {merchantName || 'Your Shop'}
-                </Text>
-                <Text style={previewStyles.bubbleText}>
-                  {body ? parseWhatsAppText(body) : (
-                    <Text style={{ color: '#94A3B8', fontStyle: 'italic' }}>
-                      Type a template message on the left to see preview...
-                    </Text>
-                  )}
-                </Text>
-                
-                <View style={previewStyles.bubbleFooter}>
-                  <Text style={previewStyles.bubbleTime}>{timeString}</Text>
-                  <Ionicons name="checkmark-done" size={14} color="#34B7F1" style={{ marginLeft: 3 }} />
-                </View>
-              </View>
-              
-
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-const previewStyles = StyleSheet.create({
-  iphoneContainer: {
-    width: 250,
-    height: 420,
-    borderRadius: 32,
-    borderWidth: 6,
-    borderColor: '#1E293B',
-    backgroundColor: '#050505',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    alignSelf: 'center',
-  },
-  iphoneTop: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    transform: [{ translateX: -45 }],
-    width: 90,
-    height: 16,
-    backgroundColor: '#1E293B',
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    zIndex: 100,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  iphoneSpeaker: {
-    width: 30,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#475569',
-  },
-  iphoneCamera: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#0B132B',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#efeae2',
-  },
-  chatHeader: {
-    backgroundColor: '#075E54',
-    paddingTop: 20,
-    paddingBottom: 8,
-    paddingHorizontal: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#075E54',
-  },
-  headerTitle: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  headerSub: {
-    fontSize: 8,
-    color: '#CBD5E1',
-    fontFamily: 'PlusJakartaSans_500Medium',
-  },
-  chatBody: {
-    flex: 1,
-    backgroundColor: '#efeae2',
-  },
-  systemBadge: {
-    backgroundColor: '#FFF9C4',
-    padding: 6,
-    borderRadius: 6,
-    alignSelf: 'center',
-    maxWidth: '95%',
-    marginBottom: 4,
-  },
-  systemBadgeText: {
-    fontSize: 8,
-    color: '#5D4037',
-    textAlign: 'center',
-    fontFamily: 'PlusJakartaSans_500Medium',
-    lineHeight: 11,
-  },
-  bubbleWrapper: {
-    alignSelf: 'flex-start',
-    maxWidth: '90%',
-  },
-  bubble: {
+  heroCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderTopLeftRadius: 0,
-    padding: 8,
-    shadowColor: '#000',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  heroBadgeText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.8,
+  },
+  modeTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+  },
+  modeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
-    shadowRadius: 1,
-    elevation: 1,
-    position: 'relative',
+    shadowRadius: 4,
+    elevation: 2,
   },
-  bubbleTail: {
-    position: 'absolute',
-    top: 0,
-    left: -6,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderRightWidth: 8,
-    borderRightColor: '#FFFFFF',
-    borderBottomWidth: 8,
-    borderBottomColor: 'transparent',
+  modeTabText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
-  bubbleSender: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#075E54',
+  modeTabTextActive: {
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+    lineHeight: 28,
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  metricItem: {
+    alignItems: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
     marginBottom: 2,
   },
-  bubbleText: {
+  metricLabel: {
     fontSize: 11,
-    color: '#1E293B',
-    fontFamily: 'PlusJakartaSans_500Medium',
-    lineHeight: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
-  bubbleFooter: {
+  metricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#CBD5E1',
+  },
+  recipesSection: {
+    width: '100%',
+  },
+  sectionHeaderRow: {
     flexDirection: 'row',
-    alignSelf: 'flex-end',
     alignItems: 'center',
-    marginTop: 2,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  bubbleTime: {
-    fontSize: 7,
-    color: '#94A3B8',
-    fontFamily: 'PlusJakartaSans_500Medium',
+  sectionTitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.8,
   },
-  buttonsContainer: {
-    backgroundColor: '#E2E8F0',
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    overflow: 'hidden',
-    marginTop: 1,
-    gap: 0.5,
-  },
-  templateButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 6,
+  loadingBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    paddingVertical: 40,
+    gap: 10,
   },
-  templateButtonText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0066CC',
+  loadingText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
-});
-
-const btnStyles = StyleSheet.create({
-  btn: { 
-    backgroundColor: '#050505', 
-    borderRadius: 16, 
-    paddingHorizontal: 18, 
-    height: 52, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  recipeGrid: {
+    gap: 14,
+  },
+  recipeGridDesktop: {
     flexDirection: 'row',
-    shadowColor: '#050505',
+    flexWrap: 'wrap',
+  },
+  recipeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+    width: '100%',
+  },
+  recipeCardActive: {
+    borderColor: '#FFC700',
+    backgroundColor: '#FFFDF5',
+  },
+  recipeTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  recipeIconWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  recipeIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipeTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  recipeBadgePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 3,
+  },
+  recipeBadgeText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+    letterSpacing: 0.5,
+  },
+  triggerInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  triggerInfoText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  whatsappBubbleCard: {
+    backgroundColor: '#DCF8C6',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginBottom: 14,
+  },
+  whatsappBubbleTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
+  whatsappSenderText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#166534',
+    flex: 1,
+  },
+  whatsappTimeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#15803D',
+  },
+  whatsappBodyText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#0F172A',
+    lineHeight: 18,
+  },
+  recipeFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  activeStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  editBtnText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  advancedSection: {
+    width: '100%',
+  },
+  emptyAdvancedBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  emptyAdvancedTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  emptyAdvancedDesc: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    maxWidth: 320,
+    lineHeight: 18,
+  },
+  advancedGroupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  advancedGroupName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  advancedGroupMeta: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  advStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  advStatusText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
+    width: '100%',
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  daysInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  daysInput: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    width: 48,
+  },
+  daysInputUnit: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  messageInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#0F172A',
+    lineHeight: 20,
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  chipsLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  chipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 14,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  modalSaveBtn: {
+    flex: 1.6,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
-  btnText: { 
-    fontSize: 14, 
-    fontFamily: 'PlusJakartaSans_800ExtraBold', 
-    color: '#FFFFFF',
-    letterSpacing: 0.5
+  modalSaveText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
   },
-});
-
-const badgeStyles = StyleSheet.create({
-  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  text: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', letterSpacing: 0.5 },
-});
-
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 28, padding: 24, width: '100%', maxWidth: 500, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
-  title: { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' },
-});
-
-const inputStyles = StyleSheet.create({
-  label: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1.0, marginBottom: 8 },
-  input: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#050505', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
 });
