@@ -301,8 +301,8 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
   return (
     <View style={styles.container}>
       {/* ── HEADER & ACTIONS ── */}
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerTextWrap}>
           <Text style={styles.sectionTitle}>WhatsApp Template Studio</Text>
           <Text style={styles.sectionSub}>
             Create and manage approved broadcast templates directly without logging into Meta.
@@ -690,38 +690,43 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 16,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 16,
+  headerContainer: {
+    width: '100%',
     marginBottom: 20,
+    gap: 14,
+  },
+  headerTextWrap: {
+    width: '100%',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
     letterSpacing: -0.5,
+    lineHeight: 28,
   },
   sectionSub: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    marginTop: 4,
+    marginTop: 6,
+    lineHeight: 19,
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    width: '100%',
   },
   refreshBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -731,12 +736,14 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   createBtn: {
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFC700',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     shadowColor: '#FFC700',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
