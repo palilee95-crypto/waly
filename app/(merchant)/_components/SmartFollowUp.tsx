@@ -162,12 +162,8 @@ export default function SmartFollowUp({ styles: s }: Props) {
 
   // Find associated group record for a recipe
   const getRecipeGroup = (recipeId: string) => {
-    return smartGroups.find(g => {
-      const metaType = g.metadata?.recipe_type;
-      if (metaType && metaType === recipeId) return true;
-      const r = AUTOPILOT_RECIPES.find(x => x.id === recipeId);
-      return g.name === r?.title;
-    });
+    const r = AUTOPILOT_RECIPES.find(x => x.id === recipeId);
+    return smartGroups.find(g => g.name === r?.title);
   };
 
   // Is Recipe currently Active?
@@ -199,7 +195,9 @@ export default function SmartFollowUp({ styles: s }: Props) {
             requestKey: null,
           });
           for (const s of sequences) {
-            await pb.collection('follow_up_sequences').update(s.id, { status: newStatus }).catch(() => {});
+            await pb.collection('follow_up_sequences').update(s.id, {
+              status: newStatus === 'active' ? 'active' : 'inactive',
+            }).catch(() => {});
           }
         } catch (_) {}
       } else {
@@ -210,28 +208,27 @@ export default function SmartFollowUp({ styles: s }: Props) {
           status: 'active',
           interval_minutes: 5,
           archive_after_send: false,
-          metadata: {
-            recipe_type: recipe.id,
-            days: recipe.defaultDays,
-          },
+          member_count: 0,
+          sequence_count: 1,
         });
 
         // 2. Create Sequence
         const newSeq = await pb.collection('follow_up_sequences').create({
           group: newGroup.id,
-          order: 0,
-          delay_days: recipe.defaultDays,
-          delay_hours: recipe.defaultHours,
-          delay_minutes: recipe.defaultMinutes,
-          conversation_type: 'last_sequence',
+          title: recipe.title,
           status: 'active',
+          send_after_days: recipe.defaultDays,
+          send_after_hours: recipe.defaultHours,
+          send_after_minutes: recipe.defaultMinutes,
+          conversation_type: 'last_sequence',
+          order: 0,
         });
 
         // 3. Create Default Message
         await pb.collection('follow_up_messages').create({
           sequence: newSeq.id,
           message_body: recipe.defaultBody,
-          buttons: [],
+          order: 0,
         });
 
         // 4. Auto-enroll active merchant customers
@@ -261,6 +258,7 @@ export default function SmartFollowUp({ styles: s }: Props) {
           : `"${recipe.title}" has been paused.`
       );
     } catch (err: any) {
+      console.warn('[SmartFollowUp Toggle Error]:', err);
       Alert.alert('Error', err?.message || 'Failed to update automation status.');
     } finally {
       setTogglingRecipeId(null);
@@ -273,7 +271,6 @@ export default function SmartFollowUp({ styles: s }: Props) {
     const existingGroup = getRecipeGroup(recipe.id);
 
     if (existingGroup) {
-      setCustomDays(String(existingGroup.metadata?.days ?? recipe.defaultDays));
       try {
         const sequences = await pb.collection('follow_up_sequences').getFullList({
           filter: `group = "${existingGroup.id}"`,
@@ -281,6 +278,7 @@ export default function SmartFollowUp({ styles: s }: Props) {
           requestKey: null,
         });
         if (sequences.length > 0) {
+          setCustomDays(String(sequences[0].send_after_days ?? recipe.defaultDays));
           const messages = await pb.collection('follow_up_messages').getFullList({
             filter: `sequence = "${sequences[0].id}"`,
             requestKey: null,
@@ -314,18 +312,8 @@ export default function SmartFollowUp({ styles: s }: Props) {
           status: 'active',
           interval_minutes: 5,
           archive_after_send: false,
-          metadata: {
-            recipe_type: editingRecipe.id,
-            days: daysNum,
-          },
-        });
-      } else {
-        await pb.collection('follow_up_groups').update(group.id, {
-          metadata: {
-            ...(group.metadata || {}),
-            recipe_type: editingRecipe.id,
-            days: daysNum,
-          },
+          member_count: 0,
+          sequence_count: 1,
         });
       }
 
@@ -340,17 +328,18 @@ export default function SmartFollowUp({ styles: s }: Props) {
       if (!seqId) {
         const seq = await pb.collection('follow_up_sequences').create({
           group: group.id,
-          order: 0,
-          delay_days: daysNum,
-          delay_hours: editingRecipe.defaultHours,
-          delay_minutes: editingRecipe.defaultMinutes,
+          title: editingRecipe.title,
+          status: group.status === 'active' ? 'active' : 'inactive',
+          send_after_days: daysNum,
+          send_after_hours: editingRecipe.defaultHours,
+          send_after_minutes: editingRecipe.defaultMinutes,
           conversation_type: 'last_sequence',
-          status: group.status || 'active',
+          order: 0,
         });
         seqId = seq.id;
       } else {
         await pb.collection('follow_up_sequences').update(seqId, {
-          delay_days: daysNum,
+          send_after_days: daysNum,
         });
       }
 
@@ -368,7 +357,7 @@ export default function SmartFollowUp({ styles: s }: Props) {
         await pb.collection('follow_up_messages').create({
           sequence: seqId,
           message_body: customBody.trim(),
-          buttons: [],
+          order: 0,
         });
       }
 
@@ -376,6 +365,7 @@ export default function SmartFollowUp({ styles: s }: Props) {
       setEditingRecipe(null);
       Alert.alert('Saved! ✨', `"${editingRecipe.title}" has been updated.`);
     } catch (err: any) {
+      console.warn('[SmartFollowUp Save Error]:', err);
       Alert.alert('Error', err?.message || 'Failed to save customized recipe.');
     } finally {
       setIsSavingCustom(false);
