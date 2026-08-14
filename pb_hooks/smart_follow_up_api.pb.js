@@ -50,32 +50,13 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
       }
     } catch (_) {}
 
-    if (group) {
-      // Toggle existing
-      const currentStatus = group.getString("status");
-      const newStatus = currentStatus === "active" ? "paused" : "active";
-      group.set("status", newStatus);
-      $app.save(group);
+    let targetGroupId = "";
+    let finalStatus = "active";
 
-      // Update child sequences
-      try {
-        const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${group.id}'`, null, 100, 0);
-        for (const seq of sequences) {
-          seq.set("status", newStatus === "active" ? "active" : "inactive");
-          $app.save(seq);
-        }
-      } catch (_) {}
-
-      return e.json(200, {
-        success: true,
-        status: newStatus,
-        message: newStatus === "active" ? "Autopilot activated!" : "Autopilot paused.",
-        groupId: group.id,
-      });
-    } else {
-      // 2. Create new group
+    if (!group) {
+      // Create new group
       const groupsCol = $app.findCollectionByNameOrId("follow_up_groups");
-      const newGroup = new Record(groupsCol, {
+      group = new Record(groupsCol, {
         id: makeId(),
         merchant: merchantId,
         name: title,
@@ -85,61 +66,105 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/toggle", (e) => {
         member_count: 0,
         sequence_count: 1,
       });
-      $app.save(newGroup);
+      $app.save(group);
+      targetGroupId = group.id;
+      finalStatus = "active";
+    } else {
+      // Toggle existing
+      const currentStatus = group.getString("status");
+      finalStatus = currentStatus === "active" ? "paused" : "active";
+      group.set("status", finalStatus);
+      $app.save(group);
+      targetGroupId = group.id;
+    }
 
-      // 3. Create sequence
+    // 2. Ensure sequence exists
+    let seq = null;
+    try {
+      const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${targetGroupId}'`, "order", 1, 0);
+      if (sequences.length > 0) {
+        seq = sequences[0];
+        seq.set("status", finalStatus === "active" ? "active" : "inactive");
+        $app.save(seq);
+      }
+    } catch (_) {}
+
+    if (!seq) {
       const seqCol = $app.findCollectionByNameOrId("follow_up_sequences");
-      const newSeq = new Record(seqCol, {
+      seq = new Record(seqCol, {
         id: makeId(),
-        group: newGroup.id,
+        group: targetGroupId,
         title: title,
-        status: "active",
+        status: finalStatus === "active" ? "active" : "inactive",
         send_after_days: defaultDays,
         send_after_hours: defaultHours,
         send_after_minutes: defaultMinutes,
         conversation_type: "last_sequence",
         order: 1,
       });
-      $app.save(newSeq);
+      $app.save(seq);
+    }
 
-      // 4. Create message
+    // 3. Ensure message exists
+    let msg = null;
+    try {
+      const messages = $app.findRecordsByFilter("follow_up_messages", `sequence = '${seq.id}'`, "order", 1, 0);
+      if (messages.length > 0) {
+        msg = messages[0];
+      }
+    } catch (_) {}
+
+    if (!msg) {
       const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
-      const newMsg = new Record(msgCol, {
+      msg = new Record(msgCol, {
         id: makeId(),
-        sequence: newSeq.id,
+        sequence: seq.id,
         message_body: defaultBody,
         order: 1,
       });
-      $app.save(newMsg);
-
-      // 5. Auto-enroll active merchant customers
-      try {
-        const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = '${merchantId}'`, "-created", 5000, 0);
-        const memCol = $app.findCollectionByNameOrId("follow_up_members");
-        for (const card of cards) {
-          const customerId = card.get("customer");
-          if (customerId) {
-            try {
-              const mem = new Record(memCol, {
-                id: makeId(),
-                group: newGroup.id,
-                customer: customerId,
-                status: "enrolled",
-                sequence_completed: 0,
-              });
-              $app.save(mem);
-            } catch (_) {}
-          }
-        }
-      } catch (_) {}
-
-      return e.json(200, {
-        success: true,
-        status: "active",
-        message: "Autopilot activated!",
-        groupId: newGroup.id,
-      });
+      $app.save(msg);
     }
+
+    // 4. Ensure customer enrollment
+    let enrolledCount = 0;
+    try {
+      const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = '${merchantId}'`, "-created", 5000, 0);
+      const memCol = $app.findCollectionByNameOrId("follow_up_members");
+      const existingMembers = $app.findRecordsByFilter("follow_up_members", `group = '${targetGroupId}'`, null, 5000, 0);
+      const enrolledCustomerIds = new Set(existingMembers.map(m => m.getString("customer")));
+
+      for (const card of cards) {
+        const customerId = card.getString("customer");
+        if (customerId && !enrolledCustomerIds.has(customerId)) {
+          try {
+            const mem = new Record(memCol, {
+              id: makeId(),
+              group: targetGroupId,
+              customer: customerId,
+              status: "enrolled",
+              sequence_completed: 0,
+            });
+            $app.save(mem);
+            enrolledCustomerIds.add(customerId);
+          } catch (_) {}
+        }
+      }
+      enrolledCount = enrolledCustomerIds.size;
+
+      // Update member count on group
+      group.set("member_count", enrolledCount);
+      $app.save(group);
+    } catch (memErr) {
+      console.log("[Enrollment Error]:", memErr.message || memErr);
+    }
+
+    return e.json(200, {
+      success: true,
+      status: finalStatus,
+      message: finalStatus === "active" ? "Autopilot activated!" : "Autopilot paused.",
+      groupId: targetGroupId,
+      memberCount: enrolledCount,
+    });
   } catch (err) {
     console.log("[SmartFollowUp API Toggle Error]:", err.message || err);
     return e.json(500, { success: false, message: "Server error: " + (err.message || err) });
@@ -250,13 +275,13 @@ routerAdd("POST", "/api/risev/merchant/smart-follow-up/save", (e) => {
 
     if (!msg) {
       const msgCol = $app.findCollectionByNameOrId("follow_up_messages");
-      const newMsg = new Record(msgCol, {
+      msg = new Record(msgCol, {
         id: makeId(),
         sequence: seq.id,
         message_body: customBody,
         order: 1,
       });
-      $app.save(newMsg);
+      $app.save(msg);
     }
 
     return e.json(200, {
