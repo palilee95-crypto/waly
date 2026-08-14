@@ -22,6 +22,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
 import SmartFollowUp from './_components/SmartFollowUp';
+import TemplateStudio, { WhatsAppTemplate } from './_components/TemplateStudio';
 
 
 
@@ -117,7 +118,7 @@ export default function MarketingScreen() {
   const [expiryFocused, setExpiryFocused] = useState(false);
   const [rewardFocused, setRewardFocused] = useState(false);
 
-  const [subTab, setSubTab] = useState<'campaigns' | 'broadcast'>('campaigns');
+  const [subTab, setSubTab] = useState<'campaigns' | 'broadcast' | 'templates'>('campaigns');
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
@@ -852,6 +853,15 @@ export default function MarketingScreen() {
               {t('broadcast')}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.subTabButton, subTab === 'templates' && styles.subTabButtonActive]}
+            onPress={() => setSubTab('templates')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]}>
+              Templates
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {subTab === 'campaigns' && (
@@ -1325,6 +1335,19 @@ export default function MarketingScreen() {
                 <SmartFollowUp styles={styles} Alert={Alert} />
               </View>
             )}
+          </View>
+        )}
+
+        {subTab === 'templates' && (
+          <View style={styles.campaignsContent}>
+            <TemplateStudio 
+              onSelectTemplateForBroadcast={(tpl: WhatsAppTemplate) => {
+                setBTitle(tpl.headerText || tpl.name);
+                setBMessage(tpl.bodyText);
+                setBSendWhatsApp(true);
+                setSubTab('broadcast');
+              }}
+            />
           </View>
         )}
       </ScrollView>

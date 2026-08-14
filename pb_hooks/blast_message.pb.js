@@ -77,6 +77,7 @@ routerAdd("POST", "/api/risev/merchant/whatsapp/disconnect", (e) => {
 
 // 2b. GET WhatsApp Business Message Templates (from Meta Cloud API)
 routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
+  const { listMessageTemplates, getMerchantWabaConfig } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const authRecord = e.auth;
     if (!authRecord) {
@@ -87,23 +88,9 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
       return e.json(400, { message: "No merchant profile linked" });
     }
 
-    // 1. Fetch credentials
-    let config = null;
-    try {
-      const configs = $app.findRecordsByFilter(
-        "whatsapp_configurations",
-        `merchant = '${merchantId}' && status = 'connected'`,
-        "-created",
-        1,
-        0
-      );
-      if (configs.length > 0) {
-        config = configs[0];
-      }
-    } catch (err) {}
-
-    // 2. If no config, return dummy templates for testing/onboarding
+    const config = getMerchantWabaConfig(merchantId);
     if (!config) {
+      // Return starter sandbox presets if not connected
       return e.json(200, {
         templates: [
           {
@@ -111,57 +98,102 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/templates", (e) => {
             status: "APPROVED",
             category: "MARKETING",
             language: "en_US",
-            components: [
-              { type: "BODY", text: "We miss you, {{1}}! Come back to {{2}} to collect more stamps." }
-            ]
+            bodyText: "We miss you, {{1}}! Come back to {{2}} to collect more stamps.",
+            headerText: "",
+            footerText: "Reply STOP to unsubscribe",
           },
           {
             name: "visit_thank_you_mock",
             status: "APPROVED",
             category: "UTILITY",
             language: "en_US",
-            components: [
-              { type: "BODY", text: "Hi {{1}}, thanks for visiting {{2}}! You collected {{3}} stamps today." }
-            ]
+            bodyText: "Hi {{1}}, thanks for visiting {{2}}! You collected {{3}} stamps today.",
+            headerText: "Thank You! ✨",
+            footerText: "",
           }
         ],
-        sandbox: true
+        sandbox: true,
+        connected: false
       });
     }
 
-    const wabaId = config.getString("waba_id");
-    const accessToken = config.getString("access_token");
-
-    // 3. Request templates from Meta
-    const res = $http.send({
-      url: `https://graph.facebook.com/v20.0/${wabaId}/message_templates?limit=100`,
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`
-      }
-    });
-
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      const resData = JSON.parse(res.raw);
-      // Filter out templates that are not APPROVED or are rejected
-      const templates = (resData.data || [])
-        .filter(t => t.status === "APPROVED")
-        .map(t => ({
-          name: t.name,
-          status: t.status,
-          category: t.category,
-          language: t.language,
-          components: t.components
-        }));
-
-      return e.json(200, { templates, sandbox: false });
+    const res = listMessageTemplates(merchantId);
+    if (res.success) {
+      return e.json(200, { templates: res.templates || [], sandbox: false, connected: true });
     } else {
-      console.log(`[META TEMPLATE ERROR] Status: ${res.statusCode} | Raw: ${res.raw}`);
-      return e.json(res.statusCode, { message: "Failed to fetch templates from Meta", error: res.raw });
+      return e.json(400, { message: res.error || "Failed to fetch templates from Meta", templates: [], connected: true });
     }
   } catch (err) {
     console.log(`[META TEMPLATE EXCEPTION]`, err.message || err);
     return e.json(500, { message: err.message || err });
+  }
+}, $apis.requireAuth("users"));
+
+// 2b-2. POST Create WhatsApp Business Message Template
+routerAdd("POST", "/api/risev/merchant/whatsapp/templates/create", (e) => {
+  const { createMessageTemplate } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    if (authRecord.get("role") !== "merchant" && authRecord.get("role") !== "both") {
+      return e.json(403, { message: "Forbidden. Merchant account required." });
+    }
+
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    const body = e.requestInfo().body || {};
+    const res = createMessageTemplate(merchantId, body);
+
+    if (res.success) {
+      return e.json(200, {
+        success: true,
+        message: "Template submitted to Meta successfully! Review usually completes in 1-2 minutes.",
+        template: res.template
+      });
+    } else {
+      return e.json(400, { success: false, message: res.error || "Failed to create template on Meta" });
+    }
+  } catch (err) {
+    return e.json(500, { message: "Error creating template: " + (err.message || err) });
+  }
+}, $apis.requireAuth("users"));
+
+// 2b-3. POST Delete WhatsApp Business Message Template
+routerAdd("POST", "/api/risev/merchant/whatsapp/templates/delete", (e) => {
+  const { deleteMessageTemplate } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    if (authRecord.get("role") !== "merchant" && authRecord.get("role") !== "both") {
+      return e.json(403, { message: "Forbidden. Merchant account required." });
+    }
+
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    const body = e.requestInfo().body || {};
+    const templateName = body.name || body.template_name || "";
+    if (!templateName) {
+      return e.json(400, { message: "Template name is required" });
+    }
+
+    const res = deleteMessageTemplate(merchantId, templateName);
+    if (res.success) {
+      return e.json(200, { success: true, message: "Template deleted successfully." });
+    } else {
+      return e.json(400, { success: false, message: res.error || "Failed to delete template from Meta" });
+    }
+  } catch (err) {
+    return e.json(500, { message: "Error deleting template: " + (err.message || err) });
   }
 }, $apis.requireAuth("users"));
 
