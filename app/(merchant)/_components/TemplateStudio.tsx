@@ -85,6 +85,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -320,12 +321,9 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
             activeOpacity={0.8}
           >
             {isRefreshing ? (
-              <ActivityIndicator size="small" color="#050505" />
+              <ActivityIndicator size="small" color="#64748B" />
             ) : (
-              <>
-                <Ionicons name="sync" size={16} color="#050505" style={{ marginRight: 6 }} />
-                <Text style={styles.refreshBtnText}>Sync Status</Text>
-              </>
+              <Ionicons name="sync" size={16} color="#64748B" />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -333,7 +331,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
             onPress={() => handleOpenCreateModal()}
             activeOpacity={0.8}
           >
-            <Ionicons name="add" size={18} color="#050505" style={{ marginRight: 4 }} />
+            <Ionicons name="add" size={16} color="#050505" style={{ marginRight: 4 }} />
             <Text style={styles.createBtnText}>New Template</Text>
           </TouchableOpacity>
         </View>
@@ -344,7 +342,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         <View style={styles.notConnectedBanner}>
           <View style={styles.notConnectedLeft}>
             <View style={styles.notConnectedIconBox}>
-              <Ionicons name="warning" size={18} color="#B45309" />
+              <Ionicons name="warning" size={16} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.notConnectedTitle}>WhatsApp Business Not Connected</Text>
@@ -376,7 +374,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
               activeOpacity={0.85}
             >
               <View style={styles.presetHeader}>
-                <Ionicons name="sparkles" size={14} color="#FFC700" />
+                <Ionicons name="sparkles" size={14} color="#F59E0B" />
                 <Text style={styles.presetTitle}>{preset.title}</Text>
               </View>
               <Text style={styles.presetDesc} numberOfLines={2}>
@@ -412,67 +410,100 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         </View>
       ) : (
         <View style={styles.templateGrid}>
-          {templates.map((tpl, idx) => (
-            <View key={tpl.id || tpl.name || idx} style={styles.templateCard}>
-              <View style={styles.templateCardHeader}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={styles.templateCardName}>{tpl.name}</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 }}>
-                    <Text style={styles.templateCategory}>{tpl.category}</Text>
-                    <Text style={styles.templateCategory}>• {tpl.language}</Text>
+          {templates.map((tpl, idx) => {
+            const isExpanded = expandedTemplateId === (tpl.id || tpl.name || String(idx));
+            return (
+              <TouchableOpacity
+                key={tpl.id || tpl.name || idx}
+                activeOpacity={0.9}
+                onPress={() => setExpandedTemplateId(isExpanded ? null : (tpl.id || tpl.name || String(idx)))}
+                style={[
+                  styles.templateCard,
+                  isExpanded && styles.templateCardExpanded
+                ]}
+              >
+                <View style={styles.templateCardTopRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.templateCardName}>{tpl.name}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 }}>
+                      <Text style={styles.templateCategory}>{tpl.category}</Text>
+                      <Text style={styles.templateCategory}>• {tpl.language}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    {getStatusBadge(tpl.status)}
+                    <View style={styles.chevronBox}>
+                      <Ionicons 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={16} 
+                        color="#94A3B8" 
+                      />
+                    </View>
                   </View>
                 </View>
-                {getStatusBadge(tpl.status)}
-              </View>
 
-              {tpl.headerText ? (
-                <Text style={styles.templatePreviewHeader} numberOfLines={1}>
-                  {tpl.headerText}
-                </Text>
-              ) : null}
+                {isExpanded && (
+                  <View style={styles.expandedContent}>
+                    {tpl.rejectedReason && (
+                      <View style={styles.rejectionBox}>
+                        <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                        <Text style={styles.rejectionText}>{tpl.rejectedReason}</Text>
+                      </View>
+                    )}
 
-              <Text style={styles.templatePreviewBody} numberOfLines={4}>
-                {tpl.bodyText}
-              </Text>
+                    {/* WhatsApp Mockup Preview */}
+                    <View style={styles.whatsappMockupContainer}>
+                      <View style={styles.whatsappMockupHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={styles.whatsappAvatar}>
+                            <Text style={styles.whatsappAvatarText}>R</Text>
+                          </View>
+                          <Text style={styles.whatsappNameText}>Risev Merchant</Text>
+                          <Ionicons name="checkmark-circle" size={11} color="#10B981" />
+                        </View>
+                      </View>
+                      <View style={styles.whatsappMockupBody}>
+                        <View style={styles.whatsappChatBubble}>
+                          {tpl.headerText && (
+                            <Text style={styles.whatsappBubbleHeader}>{tpl.headerText}</Text>
+                          )}
+                          <Text style={styles.whatsappBubbleText}>
+                            {tpl.bodyText}
+                          </Text>
+                          {tpl.footerText && (
+                            <Text style={styles.whatsappBubbleFooter}>{tpl.footerText}</Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
 
-              {tpl.footerText ? (
-                <Text style={styles.templatePreviewFooter} numberOfLines={1}>
-                  {tpl.footerText}
-                </Text>
-              ) : null}
+                    {/* Footer Actions */}
+                    <View style={styles.templateCardFooter}>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteTemplate(tpl.name)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                        <Text style={styles.deleteBtnText}>Delete Template</Text>
+                      </TouchableOpacity>
 
-              {tpl.rejectedReason && (
-                <View style={styles.rejectionBox}>
-                  <Ionicons name="alert-circle" size={14} color="#DC2626" />
-                  <Text style={styles.rejectionText}>{tpl.rejectedReason}</Text>
-                </View>
-              )}
-
-              {/* Template Card Footer */}
-              <View style={styles.templateCardFooter}>
-                {onSelectTemplateForBroadcast && tpl.status === 'APPROVED' ? (
-                  <TouchableOpacity
-                    style={styles.useInBlastBtn}
-                    onPress={() => onSelectTemplateForBroadcast(tpl)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="paper-plane-outline" size={14} color="#050505" style={{ marginRight: 4 }} />
-                    <Text style={styles.useInBlastBtnText}>Use in Broadcast</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View />
+                      {onSelectTemplateForBroadcast && tpl.status === 'APPROVED' && (
+                        <TouchableOpacity
+                          style={styles.useInBlastBtn}
+                          onPress={() => onSelectTemplateForBroadcast(tpl)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="paper-plane" size={14} color="#050505" style={{ marginRight: 4 }} />
+                          <Text style={styles.useInBlastBtnText}>Use for Broadcast</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
                 )}
-
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => handleDeleteTemplate(tpl.name)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -754,17 +785,15 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     width: '100%',
   },
   refreshBtn: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -775,59 +804,60 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   createBtn: {
-    flex: 1.2,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFC700',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    height: 48,
     borderRadius: 14,
     shadowColor: '#FFC700',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 3,
   },
   createBtnText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
   },
   notConnectedBanner: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#050505',
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#FDE68A',
-    padding: 14,
-    marginBottom: 20,
-    gap: 12,
+    padding: 16,
+    marginBottom: 24,
+    gap: 14,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   notConnectedLeft: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   notConnectedIconBox: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: 10,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
   notConnectedTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#92400E',
-    marginBottom: 2,
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   notConnectedDesc: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#78350F',
-    lineHeight: 17,
+    color: '#94A3B8',
+    lineHeight: 18,
   },
   connectMetaBtn: {
     flexDirection: 'row',
@@ -836,12 +866,11 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#FFC700',
     borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    alignSelf: 'flex-start',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   connectMetaBtnText: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
   },
@@ -868,11 +897,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   presetSectionTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#94A3B8',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: 10,
+    marginLeft: 2,
   },
   presetsScroll: {
     gap: 12,
@@ -881,39 +911,39 @@ const styles = StyleSheet.create({
     width: 220,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    borderColor: '#F8FAFC',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
   },
   presetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   presetTitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
   },
   presetDesc: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    lineHeight: 16,
-    marginBottom: 10,
+    lineHeight: 17,
+    marginBottom: 12,
   },
   presetUseRow: {
     marginTop: 'auto',
   },
   presetUseText: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#D97706',
   },
   loadingContainer: {
@@ -962,29 +992,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   templateGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
+    gap: 14,
+    marginTop: 8,
   },
   templateCard: {
-    flex: 1,
-    minWidth: 300,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    borderColor: '#F1F5F9',
+    shadowColor: '#050505',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 2,
   },
-  templateCardHeader: {
+  templateCardExpanded: {
+    borderColor: '#FFC700',
+    backgroundColor: '#FFFDF5',
+  },
+  templateCardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
   },
   templateCardName: {
     fontSize: 15,
@@ -1002,7 +1032,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    gap: 5,
+    gap: 4,
   },
   statusDot: {
     width: 6,
@@ -1010,27 +1040,97 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
-  templatePreviewHeader: {
-    fontSize: 13,
+  chevronBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandedContent: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#FEE685',
+    paddingTop: 16,
+  },
+  whatsappMockupContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  whatsappMockupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#050505',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  whatsappAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  whatsappAvatarText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  whatsappNameText: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
-    marginBottom: 6,
+    color: '#FFFFFF',
   },
-  templatePreviewBody: {
+  whatsappMockupBody: {
+    padding: 10,
+  },
+  whatsappChatBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    maxWidth: '90%',
+    alignSelf: 'flex-start',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  whatsappBubbleHeader: {
     fontSize: 12.5,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#475569',
-    lineHeight: 18,
-    marginBottom: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 4,
   },
-  templatePreviewFooter: {
-    fontSize: 11,
+  whatsappBubbleText: {
+    fontSize: 11.5,
+    color: '#0F172A',
+    lineHeight: 16,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginBottom: 12,
+  },
+  whatsappBubbleFooter: {
+    fontSize: 10,
+    color: '#64748B',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginTop: 4,
   },
   rejectionBox: {
     flexDirection: 'row',
@@ -1052,26 +1152,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: '#FEE685',
     paddingTop: 12,
-    marginTop: 'auto',
   },
   useInBlastBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFC700',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 7,
+    borderRadius: 10,
   },
   useInBlastBtnText: {
-    fontSize: 11.5,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
   },
   deleteBtn: {
-    padding: 6,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+  },
+  deleteBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#EF4444',
   },
 
   /* ── MODAL STYLES ── */
@@ -1110,27 +1219,53 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+    letterSpacing: -0.2,
   },
   modalSub: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+    marginTop: 2,
   },
   modalCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalNotConnectedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#050505',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  modalNotConnectedText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#FFFFFF',
+    lineHeight: 18,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -1155,33 +1290,33 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   inputLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#64748B',
+    color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   inputField: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0F172A',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
   },
   textAreaField: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#0F172A',
+    color: '#050505',
     minHeight: 120,
   },
   charCounter: {
@@ -1191,27 +1326,29 @@ const styles = StyleSheet.create({
   },
   categoryToggleRow: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 3,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 4,
     gap: 4,
   },
   togglePill: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
   },
   togglePillActive: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 1,
   },
   togglePillText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
   },
@@ -1220,30 +1357,30 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   variableChipsRow: {
-    backgroundColor: '#FEF3C7',
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 16,
   },
   chipsLabel: {
     fontSize: 10.5,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#92400E',
-    marginBottom: 6,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+    marginBottom: 8,
   },
   chipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFBEB',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#FFE38F',
   },
   chipBtnText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#B45309',
   },
 
@@ -1355,18 +1492,20 @@ const styles = StyleSheet.create({
 
   modalFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
   modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalCancelText: {
     fontSize: 13,
@@ -1374,17 +1513,18 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   modalSubmitBtn: {
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFC700',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
     shadowColor: '#FFC700',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   modalSubmitText: {
     fontSize: 13,

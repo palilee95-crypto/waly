@@ -119,7 +119,7 @@ export default function MarketingScreen() {
   const [expiryFocused, setExpiryFocused] = useState(false);
   const [rewardFocused, setRewardFocused] = useState(false);
 
-  const [subTab, setSubTab] = useState<'campaigns' | 'broadcast' | 'templates'>('campaigns');
+  const [subTab, setSubTab] = useState<'campaigns' | 'blast' | 'followup' | 'templates'>('campaigns');
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
@@ -981,17 +981,26 @@ export default function MarketingScreen() {
             onPress={() => setSubTab('campaigns')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]}>
-              {t('promotions')}
+            <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]} numberOfLines={1}>
+              Promo
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'broadcast' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('broadcast')}
+            style={[styles.subTabButton, subTab === 'blast' && styles.subTabButtonActive]}
+            onPress={() => setSubTab('blast')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'broadcast' && styles.subTabTextActive]}>
-              {t('broadcast')}
+            <Text style={[styles.subTabText, subTab === 'blast' && styles.subTabTextActive]} numberOfLines={1}>
+              Blast
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.subTabButton, subTab === 'followup' && styles.subTabButtonActive]}
+            onPress={() => setSubTab('followup')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.subTabText, subTab === 'followup' && styles.subTabTextActive]} numberOfLines={1}>
+              Follow Up
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -999,7 +1008,7 @@ export default function MarketingScreen() {
             onPress={() => setSubTab('templates')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]}>
+            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]} numberOfLines={1}>
               Templates
             </Text>
           </TouchableOpacity>
@@ -1145,34 +1154,9 @@ export default function MarketingScreen() {
           </View>
         )}
 
-        {subTab === 'broadcast' && (
+        {subTab === 'blast' && (
           <View style={styles.broadcastContent}>
-
-
-            {/* Mode Switch Segment */}
-            <View style={styles.modeSegmentContainer}>
-              <TouchableOpacity
-                style={[styles.modeSegmentBtn, broadcastMode === 'manual' && styles.modeSegmentBtnActive]}
-                onPress={() => setBroadcastMode('manual')}
-              >
-                <Ionicons name="send-outline" size={15} color={broadcastMode === 'manual' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
-                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'manual' && styles.modeSegmentBtnTextActive]}>
-                  {t('instant_blast')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeSegmentBtn, broadcastMode === 'smart' && styles.modeSegmentBtnActive]}
-                onPress={() => setBroadcastMode('smart')}
-              >
-                <Ionicons name="git-branch-outline" size={15} color={broadcastMode === 'smart' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
-                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'smart' && styles.modeSegmentBtnTextActive]}>
-                  Smart Follow Up
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {broadcastMode === 'manual' && (
-                <View style={{ width: '100%' }}>
+            <View style={{ width: '100%' }}>
                   
                   {/* WhatsApp Status Connection Banner */}
                   <View style={{ 
@@ -1315,35 +1299,52 @@ export default function MarketingScreen() {
                     
                     {/* Target Segment Selector */}
                     <View style={{ marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                        <Ionicons name="people-outline" size={14} color="#64748B" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>Target Segment</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <Ionicons name="people-outline" size={13} color="#475569" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>TARGET SEGMENT</Text>
                       </View>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                         {[
                           { id: 'all', label: 'All' },
                           { id: 'spenders', label: 'Top Spenders' },
                           { id: 'visitors', label: 'Top Visitors' },
                           { id: 'inactive', label: 'Inactive' },
                           { id: 'custom', label: 'Custom' },
-                        ].map((seg) => (
-                          <TouchableOpacity
-                            key={seg.id}
-                            onPress={() => setSelectedSegment(seg.id as any)}
-                            style={{
-                              paddingHorizontal: 14,
-                              paddingVertical: 10,
-                              borderRadius: 20,
-                              alignItems: 'center',
-                              backgroundColor: selectedSegment === seg.id ? '#FFC700' : '#F8FAFC',
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={{ fontSize: 11, fontFamily: selectedSegment === seg.id ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold', color: selectedSegment === seg.id ? '#050505' : '#64748B' }}>
-                              {seg.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                        ].map((seg) => {
+                          const isActive = selectedSegment === seg.id;
+                          return (
+                            <TouchableOpacity
+                              key={seg.id}
+                              onPress={() => setSelectedSegment(seg.id as any)}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 7,
+                                borderRadius: 100,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: isActive ? '#FFC700' : '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: isActive ? '#FFC700' : '#E2E8F0',
+                                shadowColor: isActive ? '#FFC700' : 'transparent',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: isActive ? 0.2 : 0,
+                                shadowRadius: 4,
+                                elevation: isActive ? 2 : 0,
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11.5,
+                                  fontFamily: isActive ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                                  color: isActive ? '#050505' : '#64748B',
+                                }}
+                              >
+                                {seg.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
                     </View>
 
@@ -1615,15 +1616,22 @@ export default function MarketingScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
                           {/* Store Avatar Circle */}
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#128C7E', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                              {(user?.merchant_name || 'K').substring(0, 1).toUpperCase()}
-                            </Text>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#128C7E', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                            {merchantLogo ? (
+                              <Image source={{ uri: merchantLogo }} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                            ) : (
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                                {(merchant?.name || user?.merchant_name || 'K').substring(0, 1).toUpperCase()}
+                              </Text>
+                            )}
                           </View>
                           <View style={{ gap: 1 }}>
-                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
-                              {user?.merchant_name || 'Kedai Kami'}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
+                                {merchant?.name || user?.merchant_name || 'Kedai Kami'}
+                              </Text>
+                              <MaterialIcons name="verified" size={12} color="#25D366" />
+                            </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                               <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#25D366' }} />
                               <Text style={{ fontSize: 8.5, color: '#A7F3D0', fontFamily: 'PlusJakartaSans_600SemiBold' }}>online</Text>
@@ -1638,50 +1646,44 @@ export default function MarketingScreen() {
                       </View>
 
                       {/* Mockup Chat Body */}
-                      <View style={{ padding: 12, paddingBottom: 16 }}>
+                      <View style={{ padding: 12, paddingBottom: 16, backgroundColor: '#F8FAFC' }}>
                         <View style={{ 
-                          backgroundColor: '#DCF8C6', 
-                          borderRadius: 12, 
-                          padding: 10, 
+                          backgroundColor: '#FFFFFF', 
+                          borderRadius: 16, 
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12, 
                           maxWidth: '85%', 
                           alignSelf: 'flex-start', 
-                          shadowColor: '#000000', 
-                          shadowOffset: { width: 0, height: 1 }, 
-                          shadowOpacity: 0.1, 
-                          shadowRadius: 1, 
-                          elevation: 1 
                         }}>
                           {bImageUrl ? (
                             <Image source={{ uri: bImageUrl }} style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }} resizeMode="cover" />
                           ) : null}
-                          <Text style={{ fontSize: 12, color: '#075E54', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
-                            💌 Hebahan Eksklusif daripada {user?.merchant_name || 'Kedai Kami'}
-                          </Text>
-                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 4 }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                             📣 {bTitle || 'Campaign Title'}
                           </Text>
-                          <View style={{ height: 1, backgroundColor: '#C8E6C9', marginVertical: 6 }} />
-                          <Text style={{ fontSize: 12, color: '#0F172A', lineHeight: 17, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 8 }} />
+                          <Text style={{ fontSize: 12, color: '#050505', lineHeight: 18, fontFamily: 'PlusJakartaSans_500Medium' }}>
                             {bMessage
                               .replace(/\{\{\s*name\s*\}\}/g, 'Hashiff')
                               .replace(/\{\{\s*stamps\s*\}\}/g, '8')}
                           </Text>
-                          <View style={{ height: 1, backgroundColor: '#C8E6C9', marginVertical: 6 }} />
-                          <Text style={{ fontSize: 9.5, color: '#555555', fontStyle: 'italic', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 8 }} />
+                          <Text style={{ fontSize: 9.5, color: '#64748B', fontStyle: 'italic', fontFamily: 'PlusJakartaSans_500Medium' }}>
                             Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV.
                           </Text>
                           
                           {/* Time & Double Tick inside bubble */}
                           <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center', gap: 3, marginTop: 4 }}>
-                            <Text style={{ fontSize: 8, color: '#738A75', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            <Text style={{ fontSize: 9, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>
                               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </Text>
-                            <Ionicons name="checkmark-done" size={11} color="#34B7F1" />
+                            <Ionicons name="checkmark-done" size={12} color="#0EA5E9" />
                           </View>
 
                           {bBtnText ? (
-                            <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#C8E6C9', paddingTop: 8, alignItems: 'center' }}>
-                              <Text style={{ fontSize: 13, color: '#0EA5E9', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{bBtnText}</Text>
+                            <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, alignItems: 'center' }}>
+                              <Text style={{ fontSize: 13, color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{bBtnText}</Text>
                             </View>
                           ) : null}
                         </View>
@@ -1689,58 +1691,34 @@ export default function MarketingScreen() {
                     </View>
 
                     {/* Visual Segment Delivery Target Grid */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-                      <View style={{ 
-                        flex: 1, 
-                        backgroundColor: '#F8FAFC', 
-                        borderRadius: 14, 
-                        paddingHorizontal: 12, 
-                        paddingVertical: 10, 
-                        borderWidth: 1, 
-                        borderColor: '#E2E8F0',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Ionicons name="people-outline" size={16} color="#64748B" />
-                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Audience Size</Text>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{audienceEstimate} Members</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 16 }}>
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="people-outline" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Audience</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{audienceEstimate}</Text>
                       </View>
 
-                      <View style={{ 
-                        flex: 1, 
-                        backgroundColor: '#F8FAFC', 
-                        borderRadius: 14, 
-                        paddingHorizontal: 12, 
-                        paddingVertical: 10, 
-                        borderWidth: 1, 
-                        borderColor: '#E2E8F0',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Ionicons name="notifications-outline" size={16} color="#10B981" />
-                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Push Channel</Text>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Active</Text>
+                      <View style={{ width: 1, height: 24, backgroundColor: '#E2E8F0' }} />
+
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="notifications-outline" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Push</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Active</Text>
                       </View>
 
-                      <View style={{ 
-                        flex: 1, 
-                        backgroundColor: '#F8FAFC', 
-                        borderRadius: 14, 
-                        paddingHorizontal: 12, 
-                        paddingVertical: 10, 
-                        borderWidth: 1, 
-                        borderColor: '#E2E8F0',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Ionicons 
-                          name="chatbubble-outline" 
-                          size={16} 
-                          color={bSendWhatsApp ? '#10B981' : '#94A3B8'} 
-                        />
-                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>WhatsApp</Text>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: bSendWhatsApp ? '#10B981' : '#94A3B8' }}>
-                          {bSendWhatsApp ? 'Enabled' : 'Disabled'}
+                      <View style={{ width: 1, height: 24, backgroundColor: '#E2E8F0' }} />
+
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="logo-whatsapp" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>WhatsApp</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: bSendWhatsApp ? '#10B981' : '#94A3B8' }}>
+                          {bSendWhatsApp ? 'Ready' : 'Off'}
                         </Text>
                       </View>
                     </View>
@@ -1769,18 +1747,13 @@ export default function MarketingScreen() {
                         disabled={isSendingBlast || audienceEstimate === 0}
                         style={{ 
                           backgroundColor: '#FFC700', 
-                          height: 50, 
+                          height: 52, 
                           borderRadius: 14, 
                           alignItems: 'center', 
                           justifyContent: 'center',
                           opacity: (isSendingBlast || audienceEstimate === 0) ? 0.5 : 1,
                           flexDirection: 'row',
-                          gap: 8,
-                          shadowColor: '#FFC700',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.2,
-                          shadowRadius: 8,
-                          elevation: 3
+                          gap: 8
                         }}
                         activeOpacity={0.8}
                       >
@@ -1803,11 +1776,11 @@ export default function MarketingScreen() {
                     >
                       <Text style={{ color: '#64748B', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Go Back to Edit</Text>
                     </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                  </View>
+                )}
               </View>
-            )}
+            </View>
+          )}
 
               {blastSubTab === 'running' && (
                 <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 24 }}>
@@ -1905,213 +1878,14 @@ export default function MarketingScreen() {
               </View>
             )}
           </View>
-        )}
+        </View>
+      )}
 
-            {broadcastMode === 'automated' && (
-              <View style={{ width: '100%' }}>
-                {/* Compose Automation Rule */}
-                <View style={styles.configCard}>
-                  <Text style={styles.cardSectionTitle}>
-                    {selectedAutomation ? t('edit_automation_rule') : t('automated_winback')}
-                  </Text>
-                  <Text style={styles.cardSectionDesc}>
-                    {t('automation_desc')}
-                  </Text>
-
-                  {/* Trigger Days Selection */}
-                  <Text style={styles.inputLabelSmall}>{t('trigger_delay')}</Text>
-                  <View style={styles.triggerDaysRow}>
-                    {['3', '7', '14', '30'].map((day) => (
-                      <TouchableOpacity
-                        key={day}
-                        style={[
-                          styles.triggerDayBtn,
-                          arTriggerDays === day && styles.triggerDayBtnActive
-                        ]}
-                        onPress={() => setArTriggerDays(day)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[
-                          styles.triggerDayBtnText,
-                          arTriggerDays === day && styles.triggerDayBtnTextActive
-                        ]}>
-                          {day} {t('days')}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity
-                      style={[
-                        styles.triggerDayBtn,
-                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnActive
-                      ]}
-                      onPress={() => {
-                        if (['3', '7', '14', '30'].includes(arTriggerDays)) {
-                          setArTriggerDays('');
-                        }
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[
-                        styles.triggerDayBtnText,
-                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnTextActive
-                      ]}>
-                        {t('custom')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {!['3', '7', '14', '30'].includes(arTriggerDays) && (
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={arTriggerDays}
-                      onChangeText={(val) => {
-                        const cleaned = val.replace(/[^\d]/g, '');
-                        setArTriggerDays(cleaned);
-                      }}
-                      placeholder={t('custom_days_placeholder')}
-                      placeholderTextColor="#BEC6E0"
-                      keyboardType="numeric"
-                    />
-                  )}
-
-                  <Text style={styles.inputLabelSmall}>{t('rule_name')}</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={arName}
-                    onChangeText={setArName}
-                    placeholder="e.g. 7-Day Winback Campaign"
-                    placeholderTextColor="#BEC6E0"
-                  />
-
-                  <Text style={styles.inputLabelSmall}>{t('message_title')}</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={arTitle}
-                    onChangeText={setArTitle}
-                    placeholder="e.g. We Miss You! ❤️"
-                    placeholderTextColor="#BEC6E0"
-                  />
-
-                  <Text style={styles.inputLabelSmall}>{t('message_body')}</Text>
-                  <TextInput
-                    style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
-                    multiline
-                    numberOfLines={4}
-                    value={arMessage}
-                    onChangeText={setArMessage}
-                    placeholder={locale === 'en' ? "Use {{name}} and {{stamps}} tags..." : "Gunakan tag {{name}} dan {{stamps}}..."}
-                    placeholderTextColor="#BEC6E0"
-                  />
-                  <Text style={styles.helperText}>
-                    {t('template_helper_desc')}
-                  </Text>
-
-
-
-                  <TouchableOpacity
-                    style={styles.saveBtn}
-                    onPress={handleSaveAutomationRule}
-                    disabled={isSavingRule}
-                    activeOpacity={0.9}
-                  >
-                    {isSavingRule ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.saveBtnText}>
-                        {selectedAutomation ? t('update_rule') : t('activate_rule')}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-
-                  {selectedAutomation && (
-                    <TouchableOpacity
-                      style={{ alignSelf: 'center', marginTop: 12 }}
-                      onPress={() => {
-                        setSelectedAutomation(null);
-                        setArName('');
-                        setArTriggerDays('7');
-                        setArTitle('We Miss You! ❤️');
-                        setArMessage("Hi {{name}}! 👋\n\nIt's been a while since your last visit. Come back soon to collect your next stamp! ✨");
-                        setArSendWhatsApp(true);
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>
-                        {t('cancel_edit')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Automation Rules List */}
-                <Text style={styles.previewSectionHeader}>{t('active_automation_rules')}</Text>
-
-                {loadingRules ? (
-                  <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
-                ) : automationRules.length === 0 ? (
-                  <View style={styles.campEmptyState}>
-                    <Ionicons name="time-outline" size={40} color="#94A3B8" />
-                    <Text style={styles.campEmptyTitle}>{t('no_automation_rules')}</Text>
-                    <Text style={styles.campEmptySub}>{t('no_automation_desc')}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.campList}>
-                    {automationRules.map((rule) => (
-                      <View key={rule.id} style={[styles.campCard, !rule.is_active && { opacity: 0.7 }]}>
-                        <View style={styles.campCardHeader}>
-                          <View style={{ gap: 4, flex: 1 }}>
-                            <Text style={styles.campCardName}>{rule.name}</Text>
-                            <Text style={{ fontSize: 11, color: '#475569', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                              {t('trigger_label')}: {rule.trigger_days} {t('days_inactive')}
-                            </Text>
-                          </View>
-                          <Switch
-                            value={rule.is_active}
-                            onValueChange={() => toggleAutomationRuleActive(rule)}
-                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
-                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : rule.is_active ? '#10B981' : '#F4F3F4'}
-                          />
-                        </View>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginTop: 4 }}>
-                          {t('subject')}: {rule.title}
-                        </Text>
-                        <Text style={styles.campCardDesc}>{rule.message}</Text>
-                        
-                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }}>
-                          <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => {
-                              setSelectedAutomation(rule);
-                              setArName(rule.name);
-                              setArTriggerDays(String(rule.trigger_days));
-                              setArTitle(rule.title);
-                              setArMessage(rule.message);
-                              setArSendWhatsApp(rule.send_whatsapp);
-                            }}
-                          >
-                            <Feather name="edit-2" size={13} color="#475569" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('edit')}</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => handleDeleteAutomationRule(rule.id)}
-                          >
-                            <Feather name="trash-2" size={13} color="#EF4444" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('delete')}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-
-            {broadcastMode === 'smart' && (
-              <View style={{ width: '100%' }}>
-                <SmartFollowUp styles={styles} Alert={Alert} />
-              </View>
-            )}
+        {subTab === 'followup' && (
+          <View style={styles.broadcastContent}>
+            <View style={{ width: '100%' }}>
+              <SmartFollowUp styles={styles} Alert={Alert} />
+            </View>
           </View>
         )}
 
@@ -2122,11 +1896,12 @@ export default function MarketingScreen() {
                 setBTitle(tpl.headerText || tpl.name);
                 setBMessage(tpl.bodyText);
                 setBSendWhatsApp(true);
-                setSubTab('broadcast');
+                setSubTab('blast');
               }}
             />
           </View>
         )}
+
       </ScrollView>
 
       {/* Create Campaign Modal */}
@@ -3009,34 +2784,40 @@ const styles = StyleSheet.create({
   // Sub-tabs styles
   subTabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#171717',
+    backgroundColor: '#111111',
     borderRadius: 100,
-    padding: 6,
+    padding: 5,
     marginBottom: 24,
     zIndex: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   subTabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 100,
   },
   subTabButtonActive: {
     backgroundColor: '#FFC700',
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   subTabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#FFFFFF',
+    color: '#64748B',
+    letterSpacing: 0.1,
   },
   subTabTextActive: {
     color: '#050505',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 12,
   },
 
   // Campaigns content styles
