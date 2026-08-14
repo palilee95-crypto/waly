@@ -336,7 +336,7 @@ export default function OnboardingSetupScreen() {
             } else {
               // Open seamlessly inside the mobile app
               router.push({
-                pathname: '/nfc',
+                pathname: '/nfc' as any,
                 params: { m: merchantId }
               });
             }
