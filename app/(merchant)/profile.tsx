@@ -252,6 +252,25 @@ export default function ProfileScreen() {
 
     const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209';
 
+    const initFB = () => {
+      if ((window as any).FB) {
+        try {
+          (window as any).FB.init({
+            appId: fbAppId,
+            autoLogAppEvents: true,
+            xfbml: true,
+            version: 'v20.0'
+          });
+        } catch (e) {
+          console.warn('FB.init warning:', e);
+        }
+      }
+    };
+
+    (window as any).fbAsyncInit = function () {
+      initFB();
+    };
+
     if (!document.getElementById('facebook-jssdk')) {
       const script = document.createElement('script');
       script.id = 'facebook-jssdk';
@@ -259,19 +278,13 @@ export default function ProfileScreen() {
       script.async = true;
       script.defer = true;
       script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        initFB();
+      };
       document.body.appendChild(script);
+    } else {
+      initFB();
     }
-
-    (window as any).fbAsyncInit = function () {
-      if ((window as any).FB) {
-        (window as any).FB.init({
-          appId: fbAppId,
-          autoLogAppEvents: true,
-          xfbml: true,
-          version: 'v20.0'
-        });
-      }
-    };
 
     const handleMetaMessage = (event: MessageEvent) => {
       if (
@@ -334,55 +347,63 @@ export default function ProfileScreen() {
     if (Platform.OS === 'web' && (window as any).FB && fbConfigId) {
       setIsConnectingMeta(true);
       setConnectingStepText('Connecting via Meta popup...');
-      (window as any).FB.login(
-        async (response: any) => {
-          console.log('[META FB.LOGIN RESPONSE]', response);
-          if (response?.authResponse?.code) {
-            setConnectingStepText('Configuring WhatsApp Business Account & Webhooks...');
-            try {
-              const res = await pb.send('/api/risev/merchant/whatsapp/meta-connect', {
+      try {
+        (window as any).FB.login(
+          function (response: any) {
+            console.log('[META FB.LOGIN RESPONSE]', response);
+            if (response?.authResponse?.code) {
+              setConnectingStepText('Configuring WhatsApp Business Account & Webhooks...');
+              pb.send('/api/risev/merchant/whatsapp/meta-connect', {
                 method: 'POST',
                 body: {
                   code: response.authResponse.code,
                   wabaId: metaWabaId,
                   phoneNumberId: metaPhoneId
                 }
-              });
-              if (res && res.success) {
-                await fetchMetaConfig();
-                setResultModalConfig({
-                  title: 'WhatsApp Connected! 🎉',
-                  desc: `Your WhatsApp Business API (${res.phone_number || 'verified number'}) is active and ready to deliver loyalty updates!`,
-                  type: 'success'
+              })
+                .then(async (res: any) => {
+                  if (res && res.success) {
+                    await fetchMetaConfig();
+                    setResultModalConfig({
+                      title: 'WhatsApp Connected! 🎉',
+                      desc: `Your WhatsApp Business API (${res.phone_number || 'verified number'}) is active and ready to deliver loyalty updates!`,
+                      type: 'success'
+                    });
+                    setShowResultModal(true);
+                  } else {
+                    Alert.alert('Notice', res?.message || 'Meta connection received.');
+                    await fetchMetaConfig();
+                  }
+                })
+                .catch((err: any) => {
+                  Alert.alert('Connection Error', err.message || 'Failed to complete Meta setup.');
+                })
+                .finally(() => {
+                  setIsConnectingMeta(false);
+                  setConnectingStepText('');
                 });
-                setShowResultModal(true);
-              } else {
-                Alert.alert('Notice', res?.message || 'Meta connection received.');
-                await fetchMetaConfig();
-              }
-            } catch (err: any) {
-              Alert.alert('Connection Error', err.message || 'Failed to complete Meta setup.');
-            } finally {
+            } else {
               setIsConnectingMeta(false);
               setConnectingStepText('');
             }
-          } else {
-            setIsConnectingMeta(false);
-            setConnectingStepText('');
+          },
+          {
+            config_id: fbConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+            extras: {
+              feature: 'whatsapp_embedded_signup',
+              version: 2,
+              setup: {}
+            }
           }
-        },
-        {
-          config_id: fbConfigId,
-          response_type: 'code',
-          override_default_response_type: true,
-          extras: {
-            feature: 'whatsapp_embedded_signup',
-            version: 2,
-            setup: {}
-          }
-        }
-      );
-      return;
+        );
+        return;
+      } catch (fbErr) {
+        console.warn('FB.login error, using fallback:', fbErr);
+        setIsConnectingMeta(false);
+        setConnectingStepText('');
+      }
     }
 
     // Fallback standard OAuth redirection if SDK not ready or on native
