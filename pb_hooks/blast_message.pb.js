@@ -439,6 +439,226 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
   }
 });
 
+// 2d. POST In-App Embedded Signup Completion (Popup / Session Listener Flow)
+routerAdd("POST", "/api/risev/merchant/whatsapp/meta-connect", (e) => {
+  const { registerAppTemplates, subscribeWabaApp, syncBusinessProfile } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    const body = e.requestInfo().body;
+    const code = body.code;
+    let wabaId = body.wabaId || body.waba_id || "";
+    let phoneNumberId = body.phoneNumberId || body.phone_number_id || "";
+
+    if (!code) {
+      return e.json(400, { message: "Missing authorization code from Meta Embedded Signup." });
+    }
+
+    // 1. Fetch Meta Developer App Secrets
+    const fbAppId = $os.getenv("META_APP_ID") || "YOUR_META_APP_ID"; 
+    const fbAppSecret = $os.getenv("META_APP_SECRET") || "YOUR_META_APP_SECRET";
+
+    // 2. Exchange code for permanent / system user token
+    console.log(`[META POPUP CONNECT] Exchanging code for token for merchant ${merchantId}`);
+    const tokenRes = $http.send({
+      url: "https://graph.facebook.com/v20.0/oauth/access_token",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        client_id: fbAppId,
+        client_secret: fbAppSecret,
+        code: code
+      })
+    });
+
+    if (tokenRes.statusCode < 200 || tokenRes.statusCode >= 300) {
+      console.log(`[META POPUP ERROR] Code exchange failed: ${tokenRes.statusCode} | ${tokenRes.raw}`);
+      return e.json(tokenRes.statusCode, { message: `Failed to exchange token with Meta: ${tokenRes.raw}` });
+    }
+
+    const tokenData = JSON.parse(tokenRes.raw);
+    const userAccessToken = tokenData.access_token;
+
+    // 3. Resolve WABA ID if not already provided by session listener
+    if (!wabaId) {
+      try {
+        const debugRes = $http.send({
+          url: `https://graph.facebook.com/v20.0/debug_token?input_token=${userAccessToken}&access_token=${fbAppId}|${fbAppSecret}`,
+          method: "GET"
+        });
+        if (debugRes.statusCode >= 200 && debugRes.statusCode < 300) {
+          const debugData = JSON.parse(debugRes.raw);
+          const granularScopes = (debugData.data && debugData.data.granular_scopes) || [];
+          for (let i = 0; i < granularScopes.length; i++) {
+            const s = granularScopes[i];
+            if (s.scope === "whatsapp_business_management" && s.target_ids && s.target_ids.length > 0) {
+              wabaId = s.target_ids[0];
+              break;
+            }
+          }
+        }
+      } catch (debugErr) {
+        console.log("[META POPUP DEBUG ERROR]:", debugErr.message || debugErr);
+      }
+    }
+
+    if (!wabaId) {
+      return e.json(400, { message: "Could not retrieve WhatsApp Business Account (WABA) ID from Meta." });
+    }
+
+    // 4. Fetch / verify Phone Number
+    let verifiedPhone = "";
+    const numbersRes = $http.send({
+      url: `https://graph.facebook.com/v20.0/${wabaId}/phone_numbers`,
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${userAccessToken}`
+      }
+    });
+
+    if (numbersRes.statusCode >= 200 && numbersRes.statusCode < 300) {
+      const numbersData = JSON.parse(numbersRes.raw);
+      const numbers = numbersData.data || [];
+      if (numbers.length > 0) {
+        // Match specific phone number id if provided, else use first active number
+        let matched = numbers.find(n => n.id === phoneNumberId) || numbers[0];
+        phoneNumberId = matched.id;
+        verifiedPhone = matched.display_phone_number || "";
+      }
+    }
+
+    if (!phoneNumberId) {
+      return e.json(400, { message: "No registered phone numbers found in your WhatsApp Business Account." });
+    }
+
+    // 5. Save or Update in whatsapp_configurations collection
+    let configRecord = null;
+    try {
+      const records = $app.findRecordsByFilter(
+        "whatsapp_configurations",
+        `merchant = '${merchantId}'`,
+        "-created",
+        1,
+        0
+      );
+      if (records.length > 0) {
+        configRecord = records[0];
+      }
+    } catch (err) {}
+
+    if (configRecord) {
+      configRecord.set("waba_id", wabaId);
+      configRecord.set("phone_number_id", phoneNumberId);
+      configRecord.set("access_token", userAccessToken);
+      configRecord.set("phone_number", verifiedPhone);
+      configRecord.set("status", "connected");
+      $app.save(configRecord);
+    } else {
+      const collection = $app.findCollectionByNameOrId("whatsapp_configurations");
+      const record = new Record(collection);
+      record.set("id", $security.randomString(15).toLowerCase());
+      record.set("merchant", merchantId);
+      record.set("waba_id", wabaId);
+      record.set("phone_number_id", phoneNumberId);
+      record.set("access_token", userAccessToken);
+      record.set("phone_number", verifiedPhone);
+      record.set("status", "connected");
+      $app.save(record);
+    }
+
+    // 6. Auto-bind webhooks via Subscribed Apps API
+    subscribeWabaApp(wabaId, userAccessToken);
+
+    // 7. Auto-sync Merchant Business Profile
+    try {
+      const mRec = $app.findRecordById("merchants", merchantId);
+      if (mRec) {
+        syncBusinessProfile(phoneNumberId, userAccessToken, {
+          about: mRec.getString("name") + " Rewards & Loyalty",
+          description: mRec.getString("description") || "Official WhatsApp channel",
+          website: mRec.getString("website") || ""
+        });
+      }
+    } catch (profErr) {
+      console.log("[META POPUP PROFILE SYNC WARNING]:", profErr.message || profErr);
+    }
+
+    // 8. Auto-register default loyalty templates on the WABA
+    try {
+      registerAppTemplates(wabaId, userAccessToken);
+    } catch (tmplErr) {
+      console.log("[META POPUP TEMPLATE WARNING]:", tmplErr.message || tmplErr);
+    }
+
+    console.log(`[META POPUP SUCCESS] Merchant ${merchantId} connected WhatsApp (${verifiedPhone}) successfully!`);
+
+    return e.json(200, {
+      success: true,
+      waba_id: wabaId,
+      phone_number_id: phoneNumberId,
+      phone_number: verifiedPhone,
+      status: "connected"
+    });
+  } catch (err) {
+    console.log("[META POPUP CONNECT EXCEPTION]", err.message || err);
+    return e.json(500, { message: `Internal server error: ${err.message || err}` });
+  }
+}, $apis.requireAuth("users"));
+
+// 2e. POST Send Live Test Message
+routerAdd("POST", "/api/risev/merchant/whatsapp/send-test", (e) => {
+  const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { message: "Unauthorized" });
+    }
+    const merchantId = authRecord.get("merchant_id");
+    if (!merchantId) {
+      return e.json(400, { message: "No merchant profile linked" });
+    }
+
+    const body = e.requestInfo().body;
+    let targetPhone = body.phone || authRecord.get("phone") || "";
+    if (!targetPhone) {
+      return e.json(400, { message: "Recipient phone number is required." });
+    }
+
+    let storeName = "RISEV Loyalty";
+    try {
+      const mRec = $app.findRecordById("merchants", merchantId);
+      if (mRec && mRec.getString("name")) {
+        storeName = mRec.getString("name");
+      }
+    } catch (e) {}
+
+    const result = sendTemplateMessage(
+      merchantId,
+      targetPhone,
+      "risev_notification",
+      "en_US",
+      [storeName, "Test Notification", "Your Risev WhatsApp Cloud API is connected and working perfectly! 🎉"]
+    );
+
+    if (result.success) {
+      return e.json(200, { success: true, messageId: result.messageId });
+    } else {
+      return e.json(400, { success: false, error: result.error || "Failed to send test message" });
+    }
+  } catch (err) {
+    return e.json(500, { message: err.message || err });
+  }
+}, $apis.requireAuth("users"));
+
 // 3. POST Blast Message to Customers
 routerAdd("POST", "/api/risev/merchant/blast", (e) => {
   const { sendTemplateMessage, fetchAllRecords } = require(`${__hooks}/whatsapp_helper.js`);

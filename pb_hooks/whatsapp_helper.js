@@ -377,6 +377,52 @@ function deleteMessageTemplate(merchantId, templateName) {
   }
 }
 
+function subscribeWabaApp(wabaId, accessToken) {
+  try {
+    const res = $http.send({
+      url: `https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`,
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+    console.log(`[META SUBSCRIBED_APPS] Status: ${res.statusCode} | Response: ${res.raw}`);
+    return { success: res.statusCode >= 200 && res.statusCode < 300, raw: res.raw };
+  } catch (err) {
+    console.log("[META SUBSCRIBED_APPS EXCEPTION]:", err.message || err);
+    return { success: false, error: err.message || err };
+  }
+}
+
+function syncBusinessProfile(phoneNumberId, accessToken, profileData) {
+  try {
+    const body = {
+      messaging_product: "whatsapp",
+      about: profileData.about || "Loyalty & Rewards Program",
+      description: profileData.description || "Official WhatsApp channel",
+      vertical: profileData.vertical || "RETAIL"
+    };
+    if (profileData.website) {
+      body.websites = [profileData.website];
+    }
+    const res = $http.send({
+      url: `https://graph.facebook.com/v20.0/${phoneNumberId}/whatsapp_business_profile`,
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    console.log(`[META BUSINESS PROFILE SYNC] Status: ${res.statusCode} | Response: ${res.raw}`);
+    return { success: res.statusCode >= 200 && res.statusCode < 300, raw: res.raw };
+  } catch (err) {
+    console.log("[META BUSINESS PROFILE EXCEPTION]:", err.message || err);
+    return { success: false, error: err.message || err };
+  }
+}
+
 function registerAppTemplates(wabaId, accessToken) {
   const templates = [
     {
@@ -390,6 +436,38 @@ function registerAppTemplates(wabaId, accessToken) {
           "example": {
             "body_text": [
               ["Store Name", "Notification", "This is a test notification message."]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stamp_earned_v1",
+      "category": "UTILITY",
+      "language": "en_US",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi {{1}}, you just received {{2}} stamp(s) at {{3}}! Your total balance is now {{4}} stamp(s).",
+          "example": {
+            "body_text": [
+              ["Customer", "1", "Coffee House", "5"]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "voucher_received_v1",
+      "category": "UTILITY",
+      "language": "en_US",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Congratulations {{1}}! You have unlocked a new reward: *{{2}}* at {{3}}. Your voucher code is *{{4}}*.",
+          "example": {
+            "body_text": [
+              ["Customer", "Free Iced Latte", "Coffee House", "WV-9821-4820"]
             ]
           }
         }
@@ -439,5 +517,7 @@ module.exports = {
   getMerchantWabaConfig,
   listMessageTemplates,
   createMessageTemplate,
-  deleteMessageTemplate
+  deleteMessageTemplate,
+  subscribeWabaApp,
+  syncBusinessProfile
 };

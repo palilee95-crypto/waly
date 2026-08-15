@@ -109,6 +109,9 @@ export default function ProfileScreen() {
   const [metaPhone, setMetaPhone] = useState('');
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [isDisconnectingMeta, setIsDisconnectingMeta] = useState(false);
+  const [isConnectingMeta, setIsConnectingMeta] = useState(false);
+  const [connectingStepText, setConnectingStepText] = useState('');
+  const [isSendingTest, setIsSendingTest] = useState(false);
   const [metaConfigId, setMetaConfigId] = useState<string | null>(null);
 
   const [showMetaHelp, setShowMetaHelp] = useState(false);
@@ -243,14 +246,146 @@ export default function ProfileScreen() {
     }
   };
 
+  // Initialize Facebook JS SDK for Embedded Signup popup on web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209';
+
+    if (!document.getElementById('facebook-jssdk')) {
+      const script = document.createElement('script');
+      script.id = 'facebook-jssdk';
+      script.src = 'https://connect.facebook.net/en_US/sdk.js';
+      script.async = true;
+      script.defer = true;
+      script.crossOrigin = 'anonymous';
+      document.body.appendChild(script);
+    }
+
+    (window as any).fbAsyncInit = function () {
+      if ((window as any).FB) {
+        (window as any).FB.init({
+          appId: fbAppId,
+          autoLogAppEvents: true,
+          xfbml: true,
+          version: 'v20.0'
+        });
+      }
+    };
+
+    const handleMetaMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== 'https://www.facebook.com' &&
+        event.origin !== 'https://web.facebook.com'
+      ) {
+        return;
+      }
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data?.type === 'WA_EMBEDDED_SIGNUP') {
+          console.log('[META EMBEDDED SIGNUP EVENT]', data);
+          if (data.data?.waba_id) setMetaWabaId(data.data.waba_id);
+          if (data.data?.phone_number_id) setMetaPhoneId(data.data.phone_number_id);
+          if (data.data?.current_step) {
+            setConnectingStepText(`Step: ${String(data.data.current_step).replace(/_/g, ' ')}...`);
+          }
+        }
+      } catch (err) {}
+    };
+
+    window.addEventListener('message', handleMetaMessage);
+    return () => {
+      window.removeEventListener('message', handleMetaMessage);
+    };
+  }, []);
+
   const handleOpenMetaSetup = () => {
     fetchMetaConfig();
     setMetaModalVisible(true);
   };
 
+  const handleSendTestMessage = async () => {
+    if (!user || !user.merchant_id) return;
+    setIsSendingTest(true);
+    try {
+      const res = await pb.send('/api/risev/merchant/whatsapp/send-test', {
+        method: 'POST',
+        body: { phone: metaPhone || user.phone }
+      });
+      if (res && res.success) {
+        Alert.alert('Message Sent! 🚀', `A test WhatsApp message was sent to ${metaPhone || user.phone}. Please check your phone!`);
+      } else {
+        Alert.alert('Send Notice', res?.error || 'Could not send test message.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to send test message.');
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   const handleQuickConnectMeta = () => {
     if (!user || !user.merchant_id) return;
     
+    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
+    const fbConfigId = process.env.EXPO_PUBLIC_META_CONFIG_ID || '';
+
+    // Check if FB SDK is loaded on web
+    if (Platform.OS === 'web' && (window as any).FB && fbConfigId) {
+      setIsConnectingMeta(true);
+      setConnectingStepText('Connecting via Meta popup...');
+      (window as any).FB.login(
+        async (response: any) => {
+          console.log('[META FB.LOGIN RESPONSE]', response);
+          if (response?.authResponse?.code) {
+            setConnectingStepText('Configuring WhatsApp Business Account & Webhooks...');
+            try {
+              const res = await pb.send('/api/risev/merchant/whatsapp/meta-connect', {
+                method: 'POST',
+                body: {
+                  code: response.authResponse.code,
+                  wabaId: metaWabaId,
+                  phoneNumberId: metaPhoneId
+                }
+              });
+              if (res && res.success) {
+                await fetchMetaConfig();
+                setResultModalConfig({
+                  title: 'WhatsApp Connected! 🎉',
+                  desc: `Your WhatsApp Business API (${res.phone_number || 'verified number'}) is active and ready to deliver loyalty updates!`,
+                  type: 'success'
+                });
+                setShowResultModal(true);
+              } else {
+                Alert.alert('Notice', res?.message || 'Meta connection received.');
+                await fetchMetaConfig();
+              }
+            } catch (err: any) {
+              Alert.alert('Connection Error', err.message || 'Failed to complete Meta setup.');
+            } finally {
+              setIsConnectingMeta(false);
+              setConnectingStepText('');
+            }
+          } else {
+            setIsConnectingMeta(false);
+            setConnectingStepText('');
+          }
+        },
+        {
+          config_id: fbConfigId,
+          response_type: 'code',
+          override_default_response_type: true,
+          extras: {
+            feature: 'whatsapp_embedded_signup',
+            version: 2,
+            setup: {}
+          }
+        }
+      );
+      return;
+    }
+
+    // Fallback standard OAuth redirection if SDK not ready or on native
     const pbBaseUrl = pb.baseUrl.replace(/\/$/, '');
     const redirectUriRaw = pbBaseUrl + '/api/risev/merchant/whatsapp/callback';
 
@@ -263,12 +398,6 @@ export default function ProfileScreen() {
     const encodedState = encodeURIComponent(JSON.stringify(stateObj));
     const redirectUri = encodeURIComponent(redirectUriRaw);
     
-    // Facebook Developer App ID (Platform central App)
-    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
-    const fbConfigId = process.env.EXPO_PUBLIC_META_CONFIG_ID || '';
-    if (fbAppId === '1040853298682209') {
-      console.log('Using default fallback Meta App ID.');
-    }
     let oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&response_type=code`;
     if (fbConfigId) {
       const extrasObj = { setup: {} };
@@ -1492,6 +1621,31 @@ export default function ProfileScreen() {
                         <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
                       </TouchableOpacity>
 
+                      {/* Send Test Message */}
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}
+                        onPress={handleSendTestMessage}
+                        disabled={isSendingTest}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 10, marginRight: 16 }}>
+                          {isSendingTest ? (
+                            <ActivityIndicator size="small" color="#3B82F6" />
+                          ) : (
+                            <Ionicons name="paper-plane" size={20} color="#3B82F6" />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#0F172A', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            {locale === 'en' ? 'Send Test WhatsApp Message' : 'Hantar Mesej WhatsApp Ujian'}
+                          </Text>
+                          <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 2 }}>
+                            {locale === 'en' ? 'Send an instant test ping to your phone' : 'Hantar ujian segera ke telefon anda'}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                      </TouchableOpacity>
+
                       <TouchableOpacity
                         style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}
                         onPress={() => Linking.openURL(`https://business.facebook.com/wa/manage/message-templates/?waba_id=${metaWabaId}`)}
@@ -1664,11 +1818,12 @@ export default function ProfileScreen() {
                 {/* Quick Connect Button */}
                 <TouchableOpacity 
                   onPress={handleQuickConnectMeta}
+                  disabled={isConnectingMeta}
                   style={{ 
                     flexDirection: 'row', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    backgroundColor: '#1877F2',
+                    backgroundColor: isConnectingMeta ? '#93C5FD' : '#1877F2',
                     paddingVertical: 14,
                     borderRadius: 12,
                     marginBottom: 20,
@@ -1681,10 +1836,21 @@ export default function ProfileScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
-                    {locale === 'en' ? 'Quick Connect via Meta' : 'Sambungan Pantas via Meta'}
-                  </Text>
+                  {isConnectingMeta ? (
+                    <>
+                      <ActivityIndicator color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold' }}>
+                        {connectingStepText || (locale === 'en' ? 'Connecting to Meta...' : 'Menyambung ke Meta...')}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
+                        {locale === 'en' ? 'Quick Connect via Meta' : 'Sambungan Pantas via Meta'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </>
             )}
