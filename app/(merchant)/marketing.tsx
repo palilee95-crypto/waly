@@ -155,6 +155,7 @@ export default function MarketingScreen() {
   const [blastStep, setBlastStep] = useState<1 | 2 | 3>(1);
   const [blastSubTab, setBlastSubTab] = useState<'create' | 'running' | 'history'>('create');
   const [selectedSegment, setSelectedSegment] = useState<'all' | 'spenders' | 'inactive' | 'visitors' | 'custom'>('all');
+  const [isSegmentDropdownOpen, setIsSegmentDropdownOpen] = useState(false);
   const [customAudienceIds, setCustomAudienceIds] = useState<string[]>([]);
   const [showCustomAudienceModal, setShowCustomAudienceModal] = useState(false);
   const [caTab, setCaTab] = useState<'manual' | 'rules' | 'paste'>('manual');
@@ -1297,56 +1298,130 @@ export default function MarketingScreen() {
                     {blastStep === 1 && (
                       <View>
                     
-                    {/* Target Segment Selector */}
-                    <View style={{ marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                        <Ionicons name="people-outline" size={13} color="#475569" />
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>TARGET SEGMENT</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {[
-                          { id: 'all', label: 'All' },
-                          { id: 'spenders', label: 'Top Spenders' },
-                          { id: 'visitors', label: 'Top Visitors' },
-                          { id: 'inactive', label: 'Inactive' },
-                          { id: 'custom', label: 'Custom' },
-                        ].map((seg) => {
-                          const isActive = selectedSegment === seg.id;
-                          return (
+                      {/* Target Segment Selector */}
+                      <View style={{ marginBottom: 16, zIndex: 50, elevation: 50 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                          <Ionicons name="people-outline" size={13} color="#475569" />
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>TARGET SEGMENT</Text>
+                        </View>
+                        
+                        <View style={{ flexDirection: 'row', gap: 8, zIndex: 10 }}>
+                          {/* Dropdown Toggle */}
+                          <View style={{ position: 'relative', flex: 1 }}>
                             <TouchableOpacity
-                              key={seg.id}
-                              onPress={() => setSelectedSegment(seg.id as any)}
+                              onPress={() => setIsSegmentDropdownOpen(!isSegmentDropdownOpen)}
                               style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 7,
-                                borderRadius: 100,
+                                flexDirection: 'row',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: isActive ? '#FFC700' : '#F8FAFC',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                borderRadius: 12,
+                                backgroundColor: (selectedSegment !== 'custom' && selectedSegment !== 'all') ? '#FFC700' : '#F8FAFC',
                                 borderWidth: 1,
-                                borderColor: isActive ? '#FFC700' : '#E2E8F0',
-                                shadowColor: isActive ? '#FFC700' : 'transparent',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: isActive ? 0.2 : 0,
-                                shadowRadius: 4,
-                                elevation: isActive ? 2 : 0,
+                                borderColor: (selectedSegment !== 'custom' && selectedSegment !== 'all') ? '#FFC700' : '#E2E8F0',
                               }}
-                              activeOpacity={0.8}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 11.5,
-                                  fontFamily: isActive ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
-                                  color: isActive ? '#050505' : '#64748B',
-                                }}
-                              >
-                                {seg.label}
+                              <Text style={{ 
+                                fontSize: 14, 
+                                fontFamily: 'PlusJakartaSans_600SemiBold',
+                                color: (selectedSegment !== 'custom' && selectedSegment !== 'all') ? '#050505' : '#475569'
+                              }}>
+                                {selectedSegment === 'all' ? 'All Customers' : 
+                                 selectedSegment === 'spenders' ? 'Top Spenders' : 
+                                 selectedSegment === 'visitors' ? 'Top Visitors' : 
+                                 selectedSegment === 'inactive' ? 'Inactive Customers' : 'Select Segment'}
                               </Text>
+                              <Ionicons name={isSegmentDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color={(selectedSegment !== 'custom' && selectedSegment !== 'all') ? '#050505' : '#475569'} />
                             </TouchableOpacity>
-                          );
-                        })}
+
+                            {/* Dropdown Menu */}
+                            {isSegmentDropdownOpen && (
+                              <View style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                marginTop: 8,
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 12,
+                                elevation: 5,
+                                zIndex: 20,
+                                overflow: 'hidden'
+                              }}>
+                                {[
+                                  { id: 'all', label: 'All Customers' },
+                                  { id: 'spenders', label: 'Top Spenders' },
+                                  { id: 'visitors', label: 'Top Visitors' },
+                                  { id: 'inactive', label: 'Inactive Customers' },
+                                ].map((seg, idx) => {
+                                  const isActive = selectedSegment === seg.id;
+                                  return (
+                                    <TouchableOpacity
+                                      key={seg.id}
+                                      onPress={() => {
+                                        setSelectedSegment(seg.id as any);
+                                        setIsSegmentDropdownOpen(false);
+                                      }}
+                                      style={{
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 12,
+                                        backgroundColor: isActive ? '#F8FAFC' : '#FFFFFF',
+                                        borderBottomWidth: idx < 3 ? 1 : 0,
+                                        borderBottomColor: '#F1F5F9',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                      }}
+                                    >
+                                      <Text style={{
+                                        fontSize: 14,
+                                        fontFamily: isActive ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_500Medium',
+                                        color: isActive ? '#050505' : '#475569'
+                                      }}>
+                                        {seg.label}
+                                      </Text>
+                                      {isActive && <Ionicons name="checkmark" size={16} color="#FFC700" />}
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Custom Button */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSelectedSegment('custom');
+                              setIsSegmentDropdownOpen(false);
+                            }}
+                            style={{
+                              paddingHorizontal: 16,
+                              paddingVertical: 12,
+                              borderRadius: 12,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: selectedSegment === 'custom' ? '#FFC700' : '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: selectedSegment === 'custom' ? '#FFC700' : '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 14,
+                              fontFamily: selectedSegment === 'custom' ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold',
+                              color: selectedSegment === 'custom' ? '#050505' : '#475569'
+                            }}>
+                              Custom
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
 
                     {selectedSegment === 'custom' && (
                       <TouchableOpacity
