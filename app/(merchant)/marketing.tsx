@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import SmartFollowUp from './_components/SmartFollowUp';
 import TemplateStudio, { WhatsAppTemplate } from './_components/TemplateStudio';
 
@@ -118,7 +119,7 @@ export default function MarketingScreen() {
   const [expiryFocused, setExpiryFocused] = useState(false);
   const [rewardFocused, setRewardFocused] = useState(false);
 
-  const [subTab, setSubTab] = useState<'campaigns' | 'broadcast' | 'templates'>('campaigns');
+  const [subTab, setSubTab] = useState<'campaigns' | 'blast' | 'followup' | 'templates'>('campaigns');
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
@@ -132,10 +133,145 @@ export default function MarketingScreen() {
   const [whatsappQr, setWhatsappQr] = useState<string>('');
   const [bCampaignId, setBCampaignId] = useState('');
   const [bTitle, setBTitle] = useState('Exclusive Promotion! 🎁');
+  const [bImageUrl, setBImageUrl] = useState('');
+  const [bBtnText, setBBtnText] = useState('');
+  const [bBtnUrl, setBBtnUrl] = useState('');
   const [bMessage, setBMessage] = useState('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setBImageUrl(result.assets[0].uri);
+    }
+  };
   const [bSendWhatsApp, setBSendWhatsApp] = useState(false);
   const [isSendingBlast, setIsSendingBlast] = useState(false);
-  const [audienceEstimate, setAudienceEstimate] = useState(0);
+  const [blastStep, setBlastStep] = useState<1 | 2 | 3>(1);
+  const [blastSubTab, setBlastSubTab] = useState<'create' | 'running' | 'history'>('create');
+  const [selectedSegment, setSelectedSegment] = useState<'all' | 'spenders' | 'inactive' | 'visitors' | 'custom'>('all');
+  const [customAudienceIds, setCustomAudienceIds] = useState<string[]>([]);
+  const [showCustomAudienceModal, setShowCustomAudienceModal] = useState(false);
+  const [caTab, setCaTab] = useState<'manual' | 'rules' | 'paste'>('manual');
+  const [caManualSelection, setCaManualSelection] = useState<Set<string>>(new Set());
+  const [caMinStamps, setCaMinStamps] = useState<string>('');
+  const [caStartDate, setCaStartDate] = useState<string>('');
+  const [caEndDate, setCaEndDate] = useState<string>('');
+  const [caPasteText, setCaPasteText] = useState<string>('');
+  
+  const [dbCards, setDbCards] = useState<any[]>([]);
+  const [dbTxs, setDbTxs] = useState<any[]>([]);
+
+  const targetCustomerIds = React.useMemo(() => {
+    const allCustomerIds = new Set<string>([
+      ...dbCards.map((c: any) => c.customer),
+      ...dbTxs.map((t: any) => t.customer)
+    ].filter(Boolean));
+
+    if (selectedSegment === 'custom') {
+      return customAudienceIds;
+    }
+
+    if (selectedSegment === 'all') {
+      return Array.from(allCustomerIds);
+    }
+
+    if (selectedSegment === 'inactive') {
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const lastTxMap: Record<string, number> = {};
+      dbTxs.forEach(t => {
+        if (!t.customer) return;
+        const time = new Date(t.created).getTime();
+        if (!lastTxMap[t.customer] || time > lastTxMap[t.customer]) {
+          lastTxMap[t.customer] = time;
+        }
+      });
+      return Array.from(allCustomerIds).filter(cid => {
+        const lastTxTime = lastTxMap[cid] || 0;
+        return lastTxTime < thirtyDaysAgo;
+      });
+    }
+
+    const statsMap: Record<string, { totalSpend: number; visits: number }> = {};
+    dbTxs.forEach(t => {
+      if (!t.customer) return;
+      if (!statsMap[t.customer]) {
+        statsMap[t.customer] = { totalSpend: 0, visits: 0 };
+      }
+      statsMap[t.customer].visits += 1;
+      if ((t.type === 'PURCHASE' || t.type === 'earn') && t.bill_amount) {
+        statsMap[t.customer].totalSpend += Number(t.bill_amount);
+      }
+    });
+
+    if (selectedSegment === 'spenders') {
+      const sorted = Array.from(allCustomerIds).sort((a, b) => {
+        const spendA = statsMap[a]?.totalSpend || 0;
+        const spendB = statsMap[b]?.totalSpend || 0;
+        return spendB - spendA;
+      });
+      return sorted.slice(0, 10);
+    }
+
+    if (selectedSegment === 'visitors') {
+      const sorted = Array.from(allCustomerIds).sort((a, b) => {
+        const visA = statsMap[a]?.visits || 0;
+        const visB = statsMap[b]?.visits || 0;
+        return visB - visA;
+      });
+      return sorted.slice(0, 10);
+    }
+
+    return Array.from(allCustomerIds);
+  }, [dbCards, dbTxs, selectedSegment, customAudienceIds]);
+
+  const rulesMatchCount = React.useMemo(() => {
+    let count = 0;
+    
+    let minStamps = 0;
+    let maxStamps = Infinity;
+    if (caMinStamps.includes('-')) {
+      const parts = caMinStamps.split('-');
+      minStamps = parseInt(parts[0]) || 0;
+      maxStamps = parseInt(parts[1]) || Infinity;
+    } else {
+      minStamps = parseInt(caMinStamps) || 0;
+    }
+
+    const startTs = caStartDate ? new Date(caStartDate).getTime() : 0;
+    const endTs = caEndDate ? new Date(caEndDate).getTime() + (24 * 60 * 60 * 1000) - 1 : Infinity;
+
+    const lastVisitMap: Record<string, number> = {};
+    dbTxs.forEach(t => {
+      if (!t.customer) return;
+      const time = new Date(t.created).getTime();
+      if (!lastVisitMap[t.customer] || time > lastVisitMap[t.customer]) {
+        lastVisitMap[t.customer] = time;
+      }
+    });
+
+    dbCards.forEach(c => {
+      if (c.customer) {
+        const userStamps = c.stamps || c.stamps_collected || 0;
+        const stampPass = (minStamps === 0 && maxStamps === Infinity) ? true : (userStamps >= minStamps && userStamps <= maxStamps);
+        const lastV = lastVisitMap[c.customer] || 0;
+        const hasDateRule = caStartDate || caEndDate;
+        const datePass = !hasDateRule || (lastV >= startTs && lastV <= endTs);
+        
+        if (stampPass && datePass) {
+          count++;
+        }
+      }
+    });
+    return count;
+  }, [caMinStamps, caStartDate, caEndDate, dbCards, dbTxs]);
+
+  const audienceEstimate = targetCustomerIds.length;
 
   // Automated winback rules states
   const [broadcastMode, setBroadcastMode] = useState<'manual' | 'automated' | 'smart'>('manual');
@@ -149,6 +285,11 @@ export default function MarketingScreen() {
   const [arSendWhatsApp, setArSendWhatsApp] = useState(false);
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [activeFollowUpParent, setActiveFollowUpParent] = useState<any | null>(null);
+
+  // Check for recent broadcasts to enforce 24-hour cooldown
+  const lastBroadcast = broadcastsList.length > 0 ? broadcastsList[0] : null;
+  const hasCooldown = lastBroadcast ? (Date.now() - new Date(lastBroadcast.created).getTime()) < 24 * 60 * 60 * 1000 : false;
+  const cooldownHoursLeft = lastBroadcast ? Math.max(0, Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - new Date(lastBroadcast.created).getTime())) / (60 * 60 * 1000))) : 0;
 
   // Custom Confirm Alert Modal states
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -480,17 +621,15 @@ export default function MarketingScreen() {
     try {
       const [cards, txs] = await Promise.all([
         pb.collection('loyalty_cards').getFullList({
-          filter: `merchant = '${user.merchant_id}' && (opt_in_marketing != false || opt_in_marketing = null)`
+          filter: `merchant = '${user.merchant_id}' && (opt_in_marketing != false || opt_in_marketing = null)`,
+          expand: 'customer'
         }),
         pb.collection('transactions').getFullList({
           filter: `merchant = '${user.merchant_id}'`
         })
       ]);
-      const customerIds = new Set([
-        ...cards.map((c: any) => c.customer),
-        ...txs.map((t: any) => t.customer)
-      ].filter(Boolean));
-      setAudienceEstimate(customerIds.size);
+      setDbCards(cards);
+      setDbTxs(txs);
     } catch (err) {
       console.warn('Failed to estimate audience:', err);
     }
@@ -526,7 +665,8 @@ export default function MarketingScreen() {
                   message: bMessage.trim(),
                   campaignId: bCampaignId || undefined,
                   sendWhatsApp: bSendWhatsApp,
-                  parentBroadcastId: activeFollowUpParent ? activeFollowUpParent.id : undefined
+                  parentBroadcastId: activeFollowUpParent ? activeFollowUpParent.id : undefined,
+                  targetCustomerIds: selectedSegment !== 'all' ? targetCustomerIds : undefined
                 }
               });
 
@@ -535,6 +675,7 @@ export default function MarketingScreen() {
               setBMessage('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
               setBCampaignId('');
               setActiveFollowUpParent(null);
+              setBlastStep(1);
               fetchBroadcasts();
             } catch (err: any) {
               console.warn(err);
@@ -840,17 +981,26 @@ export default function MarketingScreen() {
             onPress={() => setSubTab('campaigns')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]}>
-              {t('promotions')}
+            <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]} numberOfLines={1}>
+              Promo
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'broadcast' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('broadcast')}
+            style={[styles.subTabButton, subTab === 'blast' && styles.subTabButtonActive]}
+            onPress={() => setSubTab('blast')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'broadcast' && styles.subTabTextActive]}>
-              {t('broadcast')}
+            <Text style={[styles.subTabText, subTab === 'blast' && styles.subTabTextActive]} numberOfLines={1}>
+              Blast
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.subTabButton, subTab === 'followup' && styles.subTabButtonActive]}
+            onPress={() => setSubTab('followup')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.subTabText, subTab === 'followup' && styles.subTabTextActive]} numberOfLines={1}>
+              Follow Up
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -858,7 +1008,7 @@ export default function MarketingScreen() {
             onPress={() => setSubTab('templates')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]}>
+            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]} numberOfLines={1}>
               Templates
             </Text>
           </TouchableOpacity>
@@ -1004,46 +1154,644 @@ export default function MarketingScreen() {
           </View>
         )}
 
-        {subTab === 'broadcast' && (
+        {subTab === 'blast' && (
           <View style={styles.broadcastContent}>
-
-
-            {/* Mode Switch Segment */}
-            <View style={styles.modeSegmentContainer}>
-              <TouchableOpacity
-                style={[styles.modeSegmentBtn, broadcastMode === 'manual' && styles.modeSegmentBtnActive]}
-                onPress={() => setBroadcastMode('manual')}
-              >
-                <Ionicons name="send-outline" size={15} color={broadcastMode === 'manual' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
-                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'manual' && styles.modeSegmentBtnTextActive]}>
-                  {t('instant_blast')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeSegmentBtn, broadcastMode === 'smart' && styles.modeSegmentBtnActive]}
-                onPress={() => setBroadcastMode('smart')}
-              >
-                <Ionicons name="git-branch-outline" size={15} color={broadcastMode === 'smart' ? '#FFFFFF' : '#475569'} style={{ marginRight: 6 }} />
-                <Text style={[styles.modeSegmentBtnText, broadcastMode === 'smart' && styles.modeSegmentBtnTextActive]}>
-                  Smart Follow Up
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {broadcastMode === 'manual' && (
-              <View style={{ width: '100%' }}>
-                {/* In Development Lock Screen */}
-                <View style={[styles.campEmptyState, { paddingVertical: 56, backgroundColor: '#FFFFFF', borderStyle: 'solid', borderColor: '#E5E7EB', marginBottom: 20 }]}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                    <Ionicons name="construct-outline" size={30} color="#D97706" />
+            <View style={{ width: '100%' }}>
+                  
+                  {/* WhatsApp Status Connection Banner */}
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    backgroundColor: whatsappStatus === 'connected' ? '#050505' : '#FFC700', 
+                    borderRadius: 20, 
+                    paddingHorizontal: 16, 
+                    paddingVertical: 14, 
+                    borderWidth: 1, 
+                    borderColor: whatsappStatus === 'connected' ? '#10B981' : '#EAB308',
+                    marginBottom: 24,
+                    shadowColor: '#050505',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 12,
+                    elevation: 3
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 12 }}>
+                      <View style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 20, 
+                        backgroundColor: whatsappStatus === 'connected' ? '#10B981' : '#050505', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Ionicons 
+                          name="logo-whatsapp" 
+                          size={20} 
+                          color={whatsappStatus === 'connected' ? '#FFFFFF' : '#FFC700'} 
+                        />
+                      </View>
+                      <View style={{ gap: 2, flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: whatsappStatus === 'connected' ? '#FFFFFF' : '#050505' }}>
+                          {whatsappStatus === 'connected' ? 'Meta Cloud API Connected' : 'WhatsApp API Offline'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: whatsappStatus === 'connected' ? '#94A3B8' : '#0F172A', fontFamily: 'PlusJakartaSans_600SemiBold' }}>
+                          {whatsappStatus === 'connected' ? 'Messages will deliver via WhatsApp & Push' : 'Messages will deliver via Push Notification only'}
+                        </Text>
+                      </View>
+                    </View>
+                    {whatsappStatus !== 'connected' && (
+                      <TouchableOpacity 
+                        onPress={() => router.push('/(merchant)/profile')}
+                        style={{ 
+                          backgroundColor: '#050505', 
+                          paddingHorizontal: 16, 
+                          paddingVertical: 10, 
+                          borderRadius: 12,
+                          shadowColor: '#050505',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 2,
+                          flexShrink: 0
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>LINK WABA</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  <Text style={[styles.campEmptyTitle, { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }]}>
-                    In Development
-                  </Text>
-                  <Text style={[styles.campEmptySub, { textAlign: 'center', maxWidth: 320, color: '#64748B', lineHeight: 20, marginTop: 4 }]}>
-                    Instant Blast is currently under active development. Stay tuned for single-click customer broadcasts!
-                  </Text>
+
+                  {/* Sub-Tabs for Instant Blast */}
+                  <View style={{ flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 14, padding: 4, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    {[
+                      { id: 'create', label: 'Create' },
+                      { id: 'running', label: 'Running' },
+                      { id: 'history', label: 'History' }
+                    ].map(tab => (
+                      <TouchableOpacity
+                        key={tab.id}
+                        onPress={() => setBlastSubTab(tab.id as any)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 12,
+                          alignItems: 'center',
+                          borderRadius: 10,
+                          backgroundColor: blastSubTab === tab.id ? '#FFC700' : 'transparent',
+                          shadowColor: blastSubTab === tab.id ? '#050505' : 'transparent',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                          elevation: blastSubTab === tab.id ? 2 : 0
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: blastSubTab === tab.id ? '#050505' : '#64748B' }}>
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {blastSubTab === 'create' && (
+                    <View>
+                      {/* Campaign Creation Card */}
+                      <View style={{ 
+                        backgroundColor: '#FFFFFF', 
+                    borderRadius: 24, 
+                    padding: 20, 
+                    borderWidth: 1, 
+                    borderColor: '#F1F5F9', 
+                    shadowColor: '#050505', 
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.02, 
+                    shadowRadius: 16, 
+                    elevation: 2, 
+                    marginBottom: 24 
+                  }}>
+                    
+                    {/* Wizard Breadcrumbs */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 1 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 1 ? '#050505' : '#94A3B8' }}>1</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 1 ? '#050505' : '#94A3B8' }}>Audience</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 2 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 2 ? '#050505' : '#94A3B8' }}>2</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 2 ? '#050505' : '#94A3B8' }}>Compose</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 3 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 3 ? '#050505' : '#94A3B8' }}>3</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 3 ? '#050505' : '#94A3B8' }}>Preview</Text>
+                      </View>
+                    </View>
+
+                    {blastStep === 1 && (
+                      <View>
+                    
+                    {/* Target Segment Selector */}
+                    <View style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <Ionicons name="people-outline" size={13} color="#475569" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>TARGET SEGMENT</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {[
+                          { id: 'all', label: 'All' },
+                          { id: 'spenders', label: 'Top Spenders' },
+                          { id: 'visitors', label: 'Top Visitors' },
+                          { id: 'inactive', label: 'Inactive' },
+                          { id: 'custom', label: 'Custom' },
+                        ].map((seg) => {
+                          const isActive = selectedSegment === seg.id;
+                          return (
+                            <TouchableOpacity
+                              key={seg.id}
+                              onPress={() => setSelectedSegment(seg.id as any)}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 7,
+                                borderRadius: 100,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: isActive ? '#FFC700' : '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: isActive ? '#FFC700' : '#E2E8F0',
+                                shadowColor: isActive ? '#FFC700' : 'transparent',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: isActive ? 0.2 : 0,
+                                shadowRadius: 4,
+                                elevation: isActive ? 2 : 0,
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11.5,
+                                  fontFamily: isActive ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                                  color: isActive ? '#050505' : '#64748B',
+                                }}
+                              >
+                                {seg.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    {selectedSegment === 'custom' && (
+                      <TouchableOpacity
+                        onPress={() => setShowCustomAudienceModal(true)}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}
+                      >
+                        <Ionicons name="construct-outline" size={14} color="#050505" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Build Custom Audience</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <View style={{ backgroundColor: '#FFFFFF', padding: 24, borderRadius: 16, alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8' }}>Targeting Approximately</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                        <Text style={{ fontSize: 40, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{audienceEstimate}</Text>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8' }}>Customers</Text>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity 
+                      onPress={() => setBlastStep(2)}
+                      style={{ backgroundColor: '#FFC700', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Next: Compose Message</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {blastStep === 2 && (
+                  <View>
+                    {/* Campaign Title Input */}
+                    <View style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <Ionicons name="bookmark-outline" size={14} color="#050505" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Campaign Title</Text>
+                      </View>
+                      <TextInput
+                        style={{ 
+                          height: 52, 
+                          borderWidth: 1, 
+                          borderColor: '#E2E8F0', 
+                          borderRadius: 12, 
+                          paddingHorizontal: 16, 
+                          fontFamily: 'PlusJakartaSans_600SemiBold', 
+                          fontSize: 14, 
+                          color: '#050505',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                        placeholder="e.g. Special Weekend Voucher 🎁"
+                        placeholderTextColor="#94A3B8"
+                        value={bTitle}
+                        onChangeText={setBTitle}
+                      />
+                    </View>
+
+                    {/* Campaign Message Body Input */}
+                    <View style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#050505" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Message Body</Text>
+                      </View>
+                      <TextInput
+                        style={{ 
+                          minHeight: 120, 
+                          borderWidth: 1, 
+                          borderColor: '#E2E8F0', 
+                          borderRadius: 12, 
+                          padding: 16, 
+                          fontFamily: 'PlusJakartaSans_500Medium', 
+                          fontSize: 14, 
+                          color: '#050505',
+                          backgroundColor: '#FFFFFF',
+                          textAlignVertical: 'top',
+                        }}
+                        multiline
+                        numberOfLines={4}
+                        placeholder="Enter broadcast message body..."
+                        placeholderTextColor="#94A3B8"
+                        value={bMessage}
+                        onChangeText={setBMessage}
+                      />
+                    </View>
+
+                    {/* Personalization badges */}
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+                      <TouchableOpacity 
+                        onPress={() => setBMessage(prev => prev + ' {{name}}')}
+                        style={{ 
+                          backgroundColor: '#FFFFFF', 
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          paddingHorizontal: 14, 
+                          paddingVertical: 8, 
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <Ionicons name="add" size={14} color="#050505" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Customer Name</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => setBMessage(prev => prev + ' {{stamps}}')}
+                        style={{ 
+                          backgroundColor: '#FFFFFF', 
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          paddingHorizontal: 14, 
+                          paddingVertical: 8, 
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <Ionicons name="add" size={14} color="#050505" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Stamp Balance</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Media & Action Button Settings */}
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Image Attachment (Optional)</Text>
+                      {bImageUrl ? (
+                        <View style={{ position: 'relative' }}>
+                          <Image source={{ uri: bImageUrl }} style={{ width: '100%', height: 160, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }} resizeMode="cover" />
+                          <TouchableOpacity 
+                            onPress={() => setBImageUrl('')}
+                            style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(5,5,5,0.6)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Ionicons name="close" size={20} color="#FFFFFF" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity 
+                          onPress={pickImage}
+                          style={{ height: 64, borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed', borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
+                        >
+                          <Ionicons name="cloud-upload-outline" size={20} color="#64748B" />
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Tap to upload image</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={{ marginBottom: 24 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Call to Action Button (Optional)</Text>
+                      <View style={{ gap: 12 }}>
+                        <TextInput
+                          style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
+                          placeholder="Button Text (e.g. Shop Now)"
+                          placeholderTextColor="#94A3B8"
+                          value={bBtnText}
+                          onChangeText={setBBtnText}
+                        />
+                        <TextInput
+                          style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
+                          placeholder="Button URL (https://...)"
+                          placeholderTextColor="#94A3B8"
+                          value={bBtnUrl}
+                          onChangeText={setBBtnUrl}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Deliverability Channel Settings */}
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      paddingVertical: 14, 
+                      borderTopWidth: 1, 
+                      borderTopColor: '#F1F5F9', 
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#F1F5F9',
+                      marginBottom: 20 
+                    }}>
+                      <View style={{ gap: 2, flex: 1, marginRight: 16 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Send via WhatsApp</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
+                          Deliver message directly to customers' WhatsApp phones via official Meta WABA.
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (whatsappStatus !== 'connected' && !bSendWhatsApp) {
+                            Alert.alert('WhatsApp Offline', 'Link your WhatsApp Business Account (WABA) in Settings to activate WhatsApp broadcasting.');
+                            return;
+                          }
+                          setBSendWhatsApp(prev => !prev);
+                        }}
+                        style={{ 
+                          width: 46, 
+                          height: 26, 
+                          borderRadius: 13, 
+                          backgroundColor: bSendWhatsApp ? '#10B981' : '#E2E8F0', 
+                          justifyContent: 'center', 
+                          paddingHorizontal: 3 
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ 
+                          width: 20, 
+                          height: 20, 
+                          borderRadius: 10, 
+                          backgroundColor: '#FFFFFF', 
+                          alignSelf: bSendWhatsApp ? 'flex-end' : 'flex-start',
+                          shadowColor: '#000000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.15,
+                          shadowRadius: 2,
+                          elevation: 2
+                        }} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <TouchableOpacity 
+                        onPress={() => setBlastStep(1)}
+                        style={{ flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (!bTitle.trim() || !bMessage.trim()) {
+                            Alert.alert('Validation', 'Please enter title and message.');
+                            return;
+                          }
+                          setBlastStep(3);
+                        }}
+                        style={{ flex: 2, backgroundColor: '#FFC700', paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Next: Review & Preview</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {blastStep === 3 && (
+                  <View>
+                    {/* High-Fidelity WhatsApp Device Mockup Container */}
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 10 }}>Live Message Preview</Text>
+                    <View style={{ 
+                      backgroundColor: '#E5DDD5', 
+                      borderRadius: 18, 
+                      borderWidth: 1, 
+                      borderColor: '#E2E8F0',
+                      overflow: 'hidden',
+                      shadowColor: '#050505',
+                      shadowOpacity: 0.05,
+                      shadowRadius: 8,
+                      elevation: 2,
+                      marginBottom: 20
+                    }}>
+                      {/* WhatsApp Mockup Phone Top Header */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        backgroundColor: '#075E54', 
+                        paddingHorizontal: 12, 
+                        paddingVertical: 10 
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
+                          {/* Store Avatar Circle */}
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#128C7E', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                            {merchantLogo ? (
+                              <Image source={{ uri: merchantLogo }} style={{ width: 28, height: 28 }} resizeMode="cover" />
+                            ) : (
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                                {(merchant?.name || user?.merchant_name || 'K').substring(0, 1).toUpperCase()}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={{ gap: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
+                                {merchant?.name || user?.merchant_name || 'Kedai Kami'}
+                              </Text>
+                              <MaterialIcons name="verified" size={12} color="#25D366" />
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#25D366' }} />
+                              <Text style={{ fontSize: 8.5, color: '#A7F3D0', fontFamily: 'PlusJakartaSans_600SemiBold' }}>online</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                          <Ionicons name="videocam" size={15} color="#FFFFFF" />
+                          <Ionicons name="call" size={13} color="#FFFFFF" />
+                          <Ionicons name="ellipsis-vertical" size={15} color="#FFFFFF" />
+                        </View>
+                      </View>
+
+                      {/* Mockup Chat Body */}
+                      <View style={{ padding: 12, paddingBottom: 16, backgroundColor: '#F8FAFC' }}>
+                        <View style={{ 
+                          backgroundColor: '#FFFFFF', 
+                          borderRadius: 16, 
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12, 
+                          maxWidth: '85%', 
+                          alignSelf: 'flex-start', 
+                        }}>
+                          {bImageUrl ? (
+                            <Image source={{ uri: bImageUrl }} style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }} resizeMode="cover" />
+                          ) : null}
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                            📣 {bTitle || 'Campaign Title'}
+                          </Text>
+                          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 8 }} />
+                          <Text style={{ fontSize: 12, color: '#050505', lineHeight: 18, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            {bMessage
+                              .replace(/\{\{\s*name\s*\}\}/g, 'Hashiff')
+                              .replace(/\{\{\s*stamps\s*\}\}/g, '8')}
+                          </Text>
+                          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 8 }} />
+                          <Text style={{ fontSize: 9.5, color: '#64748B', fontStyle: 'italic', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                            Untuk mengurus notifikasi, kemas kini Tetapan Profil di Aplikasi RISEV.
+                          </Text>
+                          
+                          {/* Time & Double Tick inside bubble */}
+                          <View style={{ flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                            <Text style={{ fontSize: 9, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>
+                              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                            <Ionicons name="checkmark-done" size={12} color="#0EA5E9" />
+                          </View>
+
+                          {bBtnText ? (
+                            <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, alignItems: 'center' }}>
+                              <Text style={{ fontSize: 13, color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{bBtnText}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Visual Segment Delivery Target Grid */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 16 }}>
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="people-outline" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Audience</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{audienceEstimate}</Text>
+                      </View>
+
+                      <View style={{ width: 1, height: 24, backgroundColor: '#E2E8F0' }} />
+
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="notifications-outline" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Push</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Active</Text>
+                      </View>
+
+                      <View style={{ width: 1, height: 24, backgroundColor: '#E2E8F0' }} />
+
+                      <View style={{ alignItems: 'center', gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="logo-whatsapp" size={14} color="#64748B" />
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>WhatsApp</Text>
+                        </View>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: bSendWhatsApp ? '#10B981' : '#94A3B8' }}>
+                          {bSendWhatsApp ? 'Ready' : 'Off'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Trigger Broadcast button */}
+                    {hasCooldown ? (
+                      <View style={{ 
+                        backgroundColor: '#FFFBEA', 
+                        borderWidth: 1, 
+                        borderColor: '#FFE38F', 
+                        borderRadius: 16, 
+                        padding: 14, 
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8
+                      }}>
+                        <Ionicons name="time-outline" size={16} color="#D97706" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B38B00', textAlign: 'center', flex: 1 }}>
+                          Anti-Spam active. You can send another blast in {cooldownHoursLeft}h.
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        onPress={handleSendBlast}
+                        disabled={isSendingBlast || audienceEstimate === 0}
+                        style={{ 
+                          backgroundColor: '#FFC700', 
+                          height: 52, 
+                          borderRadius: 14, 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          opacity: (isSendingBlast || audienceEstimate === 0) ? 0.5 : 1,
+                          flexDirection: 'row',
+                          gap: 8
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        {isSendingBlast ? (
+                          <ActivityIndicator size="small" color="#0F172A" />
+                        ) : (
+                          <>
+                            <Ionicons name="paper-plane-outline" size={16} color="#0F172A" />
+                            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                              Send Broadcast Notification
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    
+                    <TouchableOpacity 
+                      onPress={() => setBlastStep(2)}
+                      style={{ marginTop: 16, paddingVertical: 12, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: '#64748B', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Go Back to Edit</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+              {blastSubTab === 'running' && (
+                <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 24 }}>
+                  <Ionicons name="rocket-outline" size={48} color="#CBD5E1" />
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 16, textAlign: 'center' }}>No running broadcasts</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 8, textAlign: 'center', maxWidth: 250 }}>Active blast campaigns will appear here.</Text>
                 </View>
+              )}
+
+              {blastSubTab === 'history' && (
+                <View style={{ paddingBottom: 24 }}>
 
                 {/* Broadcast History Title */}
                 <Text style={styles.previewSectionHeader}>{t('broadcast_history')}</Text>
@@ -1129,212 +1877,15 @@ export default function MarketingScreen() {
                 )}
               </View>
             )}
+          </View>
+        </View>
+      )}
 
-            {broadcastMode === 'automated' && (
-              <View style={{ width: '100%' }}>
-                {/* Compose Automation Rule */}
-                <View style={styles.configCard}>
-                  <Text style={styles.cardSectionTitle}>
-                    {selectedAutomation ? t('edit_automation_rule') : t('automated_winback')}
-                  </Text>
-                  <Text style={styles.cardSectionDesc}>
-                    {t('automation_desc')}
-                  </Text>
-
-                  {/* Trigger Days Selection */}
-                  <Text style={styles.inputLabelSmall}>{t('trigger_delay')}</Text>
-                  <View style={styles.triggerDaysRow}>
-                    {['3', '7', '14', '30'].map((day) => (
-                      <TouchableOpacity
-                        key={day}
-                        style={[
-                          styles.triggerDayBtn,
-                          arTriggerDays === day && styles.triggerDayBtnActive
-                        ]}
-                        onPress={() => setArTriggerDays(day)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[
-                          styles.triggerDayBtnText,
-                          arTriggerDays === day && styles.triggerDayBtnTextActive
-                        ]}>
-                          {day} {t('days')}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity
-                      style={[
-                        styles.triggerDayBtn,
-                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnActive
-                      ]}
-                      onPress={() => {
-                        if (['3', '7', '14', '30'].includes(arTriggerDays)) {
-                          setArTriggerDays('');
-                        }
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[
-                        styles.triggerDayBtnText,
-                        !['3', '7', '14', '30'].includes(arTriggerDays) && styles.triggerDayBtnTextActive
-                      ]}>
-                        {t('custom')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {!['3', '7', '14', '30'].includes(arTriggerDays) && (
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={arTriggerDays}
-                      onChangeText={(val) => {
-                        const cleaned = val.replace(/[^\d]/g, '');
-                        setArTriggerDays(cleaned);
-                      }}
-                      placeholder={t('custom_days_placeholder')}
-                      placeholderTextColor="#BEC6E0"
-                      keyboardType="numeric"
-                    />
-                  )}
-
-                  <Text style={styles.inputLabelSmall}>{t('rule_name')}</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={arName}
-                    onChangeText={setArName}
-                    placeholder="e.g. 7-Day Winback Campaign"
-                    placeholderTextColor="#BEC6E0"
-                  />
-
-                  <Text style={styles.inputLabelSmall}>{t('message_title')}</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    value={arTitle}
-                    onChangeText={setArTitle}
-                    placeholder="e.g. We Miss You! ❤️"
-                    placeholderTextColor="#BEC6E0"
-                  />
-
-                  <Text style={styles.inputLabelSmall}>{t('message_body')}</Text>
-                  <TextInput
-                    style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
-                    multiline
-                    numberOfLines={4}
-                    value={arMessage}
-                    onChangeText={setArMessage}
-                    placeholder={locale === 'en' ? "Use {{name}} and {{stamps}} tags..." : "Gunakan tag {{name}} dan {{stamps}}..."}
-                    placeholderTextColor="#BEC6E0"
-                  />
-                  <Text style={styles.helperText}>
-                    {t('template_helper_desc')}
-                  </Text>
-
-
-
-                  <TouchableOpacity
-                    style={styles.saveBtn}
-                    onPress={handleSaveAutomationRule}
-                    disabled={isSavingRule}
-                    activeOpacity={0.9}
-                  >
-                    {isSavingRule ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.saveBtnText}>
-                        {selectedAutomation ? t('update_rule') : t('activate_rule')}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-
-                  {selectedAutomation && (
-                    <TouchableOpacity
-                      style={{ alignSelf: 'center', marginTop: 12 }}
-                      onPress={() => {
-                        setSelectedAutomation(null);
-                        setArName('');
-                        setArTriggerDays('7');
-                        setArTitle('We Miss You! ❤️');
-                        setArMessage("Hi {{name}}! 👋\n\nIt's been a while since your last visit. Come back soon to collect your next stamp! ✨");
-                        setArSendWhatsApp(true);
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>
-                        {t('cancel_edit')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Automation Rules List */}
-                <Text style={styles.previewSectionHeader}>{t('active_automation_rules')}</Text>
-
-                {loadingRules ? (
-                  <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 30 }} />
-                ) : automationRules.length === 0 ? (
-                  <View style={styles.campEmptyState}>
-                    <Ionicons name="time-outline" size={40} color="#94A3B8" />
-                    <Text style={styles.campEmptyTitle}>{t('no_automation_rules')}</Text>
-                    <Text style={styles.campEmptySub}>{t('no_automation_desc')}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.campList}>
-                    {automationRules.map((rule) => (
-                      <View key={rule.id} style={[styles.campCard, !rule.is_active && { opacity: 0.7 }]}>
-                        <View style={styles.campCardHeader}>
-                          <View style={{ gap: 4, flex: 1 }}>
-                            <Text style={styles.campCardName}>{rule.name}</Text>
-                            <Text style={{ fontSize: 11, color: '#475569', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                              {t('trigger_label')}: {rule.trigger_days} {t('days_inactive')}
-                            </Text>
-                          </View>
-                          <Switch
-                            value={rule.is_active}
-                            onValueChange={() => toggleAutomationRuleActive(rule)}
-                            trackColor={{ false: '#E2E8F0', true: '#10B981' }}
-                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : rule.is_active ? '#10B981' : '#F4F3F4'}
-                          />
-                        </View>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginTop: 4 }}>
-                          {t('subject')}: {rule.title}
-                        </Text>
-                        <Text style={styles.campCardDesc}>{rule.message}</Text>
-                        
-                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }}>
-                          <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => {
-                              setSelectedAutomation(rule);
-                              setArName(rule.name);
-                              setArTriggerDays(String(rule.trigger_days));
-                              setArTitle(rule.title);
-                              setArMessage(rule.message);
-                              setArSendWhatsApp(rule.send_whatsapp);
-                            }}
-                          >
-                            <Feather name="edit-2" size={13} color="#475569" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('edit')}</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => handleDeleteAutomationRule(rule.id)}
-                          >
-                            <Feather name="trash-2" size={13} color="#EF4444" style={{ marginRight: 4 }} />
-                            <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{t('delete')}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-
-            {broadcastMode === 'smart' && (
-              <View style={{ width: '100%' }}>
-                <SmartFollowUp styles={styles} Alert={Alert} />
-              </View>
-            )}
+        {subTab === 'followup' && (
+          <View style={styles.broadcastContent}>
+            <View style={{ width: '100%' }}>
+              <SmartFollowUp styles={styles} Alert={Alert} />
+            </View>
           </View>
         )}
 
@@ -1345,11 +1896,12 @@ export default function MarketingScreen() {
                 setBTitle(tpl.headerText || tpl.name);
                 setBMessage(tpl.bodyText);
                 setBSendWhatsApp(true);
-                setSubTab('broadcast');
+                setSubTab('blast');
               }}
             />
           </View>
         )}
+
       </ScrollView>
 
       {/* Create Campaign Modal */}
@@ -1637,6 +2189,252 @@ export default function MarketingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Audience Builder Modal */}
+      <Modal
+        visible={showCustomAudienceModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCustomAudienceModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16, backgroundColor: '#FFFFFF' }}>
+            <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Build Custom Audience</Text>
+            <TouchableOpacity onPress={() => setShowCustomAudienceModal(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}>
+              <Ionicons name="close" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Tabs */}
+          <View style={{ flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 6, marginHorizontal: 20, marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            {[
+              { id: 'manual', label: 'Manual Pick' },
+              { id: 'rules', label: 'Rules' },
+              { id: 'paste', label: 'Paste List' }
+            ].map(tab => (
+              <TouchableOpacity
+                key={tab.id}
+                onPress={() => setCaTab(tab.id as any)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  borderRadius: 12,
+                  backgroundColor: caTab === tab.id ? '#050505' : 'transparent',
+                  shadowColor: caTab === tab.id ? '#050505' : 'transparent',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 4,
+                  elevation: caTab === tab.id ? 2 : 0
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: caTab === tab.id ? '#FFC700' : '#64748B' }}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} contentContainerStyle={{ paddingTop: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+            {caTab === 'manual' && (
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>Select specific customers to target.</Text>
+                
+                {dbCards.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>No customers found in database.</Text>
+                ) : (
+                  dbCards.map((card, idx) => {
+                    const isSelected = caManualSelection.has(card.customer);
+                    return (
+                      <TouchableOpacity 
+                        key={idx} 
+                        onPress={() => {
+                          setCaManualSelection(prev => {
+                            const newSet = new Set(prev);
+                            if (newSet.has(card.customer)) {
+                              newSet.delete(card.customer);
+                            } else {
+                              newSet.add(card.customer);
+                            }
+                            return newSet;
+                          });
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 1 }}>
+                            <Ionicons name="person" size={20} color="#FFC700" />
+                          </View>
+                          <View>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{card.expand?.customer?.name || card.expand?.customer?.phone || 'Unknown Customer'}</Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{card.stamps || card.stamps_collected || 0} Stamps collected</Text>
+                          </View>
+                        </View>
+                        <View style={{ width: 24, height: 24, borderRadius: 8, borderWidth: isSelected ? 0 : 2, borderColor: '#CBD5E1', backgroundColor: isSelected ? '#FFC700' : '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: isSelected ? '#FFC700' : 'transparent', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: isSelected ? 2 : 0 }}>
+                          {isSelected && <Ionicons name="checkmark" size={16} color="#050505" />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            )}
+
+            {caTab === 'rules' && (
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 24 }}>Filter customers based on their activity.</Text>
+                
+                {/* Stamp Balance */}
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Stamp Balance Range</Text>
+                  <TextInput
+                    style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
+                    placeholder="e.g. 5 or 1-9"
+                    keyboardType="default"
+                    value={caMinStamps}
+                    onChangeText={setCaMinStamps}
+                  />
+                  <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium', marginTop: 8, lineHeight: 16 }}>
+                    Finds customers who have at least this many stamps, or fall within the specified range (e.g. 1-9).
+                  </Text>
+                </View>
+
+                {/* Date Visited */}
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Date Visited Range</Text>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>Start Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date"
+                          value={caStartDate}
+                          onChange={(e: any) => setCaStartDate(e.target.value)}
+                          style={{ width: '100%', height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505', outline: 'none' } as any}
+                        />
+                      ) : (
+                        <TextInput
+                          style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
+                          placeholder="YYYY-MM-DD"
+                          value={caStartDate}
+                          onChangeText={setCaStartDate}
+                        />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>End Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date"
+                          value={caEndDate}
+                          onChange={(e: any) => setCaEndDate(e.target.value)}
+                          style={{ width: '100%', height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505', outline: 'none' } as any}
+                        />
+                      ) : (
+                        <TextInput
+                          style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
+                          placeholder="YYYY-MM-DD"
+                          value={caEndDate}
+                          onChangeText={setCaEndDate}
+                        />
+                      )}
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium', marginTop: 8, lineHeight: 16 }}>
+                    Finds customers whose last visit falls within this date range. Leave blank for any date.
+                  </Text>
+                </View>
+
+                {/* Rules Matching Tracker */}
+                <View style={{ marginTop: 8, padding: 20, backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Rules Matching</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>Targeted Customers</Text>
+                  </View>
+                  <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{rulesMatchCount}</Text>
+                </View>
+              </View>
+            )}
+
+            {caTab === 'paste' && (
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>Paste a list of phone numbers (comma-separated or line-by-line).</Text>
+                <TextInput
+                  style={{ minHeight: 180, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, backgroundColor: '#FFFFFF', color: '#0F172A', textAlignVertical: 'top' }}
+                  multiline
+                  placeholder="60123456789, 60198765432..."
+                  value={caPasteText}
+                  onChangeText={setCaPasteText}
+                />
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Footer Action */}
+          <View style={{ padding: 20, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 40 }}>
+            <TouchableOpacity 
+              style={{ backgroundColor: '#FFC700', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#FFC700', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 }}
+              onPress={() => {
+                let computedIds = new Set<string>();
+                
+                if (caTab === 'manual') {
+                  computedIds = new Set(caManualSelection);
+                } 
+                else if (caTab === 'rules') {
+                  let minStamps = 0;
+                  let maxStamps = Infinity;
+                  if (caMinStamps.includes('-')) {
+                    const parts = caMinStamps.split('-');
+                    minStamps = parseInt(parts[0]) || 0;
+                    maxStamps = parseInt(parts[1]) || Infinity;
+                  } else {
+                    minStamps = parseInt(caMinStamps) || 0;
+                  }
+                  
+                  const startTs = caStartDate ? new Date(caStartDate).getTime() : 0;
+                  const endTs = caEndDate ? new Date(caEndDate).getTime() + (24 * 60 * 60 * 1000) - 1 : Infinity;
+
+                  const lastVisitMap: Record<string, number> = {};
+                  dbTxs.forEach(t => {
+                    if (!t.customer) return;
+                    const time = new Date(t.created).getTime();
+                    if (!lastVisitMap[t.customer] || time > lastVisitMap[t.customer]) {
+                      lastVisitMap[t.customer] = time;
+                    }
+                  });
+
+                  dbCards.forEach(c => {
+                    if (c.customer) {
+                      const userStamps = c.stamps || c.stamps_collected || 0;
+                      const stampPass = (minStamps === 0 && maxStamps === Infinity) ? true : (userStamps >= minStamps && userStamps <= maxStamps);
+                      const lastV = lastVisitMap[c.customer] || 0;
+                      // Only check date rule if start or end is provided
+                      const hasDateRule = caStartDate || caEndDate;
+                      const datePass = !hasDateRule || (lastV >= startTs && lastV <= endTs);
+                      
+                      if (stampPass && datePass) {
+                        computedIds.add(c.customer);
+                      }
+                    }
+                  });
+                }
+                else if (caTab === 'paste') {
+                  // Not fully implemented DB matching for pasted text in this scope, but structure is here
+                  Alert.alert("Coming Soon", "Matching pasted phone numbers to customer profiles requires backend resolution.");
+                }
+
+                setCustomAudienceIds(Array.from(computedIds));
+                setShowCustomAudienceModal(false);
+              }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Save & Apply Audience</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -1986,34 +2784,40 @@ const styles = StyleSheet.create({
   // Sub-tabs styles
   subTabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#171717',
+    backgroundColor: '#111111',
     borderRadius: 100,
-    padding: 6,
+    padding: 5,
     marginBottom: 24,
     zIndex: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   subTabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 100,
   },
   subTabButtonActive: {
     backgroundColor: '#FFC700',
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   subTabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#FFFFFF',
+    color: '#64748B',
+    letterSpacing: 0.1,
   },
   subTabTextActive: {
     color: '#050505',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 12,
   },
 
   // Campaigns content styles
