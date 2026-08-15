@@ -24,6 +24,7 @@ import { pb } from '@/lib/pocketbase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import Svg, { Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
@@ -768,7 +769,7 @@ export default function CustomersScreen() {
               style={{ width: 44, height: 44, borderRadius: 22, borderColor: '#050505', borderWidth: 2 }}
             />
             <View style={{ justifyContent: 'center' }}>
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>{t('welcome_back')}</Text>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>Customer Analytics</Text>
               <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant?.name || 'Boutique Royal'}</Text>
             </View>
           </View>
@@ -780,7 +781,7 @@ export default function CustomersScreen() {
         </View>
 
         {/* 💳 Replicated Transfer-style Stats Card */}
-        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -30, marginBottom: 8 }}>
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -10, marginBottom: 8 }}>
           {/* Row 1: Stamps Distributed */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 16 }}>
             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
@@ -823,53 +824,106 @@ export default function CustomersScreen() {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             backgroundColor: '#FFC700',
-            borderRadius: 20,
+            borderRadius: 16,
             paddingVertical: 18,
             paddingHorizontal: 24,
             marginBottom: 20,
             marginTop: 8,
             shadowColor: '#FFC700',
-            shadowOffset: { width: 0, height: 8 },
+            shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.3,
-            shadowRadius: 16,
+            shadowRadius: 12,
             elevation: 4,
-            zIndex: 20
+            zIndex: 20,
+            gap: 10
           }}
           onPress={() => router.push('/(merchant)/analytics' as any)}
           activeOpacity={0.85}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="bar-chart" size={18} color="#FFC700" />
-            </View>
-            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.2 }}>
-              View Sales Opportunity Analytics
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#050505" />
+          <Ionicons name="bar-chart" size={22} color="#050505" />
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.2 }}>
+            View Sales Opportunity Analytics
+          </Text>
         </TouchableOpacity>
 
-        {/* 📊 Weekly Activity Bar Chart */}
+        {/* 📈 Weekly Activity Line Chart */}
         <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, marginBottom: 8 }}>
           <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 16 }}>
             Weekly stamps distributed
           </Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, paddingBottom: 8 }}>
-            {weeklyStampData.map((item, idx) => (
-              <View key={idx} style={{ alignItems: 'center', flex: 1 }}>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: item.isMax ? '#FFC700' : '#94A3B8', marginBottom: 4 }}>
-                  {item.value}
-                </Text>
-                <View style={{ width: 16, height: 60, backgroundColor: '#F1F5F9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#050505', borderRadius: 8 }} />
+          <View style={{ height: 140, width: '100%' }}>
+            
+            {/* Values (Top) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+              {weeklyStampData.map((item, idx) => (
+                <View key={idx} style={{ width: 30, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: item.isMax ? '#FFC700' : '#94A3B8' }}>
+                    {item.value}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8', marginTop: 6 }}>
-                  {item.day}
-                </Text>
+              ))}
+            </View>
+
+            {/* Chart Area */}
+            <View style={{ flex: 1, position: 'relative', marginTop: 12, marginBottom: 12 }}>
+              <View style={{ position: 'absolute', top: 0, bottom: 0, left: 25, right: 25 }}>
+                <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <Defs>
+                    <LinearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor="#FFC700" stopOpacity="0.4" />
+                      <Stop offset="1" stopColor="#FFC700" stopOpacity="0.0" />
+                    </LinearGradient>
+                  </Defs>
+                  <Path 
+                    d={`M 0,100 ${weeklyStampData.map((item, i) => `L ${(i / 6) * 100},${100 - item.percentage}`).join(' ')} L 100,100 Z`}
+                    fill="url(#gradient)"
+                  />
+                  <Polyline
+                    points={weeklyStampData.map((item, i) => `${(i / 6) * 100},${100 - item.percentage}`).join(' ')}
+                    fill="none"
+                    stroke="#FFC700"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </Svg>
               </View>
-            ))}
+
+              {/* Dots */}
+              <View style={{ position: 'absolute', top: 0, bottom: 0, left: 25, right: 25, flexDirection: 'row', justifyContent: 'space-between' }}>
+                {weeklyStampData.map((item, idx) => (
+                  <View key={idx} style={{ height: '100%', width: 0, alignItems: 'center' }}>
+                    <View 
+                      style={{ 
+                        position: 'absolute', 
+                        top: `${100 - item.percentage}%`, 
+                        width: 10, 
+                        height: 10, 
+                        borderRadius: 5, 
+                        backgroundColor: item.isMax ? '#FFC700' : '#FFFFFF',
+                        borderWidth: 2,
+                        borderColor: '#FFC700',
+                        marginTop: -5,
+                        marginLeft: -5
+                      }} 
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Days (Bottom) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+              {weeklyStampData.map((item, idx) => (
+                <View key={idx} style={{ width: 30, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8' }}>
+                    {item.day}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
           </View>
         </View>
 

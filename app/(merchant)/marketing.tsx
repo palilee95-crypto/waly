@@ -953,7 +953,7 @@ export default function MarketingScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Dark Background - full black, spanning full width */}
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 168 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 142 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
         {/* Centered Content Wrapper */}
         <View style={[
@@ -968,7 +968,7 @@ export default function MarketingScreen() {
                 style={styles.merchantAvatar}
               />
               <View style={styles.profileTextWrap}>
-                <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
+                <Text style={styles.welcomeSub}>Marketing Console</Text>
                 <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
               </View>
             </View>
