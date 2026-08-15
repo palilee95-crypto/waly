@@ -14,6 +14,7 @@ function normalizePhone(input) {
   const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
   return { cleanPhone, rawDigits, localDigits, filter };
 }
+globalThis.normalizePhone = normalizePhone;
 
 // Helper to find user by phone number using normalized exact matching
 function findUserByPhone(phoneInput) {
@@ -25,6 +26,7 @@ function findUserByPhone(phoneInput) {
   } catch (err) { /* not found */ }
   return null;
 }
+globalThis.findUserByPhone = findUserByPhone;
 
 // ── Check if phone exists ──────────────────────────────────────────
 const checkPhoneHandler = (e) => {
@@ -37,7 +39,22 @@ const checkPhoneHandler = (e) => {
     return e.json(400, { message: "phone parameter is required" });
   }
 
-  const user = findUserByPhone(phone);
+  // Normalize phone directly
+  let digits = String(phone).replace(/[^\d]/g, '');
+  if (!digits) return e.json(400, { message: "valid phone parameter is required" });
+  if (digits.startsWith('0')) digits = '6' + digits;
+  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+  const cleanPhone = '+' + digits;
+  const rawDigits = digits;
+  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+  const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
+
+  let user = null;
+  try {
+    const users = $app.findRecordsByFilter("users", filter, "-created", 1, 0);
+    if (users && users.length > 0) user = users[0];
+  } catch (err) { /* not found */ }
+
   if (user) {
     return e.json(200, { 
       exists: true, 

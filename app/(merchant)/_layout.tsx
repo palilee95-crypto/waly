@@ -198,7 +198,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function MerchantLayout() {
-  const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout } = useAuth();
+  const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout, switchRole } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const [isPaying, setIsPaying] = React.useState(false);
@@ -871,6 +871,15 @@ export default function MerchantLayout() {
             <Ionicons name="paper-plane" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
             <Text style={styles.payBtnText}>Upgrade via Telegram</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.switchRoleBtn}
+            onPress={() => switchRole('customer')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="swap-horizontal" size={16} color="#0F172A" style={{ marginRight: 6 }} />
+            <Text style={styles.switchRoleBtnText}>Switch to Customer Mode</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity
             style={styles.logoutLink}
@@ -1056,6 +1065,15 @@ export default function MerchantLayout() {
                 <Text style={styles.submitBtnText}>Complete Store Setup</Text>
               </>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.switchRoleBtn, { marginTop: 12 }]}
+            onPress={() => switchRole('customer')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="swap-horizontal" size={16} color="#0F172A" style={{ marginRight: 6 }} />
+            <Text style={styles.switchRoleBtnText}>Switch to Customer Mode</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.onboardingCancelBtn} onPress={logout} activeOpacity={0.7}>
@@ -1297,6 +1315,23 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#EF4444',
     textDecorationLine: 'underline',
+  },
+  switchRoleBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  switchRoleBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   // Desktop Sidebar Navigation Styles
   desktopSidebar: {
