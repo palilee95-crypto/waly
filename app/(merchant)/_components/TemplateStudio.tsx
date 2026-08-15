@@ -11,6 +11,7 @@ import {
   Alert,
   useWindowDimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,10 @@ export interface WhatsAppTemplate {
   language: string;
   bodyText: string;
   headerText?: string;
+  headerFormat?: 'TEXT' | 'IMAGE';
+  headerImageUrl?: string;
   footerText?: string;
+  buttons?: Array<{ type: 'URL' | 'PHONE_NUMBER' | 'QUICK_REPLY'; text: string; url?: string; phoneNumber?: string }>;
   rejectedReason?: string | null;
 }
 
@@ -84,18 +88,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
-
-  // Form State
-  const [formName, setFormName] = useState('');
-  const [formCategory, setFormCategory] = useState<'MARKETING' | 'UTILITY'>('MARKETING');
-  const [formLanguage, setFormLanguage] = useState<'en_US' | 'ms'>('en_US');
-  const [formHeader, setFormHeader] = useState('');
-  const [formBody, setFormBody] = useState('');
-  const [formFooter, setFormFooter] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
 
   // Sample values for live preview
   const sampleData: Record<string, string> = {
@@ -129,100 +122,19 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
   }, [fetchTemplates]);
 
   const handleOpenCreateModal = (preset?: typeof STARTER_PRESETS[0]) => {
-    setFormError('');
     if (preset) {
-      setFormName(preset.name);
-      setFormCategory(preset.category);
-      setFormHeader(preset.header);
-      setFormBody(preset.body);
-      setFormFooter(preset.footer);
+      router.push({
+        pathname: '/(merchant)/create-template',
+        params: {
+          presetName: preset.name,
+          presetCategory: preset.category,
+          presetHeader: preset.header,
+          presetBody: preset.body,
+          presetFooter: preset.footer,
+        },
+      });
     } else {
-      setFormName('');
-      setFormCategory('MARKETING');
-      setFormLanguage('en_US');
-      setFormHeader('');
-      setFormBody('Hi {Customer Name}! 👋\n\nWe have an exclusive update for you from {Store Name}. You currently have {Stamp Balance} stamps!\n\nVisit us today to claim {Reward Item}. ✨');
-      setFormFooter('Reply STOP to opt out');
-    }
-    setModalVisible(true);
-  };
-
-  const insertVariable = (variableKey: string) => {
-    setFormBody((prev) => prev + variableKey + ' ');
-  };
-
-  // Convert friendly {Customer Name} placeholders into Meta {{1}}, {{2}} & samples
-  const compileTemplatePayload = () => {
-    let transformedBody = formBody;
-    const variableOrder: string[] = [];
-    const sampleValues: string[] = [];
-
-    const chipKeys = Object.keys(sampleData);
-    const regex = new RegExp(chipKeys.map(k => k.replace(/[{}]/g, '\\$&')).join('|'), 'g');
-    
-    let varIndex = 1;
-    const replacedMap: Record<string, string> = {};
-
-    transformedBody = transformedBody.replace(regex, (match) => {
-      if (!replacedMap[match]) {
-        replacedMap[match] = `{{${varIndex}}}`;
-        variableOrder.push(match);
-        sampleValues.push(sampleData[match] || 'Sample');
-        varIndex++;
-      }
-      return replacedMap[match];
-    });
-
-    return {
-      name: formName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-      category: formCategory,
-      language: formLanguage,
-      headerText: formHeader.trim() || undefined,
-      bodyText: transformedBody.trim(),
-      footerText: formFooter.trim() || undefined,
-      sampleValues: sampleValues,
-    };
-  };
-
-  const handleCreateTemplate = async () => {
-    if (!formName.trim()) {
-      setFormError('Please enter a template name.');
-      return;
-    }
-    if (!formBody.trim()) {
-      setFormError('Please enter the message body text.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError('');
-
-    try {
-      const payload = compileTemplatePayload();
-      const res = await pb.send<{ success: boolean; message: string; template?: any }>(
-        '/api/risev/merchant/whatsapp/templates/create',
-        {
-          method: 'POST',
-          body: payload,
-          requestKey: null,
-        }
-      );
-
-      if (res.success) {
-        Alert.alert(
-          'Template Submitted! 🚀',
-          'Your template has been submitted to Meta AI for automated review. It is usually approved and ready to use in 1–2 minutes.',
-          [{ text: 'OK' }]
-        );
-        setModalVisible(false);
-        fetchTemplates();
-      } else {
-        setFormError(res.message || 'Failed to submit template to Meta.');
-      }
-    } catch (err: any) {
-      setFormError(err?.message || 'Error submitting template.');
-    } finally {
-      setIsSubmitting(false);
+      router.push('/(merchant)/create-template');
     }
   };
 
@@ -259,8 +171,8 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
     );
   };
 
-  const getLivePreviewBody = () => {
-    let preview = formBody || 'Your message will appear here...';
+  const getLivePreviewBody = (bodyText?: string) => {
+    let preview = bodyText || 'Your message will appear here...';
     Object.keys(sampleData).forEach((key) => {
       preview = preview.split(key).join(sampleData[key]);
     });
@@ -337,56 +249,9 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         </View>
       </View>
 
-      {/* ── NOT CONNECTED WARNING BANNER ── */}
-      {!isConnected && (
-        <View style={styles.notConnectedBanner}>
-          <View style={styles.notConnectedLeft}>
-            <View style={styles.notConnectedIconBox}>
-              <Ionicons name="warning" size={16} color="#F59E0B" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.notConnectedTitle}>WhatsApp Business Not Connected</Text>
-              <Text style={styles.notConnectedDesc}>
-                Connect your WhatsApp Business number in Settings to submit templates for instant 1–2 min Meta approval.
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.connectMetaBtn}
-            onPress={() => router.push('/(merchant)/profile')}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="logo-whatsapp" size={14} color="#050505" />
-            <Text style={styles.connectMetaBtnText}>Connect Number</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {/* ── STARTER PRESETS BANNER ── */}
-      <View style={styles.presetsSection}>
-        <Text style={styles.presetSectionTitle}>1-CLICK STARTER PRESETS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetsScroll}>
-          {STARTER_PRESETS.map((preset) => (
-            <TouchableOpacity
-              key={preset.id}
-              style={styles.presetCard}
-              onPress={() => handleOpenCreateModal(preset)}
-              activeOpacity={0.85}
-            >
-              <View style={styles.presetHeader}>
-                <Ionicons name="sparkles" size={14} color="#F59E0B" />
-                <Text style={styles.presetTitle}>{preset.title}</Text>
-              </View>
-              <Text style={styles.presetDesc} numberOfLines={2}>
-                {preset.desc}
-              </Text>
-              <View style={styles.presetUseRow}>
-                <Text style={styles.presetUseText}>Use Preset →</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+
+
 
       {/* ── TEMPLATES LIST ── */}
       {isLoading ? (
@@ -423,33 +288,37 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
                 ]}
               >
                 <View style={styles.templateCardTopRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.templateCardName}>{tpl.name}</Text>
-                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 }}>
-                      <Text style={styles.templateCategory}>{tpl.category}</Text>
-                      <Text style={styles.templateCategory}>• {tpl.language}</Text>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.templateCardName} numberOfLines={1}>{tpl.name}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                      <View style={styles.tagPill}>
+                        <Text style={styles.tagPillText}>🏷️ {tpl.category}</Text>
+                      </View>
+                      <View style={styles.tagPill}>
+                        <Text style={styles.tagPillText}>🌐 {tpl.language}</Text>
+                      </View>
                     </View>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {getStatusBadge(tpl.status)}
-                    <View style={styles.chevronBox}>
+                    <View style={[styles.chevronBox, isExpanded && styles.chevronBoxExpanded]}>
                       <Ionicons 
                         name={isExpanded ? "chevron-up" : "chevron-down"} 
-                        size={16} 
-                        color="#94A3B8" 
+                        size={14} 
+                        color={isExpanded ? "#050505" : "#64748B"} 
                       />
                     </View>
                   </View>
                 </View>
 
-                {isExpanded && (
+                {isExpanded ? (
                   <View style={styles.expandedContent}>
-                    {tpl.rejectedReason && (
+                    {tpl.rejectedReason ? (
                       <View style={styles.rejectionBox}>
                         <Ionicons name="alert-circle" size={14} color="#DC2626" />
                         <Text style={styles.rejectionText}>{tpl.rejectedReason}</Text>
                       </View>
-                    )}
+                    ) : null}
 
                     {/* WhatsApp Mockup Preview */}
                     <View style={styles.whatsappMockupContainer}>
@@ -464,16 +333,57 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
                       </View>
                       <View style={styles.whatsappMockupBody}>
                         <View style={styles.whatsappChatBubble}>
-                          {tpl.headerText && (
+                          {(tpl.headerFormat === 'IMAGE' || tpl.headerImageUrl) ? (
+                            <Image
+                              source={{ uri: tpl.headerImageUrl || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=600' }}
+                              style={{ width: '100%', height: 120, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}
+                              resizeMode="cover"
+                            />
+                          ) : tpl.headerText ? (
                             <Text style={styles.whatsappBubbleHeader}>{tpl.headerText}</Text>
-                          )}
-                          <Text style={styles.whatsappBubbleText}>
-                            {tpl.bodyText}
-                          </Text>
-                          {tpl.footerText && (
-                            <Text style={styles.whatsappBubbleFooter}>{tpl.footerText}</Text>
-                          )}
+                          ) : null}
+                          <View style={{ padding: 10 }}>
+                            <Text style={styles.whatsappBubbleText}>
+                              {getLivePreviewBody(tpl.bodyText)}
+                            </Text>
+                            {tpl.footerText ? (
+                              <Text style={styles.whatsappBubbleFooter}>{tpl.footerText}</Text>
+                            ) : null}
+                            <View style={styles.whatsappTimestampRow}>
+                              <Text style={styles.whatsappTimestamp}>12:00 PM</Text>
+                              <Ionicons name="checkmark-done" size={12} color="#34B7F1" style={{ marginLeft: 3 }} />
+                            </View>
+                          </View>
                         </View>
+
+                        {/* Interactive Buttons */}
+                        {tpl.buttons && tpl.buttons.length > 0 ? (
+                          <View style={{ marginTop: 4, gap: 4 }}>
+                            {tpl.buttons.map((b, bIdx) => (
+                              <View
+                                key={bIdx}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#FFFFFF',
+                                  borderRadius: 8,
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 10,
+                                  borderWidth: 1,
+                                  borderColor: '#E2E8F0',
+                                }}
+                              >
+                                {b.type === 'URL' && <Ionicons name="open-outline" size={12} color="#0284C7" style={{ marginRight: 5 }} />}
+                                {b.type === 'PHONE_NUMBER' && <Ionicons name="call-outline" size={12} color="#0284C7" style={{ marginRight: 5 }} />}
+                                {b.type === 'QUICK_REPLY' && <Ionicons name="return-up-back-outline" size={12} color="#0284C7" style={{ marginRight: 5 }} />}
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>
+                                  {b.text}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
                       </View>
                     </View>
 
@@ -488,7 +398,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
                         <Text style={styles.deleteBtnText}>Delete Template</Text>
                       </TouchableOpacity>
 
-                      {onSelectTemplateForBroadcast && tpl.status === 'APPROVED' && (
+                      {onSelectTemplateForBroadcast && tpl.status === 'APPROVED' ? (
                         <TouchableOpacity
                           style={styles.useInBlastBtn}
                           onPress={() => onSelectTemplateForBroadcast(tpl)}
@@ -497,260 +407,16 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
                           <Ionicons name="paper-plane" size={14} color="#050505" style={{ marginRight: 4 }} />
                           <Text style={styles.useInBlastBtnText}>Use for Broadcast</Text>
                         </TouchableOpacity>
-                      )}
+                      ) : null}
                     </View>
                   </View>
-                )}
+                ) : null}
               </TouchableOpacity>
             );
           })}
         </View>
       )}
 
-      {/* ── CREATE / EDIT TEMPLATE MODAL ── */}
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isDesktop && { maxWidth: 980 }]}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={styles.modalIconBg}>
-                  <Ionicons name="logo-whatsapp" size={20} color="#16A34A" />
-                </View>
-                <View>
-                  <Text style={styles.modalTitle}>Create WhatsApp Template</Text>
-                  <Text style={styles.modalSub}>Submitted to Meta AI for instant 1-2 min approval</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Not connected notice in modal */}
-            {!isConnected && (
-              <View style={styles.modalNotConnectedNotice}>
-                <Ionicons name="alert-circle" size={16} color="#B45309" />
-                <Text style={styles.modalNotConnectedText}>
-                  WhatsApp is not connected yet. Connect your number in Settings to submit this template to Meta AI.
-                </Text>
-              </View>
-            )}
-
-            {formError ? (
-              <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                <Text style={styles.errorBannerText}>{formError}</Text>
-              </View>
-            ) : null}
-
-            {/* Split Content: Left Editor | Right Live WhatsApp Bubble */}
-            <ScrollView 
-              style={{ flex: 1 }} 
-              showsVerticalScrollIndicator={true} 
-              nestedScrollEnabled={true}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ padding: 20, paddingBottom: 60, flexGrow: 1 }}
-            >
-              <View style={[styles.splitEditorLayout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
-                {/* ── LEFT: FORM INPUTS ── */}
-                <View style={[styles.editorColumn, isDesktop && { flex: 1.2 }]}>
-                  {/* Template Name */}
-                  <Text style={styles.inputLabel}>TEMPLATE NAME (LOWERCASE & UNDERSCORES)</Text>
-                  <TextInput
-                    style={[styles.inputField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                    placeholder="e.g. weekend_flash_sale"
-                    placeholderTextColor="#94A3B8"
-                    value={formName}
-                    onChangeText={(t) => setFormName(t.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
-                    autoCapitalize="none"
-                  />
-
-                  {/* Category & Language */}
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 14 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>CATEGORY</Text>
-                      <View style={styles.categoryToggleRow}>
-                        <TouchableOpacity
-                          style={[styles.togglePill, formCategory === 'MARKETING' && styles.togglePillActive]}
-                          onPress={() => setFormCategory('MARKETING')}
-                        >
-                          <Text style={[styles.togglePillText, formCategory === 'MARKETING' && styles.togglePillTextActive]}>
-                            Marketing
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.togglePill, formCategory === 'UTILITY' && styles.togglePillActive]}
-                          onPress={() => setFormCategory('UTILITY')}
-                        >
-                          <Text style={[styles.togglePillText, formCategory === 'UTILITY' && styles.togglePillTextActive]}>
-                            Utility
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>LANGUAGE</Text>
-                      <View style={styles.categoryToggleRow}>
-                        <TouchableOpacity
-                          style={[styles.togglePill, formLanguage === 'en_US' && styles.togglePillActive]}
-                          onPress={() => setFormLanguage('en_US')}
-                        >
-                          <Text style={[styles.togglePillText, formLanguage === 'en_US' && styles.togglePillTextActive]}>
-                            English (en)
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.togglePill, formLanguage === 'ms' && styles.togglePillActive]}
-                          onPress={() => setFormLanguage('ms')}
-                        >
-                          <Text style={[styles.togglePillText, formLanguage === 'ms' && styles.togglePillTextActive]}>
-                            Melayu (ms)
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Header (Optional) */}
-                  <Text style={[styles.inputLabel, { marginTop: 14 }]}>HEADER TEXT (OPTIONAL)</Text>
-                  <TextInput
-                    style={[styles.inputField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                    placeholder="e.g. Special Weekend Announcement 📣"
-                    placeholderTextColor="#94A3B8"
-                    value={formHeader}
-                    onChangeText={setFormHeader}
-                  />
-
-                  {/* Body Text & Dynamic Variable Inserter */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-                    <Text style={styles.inputLabel}>MESSAGE BODY</Text>
-                    <Text style={styles.charCounter}>{formBody.length}/1024</Text>
-                  </View>
-
-                  {/* Quick Variable Inserter Chips */}
-                  <View style={styles.variableChipsRow}>
-                    <Text style={styles.chipsLabel}>Tap to insert variable:</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                      {Object.keys(sampleData).map((chip) => (
-                        <TouchableOpacity
-                          key={chip}
-                          style={styles.chipBtn}
-                          onPress={() => insertVariable(chip)}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="add-circle" size={13} color="#D97706" style={{ marginRight: 3 }} />
-                          <Text style={styles.chipBtnText}>{chip}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-
-                  <TextInput
-                    style={[
-                      styles.textAreaField,
-                      Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null,
-                    ]}
-                    multiline
-                    numberOfLines={6}
-                    placeholder="Write your template message body..."
-                    placeholderTextColor="#94A3B8"
-                    value={formBody}
-                    onChangeText={setFormBody}
-                    textAlignVertical="top"
-                  />
-
-                  {/* Footer Text (Optional) */}
-                  <Text style={[styles.inputLabel, { marginTop: 14 }]}>FOOTER TEXT (OPTIONAL)</Text>
-                  <TextInput
-                    style={[styles.inputField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                    placeholder="e.g. Reply STOP to unsubscribe"
-                    placeholderTextColor="#94A3B8"
-                    value={formFooter}
-                    onChangeText={setFormFooter}
-                  />
-                </View>
-
-                {/* ── RIGHT: REALISTIC LIVE WHATSAPP CHAT PREVIEW ── */}
-                <View style={[styles.previewColumn, isDesktop && { flex: 0.95 }]}>
-                  <Text style={styles.inputLabel}>REAL-TIME WHATSAPP PREVIEW</Text>
-                  <View style={styles.whatsappPhoneMock}>
-                    {/* WhatsApp Chat Header */}
-                    <View style={styles.whatsappChatHeader}>
-                      <View style={styles.whatsappAvatar}>
-                        <Ionicons name="storefront" size={14} color="#FFFFFF" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.whatsappHeaderName}>Your Store</Text>
-                        <Text style={styles.whatsappHeaderStatus}>Official WhatsApp Business</Text>
-                      </View>
-                      <Ionicons name="shield-checkmark" size={16} color="#22C55E" />
-                    </View>
-
-                    {/* Chat Bubble Area */}
-                    <View style={styles.chatAreaBackground}>
-                      <View style={styles.datePill}>
-                        <Text style={styles.datePillText}>TODAY</Text>
-                      </View>
-
-                      {/* Green Inbound WhatsApp Bubble */}
-                      <View style={styles.whatsappMessageBubble}>
-                        {formHeader.trim() ? (
-                          <Text style={styles.whatsappBubbleHeader}>{formHeader.trim()}</Text>
-                        ) : null}
-
-                        <Text style={styles.whatsappBubbleText}>{getLivePreviewBody()}</Text>
-
-                        {formFooter.trim() ? (
-                          <Text style={styles.whatsappBubbleFooter}>{formFooter.trim()}</Text>
-                        ) : null}
-
-                        <View style={styles.whatsappTimestampRow}>
-                          <Text style={styles.whatsappTimestamp}>
-                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                          <Ionicons name="checkmark-done" size={14} color="#38BDF8" style={{ marginLeft: 3 }} />
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={styles.previewCaption}>
-                    ✨ Variable placeholders automatically populate with each customer's real name and stamp count when sent.
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            {/* Modal Actions */}
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setModalVisible(false)}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={handleCreateTemplate}
-                disabled={isSubmitting}
-                activeOpacity={0.85}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#050505" />
-                ) : (
-                  <>
-                    <Ionicons name="paper-plane" size={16} color="#050505" style={{ marginRight: 6 }} />
-                    <Text style={styles.modalSubmitText}>Submit for Instant Approval</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -759,6 +425,7 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     paddingVertical: 16,
+    paddingBottom: 160,
   },
   headerContainer: {
     width: '100%',
@@ -797,6 +464,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   refreshBtnText: {
     fontSize: 13,
@@ -823,56 +495,61 @@ const styles = StyleSheet.create({
     color: '#050505',
   },
   notConnectedBanner: {
-    backgroundColor: '#050505',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#FFC700',
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     marginBottom: 24,
-    gap: 14,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  notConnectedLeft: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   notConnectedIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   notConnectedTitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  notConnectedDesc: {
-    fontSize: 12.5,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    lineHeight: 18,
-  },
-  connectMetaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#FFC700',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  connectMetaBtnText: {
-    fontSize: 12.5,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
+    marginBottom: 2,
+  },
+  notConnectedDesc: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+    opacity: 0.85,
+    lineHeight: 16,
+  },
+  connectMetaBtn: {
+    backgroundColor: '#050505',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+    flexShrink: 0,
+  },
+  connectMetaBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   modalNotConnectedNotice: {
     flexDirection: 'row',
@@ -901,35 +578,62 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 10,
-    marginLeft: 2,
+  },
+  presetSectionSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
   },
   presetsScroll: {
     gap: 12,
   },
   presetCard: {
-    width: 220,
+    width: 240,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F8FAFC',
+    borderColor: '#F1F5F9',
     shadowColor: '#050505',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 2,
+    justifyContent: 'space-between',
   },
-  presetHeader: {
+  presetCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  presetIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetCategoryBadge: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  presetCategoryText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   presetTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+    marginBottom: 4,
   },
   presetDesc: {
     fontSize: 11.5,
@@ -939,7 +643,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   presetUseRow: {
-    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
   presetUseText: {
     fontSize: 11,
@@ -997,19 +710,21 @@ const styles = StyleSheet.create({
   },
   templateCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
     elevation: 2,
   },
   templateCardExpanded: {
     borderColor: '#FFC700',
     backgroundColor: '#FFFDF5',
+    shadowColor: '#FFC700',
+    shadowOpacity: 0.1,
   },
   templateCardTopRow: {
     flexDirection: 'row',
@@ -1020,6 +735,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  tagPill: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagPillText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
   },
   templateCategory: {
     fontSize: 11,
@@ -1044,12 +773,18 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   chevronBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chevronBoxExpanded: {
+    backgroundColor: '#FFC700',
+    borderColor: '#FFC700',
   },
   expandedContent: {
     marginTop: 16,
@@ -1065,9 +800,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
     shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
   },
   whatsappMockupHeader: {
@@ -1110,8 +845,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     shadowColor: '#050505',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
     elevation: 1,
   },
   whatsappBubbleHeader: {
@@ -1201,9 +936,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
-    shadowRadius: 32,
+    shadowRadius: 20,
     elevation: 8,
   },
   modalHeader: {
@@ -1244,28 +979,6 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalNotConnectedNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#050505',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 16,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  modalNotConnectedText: {
-    flex: 1,
-    fontSize: 12.5,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#FFFFFF',
-    lineHeight: 18,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -1342,9 +1055,9 @@ const styles = StyleSheet.create({
   togglePillActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
   },
   togglePillText: {
@@ -1393,8 +1106,8 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
     elevation: 3,
   },
   whatsappChatHeader: {
@@ -1404,14 +1117,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  whatsappAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   whatsappHeaderName: {
     fontSize: 12,
@@ -1449,27 +1154,9 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 1,
-  },
-  whatsappBubbleHeader: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-    marginBottom: 6,
-  },
-  whatsappBubbleText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#1E293B',
-    lineHeight: 18,
-  },
-  whatsappBubbleFooter: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    marginTop: 6,
   },
   whatsappTimestampRow: {
     flexDirection: 'row',

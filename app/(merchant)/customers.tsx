@@ -606,7 +606,7 @@ export default function CustomersScreen() {
         };
       }
       customerMap[t.customerId].totalVisits += 1;
-      if ((t.type === 'PURCHASE' || t.type === 'earn') && t.bill_amount) {
+      if ((t.type === 'PURCHASE' || (t.type as any) === 'earn') && t.bill_amount) {
         customerMap[t.customerId].totalPurchase += Number(t.bill_amount);
       }
     });
@@ -745,20 +745,23 @@ export default function CustomersScreen() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <ScrollView
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: 16 + insets.top },
-          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+          { paddingBottom: 110, minHeight: '100%' }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Standard Dark Background */}
-        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, backgroundColor: '#050505', zIndex: 0 }} />
+        {/* Dark Background - full black, spanning full width */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
-        {/* Profile Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingTop: 16, marginBottom: 20, zIndex: 10 }}>
+        {/* Centered Content Wrapper */}
+        <View style={[
+          { paddingTop: 16 + insets.top, paddingHorizontal: 20 },
+          isDesktop && { maxWidth: 840, alignSelf: 'center', width: '100%' }
+        ]}>
+          {/* Profile Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, marginBottom: 20, zIndex: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Image
               source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
@@ -821,32 +824,31 @@ export default function CustomersScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#050505',
+            backgroundColor: '#FFC700',
             borderRadius: 20,
-            paddingVertical: 16,
-            paddingHorizontal: 20,
-            marginBottom: 8,
-            borderWidth: 1,
-            borderColor: '#FFC700',
-            shadowColor: '#050505',
+            paddingVertical: 18,
+            paddingHorizontal: 24,
+            marginBottom: 20,
+            marginTop: 8,
+            shadowColor: '#FFC700',
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.15,
-            shadowRadius: 12,
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
             elevation: 4,
             zIndex: 20
           }}
           onPress={() => router.push('/(merchant)/analytics' as any)}
           activeOpacity={0.85}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="bar-chart" size={16} color="#FFC700" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="bar-chart" size={18} color="#FFC700" />
             </View>
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.2 }}>
+            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.2 }}>
               View Sales Opportunity Analytics
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#FFC700" />
+          <Ionicons name="chevron-forward" size={18} color="#050505" />
         </TouchableOpacity>
 
         {/* 📊 Weekly Activity Bar Chart */}
@@ -1257,7 +1259,8 @@ export default function CustomersScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
+    </ScrollView>
 
       <Modal
         visible={customerModalVisible}
@@ -1597,7 +1600,7 @@ export default function CustomersScreen() {
                 </Text>
                 
                 {/* Spend / Visits Rank Toggle inside Modal */}
-                <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 2, borderRadius: 8, marginLeft: 6, shrink: 0 }}>
+                <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 2, borderRadius: 8, marginLeft: 6, flexShrink: 0 }}>
                   <TouchableOpacity 
                     onPress={() => {
                       setSpendersPage(0);

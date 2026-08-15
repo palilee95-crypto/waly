@@ -431,23 +431,26 @@ export default function MerchantDashboard() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="light" />
       {/* Scrollable Dashboard View */}
       <ScrollView
         style={{ backgroundColor: '#FFFFFF' }}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: 16 + insets.top },
-          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+          { paddingBottom: 110, minHeight: '100%' },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark Background - full black */}
-        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
+        {/* Dark Background - full black, spanning full width */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
-        {/* Header Content */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 20 }}>
+        {/* Centered Content Wrapper */}
+        <View style={[
+          { paddingTop: 16 + insets.top, paddingHorizontal: 20, gap: 20 },
+          isDesktop && { maxWidth: 840, alignSelf: 'center', width: '100%' }
+        ]}>
+          {/* Header Content */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Image
               source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
@@ -769,7 +772,7 @@ export default function MerchantDashboard() {
           )}
         </View>
 
-
+        </View>
 
       </ScrollView>
 

@@ -442,7 +442,7 @@ export default function UnifiedRewardsScreen() {
     setIsSavingReward(true);
     try {
       const formData = new FormData();
-      formData.append('merchant', user!.merchant_id);
+      formData.append('merchant', user?.merchant_id || '');
       formData.append('name', formTitle.trim());
       formData.append('description', formDesc.trim());
       formData.append('points_cost', String(pointsCostVal));
@@ -668,7 +668,7 @@ export default function UnifiedRewardsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Hidden native color inputs — positioned mid-viewport so picker dialog is centred */}
       {Platform.OS === 'web' && (
         <>

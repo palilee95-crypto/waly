@@ -16,7 +16,7 @@ import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Custom Merchant Tab Bar / Sidebar component
-function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
+function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const { width } = useWindowDimensions();
@@ -31,11 +31,27 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
 
   if (isDesktop) {
     return (
-      <View style={styles.desktopSidebar}>
+      <View style={[styles.desktopSidebar, { width: sidebarWidth, paddingHorizontal: isSidebarExpanded ? 20 : 16 }]}>
+        {/* Toggle Sidebar Button */}
+        <TouchableOpacity 
+          style={{ position: 'absolute', right: -14, top: 32, width: 28, height: 28, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', zIndex: 10 }} 
+          onPress={toggleSidebar}
+        >
+          <Ionicons name={isSidebarExpanded ? 'chevron-back' : 'chevron-forward'} size={16} color="#64748B" />
+        </TouchableOpacity>
+
         {/* Branding */}
-        <View style={styles.sidebarBrand}>
-          <Text style={styles.brandTitle}>RISEV</Text>
-          <Text style={styles.brandSubtitle}>{t('merchant_console')}</Text>
+        <View style={[styles.sidebarBrand, !isSidebarExpanded && { alignItems: 'center', paddingHorizontal: 0 }]}>
+          {isSidebarExpanded ? (
+            <>
+              <Image source={require('../../assets/risev logo.png')} style={{ width: 96, height: 28, resizeMode: 'contain', tintColor: '#050505' }} />
+              <Text style={styles.brandSubtitle}>{t('merchant_console')}</Text>
+            </>
+          ) : (
+            <View style={{ width: 36, height: 36, backgroundColor: '#050505', borderRadius: 10, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 18 }}>R</Text>
+            </View>
+          )}
         </View>
 
         {/* Navigation Links */}
@@ -78,31 +94,40 @@ function CustomMerchantTabBar({ state, descriptors, navigation }: any) {
                 activeOpacity={0.8}
                 style={[
                   styles.sidebarBtn,
-                  isFocused && styles.sidebarBtnActive
+                  isFocused && styles.sidebarBtnActive,
+                  !isSidebarExpanded && { justifyContent: 'center', paddingHorizontal: 0 }
                 ]}
               >
                 <Ionicons
                   name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
-                  size={18}
-                  color={isFocused ? '#FFFFFF' : '#0F172A'}
+                  size={20}
+                  color={isFocused ? '#FFFFFF' : '#64748B'}
                 />
-                <Text style={[styles.sidebarBtnText, isFocused && styles.sidebarBtnTextActive]}>
-                  {label}
-                </Text>
+                {isSidebarExpanded && (
+                  <Text style={[styles.sidebarBtnText, isFocused && styles.sidebarBtnTextActive]}>
+                    {label}
+                  </Text>
+                )}
               </TouchableOpacity>
             );
           })}
         </View>
 
         {/* Footer with User and Logout */}
-        <View style={styles.sidebarFooter}>
-          <View style={styles.userProfileMini}>
-            <Text style={styles.userNameMini} numberOfLines={1}>{user?.name || 'Store Owner'}</Text>
-            <Text style={styles.userPhoneMini} numberOfLines={1}>{user?.phone || ''}</Text>
-          </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.7}>
-            <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-            <Text style={styles.logoutBtnText}>{t('logout')}</Text>
+        <View style={[styles.sidebarFooter, !isSidebarExpanded && { alignItems: 'center' }]}>
+          {isSidebarExpanded && (
+            <View style={styles.userProfileMini}>
+              <Text style={styles.userNameMini} numberOfLines={1}>{user?.name || 'Store Owner'}</Text>
+              <Text style={styles.userPhoneMini} numberOfLines={1}>{user?.phone || ''}</Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={[styles.logoutBtn, !isSidebarExpanded && { justifyContent: 'center', paddingHorizontal: 0, width: 44, height: 44, borderRadius: 12 }]} 
+            onPress={logout} 
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            {isSidebarExpanded && <Text style={styles.logoutBtnText}>{t('logout')}</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -202,6 +227,8 @@ export default function MerchantLayout() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const [isPaying, setIsPaying] = React.useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(true);
+  const sidebarWidth = isSidebarExpanded ? 260 : 88;
 
   const [isOnboardingRequired, setIsOnboardingRequired] = React.useState(false);
   const [checkingProfile, setCheckingProfile] = React.useState(true);
@@ -1087,9 +1114,10 @@ export default function MerchantLayout() {
   return (
     <View style={styles.container}>
       <Tabs
-        tabBar={(props) => <CustomMerchantTabBar {...props} />}
+        tabBar={(props) => <CustomMerchantTabBar {...props} isSidebarExpanded={isSidebarExpanded} toggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} sidebarWidth={sidebarWidth} />}
         screenOptions={{
           headerShown: false,
+          sceneContainerStyle: { paddingLeft: isDesktop ? sidebarWidth : 0 }
         }}
       >
         <Tabs.Screen name="index" />
@@ -1339,19 +1367,19 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 260,
     height: '100%',
     backgroundColor: '#FFFFFF',
     borderRightWidth: 1,
     borderRightColor: '#E2E8F0',
     paddingVertical: 28,
-    paddingHorizontal: 20,
     justifyContent: 'space-between',
     zIndex: 100,
   },
   sidebarBrand: {
     marginBottom: 36,
     paddingHorizontal: 8,
+    height: 48,
+    justifyContent: 'center',
   },
   brandTitle: {
     fontSize: 24,
@@ -1374,8 +1402,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 14,
-    gap: 12,
+    borderRadius: 12,
+    gap: 14,
     height: 48,
   },
   sidebarBtnActive: {

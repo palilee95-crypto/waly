@@ -919,7 +919,7 @@ export default function MarketingScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
         visible={isFocused && merchant !== null && merchant.owner !== user?.id}
@@ -948,32 +948,35 @@ export default function MarketingScreen() {
 
       <ScrollView
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: 16 + insets.top },
-          isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+          { paddingBottom: 110, minHeight: '100%' }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark Background - true black */}
-        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 180 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
+        {/* Dark Background - full black, spanning full width */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 168 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
 
-        {/* Welcome Merchant Profile Header */}
-        <View style={styles.profileHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Image
-              source={{ uri: merchantLogo }}
-              style={styles.merchantAvatar}
-            />
-            <View style={styles.profileTextWrap}>
-              <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
-              <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+        {/* Centered Content Wrapper */}
+        <View style={[
+          { paddingTop: 16 + insets.top, paddingHorizontal: 20, gap: 20 },
+          isDesktop && { maxWidth: 840, alignSelf: 'center', width: '100%' }
+        ]}>
+          {/* Welcome Merchant Profile Header */}
+          <View style={[styles.profileHeader, { marginBottom: 0 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Image
+                source={{ uri: merchantLogo }}
+                style={styles.merchantAvatar}
+              />
+              <View style={styles.profileTextWrap}>
+                <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
+                <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+              </View>
             </View>
+            <Image
+              source={require('../../assets/risev logo.png')}
+              style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+            />
           </View>
-          <Image
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
-        </View>
 
         {/* Sub-tab Selection Row */}
         <View style={styles.subTabContainer}>
@@ -1696,14 +1699,14 @@ export default function MarketingScreen() {
                               <Image source={{ uri: merchantLogo }} style={{ width: 28, height: 28 }} resizeMode="cover" />
                             ) : (
                               <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                                {(merchant?.name || user?.merchant_name || 'K').substring(0, 1).toUpperCase()}
+                                {(merchant?.name || (user as any)?.merchant_name || 'K').substring(0, 1).toUpperCase()}
                               </Text>
                             )}
                           </View>
                           <View style={{ gap: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                               <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }} numberOfLines={1}>
-                                {merchant?.name || user?.merchant_name || 'Kedai Kami'}
+                                {merchant?.name || (user as any)?.merchant_name || 'Kedai Kami'}
                               </Text>
                               <MaterialIcons name="verified" size={12} color="#25D366" />
                             </View>
@@ -1976,6 +1979,7 @@ export default function MarketingScreen() {
             />
           </View>
         )}
+        </View>
 
       </ScrollView>
 

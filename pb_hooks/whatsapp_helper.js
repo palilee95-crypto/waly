@@ -216,12 +216,33 @@ function listMessageTemplates(merchantId) {
       const templates = (data.data || []).map(t => {
         let bodyText = "";
         let headerText = "";
+        let headerFormat = "TEXT";
+        let headerImageUrl = "";
         let footerText = "";
+        let buttons = [];
         const components = t.components || [];
         for (let i = 0; i < components.length; i++) {
-          if (components[i].type === "BODY") bodyText = components[i].text || "";
-          if (components[i].type === "HEADER") headerText = components[i].text || "";
-          if (components[i].type === "FOOTER") footerText = components[i].text || "";
+          const comp = components[i];
+          if (comp.type === "BODY") bodyText = comp.text || "";
+          if (comp.type === "HEADER") {
+            headerFormat = comp.format || "TEXT";
+            if (comp.format === "IMAGE") {
+              if (comp.example && comp.example.header_handle && comp.example.header_handle[0]) {
+                headerImageUrl = comp.example.header_handle[0];
+              }
+            } else if (comp.text) {
+              headerText = comp.text;
+            }
+          }
+          if (comp.type === "FOOTER") footerText = comp.text || "";
+          if (comp.type === "BUTTONS" && Array.isArray(comp.buttons)) {
+            buttons = comp.buttons.map(b => ({
+              type: b.type,
+              text: b.text,
+              url: b.url,
+              phoneNumber: b.phone_number,
+            }));
+          }
         }
         return {
           id: t.id,
@@ -231,7 +252,10 @@ function listMessageTemplates(merchantId) {
           language: t.language,
           bodyText: bodyText,
           headerText: headerText,
+          headerFormat: headerFormat,
+          headerImageUrl: headerImageUrl,
           footerText: footerText,
+          buttons: buttons,
           rejectedReason: t.rejected_reason || null,
         };
       });
@@ -272,8 +296,19 @@ function createMessageTemplate(merchantId, templateData) {
   
   const components = [];
 
-  // Optional Header
-  if (templateData.headerText && templateData.headerText.trim()) {
+  // Header Component (TEXT or IMAGE)
+  if (templateData.headerType === "IMAGE" || templateData.headerFormat === "IMAGE" || templateData.headerImageUrl) {
+    const imageComponent = {
+      type: "HEADER",
+      format: "IMAGE",
+    };
+    if (templateData.headerImageUrl || templateData.headerImageHandle) {
+      imageComponent.example = {
+        header_handle: [templateData.headerImageHandle || templateData.headerImageUrl || "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=400"]
+      };
+    }
+    components.push(imageComponent);
+  } else if (templateData.headerText && templateData.headerText.trim()) {
     components.push({
       type: "HEADER",
       format: "TEXT",
@@ -306,6 +341,39 @@ function createMessageTemplate(merchantId, templateData) {
       type: "FOOTER",
       text: templateData.footerText.trim(),
     });
+  }
+
+  // Optional Buttons Component (URL, PHONE_NUMBER, QUICK_REPLY)
+  if (Array.isArray(templateData.buttons) && templateData.buttons.length > 0) {
+    const validButtons = [];
+    for (const btn of templateData.buttons) {
+      if (!btn || !btn.text) continue;
+      const bType = (btn.type || "URL").toUpperCase();
+      if (bType === "URL") {
+        validButtons.push({
+          type: "URL",
+          text: btn.text.trim().substring(0, 25),
+          url: btn.url ? btn.url.trim() : "https://risev.app",
+        });
+      } else if (bType === "PHONE_NUMBER") {
+        validButtons.push({
+          type: "PHONE_NUMBER",
+          text: btn.text.trim().substring(0, 25),
+          phone_number: btn.phoneNumber ? btn.phoneNumber.replace(/[^\d+]/g, '') : "+60123456789",
+        });
+      } else if (bType === "QUICK_REPLY") {
+        validButtons.push({
+          type: "QUICK_REPLY",
+          text: btn.text.trim().substring(0, 25),
+        });
+      }
+    }
+    if (validButtons.length > 0) {
+      components.push({
+        type: "BUTTONS",
+        buttons: validButtons,
+      });
+    }
   }
 
   const payload = {
