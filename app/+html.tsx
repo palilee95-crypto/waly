@@ -17,6 +17,35 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
+
+        {/* Facebook JS SDK for Meta WhatsApp Embedded Signup */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.fbAsyncInit = function() {
+                if (window.FB) {
+                  window.FB.init({
+                    appId      : '1040853298682209',
+                    cookie     : true,
+                    xfbml      : true,
+                    version    : 'v20.0'
+                  });
+                  if (window.FB.AppEvents && window.FB.AppEvents.logPageView) {
+                    window.FB.AppEvents.logPageView();
+                  }
+                }
+              };
+
+              (function(d, s, id){
+                var js, fjs = d.getElementsByTagName(s)[0];
+                if (d.getElementById(id)) {return;}
+                js = d.createElement(s); js.id = id;
+                js.src = "https://connect.facebook.net/en_US/sdk.js";
+                fjs.parentNode.insertBefore(js, fjs);
+              }(document, 'script', 'facebook-jssdk'));
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

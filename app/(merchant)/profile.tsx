@@ -340,10 +340,10 @@ export default function ProfileScreen() {
     if (!user || !user.merchant_id) return;
     
     const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
-    const fbConfigId = process.env.EXPO_PUBLIC_META_CONFIG_ID || '';
+    const fbConfigId = (process.env.EXPO_PUBLIC_META_CONFIG_ID || '1067718449538944').trim();
 
-    // Check if FB SDK is loaded on web
-    if (Platform.OS === 'web' && (window as any).FB && fbConfigId) {
+    // Check if FB SDK is loaded and valid Configuration ID is provided
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).FB && fbConfigId) {
       setIsConnectingMeta(true);
       setConnectingStepText('Connecting via Meta popup...');
       try {
@@ -406,12 +406,12 @@ export default function ProfileScreen() {
     }
 
     // Fallback standard OAuth redirection if SDK not ready or on native
-    const pbBaseUrl = pb.baseUrl.replace(/\/$/, '');
+    const pbBaseUrl = (pb.baseUrl || '').replace(/\/$/, '');
     const redirectUriRaw = pbBaseUrl + '/api/risev/merchant/whatsapp/callback';
 
     const stateObj = {
       merchantId: user.merchant_id,
-      redirectHost: Platform.OS === 'web' ? window.location.origin : 'https://risev.app',
+      redirectHost: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : 'https://risev.app',
       callbackUrl: redirectUriRaw
     };
     
