@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter } from 'expo-router';
-import Svg, { Circle, G } from 'react-native-svg';
+import Svg, { Circle, G, Defs, LinearGradient, Stop, Path, Polyline } from 'react-native-svg';
 
 export default function AnalyticsScreen() {
   const { user } = useAuth();
@@ -687,20 +687,75 @@ export default function AnalyticsScreen() {
           </View>
           <Text style={styles.sectionSubtitle}>Monthly revenue trend for the last 6 months</Text>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 120, marginTop: 16, paddingBottom: 8 }}>
-            {monthlySalesData.map((item, idx) => (
-              <View key={idx} style={{ alignItems: 'center', flex: 1 }}>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: item.isMax ? '#FFC700' : '#94A3B8', marginBottom: 4 }}>
-                  RM{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value}
-                </Text>
-                <View style={{ width: 20, height: 80, backgroundColor: '#F1F5F9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                  <View style={{ height: `${item.percentage}%`, backgroundColor: item.isMax ? '#FFC700' : '#050505', borderRadius: 8 }} />
+          <View style={{ height: 160, width: '100%', marginTop: 16, marginBottom: 8 }}>
+            
+            {/* Values (Top) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+              {monthlySalesData.map((item, idx) => (
+                <View key={idx} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: item.isMax ? '#FFC700' : '#94A3B8' }}>
+                    RM{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8', marginTop: 6 }}>
-                  {item.month}
-                </Text>
+              ))}
+            </View>
+
+            {/* Chart Area */}
+            <View style={{ flex: 1, position: 'relative', marginTop: 12, marginBottom: 12 }}>
+              <View style={{ position: 'absolute', top: 0, bottom: 0, left: '8.33%', right: '8.33%' }}>
+                <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <Defs>
+                    <LinearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor="#FFC700" stopOpacity="0.4" />
+                      <Stop offset="1" stopColor="#FFC700" stopOpacity="0.0" />
+                    </LinearGradient>
+                  </Defs>
+                  <Path 
+                    d={`M 0,100 ${monthlySalesData.map((item, i) => `L ${(i / (monthlySalesData.length - 1)) * 100},${100 - item.percentage}`).join(' ')} L 100,100 Z`}
+                    fill="url(#salesGradient)"
+                  />
+                  <Polyline
+                    points={monthlySalesData.map((item, i) => `${(i / (monthlySalesData.length - 1)) * 100},${100 - item.percentage}`).join(' ')}
+                    fill="none"
+                    stroke="#FFC700"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </Svg>
               </View>
-            ))}
+
+              {/* Dots */}
+              <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between' }}>
+                {monthlySalesData.map((item, idx) => (
+                  <View key={idx} style={{ height: '100%', flex: 1, alignItems: 'center' }}>
+                    <View 
+                      style={{ 
+                        position: 'absolute', 
+                        top: `${100 - item.percentage}%`, 
+                        width: 10, 
+                        height: 10, 
+                        borderRadius: 5, 
+                        backgroundColor: item.isMax ? '#FFC700' : '#FFFFFF',
+                        borderWidth: 2,
+                        borderColor: '#FFC700',
+                        marginTop: -5,
+                      }} 
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Labels (Bottom) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+              {monthlySalesData.map((item, idx) => (
+                <View key={idx} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isMax ? '#050505' : '#94A3B8' }}>
+                    {item.month}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 

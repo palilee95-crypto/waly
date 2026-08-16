@@ -185,7 +185,7 @@ export default function GiveStampsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: 16 + insets.top },
+          { paddingTop: 16 + insets.top, paddingBottom: 120 },
           isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }
         ]}
         showsVerticalScrollIndicator={false}
