@@ -511,6 +511,88 @@ export default function MerchantDashboard() {
           </View>
         </View>
 
+        {/* 🎯 Real-time Customer Quota Tracker Card (Stand Starter 1,000 Quota) */}
+        <View style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: 20,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: '#E2E8F0',
+          shadowColor: '#050505',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.04,
+          shadowRadius: 10,
+          elevation: 2,
+          marginTop: -8,
+          marginBottom: 4,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="people" size={15} color="#B45309" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                  Customer Quota
+                </Text>
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                  Stand Welcome Bundle • No Expiry
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => router.push('/(merchant)/subscription' as any)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#050505',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 10,
+                gap: 4
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>Upgrade</Text>
+              <Ionicons name="arrow-forward" size={10} color="#FFC700" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Progress bar */}
+          {(() => {
+            const customerCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
+            const quotaLimit = 500;
+            const percentage = Math.min(100, Math.round((customerCount / quotaLimit) * 100));
+            const isNearLimit = customerCount >= 400;
+            const isCritical = customerCount >= 475;
+
+            return (
+              <>
+                <View style={{ height: 10, backgroundColor: '#F1F5F9', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
+                  <View 
+                    style={{ 
+                      height: '100%', 
+                      width: `${Math.max(4, percentage)}%`, 
+                      backgroundColor: isCritical ? '#EF4444' : isNearLimit ? '#F59E0B' : '#FFC700', 
+                      borderRadius: 5 
+                    }} 
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                    {customerCount.toLocaleString()} / {quotaLimit.toLocaleString()} <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Customers</Text>
+                  </Text>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: isNearLimit ? '#EA580C' : '#059669' }}>
+                    {Math.max(0, quotaLimit - customerCount).toLocaleString()} remaining
+                  </Text>
+                </View>
+              </>
+            );
+          })()}
+        </View>
+
         {isInTrial && (
           <View style={styles.trialBanner}>
             <View style={styles.trialTopRow}>

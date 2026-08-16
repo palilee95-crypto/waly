@@ -923,6 +923,27 @@ export default function ProfileScreen() {
     setLogoutModalVisible(true);
   };
 
+  const handlePrivacyPress = () => {
+    Alert.alert(
+      locale === 'en' ? 'Legal Agreements' : 'Perjanjian Undang-undang',
+      locale === 'en' ? 'Please select a document to view:' : 'Sila pilih dokumen untuk dipaparkan:',
+      [
+        {
+          text: locale === 'en' ? 'Privacy Policy' : 'Dasar Privasi',
+          onPress: () => router.push('/privacy' as any)
+        },
+        {
+          text: locale === 'en' ? 'Terms & Conditions' : 'Terma & Syarat',
+          onPress: () => router.push('/terms' as any)
+        },
+        {
+          text: locale === 'en' ? 'Cancel' : 'Batal',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
   const confirmLogout = async () => {
     setLogoutModalVisible(false);
     await logout();
@@ -956,38 +977,41 @@ export default function ProfileScreen() {
 
         {/* Store Profile Info Card */}
         <View style={styles.profileCard}>
-          <View style={styles.profileHeaderRow}>
-            <Image
-              source={{ uri: logoUrl }}
-              style={styles.shopImage}
-            />
-            <View style={styles.shopMainInfo}>
-              <Text style={styles.shopName}>{merchant?.name || user?.name || 'The Coffee House'}</Text>
-              <View style={styles.partnerRow}>
-                {merchant?.status === 'active' ? (
-                  <>
-                    <View style={styles.proBadge}>
-                      <Text style={styles.proBadgeText}>PRO</Text>
+          <View style={{ gap: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.shopImage}
+              />
+              <View style={styles.shopMainInfo}>
+                <Text style={styles.shopName} numberOfLines={1}>{merchant?.name || user?.name || 'The Coffee House'}</Text>
+                <View style={styles.partnerRow}>
+                  {merchant?.status === 'active' ? (
+                    <>
+                      <View style={styles.proBadge}>
+                        <Text style={styles.proBadgeText}>PRO</Text>
+                      </View>
+                      {subscription?.current_period_end && (
+                        <Text style={styles.locationText}>{getExpiryLabel()}</Text>
+                      )}
+                    </>
+                  ) : isInTrial ? (
+                    <>
+                      <View style={styles.trialBadge}>
+                        <Text style={styles.trialBadgeText}>TRIAL</Text>
+                      </View>
+                      <Text style={styles.locationText}>{trialDaysRemaining}d left</Text>
+                    </>
+                  ) : (
+                    <View style={styles.expiredBadge}>
+                      <Text style={styles.expiredBadgeText}>SUSPENDED</Text>
                     </View>
-                    {subscription?.current_period_end && (
-                      <Text style={styles.locationText}>{getExpiryLabel()}</Text>
-                    )}
-                  </>
-                ) : isInTrial ? (
-                  <>
-                    <View style={styles.trialBadge}>
-                      <Text style={styles.trialBadgeText}>TRIAL</Text>
-                    </View>
-                    <Text style={styles.locationText}>{trialDaysRemaining}d left</Text>
-                  </>
-                ) : (
-                  <View style={styles.expiredBadge}>
-                    <Text style={styles.expiredBadgeText}>SUSPENDED</Text>
-                  </View>
-                )}
+                  )}
+                </View>
               </View>
             </View>
-            <TouchableOpacity style={styles.updateBtn} onPress={handleOpenEdit} activeOpacity={0.8}>
+
+            <TouchableOpacity style={[styles.updateBtn, { width: '100%', alignItems: 'center', marginTop: 4 }]} onPress={handleOpenEdit} activeOpacity={0.8}>
               <Text style={styles.updateBtnText}>
                 {locale === 'en' ? 'Edit Profile' : 'Edit Profil'}
               </Text>
@@ -1046,6 +1070,15 @@ export default function ProfileScreen() {
         <View style={styles.settingsGrid}>
           {merchant && merchant.owner === user?.id && (
             <>
+              <SettingItem
+                iconName="business-outline"
+                title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
+                subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
+                iconBgColor="#FEF3C7"
+                iconColor="#B45309"
+                onPress={() => router.push('/(merchant)/branches' as any)}
+              />
+
               <SettingItem
                 iconName="people-outline"
                 title={t('manage_staff')}
@@ -1111,13 +1144,13 @@ export default function ProfileScreen() {
               onPress={() => setLanguageModalVisible(true)}
             />
             <BentoSquareItem
-              iconName="sparkles-outline"
+              iconName="card-outline"
               title="My Subscription"
               subtitle="Manage your plan & billing"
-              iconBgColor="#FFF3E0"
-              iconColor="#FF9800"
+              iconBgColor="#EEF2FF"
+              iconColor="#4F46E5"
               badgeText="PRO"
-              badgeColor="#FF9800"
+              badgeColor="#4F46E5"
               onPress={() => router.push('/(merchant)/subscription' as any)}
             />
           </View>
@@ -1128,6 +1161,7 @@ export default function ProfileScreen() {
             subtitle={t('privacy_policy_desc')}
             iconBgColor="#F1F5F9"
             iconColor="#050505"
+            onPress={handlePrivacyPress}
           />
         </View>
 
@@ -1706,15 +1740,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   proBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 100,
   },
   proBadgeText: {
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#047857',
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   trialBadge: {

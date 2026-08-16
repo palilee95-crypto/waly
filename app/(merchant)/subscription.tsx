@@ -5,17 +5,19 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  Switch, 
   Dimensions, 
   Image, 
   Alert, 
   Platform,
   Linking,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -28,10 +30,13 @@ const BENEFITS = [
 export default function SubscriptionScreen() {
   const router = useRouter();
   const { user, refreshSession } = useAuth();
+  const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
-  const [trialEnabled, setTrialEnabled] = useState(true);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'fpx' | 'card' | 'duitnow'>('fpx');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   // Auto-play benefits slider
   useEffect(() => {
@@ -44,13 +49,13 @@ export default function SubscriptionScreen() {
   const getPriceDetails = () => {
     if (selectedPlan === 'starter') {
       return {
-        price: billingCycle === 'monthly' ? 'RM 39' : 'RM 31',
+        price: billingCycle === 'monthly' ? 'RM 47' : 'RM 38',
         originalPrice: billingCycle === 'monthly' ? 'RM 59' : 'RM 49',
         label: 'Starter Plan'
       };
     } else if (selectedPlan === 'pro') {
       return {
-        price: billingCycle === 'monthly' ? 'RM 79' : 'RM 63',
+        price: billingCycle === 'monthly' ? 'RM 97' : 'RM 78',
         originalPrice: billingCycle === 'monthly' ? 'RM 129' : 'RM 99',
         label: 'PRO Plan'
       };
@@ -65,39 +70,123 @@ export default function SubscriptionScreen() {
 
   const currentPrice = getPriceDetails();
 
-  const handlePurchase = async () => {
-    let merchantId = user?.merchant_id;
-    if (!merchantId) {
-      try {
-        await refreshSession();
-        if (user?.merchant_id) {
-          merchantId = user.merchant_id;
-        }
-      } catch (e) {
-        console.error("Session refresh failed:", e);
-      }
+  const getOrderSummary = () => {
+    const isAnnual = billingCycle === 'annually';
+    if (selectedPlan === 'starter') {
+      const monthlyRate = isAnnual ? 38 : 47;
+      const baseMonthly = isAnnual ? 59 : 59;
+      const subtotal = baseMonthly * (isAnnual ? 12 : 1);
+      const total = monthlyRate * (isAnnual ? 12 : 1);
+      const discount = subtotal - total;
+      return {
+        planTitle: 'Starter Plan',
+        badgeColor: '#64748B',
+        badgeBg: '#F1F5F9',
+        icon: 'cube-outline' as const,
+        monthlyRate,
+        months: isAnnual ? 12 : 1,
+        subtotal,
+        discount,
+        total,
+        periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual)' : '12 Bulan (Tahunan)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
+        highlights: locale === 'en' ? [
+          '500 monthly customer quota',
+          'Basic analytics dashboard',
+          '1 staff account'
+        ] : [
+          'Kuota 500 pelanggan bulanan',
+          'Papan pemuka analitik asas',
+          '1 akaun staf'
+        ]
+      };
+    } else if (selectedPlan === 'pro') {
+      const monthlyRate = isAnnual ? 78 : 97;
+      const baseMonthly = isAnnual ? 129 : 129;
+      const subtotal = baseMonthly * (isAnnual ? 12 : 1);
+      const total = monthlyRate * (isAnnual ? 12 : 1);
+      const discount = subtotal - total;
+      return {
+        planTitle: 'PRO Plan',
+        badgeColor: '#4F46E5',
+        badgeBg: '#EEF2FF',
+        icon: 'star-outline' as const,
+        monthlyRate,
+        months: isAnnual ? 12 : 1,
+        subtotal,
+        discount,
+        total,
+        periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual - Save 20%)' : '12 Bulan (Tahunan - Jimat 20%)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
+        highlights: locale === 'en' ? [
+          'Unlimited customer database ♾️',
+          'Official Meta WhatsApp Automation',
+          'Promotional WhatsApp Broadcasts',
+          'Up to 5 staff accounts'
+        ] : [
+          'Database pelanggan tanpa had ♾️',
+          'Automasi Rasmi Meta WhatsApp',
+          'Pemasaran Broadcast WhatsApp',
+          'Hingga 5 akaun staf'
+        ]
+      };
+    } else {
+      const monthlyRate = isAnnual ? 263 : 329;
+      const baseMonthly = isAnnual ? 499 : 499;
+      const subtotal = baseMonthly * (isAnnual ? 12 : 1);
+      const total = monthlyRate * (isAnnual ? 12 : 1);
+      const discount = subtotal - total;
+      return {
+        planTitle: 'Business Plan',
+        badgeColor: '#D97706',
+        badgeBg: '#FEF3C7',
+        icon: 'business-outline' as const,
+        monthlyRate,
+        months: isAnnual ? 12 : 1,
+        subtotal,
+        discount,
+        total,
+        periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual - Save 20%)' : '12 Bulan (Tahunan - Jimat 20%)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
+        highlights: locale === 'en' ? [
+          'Everything in PRO included',
+          'Multi-branch outlet management',
+          'Unlimited staff accounts',
+          '24/7 dedicated support'
+        ] : [
+          'Semua ciri dalam PRO',
+          'Sokongan pelbagai cawangan',
+          'Akaun staf tanpa had',
+          'Sokongan akaun 24/7'
+        ]
+      };
     }
+  };
 
-    if (!merchantId) {
-      Alert.alert('Error', 'Could not find Merchant ID. Please log in again.');
-      return;
-    }
+  const handlePurchase = () => {
+    setShowCheckoutModal(true);
+  };
 
-    const months = billingCycle === 'annually' ? 12 : 1;
-    const cleanMerchantId = merchantId.replace('merchant-', '');
+  const handleProceedToPayment = async () => {
+    setProcessingPayment(true);
+    const summary = getOrderSummary();
     
-    // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
-    const telegramUrl = `https://t.me/RisevBilling_bot?start=${cleanMerchantId}_${months}_${selectedPlan}`;
-    
-    try {
-      if (Platform.OS === 'web') {
-        window.open(telegramUrl, '_blank');
-      } else {
-        await Linking.openURL(telegramUrl);
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Could not open Telegram. Please open Telegram and search for @RisevBilling_bot.');
-    }
+    // Simulate gateway checkout session initiation
+    setTimeout(() => {
+      setProcessingPayment(false);
+      setShowCheckoutModal(false);
+      
+      const methodNames: Record<string, string> = {
+        fpx: 'FPX Online Banking',
+        card: 'Credit / Debit Card',
+        duitnow: 'DuitNow QR / E-Wallet'
+      };
+
+      Alert.alert(
+        locale === 'en' ? 'Payment Gateway Ready' : 'Gerbang Pembayaran Sedia',
+        locale === 'en' 
+          ? `Order for ${summary.planTitle} (${summary.periodLabel}) total RM ${summary.total.toLocaleString()} prepared via ${methodNames[selectedPaymentMethod]}. Ready to connect with payment gateway.`
+          : `Pesanan untuk ${summary.planTitle} (${summary.periodLabel}) berjumlah RM ${summary.total.toLocaleString()} disediakan melalui ${methodNames[selectedPaymentMethod]}. Sedia untuk dihubungkan ke gerbang pembayaran.`,
+        [{ text: 'OK' }]
+      );
+    }, 1000);
   };
 
   const getFeaturesList = () => {
@@ -141,35 +230,91 @@ export default function SubscriptionScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Dark header bleed — sits behind the SafeAreaView header only */}
+      <View style={styles.headerBleed} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView 
           showsVerticalScrollIndicator={false} 
-          style={{ backgroundColor: '#050505' }}
-          contentContainerStyle={{ paddingBottom: 180 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
         >
           {/* Sticky Header with Logo & Tagline */}
           <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
-                <Ionicons name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
+            <View style={[styles.headerTop, { justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+                <Text style={styles.headerUpsellTitle}>Subscription Plan</Text>
+              </View>
               <Image 
                 source={require('../../assets/risev logo.png')}
                 style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
               />
             </View>
-            <View style={styles.headerUpsell}>
-              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                <Ionicons name="sparkles" size={14} color="#FFC700" />
-                <Text style={styles.headerUpsellTitle}>Grow Your Shop on Autopilot</Text>
-              </View>
-              <Text style={styles.headerUpsellDesc}>
-                Turn one-time walk-ins into regular customers with automated loyalty, WhatsApp notifications, and sales analytics. (Software subscription only).
-              </Text>
-            </View>
           </View>
 
           <View style={styles.scrollContent}>
+
+          {/* 1. Current Active Plan & Quota Status Card */}
+          <View style={{
+            backgroundColor: '#050505',
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 199, 0, 0.3)',
+            shadowColor: '#050505',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.08,
+            shadowRadius: 12,
+            elevation: 3,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Stand Starter Bundle
+                  </Text>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                    Current Active Plan
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>ACTIVE</Text>
+              </View>
+            </View>
+
+            {/* Quota Progress */}
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
+                  Customer Database Quota
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
+                  44 / 500
+                </Text>
+              </View>
+              <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: '100%', width: '8.8%', backgroundColor: '#FFC700', borderRadius: 3 }} />
+              </View>
+            </View>
+
+            {/* Expiry Details */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="infinite" size={14} color="#10B981" />
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#10B981' }}>
+                  No Expiry Date
+                </Text>
+              </View>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                Valid until 500 quota used
+              </Text>
+            </View>
+          </View>
 
           {/* 2. Billing Toggle (Monthly / Annual) */}
           <View style={styles.billingToggleWrapper}>
@@ -207,7 +352,7 @@ export default function SubscriptionScreen() {
             >
               <Text style={styles.planCardTitle}>Starter</Text>
               <Text style={styles.planCardPrice}>
-                {billingCycle === 'monthly' ? 'RM 39' : 'RM 31'}
+                {billingCycle === 'monthly' ? 'RM 47' : 'RM 38'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
@@ -227,7 +372,7 @@ export default function SubscriptionScreen() {
               </View>
               <Text style={styles.planCardTitle}>PRO</Text>
               <Text style={[styles.planCardPrice, { color: '#050505' }]}>
-                {billingCycle === 'monthly' ? 'RM 79' : 'RM 63'}
+                {billingCycle === 'monthly' ? 'RM 97' : 'RM 78'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
@@ -299,20 +444,9 @@ export default function SubscriptionScreen() {
            </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
 
-      {/* 6. Sticky IAP Action Footer */}
+      {/* 6. Sticky IAP Action Footer — inside SafeAreaView so it always shows */}
       <View style={styles.stickyFooter}>
-        <View style={styles.trialRow}>
-          <Text style={styles.trialText}>Enable 7-day free trial on upgrade</Text>
-          <Switch 
-            value={trialEnabled} 
-            onValueChange={setTrialEnabled} 
-            trackColor={{ false: '#E2E8F0', true: '#FFC700' }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
         <TouchableOpacity 
           style={styles.ctaButton} 
           onPress={handlePurchase}
@@ -336,17 +470,318 @@ export default function SubscriptionScreen() {
           <TouchableOpacity onPress={() => Alert.alert('Privacy Policy', 'Privacy policy details...')}><Text style={styles.legalLink}>Privacy</Text></TouchableOpacity>
         </View>
       </View>
-    </View>
+
+      {/* Checkout Order Summary Modal */}
+      <Modal
+        visible={showCheckoutModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCheckoutModal(false)}
+      >
+        <View style={styles.checkoutOverlay}>
+          <TouchableOpacity 
+            style={styles.checkoutOverlayBg} 
+            activeOpacity={1} 
+            onPress={() => setShowCheckoutModal(false)} 
+          />
+
+          <View style={styles.checkoutSheet}>
+            {/* Sheet Handle */}
+            <View style={styles.checkoutHandle} />
+
+            {/* Header */}
+            <View style={styles.checkoutHeader}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.checkoutTitle}>
+                    {locale === 'en' ? 'Checkout Summary' : 'Ringkasan Pesanan'}
+                  </Text>
+                  <View style={styles.securePill}>
+                    <Ionicons name="lock-closed" size={9} color="#15803D" />
+                    <Text style={styles.securePillText}>SSL SECURE</Text>
+                  </View>
+                </View>
+                <Text style={styles.checkoutSubtitle}>
+                  {locale === 'en' ? 'Review & complete your subscription' : 'Semak & lengkapkan langganan anda'}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowCheckoutModal(false)} 
+                style={styles.checkoutCloseBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              showsVerticalScrollIndicator={false} 
+              style={{ maxHeight: 520 }}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              {/* Selected Plan VIP Card */}
+              {(() => {
+                const summary = getOrderSummary();
+                const isPro = selectedPlan === 'pro';
+                const isBusiness = selectedPlan === 'enterprise';
+
+                return (
+                  <>
+                    <View style={[
+                      styles.vipPlanCard,
+                      isPro && styles.vipPlanCardPro,
+                      isBusiness && styles.vipPlanCardBusiness,
+                    ]}>
+                      {/* Top Plan Header */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={[styles.vipIconWrap, { backgroundColor: isPro ? 'rgba(99, 102, 241, 0.2)' : isBusiness ? 'rgba(245, 158, 11, 0.2)' : 'rgba(148, 163, 184, 0.2)' }]}>
+                            <Ionicons name={summary.icon} size={20} color={isPro ? '#A5B4FC' : isBusiness ? '#FCD34D' : '#E2E8F0'} />
+                          </View>
+                          <View>
+                            <Text style={styles.vipPlanTitle}>{summary.planTitle}</Text>
+                            <Text style={styles.vipPlanPeriod}>{summary.periodLabel}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.vipPricePill}>
+                          <Text style={styles.vipPricePillAmount}>RM {summary.monthlyRate}</Text>
+                          <Text style={styles.vipPricePillPer}>/mo</Text>
+                        </View>
+                      </View>
+
+                      {/* Feature Highlights Grid */}
+                      <View style={styles.vipFeatureGrid}>
+                        {summary.highlights.map((h, i) => (
+                          <View key={i} style={styles.vipFeatureItem}>
+                            <Ionicons name="checkmark-circle" size={14} color="#34D399" />
+                            <Text style={styles.vipFeatureText} numberOfLines={1}>
+                              {h}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Merchant Account Identity Bar */}
+                    <View style={styles.merchantIdentityBar}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <View style={styles.merchantAvatarCircle}>
+                          <Ionicons name="storefront" size={14} color="#B45309" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.merchantStoreName} numberOfLines={1}>
+                            {(user as any)?.merchant_name || user?.name || 'Risev Merchant'}
+                          </Text>
+                          <Text style={styles.merchantIdTag}>
+                            ID: {user?.merchant_id || 'M-DEFAULT'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.invoiceBadgePill}>
+                        <Ionicons name="receipt-outline" size={11} color="#059669" />
+                        <Text style={styles.invoiceBadgePillText}>WhatsApp Invoice</Text>
+                      </View>
+                    </View>
+
+                    {/* Payment Method Selector */}
+                    <View style={{ marginTop: 16, marginBottom: 16 }}>
+                      <Text style={styles.checkoutSectionLabel}>
+                        {locale === 'en' ? 'Select Payment Method' : 'Pilih Kaedah Pembayaran'}
+                      </Text>
+                      <View style={{ gap: 8 }}>
+                        {/* FPX */}
+                        <TouchableOpacity
+                          style={[
+                            styles.modernPaymentCard,
+                            selectedPaymentMethod === 'fpx' && styles.modernPaymentCardActive
+                          ]}
+                          onPress={() => setSelectedPaymentMethod('fpx')}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'fpx' && styles.modernPaymentIconBgActive]}>
+                              <Ionicons name="business" size={18} color={selectedPaymentMethod === 'fpx' ? '#B45309' : '#475569'} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.modernPaymentTitle}>FPX Online Banking</Text>
+                                <View style={styles.instantPill}><Text style={styles.instantPillText}>POPULAR</Text></View>
+                              </View>
+                              <Text style={styles.modernPaymentSubtitle}>Maybank2u, CIMB, Bank Islam, RHB, Public Bank</Text>
+                            </View>
+                          </View>
+                          <View style={[styles.modernRadio, selectedPaymentMethod === 'fpx' && styles.modernRadioActive]}>
+                            {selectedPaymentMethod === 'fpx' && <View style={styles.modernRadioDot} />}
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Card */}
+                        <TouchableOpacity
+                          style={[
+                            styles.modernPaymentCard,
+                            selectedPaymentMethod === 'card' && styles.modernPaymentCardActive
+                          ]}
+                          onPress={() => setSelectedPaymentMethod('card')}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'card' && styles.modernPaymentIconBgActive]}>
+                              <Ionicons name="card" size={18} color={selectedPaymentMethod === 'card' ? '#B45309' : '#475569'} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.modernPaymentTitle}>Credit / Debit Card</Text>
+                                <View style={styles.feePill}><Text style={styles.feePillText}>0% FEE</Text></View>
+                              </View>
+                              <Text style={styles.modernPaymentSubtitle}>Visa, Mastercard, MyDebit (Instant Setup)</Text>
+                            </View>
+                          </View>
+                          <View style={[styles.modernRadio, selectedPaymentMethod === 'card' && styles.modernRadioActive]}>
+                            {selectedPaymentMethod === 'card' && <View style={styles.modernRadioDot} />}
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* DuitNow QR */}
+                        <TouchableOpacity
+                          style={[
+                            styles.modernPaymentCard,
+                            selectedPaymentMethod === 'duitnow' && styles.modernPaymentCardActive
+                          ]}
+                          onPress={() => setSelectedPaymentMethod('duitnow')}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'duitnow' && styles.modernPaymentIconBgActive]}>
+                              <Ionicons name="qr-code" size={18} color={selectedPaymentMethod === 'duitnow' ? '#B45309' : '#475569'} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.modernPaymentTitle}>DuitNow QR & E-Wallet</Text>
+                              <Text style={styles.modernPaymentSubtitle}>Touch 'n Go, GrabPay, ShopeePay</Text>
+                            </View>
+                          </View>
+                          <View style={[styles.modernRadio, selectedPaymentMethod === 'duitnow' && styles.modernRadioActive]}>
+                            {selectedPaymentMethod === 'duitnow' && <View style={styles.modernRadioDot} />}
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Price Breakdown Card */}
+                    <View style={styles.modernInvoiceBox}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={styles.invoiceRowLabel}>
+                          {summary.planTitle} ({summary.months} {summary.months > 1 ? (locale === 'en' ? 'Months' : 'Bulan') : (locale === 'en' ? 'Month' : 'Bulan')})
+                        </Text>
+                        <Text style={styles.invoiceRowValue}>RM {summary.subtotal.toFixed(2)}</Text>
+                      </View>
+
+                      {summary.discount > 0 && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <View style={styles.savingsPill}>
+                            <Ionicons name="sparkles" size={11} color="#15803D" />
+                            <Text style={styles.savingsPillText}>
+                              {locale === 'en' ? 'Annual Discount (20% OFF)' : 'Diskaun Tahunan (Jimat 20%)'}
+                            </Text>
+                          </View>
+                          <Text style={styles.savingsValue}>- RM {summary.discount.toFixed(2)}</Text>
+                        </View>
+                      )}
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={styles.invoiceRowLabel}>
+                          {locale === 'en' ? 'Processing & Server Fee' : 'Yuran Pemprosesan & Server'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>
+                          {locale === 'en' ? 'WAIVED' : 'PERCUMA'}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={styles.invoiceRowLabel}>
+                          {locale === 'en' ? 'SST / Service Tax' : 'Cukai Perkhidmatan (SST)'}
+                        </Text>
+                        <Text style={styles.invoiceRowValue}>RM 0.00</Text>
+                      </View>
+
+                      <View style={styles.invoiceDivider} />
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                        <View>
+                          <Text style={styles.invoiceGrandTotalLabel}>
+                            {locale === 'en' ? 'Total Payable' : 'Jumlah Perlu Dibayar'}
+                          </Text>
+                          <Text style={styles.invoiceGrandTotalSub}>
+                            {locale === 'en' ? 'All taxes & platform fees included' : 'Semua cukai & yuran platform termasuk'}
+                          </Text>
+                        </View>
+                        <Text style={styles.invoiceGrandTotalAmount}>
+                          RM {summary.total.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Trust & Guarantee Banner */}
+                    <View style={styles.modernTrustBanner}>
+                      <Ionicons name="shield-checkmark" size={15} color="#059669" />
+                      <Text style={styles.modernTrustBannerText}>
+                        {locale === 'en' 
+                          ? '256-Bit SSL Encrypted • Instant Upgrade • Cancel Anytime'
+                          : 'Penyulitan SSL 256-Bit • Pengaktifan Segera • Batal Bila-bila Masa'}
+                      </Text>
+                    </View>
+                  </>
+                );
+              })()}
+            </ScrollView>
+
+            {/* Bottom Proceed Button */}
+            <View style={styles.checkoutActionContainer}>
+              <TouchableOpacity
+                style={[styles.proceedBtn, processingPayment && { opacity: 0.7 }]}
+                onPress={handleProceedToPayment}
+                disabled={processingPayment}
+                activeOpacity={0.85}
+              >
+                {processingPayment ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="lock-closed" size={15} color="#050505" />
+                    <Text style={styles.proceedBtnText}>
+                      {locale === 'en' 
+                        ? `Proceed to Pay RM ${getOrderSummary().total.toFixed(2)}`
+                        : `Bayar RM ${getOrderSummary().total.toFixed(2)} Sekarang`}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={15} color="#050505" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050505', // Deep dark theme matches iOS App Store Paywall
+    backgroundColor: '#F8FAFC',
+  },
+  headerBleed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+    backgroundColor: '#050505',
+    zIndex: 0,
   },
   safeArea: {
     flex: 1,
+    zIndex: 1,
   },
   header: {
     paddingHorizontal: 24,
@@ -387,13 +822,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 180, // High bottom padding to avoid overlapping the sticky footer!
+    paddingBottom: 120,
     backgroundColor: '#F8FAFC',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: 28,
     marginTop: -24,
-    minHeight: '100%',
+    flex: 1,
   },
   upsellSparkle: {
     width: 28,
@@ -600,27 +1035,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   stickyFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
-  },
-  trialRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  trialText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#050505',
+    paddingBottom: Platform.OS === 'ios' ? 32 : 20,
   },
   ctaButton: {
     backgroundColor: '#FFC700',
@@ -656,5 +1076,425 @@ const styles = StyleSheet.create({
   legalSeparator: {
     fontSize: 10,
     color: '#E2E8F0',
+  },
+
+  // Checkout Modal Styles (Ultra-Refined Modern Design)
+  checkoutOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: 'rgba(5, 5, 5, 0.7)',
+  },
+  checkoutOverlayBg: {
+    ...StyleSheet.absoluteFill,
+  },
+  checkoutSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '92%',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  checkoutHandle: {
+    width: 42,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  checkoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 4,
+  },
+  checkoutTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: -0.3,
+  },
+  checkoutSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  securePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  securePillText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+    letterSpacing: 0.3,
+  },
+  checkoutCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
+  // VIP Plan Card
+  vipPlanCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  vipPlanCardPro: {
+    backgroundColor: '#0A0E1A',
+    borderColor: '#6366F1',
+    shadowColor: '#6366F1',
+    shadowOpacity: 0.25,
+  },
+  vipPlanCardBusiness: {
+    backgroundColor: '#110D05',
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.25,
+  },
+  vipIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vipPlanTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  vipPlanPeriod: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  vipPricePill: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  vipPricePillAmount: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+  },
+  vipPricePillPer: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#CBD5E1',
+  },
+  vipFeatureGrid: {
+    gap: 7,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  vipFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  vipFeatureText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#E2E8F0',
+    flex: 1,
+  },
+
+  // Merchant Account Strip
+  merchantIdentityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 6,
+  },
+  merchantAvatarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  merchantStoreName: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  merchantIdTag: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  invoiceBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  invoiceBadgePillText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#059669',
+  },
+
+  // Payment Method Options
+  checkoutSectionLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  modernPaymentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+  },
+  modernPaymentCardActive: {
+    borderColor: '#FFC700',
+    backgroundColor: '#FFFDF7',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  modernPaymentIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernPaymentIconBgActive: {
+    backgroundColor: '#FEF3C7',
+  },
+  modernPaymentTitle: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  modernPaymentSubtitle: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  instantPill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  instantPillText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
+  feePill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  feePillText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+  },
+  modernRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  modernRadioActive: {
+    borderColor: '#050505',
+    backgroundColor: '#FFC700',
+  },
+  modernRadioDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#050505',
+  },
+
+  // Invoice Breakdown
+  modernInvoiceBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  invoiceRowLabel: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  invoiceRowValue: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  savingsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  savingsPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+  },
+  savingsValue: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#16A34A',
+  },
+  invoiceDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 6,
+  },
+  invoiceGrandTotalLabel: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  invoiceGrandTotalSub: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  invoiceGrandTotalAmount: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: -0.4,
+  },
+
+  // Trust Strip
+  modernTrustBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    marginBottom: 4,
+  },
+  modernTrustBannerText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
+    textAlign: 'center',
+  },
+
+  // Checkout Action CTA
+  checkoutActionContainer: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  proceedBtn: {
+    backgroundColor: '#FFC700',
+    borderRadius: 16,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  proceedBtnText: {
+    color: '#050505',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.2,
   },
 });

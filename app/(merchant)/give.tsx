@@ -204,13 +204,13 @@ export default function GiveStampsScreen() {
               <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>
                 Issue & Redeem
               </Text>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
                 Scan vouchers or issue stamps manually
               </Text>
             </View>
           </View>
           <TouchableOpacity 
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' }} 
+            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' }} 
             onPress={fetchTransactions} 
             activeOpacity={0.7}
           >

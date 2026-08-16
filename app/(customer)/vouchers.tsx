@@ -278,8 +278,19 @@ export default function VouchersScreen() {
               filteredVouchers.map((item) => {
                 const isLight = isLightColor(item.color || '#0F172A');
                 
+                const isClickable = item.status === 'active';
+                const Container: any = isClickable ? TouchableOpacity : View;
+                const containerProps = isClickable ? {
+                  onPress: () => handleUseVoucher(item),
+                  activeOpacity: 0.9
+                } : {};
+
                 return (
-                  <View key={item.id} style={[styles.ticketCard, { backgroundColor: item.color || '#0F172A' }]}>
+                  <Container 
+                    key={item.id} 
+                    style={[styles.ticketCard, { backgroundColor: item.color || '#0F172A' }, !isClickable && { opacity: 0.65 }]}
+                    {...containerProps}
+                  >
                     {/* Left side: Merchant details with barcode and serial number */}
                     <View style={styles.ticketLeft}>
                       <View style={styles.stubBarcodeContainer}>
@@ -310,20 +321,18 @@ export default function VouchersScreen() {
                       </View>
 
                       {item.status === 'active' ? (
-                        <TouchableOpacity
-                          style={[styles.useBtn, { backgroundColor: isLight ? '#000000' : '#FFFFFF', shadowColor: isLight ? 'transparent' : 'rgba(255,255,255,0.4)' }]}
-                          onPress={() => handleUseVoucher(item)}
-                          activeOpacity={0.8}
+                        <View
+                          style={[styles.useBtn, { backgroundColor: isLight ? '#000000' : '#FFFFFF' }]}
                         >
                           <Text style={[styles.useBtnText, { color: isLight ? '#FFFFFF' : '#000000' }]}>Use Now</Text>
-                        </TouchableOpacity>
+                        </View>
                       ) : (
                         <View style={[styles.usedBadge, { borderColor: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
                           <Text style={[styles.usedBadgeText, { color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)' }]}>USED / EXPIRED</Text>
                         </View>
                       )}
                     </View>
-                  </View>
+                  </Container>
                 );
               })
             )}

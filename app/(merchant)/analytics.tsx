@@ -11,6 +11,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +41,9 @@ export default function AnalyticsScreen() {
 
   // Timeframe states
   const [timeframe, setTimeframe] = useState<'daily' | 'monthly' | 'yearly' | 'custom'>('monthly');
+  const [selectedBranch, setSelectedBranch] = useState('All Branches');
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
+  const [branchList, setBranchList] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -78,6 +82,13 @@ export default function AnalyticsScreen() {
           filter: `merchant = '${user.merchant_id}'`,
         });
         setLoyaltyCards(cards);
+
+        const branches = await pb.collection('branches').getFullList({
+          filter: `merchant = '${user.merchant_id}'`,
+          sort: '-is_hq,-created',
+          requestKey: null
+        }).catch(() => []);
+        setBranchList(branches);
       } catch (err) {
         console.warn('Failed to fetch analytics data:', err);
       } finally {
@@ -305,6 +316,38 @@ export default function AnalyticsScreen() {
           <Text style={styles.merchantNameText}>{merchant?.name || 'Scoop Creamy'}</Text>
         </View>
 
+        {/* 🏢 Branch Dropdown Selector Pill */}
+        <View style={{ alignItems: 'center', marginBottom: 16, marginTop: -15, zIndex: 20 }}>
+          <TouchableOpacity
+            onPress={() => setBranchModalVisible(true)}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#FFFFFF',
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: 20,
+              gap: 8,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#050505',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              elevation: 3,
+            }}
+          >
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="business" size={12} color="#FFC700" />
+            </View>
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+              {selectedBranch || 'All Branches'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
         {/* 📅 Refined Floating Timeframe Selector */}
         <View style={{
           backgroundColor: '#FFFFFF',
@@ -312,7 +355,6 @@ export default function AnalyticsScreen() {
           padding: 6,
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginTop: -20,
           marginBottom: 16,
           borderWidth: 1,
           borderColor: '#E2E8F0',
@@ -785,6 +827,91 @@ export default function AnalyticsScreen() {
             ))}
           </View>
         </View>
+
+        {/* 🏢 Segment 4: Branch Performance Comparison */}
+        <View style={styles.chartCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionTitle}>Branch Performance Leaderboard</Text>
+              <TouchableOpacity onPress={() => showHelp('Branch Performance', 'Compares revenue and stamp distribution across all your active store outlets.')}>
+                <Ionicons name="help-circle-outline" size={13} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/(merchant)/branches' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Manage</Text>
+              <Ionicons name="chevron-forward" size={12} color="#B45309" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionSubtitle}>Compare sales & stamp circulation per outlet</Text>
+
+          <View style={{ gap: 10, marginTop: 16 }}>
+            {branchList.length === 0 ? (
+              <View style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: 16,
+                padding: 20,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1.5,
+                borderColor: '#E2E8F0',
+                borderStyle: 'dashed',
+                gap: 6
+              }}>
+                <Ionicons name="business-outline" size={24} color="#94A3B8" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                  No Outlets Registered Yet
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
+                  Add your store branches to view comparative sales and stamp leaderboards.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(merchant)/branches' as any)}
+                  style={{
+                    backgroundColor: '#050505',
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    marginTop: 6
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
+                    + Add Branches
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              branchList.map((br, idx) => (
+                <View key={br.id || idx} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: idx === 0 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>#{idx + 1}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{br.name}</Text>
+                      {br.is_hq && (
+                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>HQ</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                      RM {(br.total_sales || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      {br.total_stamps || 0} stamps issued
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      {br.manager_name ? `Mgr: ${br.manager_name}` : (br.city || 'Active')}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
       </ScrollView>
 
       {/* Custom styled Help Tooltip Modal Card Overlay */}
@@ -824,6 +951,102 @@ export default function AnalyticsScreen() {
           </View>
         </View>
       )}
+
+      {/* 🏢 Branch Selection Modal */}
+      <Modal
+        visible={branchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBranchModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setBranchModalVisible(false)}
+        >
+          <View style={[styles.modalCard, { maxWidth: 380, padding: 20 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, width: '100%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="business" size={16} color="#B45309" />
+                </View>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                  Select Store Outlet
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setBranchModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 8, width: '100%' }}>
+              {['All Branches', ...branchList.map((b: any) => b.name)].map((bName) => {
+                const isSelected = (selectedBranch || 'All Branches') === bName;
+                return (
+                  <TouchableOpacity
+                    key={bName}
+                    onPress={() => {
+                      setSelectedBranch(bName);
+                      setBranchModalVisible(false);
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isSelected ? '#FEF3C7' : '#F8FAFC',
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isSelected ? '#FFC700' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons 
+                        name={bName === 'All Branches' ? "business-outline" : "storefront-outline"} 
+                        size={18} 
+                        color={isSelected ? "#B45309" : "#050505"} 
+                      />
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                        color: isSelected ? '#B45309' : '#050505',
+                      }}>
+                        {bName}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color="#B45309" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setBranchModalVisible(false);
+                  router.push('/(merchant)/branches' as any);
+                }}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 12,
+                  marginTop: 4,
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={16} color="#B45309" />
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                  + Manage & Add Branches
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -122,6 +122,7 @@ export default function MarketingScreen() {
   const [subTab, setSubTab] = useState<'campaigns' | 'blast' | 'followup' | 'templates'>('campaigns');
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [showValidationWarning, setShowValidationWarning] = useState(false);
   const [launchSuccessModalVisible, setLaunchSuccessModalVisible] = useState(false);
@@ -167,6 +168,7 @@ export default function MarketingScreen() {
   
   const [dbCards, setDbCards] = useState<any[]>([]);
   const [dbTxs, setDbTxs] = useState<any[]>([]);
+  const [dbAllCustomers, setDbAllCustomers] = useState<any[]>([]);
 
   const targetCustomerIds = React.useMemo(() => {
     const allCustomerIds = new Set<string>([
@@ -179,7 +181,7 @@ export default function MarketingScreen() {
     }
 
     if (selectedSegment === 'all') {
-      return Array.from(allCustomerIds);
+      return dbAllCustomers.map((u: any) => u.id).filter(Boolean);
     }
 
     if (selectedSegment === 'inactive') {
@@ -310,9 +312,16 @@ export default function MarketingScreen() {
   // New Campaign Form States
   const [cName, setCName] = useState('');
   const [cDesc, setCDesc] = useState('');
-  const [cType, setCType] = useState<'double_points' | 'bonus_stamps' | 'free_item' | 'flat_bonus'>('double_points');
+  const [cType, setCType] = useState<'voucher_discount' | 'bonus_stamps' | 'double_points' | 'flat_bonus'>('voucher_discount');
   const [cCMultiplier, setCMultiplier] = useState('2');
   const [cBonusValue, setCBonusValue] = useState('0');
+  const [cVoucherDiscountType, setCVoucherDiscountType] = useState<'amount' | 'percentage'>('amount');
+  const [cVoucherDiscountVal, setCVoucherDiscountVal] = useState('5');
+  const [cVoucherMinSpend, setCVoucherMinSpend] = useState('');
+  const [cVoucherPrefix, setCVoucherPrefix] = useState('PROMO');
+  const [cVoucherAudience, setCVoucherAudience] = useState<'all' | 'spenders' | 'inactive' | 'visitors' | 'custom'>('all');
+  const [cVoucherAutoDrop, setCVoucherAutoDrop] = useState(true);
+  const [cVoucherAutoBlast, setCVoucherAutoBlast] = useState(false);
   const [cStartDate, setCStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [cEndDate, setCEndDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
   const [cMaxRedemptions, setCMaxRedemptions] = useState('');
@@ -344,6 +353,69 @@ export default function MarketingScreen() {
     if (today < start) return 'upcoming';
     if (today > end) return 'ended';
     return 'active';
+  };
+
+  const getTargetCustomerIdsForAudience = (aud: 'all' | 'spenders' | 'inactive' | 'visitors' | 'custom') => {
+    if (aud === 'all') {
+      return dbAllCustomers.map((u: any) => u.id).filter(Boolean);
+    }
+
+    const allCustomerIds = new Set<string>([
+      ...dbCards.map((c: any) => c.customer),
+      ...dbTxs.map((t: any) => t.customer)
+    ].filter(Boolean));
+
+    if (aud === 'custom') {
+      return customAudienceIds;
+    }
+
+    if (aud === 'inactive') {
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const lastTxMap: Record<string, number> = {};
+      dbTxs.forEach(t => {
+        if (!t.customer) return;
+        const time = new Date(t.created).getTime();
+        if (!lastTxMap[t.customer] || time > lastTxMap[t.customer]) {
+          lastTxMap[t.customer] = time;
+        }
+      });
+      return Array.from(allCustomerIds).filter(cid => {
+        const lastTxTime = lastTxMap[cid] || 0;
+        return lastTxTime < thirtyDaysAgo;
+      });
+    }
+
+    const statsMap: Record<string, { totalSpend: number; visits: number }> = {};
+    dbTxs.forEach(t => {
+      if (!t.customer) return;
+      if (!statsMap[t.customer]) {
+        statsMap[t.customer] = { totalSpend: 0, visits: 0 };
+      }
+      statsMap[t.customer].visits += 1;
+      if ((t.type === 'PURCHASE' || t.type === 'earn') && t.bill_amount) {
+        statsMap[t.customer].totalSpend += Number(t.bill_amount);
+      }
+    });
+
+    if (aud === 'spenders') {
+      const sorted = Array.from(allCustomerIds).sort((a, b) => {
+        const spendA = statsMap[a]?.totalSpend || 0;
+        const spendB = statsMap[b]?.totalSpend || 0;
+        return spendB - spendA;
+      });
+      return sorted.slice(0, 10);
+    }
+
+    if (aud === 'visitors') {
+      const sorted = Array.from(allCustomerIds).sort((a, b) => {
+        const visA = statsMap[a]?.visits || 0;
+        const visB = statsMap[b]?.visits || 0;
+        return visB - visA;
+      });
+      return sorted.slice(0, 10);
+    }
+
+    return Array.from(allCustomerIds);
   };
 
   const handleCreateCampaign = async () => {
@@ -387,13 +459,23 @@ export default function MarketingScreen() {
         merchant: user.merchant_id,
         name: cName.trim(),
         description: cDesc.trim(),
-        type: cType,
+        type: cType === 'voucher_discount' ? 'free_item' : cType,
         start_date: new Date(cStartDate).toISOString(),
         end_date: new Date(cEndDate).toISOString(),
         is_active: true,
       };
 
-      if (cType === 'double_points') {
+      if (cType === 'voucher_discount') {
+        payload.bonus_value = parseFloat(cVoucherDiscountVal) || 0;
+        payload.description = JSON.stringify({
+          real_type: 'voucher_discount',
+          discount_type: cVoucherDiscountType,
+          discount_value: cVoucherDiscountVal,
+          min_spend: cVoucherMinSpend,
+          prefix: cVoucherPrefix,
+          description: cDesc.trim(),
+        });
+      } else if (cType === 'double_points') {
         payload.multiplier = parseFloat(cCMultiplier) || 2.0;
       } else if (cType === 'bonus_stamps') {
         payload.bonus_value = parseInt(cBonusValue, 10) || 1;
@@ -405,7 +487,66 @@ export default function MarketingScreen() {
         payload.max_redemptions = parseInt(cMaxRedemptions, 10) || 0;
       }
 
-      await pb.collection('campaigns').create(payload);
+      const campaignRecord = await pb.collection('campaigns').create(payload);
+
+      // If it's a voucher promo and auto-drop or distribution is enabled
+      if (cType === 'voucher_discount') {
+        let rewardRecord: any = null;
+        try {
+          rewardRecord = await pb.collection('rewards').create({
+            merchant: user.merchant_id,
+            name: cName.trim(),
+            description: cDesc.trim() || `${cVoucherDiscountType === 'percentage' ? cVoucherDiscountVal + '%' : 'RM ' + cVoucherDiscountVal} OFF Promo Voucher`,
+            points_cost: 1,
+            type: 'discount',
+            is_active: true,
+            stock: 9999,
+          });
+        } catch (rErr) {
+          console.warn('Failed to create reward item for voucher campaign:', rErr);
+        }
+
+        if (cVoucherAutoDrop && rewardRecord) {
+          const audienceIds = getTargetCustomerIdsForAudience(cVoucherAudience);
+          const prefix = (cVoucherPrefix || 'PROMO').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+          
+          await Promise.all(
+            audienceIds.map(async (custId) => {
+              try {
+                const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+                const uniqueCode = `${prefix}-${randSuffix}`;
+                await pb.collection('vouchers').create({
+                  customer: custId,
+                  reward: rewardRecord.id,
+                  code: uniqueCode,
+                  status: 'active',
+                  expires_at: new Date(cEndDate).toISOString(),
+                  metadata: {
+                    campaign_id: campaignRecord.id,
+                    discount_type: cVoucherDiscountType,
+                    discount_value: cVoucherDiscountVal,
+                    min_spend: cVoucherMinSpend,
+                  }
+                });
+              } catch (vErr) {
+                console.warn(`Failed to auto-issue voucher to ${custId}:`, vErr);
+              }
+            })
+          );
+        }
+
+        if (cVoucherAutoBlast) {
+          const discountStr = cVoucherDiscountType === 'percentage' ? `${cVoucherDiscountVal}%` : `RM ${cVoucherDiscountVal}`;
+          setBTitle(cName.trim());
+          setBMessage(
+            locale === 'en'
+              ? `Hi {{name}}! 👋\n\nEnjoy our special promo: *${cName.trim()}* (${discountStr} OFF)!\nShow this voucher code at our cashier to claim: {{code}}\n\nValid until ${new Date(cEndDate).toLocaleDateString()}. See you soon! ✨`
+              : `Hai {{name}}! 👋\n\nNikmati promosi istimewa kami: *${cName.trim()}* (${discountStr} OFF)!\nTunjukkan kod baucar ini di kaunter untuk menebus: {{code}}\n\nSah sehingga ${new Date(cEndDate).toLocaleDateString()}. Jumpa anda di kedai! ✨`
+          );
+          setSelectedSegment(cVoucherAudience);
+          setSubTab('blast');
+        }
+      }
 
       setLaunchSuccessModalVisible(true);
       setCreateModalVisible(false);
@@ -413,7 +554,10 @@ export default function MarketingScreen() {
       // Reset form fields
       setCName('');
       setCDesc('');
-      setCType('double_points');
+      setCType('voucher_discount');
+      setCVoucherDiscountVal('5');
+      setCVoucherMinSpend('');
+      setCVoucherPrefix('PROMO');
       setCMultiplier('2');
       setCBonusValue('0');
       setCStartDate(new Date().toISOString().split('T')[0]);
@@ -620,17 +764,21 @@ export default function MarketingScreen() {
   const fetchAudienceEstimate = async () => {
     if (!user || !user.merchant_id) return;
     try {
-      const [cards, txs] = await Promise.all([
+      const [cards, txs, allCusts] = await Promise.all([
         pb.collection('loyalty_cards').getFullList({
-          filter: `merchant = '${user.merchant_id}' && (opt_in_marketing != false || opt_in_marketing = null)`,
+          filter: `merchant = '${user.merchant_id}'`,
           expand: 'customer'
         }),
         pb.collection('transactions').getFullList({
           filter: `merchant = '${user.merchant_id}'`
-        })
+        }),
+        pb.collection('users').getFullList({
+          filter: "role = 'customer'"
+        }).catch(() => [])
       ]);
       setDbCards(cards);
       setDbTxs(txs);
+      setDbAllCustomers(allCusts);
     } catch (err) {
       console.warn('Failed to estimate audience:', err);
     }
@@ -1028,7 +1176,10 @@ export default function MarketingScreen() {
               </View>
               <TouchableOpacity 
                 style={styles.createCampBtn}
-                onPress={() => setCreateModalVisible(true)}
+                onPress={() => {
+                  setWizardStep(1);
+                  setCreateModalVisible(true);
+                }}
                 activeOpacity={0.8}
               >
                 <Ionicons name="add" size={16} color="#050505" />
@@ -1050,7 +1201,10 @@ export default function MarketingScreen() {
                 </View>
                 <TouchableOpacity
                   style={styles.campEmptyBtn}
-                  onPress={() => setCreateModalVisible(true)}
+                  onPress={() => {
+                    setWizardStep(1);
+                    setCreateModalVisible(true);
+                  }}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.campEmptyBtnText}>{t('create_campaign')}</Text>
@@ -1061,6 +1215,25 @@ export default function MarketingScreen() {
                 {campaignsList.map((camp) => {
                   const status = getCampaignStatus(camp);
 
+                  let parsedDesc = camp.description || '';
+                  let realType = camp.type;
+                  let discountType = '';
+                  let discountValue = camp.bonus_value || 0;
+
+                  try {
+                    if (camp.description && camp.description.trim().startsWith('{')) {
+                      const data = JSON.parse(camp.description);
+                      if (data.real_type === 'voucher_discount') {
+                        realType = 'voucher_discount';
+                        parsedDesc = data.description || '';
+                        discountType = data.discount_type || 'amount';
+                        discountValue = data.discount_value || camp.bonus_value;
+                      }
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+
                   return (
                     <View key={camp.id} style={styles.campCard}>
                       <View style={styles.campCardHeader}>
@@ -1069,7 +1242,7 @@ export default function MarketingScreen() {
                           {/* Type Badge */}
                           <View style={styles.campTypeBadge}>
                             <Text style={styles.campTypeBadgeText}>
-                              {t(camp.type)}
+                              {t(realType)}
                             </Text>
                           </View>
                         </View>
@@ -1086,14 +1259,16 @@ export default function MarketingScreen() {
                         </View>
                       </View>
 
-                      <Text style={styles.campCardDesc}>{camp.description || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>
+                      <Text style={styles.campCardDesc}>{parsedDesc || (locale === 'en' ? 'No description provided.' : 'Tiada keterangan diberikan.')}</Text>
 
                       {/* Details row */}
                       <View style={styles.campCardMetaRow}>
                         <View style={styles.campCardMetaCol}>
                           <Text style={styles.campMetaLabel}>{t('promotion_type')}</Text>
                           <Text style={styles.campMetaValue}>
-                            {camp.type === 'double_points' 
+                            {realType === 'voucher_discount'
+                              ? `${discountType === 'percentage' ? discountValue + '%' : 'RM ' + discountValue} OFF Voucher`
+                              : camp.type === 'double_points' 
                               ? `${camp.multiplier || 2}x ${locale === 'en' ? 'Multiplier' : 'Pengganda'}` 
                               : camp.type === 'bonus_stamps'
                               ? `+${camp.bonus_value || 1} ${locale === 'en' ? 'Stamps' : 'Setem'}`
@@ -1991,206 +2166,648 @@ export default function MarketingScreen() {
         onRequestClose={() => setCreateModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: '85%' }]}>
+          <View style={[styles.modalContent, { height: '88%', paddingBottom: 10 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('launch_campaign')}</Text>
+              <View>
+                <Text style={styles.modalTitle}>{t('launch_campaign')}</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                  {locale === 'en' ? `Step ${wizardStep} of 5` : `Langkah ${wizardStep} daripada 5`}
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
             </View>
 
+            {/* Progress Bar Line */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginVertical: 10, gap: 6 }}>
+              {[1, 2, 3, 4, 5].map((step) => {
+                const isActive = wizardStep === step;
+                const isCompleted = wizardStep > step;
+                return (
+                  <View 
+                    key={step} 
+                    style={{ 
+                      flex: 1, 
+                      height: 5, 
+                      borderRadius: 3, 
+                      backgroundColor: isCompleted ? '#050505' : isActive ? '#FFC700' : '#E2E8F0' 
+                    }} 
+                  />
+                );
+              })}
+            </View>
+
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
               <View style={styles.modalFormBody}>
-                {/* Form fields */}
-                <Text style={styles.modalInputLabel}>{t('campaign_name')}</Text>
-                <TextInput
-                  style={[
-                    styles.modalTextInput,
-                    showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 }
-                  ]}
-                  value={cName}
-                  onChangeText={(val) => {
-                    setCName(val);
-                    if (val.trim()) setShowValidationWarning(false);
-                  }}
-                  placeholder={locale === 'en' ? "e.g. Double Points Weekend, Autumn Festival" : "cth. Hujung Minggu Mata Berganda, Pesta Musim Luruh"}
-                  placeholderTextColor="#BEC6E0"
-                  {...Platform.select({
-                    web: {
-                      outlineStyle: 'none',
-                    } as any,
-                  })}
-                />
-                {showValidationWarning && (
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: -8, marginBottom: -8, marginLeft: 4 }}>
-                    {locale === 'en' ? 'Campaign name is mandatory' : 'Nama kempen adalah wajib'}
-                  </Text>
+                
+                {/* STEP 1: Campaign Basics */}
+                {wizardStep === 1 && (
+                  <View style={{ gap: 16 }}>
+                    <View>
+                      <Text style={styles.modalInputLabel}>{t('campaign_name')}</Text>
+                      <TextInput
+                        style={[
+                          styles.modalTextInput,
+                          showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 }
+                        ]}
+                        value={cName}
+                        onChangeText={(val) => {
+                          setCName(val);
+                          if (val.trim()) setShowValidationWarning(false);
+                        }}
+                        placeholder={locale === 'en' ? "e.g. Merdeka RM10 OFF Voucher" : "cth. Baucar RM10 OFF Merdeka"}
+                        placeholderTextColor="#BEC6E0"
+                        {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                      />
+                      {showValidationWarning && (
+                        <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 4, marginLeft: 4 }}>
+                          {locale === 'en' ? 'Campaign name is mandatory' : 'Nama kempen adalah wajib'}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View>
+                      <Text style={styles.modalInputLabel}>{t('description')}</Text>
+                      <TextInput
+                        style={[styles.modalTextInput, { height: 100, textAlignVertical: 'top' }]}
+                        multiline
+                        value={cDesc}
+                        onChangeText={setCDesc}
+                        placeholder={locale === 'en' ? "Describe the terms and conditions..." : "Terangkan syarat-syarat kempen kepada pelanggan..."}
+                        placeholderTextColor="#BEC6E0"
+                        {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                      />
+                    </View>
+                  </View>
                 )}
 
-                <Text style={styles.modalInputLabel}>{t('description')}</Text>
-                <TextInput
-                  style={[styles.modalTextInput, { height: 72, textAlignVertical: 'top' }]}
-                  multiline
-                  value={cDesc}
-                  onChangeText={setCDesc}
-                  placeholder={locale === 'en' ? "Describe the campaign terms to your customers..." : "Terangkan syarat-syarat kempen kepada pelanggan anda..."}
-                  placeholderTextColor="#BEC6E0"
-                  {...Platform.select({
-                    web: {
-                      outlineStyle: 'none',
-                    } as any,
-                  })}
-                />
+                {/* STEP 2: Promotion Type Card Grid */}
+                {wizardStep === 2 && (
+                  <View style={{ gap: 12 }}>
+                    <Text style={[styles.modalInputLabel, { marginBottom: 4 }]}>
+                      {locale === 'en' ? 'Select Promotion Type' : 'Pilih Jenis Promosi'}
+                    </Text>
+                    {[
+                      { 
+                        id: 'voucher_discount', 
+                        title: t('voucher_discount'), 
+                        desc: locale === 'en' ? 'Offer fixed cash OFF or percentage off discount vouchers.' : 'Tawarkan diskaun tunai tetap atau potongan peratusan.',
+                        icon: 'ticket-outline',
+                        color: '#7C3AED'
+                      },
+                      { 
+                        id: 'bonus_stamps', 
+                        title: t('bonus_stamps'), 
+                        desc: locale === 'en' ? 'Award extra stamps for purchase visits.' : 'Berikan setem ganjaran tambahan untuk setiap lawatan.',
+                        icon: 'ribbon-outline',
+                        color: '#FFC700'
+                      },
+                      { 
+                        id: 'double_points', 
+                        title: t('double_points'), 
+                        desc: locale === 'en' ? 'Multiply point returns for shopping transactions.' : 'Gandakan pulangan mata untuk setiap pembelian.',
+                        icon: 'flash-outline',
+                        color: '#3B82F6'
+                      },
+                      { 
+                        id: 'flat_bonus', 
+                        title: t('flat_bonus'), 
+                        desc: locale === 'en' ? 'Award flat point bonus on every purchase.' : 'Berikan mata bonus tetap dengan setiap transaksi.',
+                        icon: 'gift-outline',
+                        color: '#10B981'
+                      },
+                    ].map((opt) => {
+                      const isSelected = cType === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            padding: 14,
+                            borderRadius: 16,
+                            borderWidth: 2,
+                            borderColor: isSelected ? '#050505' : '#E2E8F0',
+                            backgroundColor: isSelected ? 'rgba(255, 199, 0, 0.05)' : '#FFFFFF',
+                            gap: 12
+                          }}
+                          onPress={() => setCType(opt.id as any)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: isSelected ? '#050505' : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Ionicons name={opt.icon as any} size={22} color={isSelected ? '#FFC700' : '#475569'} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                              {opt.title}
+                            </Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {opt.desc}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
-                <Text style={styles.modalInputLabel}>{t('promotion_type')}</Text>
-                <View style={styles.segmentRow}>
-                  {([
-                    { label: t('double_points'), value: 'double_points' },
-                    { label: t('flat_bonus'), value: 'flat_bonus' },
-                    { label: t('bonus_stamps'), value: 'bonus_stamps' },
-                  ] as const).map((opt) => (
+                {/* STEP 3: Configuration & Dates */}
+                {wizardStep === 3 && (
+                  <View style={{ gap: 16 }}>
+                    {cType === 'voucher_discount' && (
+                      <View style={{ gap: 14 }}>
+                        <View>
+                          <Text style={styles.modalInputLabel}>{t('discount_type')}</Text>
+                          <View style={[styles.segmentRow, { marginTop: 6, height: 44, padding: 4 }]}>
+                            <TouchableOpacity
+                              style={[
+                                styles.segmentBtn,
+                                cVoucherDiscountType === 'amount' && styles.segmentBtnActive,
+                                { height: '100%' }
+                              ]}
+                              onPress={() => setCVoucherDiscountType('amount')}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.segmentText, cVoucherDiscountType === 'amount' && styles.segmentTextActive, { fontSize: 11 }]}>
+                                Fixed (RM)
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.segmentBtn,
+                                cVoucherDiscountType === 'percentage' && styles.segmentBtnActive,
+                                { height: '100%' }
+                              ]}
+                              onPress={() => setCVoucherDiscountType('percentage')}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.segmentText, cVoucherDiscountType === 'percentage' && styles.segmentTextActive, { fontSize: 11 }]}>
+                                Percentage (%)
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.modalInputLabel}>{t('discount_amount')}</Text>
+                            <TextInput
+                              style={styles.modalTextInput}
+                              value={cVoucherDiscountVal}
+                              onChangeText={setCVoucherDiscountVal}
+                              placeholder={cVoucherDiscountType === 'percentage' ? 'e.g. 20' : 'e.g. 5'}
+                              placeholderTextColor="#BEC6E0"
+                              keyboardType="numeric"
+                              {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.modalInputLabel}>{t('min_spend')}</Text>
+                            <TextInput
+                              style={styles.modalTextInput}
+                              value={cVoucherMinSpend}
+                              onChangeText={setCVoucherMinSpend}
+                              placeholder="e.g. 30"
+                              placeholderTextColor="#BEC6E0"
+                              keyboardType="numeric"
+                              {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                            />
+                          </View>
+                        </View>
+
+                        <View>
+                          <Text style={styles.modalInputLabel}>{t('voucher_prefix')}</Text>
+                          <TextInput
+                            style={styles.modalTextInput}
+                            value={cVoucherPrefix}
+                            onChangeText={(v) => setCVoucherPrefix(v.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                            placeholder="e.g. MRDK, DISC, PROMO"
+                            placeholderTextColor="#BEC6E0"
+                            autoCapitalize="characters"
+                            maxLength={8}
+                            {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                          />
+                        </View>
+                      </View>
+                    )}
+
+                    {cType === 'double_points' && (
+                      <View style={styles.condFieldWrap}>
+                        <Text style={styles.modalInputLabel}>{t('point_multiplier')}</Text>
+                        <TextInput
+                          style={styles.modalTextInput}
+                          value={cCMultiplier}
+                          onChangeText={setCMultiplier}
+                          placeholder="e.g. 2 for 2x points"
+                          placeholderTextColor="#BEC6E0"
+                          keyboardType="numeric"
+                          {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                        />
+                      </View>
+                    )}
+
+                    {cType === 'flat_bonus' && (
+                      <View style={styles.condFieldWrap}>
+                        <Text style={styles.modalInputLabel}>{t('flat_points_value')}</Text>
+                        <TextInput
+                          style={styles.modalTextInput}
+                          value={cBonusValue}
+                          onChangeText={setCBonusValue}
+                          placeholder="e.g. 50 bonus points"
+                          placeholderTextColor="#BEC6E0"
+                          keyboardType="number-pad"
+                          {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                        />
+                      </View>
+                    )}
+
+                    {cType === 'bonus_stamps' && (
+                      <View style={styles.condFieldWrap}>
+                        <Text style={styles.modalInputLabel}>{t('bonus_stamps_awarded')}</Text>
+                        <TextInput
+                          style={styles.modalTextInput}
+                          value={cBonusValue}
+                          onChangeText={setCBonusValue}
+                          placeholder="e.g. 1 bonus stamp"
+                          placeholderTextColor="#BEC6E0"
+                          keyboardType="number-pad"
+                          {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                        />
+                      </View>
+                    )}
+
+                    {/* Dates */}
+                    <View style={styles.datesRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalInputLabel}>{t('start_date')}</Text>
+                        {Platform.OS === 'web' ? (
+                          <input
+                            type="date"
+                            value={cStartDate}
+                            onChange={(e) => setCStartDate(e.target.value)}
+                            style={{
+                              backgroundColor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '14px',
+                              padding: '12px 16px',
+                              fontSize: '14px',
+                              fontFamily: 'PlusJakartaSans_600SemiBold',
+                              color: '#050505',
+                              width: '100%',
+                              height: 46,
+                              boxSizing: 'border-box',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <TextInput
+                            style={styles.modalTextInput}
+                            value={cStartDate}
+                            onChangeText={setCStartDate}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#BEC6E0"
+                          />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalInputLabel}>{t('end_date')}</Text>
+                        {Platform.OS === 'web' ? (
+                          <input
+                            type="date"
+                            value={cEndDate}
+                            onChange={(e) => setCEndDate(e.target.value)}
+                            style={{
+                              backgroundColor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '14px',
+                              padding: '12px 16px',
+                              fontSize: '14px',
+                              fontFamily: 'PlusJakartaSans_600SemiBold',
+                              color: '#050505',
+                              width: '100%',
+                              height: 46,
+                              boxSizing: 'border-box',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <TextInput
+                            style={styles.modalTextInput}
+                            value={cEndDate}
+                            onChangeText={setCEndDate}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#BEC6E0"
+                          />
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Presets Row */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: -4 }}>
+                      {[
+                        { label: locale === 'en' ? '7 Days' : '7 Hari', val: 7 },
+                        { label: locale === 'en' ? '14 Days' : '14 Hari', val: 14 },
+                        { label: locale === 'en' ? '30 Days' : '30 Hari', val: 30 },
+                      ].map((preset, idx) => {
+                        const startD = new Date(cStartDate);
+                        const endD = new Date(cEndDate);
+                        const diffTime = endD.getTime() - startD.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        const isPresetSelected = diffDays === preset.val;
+
+                        return (
+                          <TouchableOpacity
+                            key={idx}
+                            style={{
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 20,
+                              borderWidth: 1,
+                              borderColor: isPresetSelected ? '#FFC700' : '#E2E8F0',
+                              backgroundColor: isPresetSelected ? '#FEF3C7' : '#F8FAFC'
+                            }}
+                            onPress={() => {
+                              const end = new Date(new Date(cStartDate).getTime() + preset.val * 86400000);
+                              setCEndDate(end.toISOString().split('T')[0]);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={{ 
+                              fontSize: 11, 
+                              fontFamily: isPresetSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold', 
+                              color: isPresetSelected ? '#B45309' : '#64748B' 
+                            }}>
+                              {preset.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Limit Max Redemptions */}
+                    <View>
+                      <Text style={styles.modalInputLabel}>{t('max_redemptions')}</Text>
+                      <TextInput
+                        style={styles.modalTextInput}
+                        value={cMaxRedemptions}
+                        onChangeText={setCMaxRedemptions}
+                        placeholder={t('unlimited_placeholder')}
+                        placeholderTextColor="#BEC6E0"
+                        keyboardType="number-pad"
+                        {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {/* STEP 4: Target Audience & Channels */}
+                {wizardStep === 4 && (
+                  <View style={{ gap: 16 }}>
+                    {/* Target Audience */}
+                    <View>
+                      <Text style={styles.modalInputLabel}>{t('target_audience')}</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {[
+                          { id: 'all', label: locale === 'en' ? 'All Customers' : 'Semua Pelanggan' },
+                          { id: 'spenders', label: locale === 'en' ? 'Top Spenders' : 'VIP Spenders' },
+                          { id: 'inactive', label: locale === 'en' ? 'Inactive (>30d)' : 'Pelanggan Lama' },
+                          { id: 'visitors', label: locale === 'en' ? 'Top Visitors' : 'Kerap Datang' },
+                        ].map((aud) => (
+                          <TouchableOpacity
+                            key={aud.id}
+                            style={[
+                              {
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                                borderRadius: 12,
+                                backgroundColor: cVoucherAudience === aud.id ? '#050505' : '#F1F5F9',
+                                borderWidth: 1,
+                                borderColor: cVoucherAudience === aud.id ? '#050505' : '#E2E8F0',
+                              }
+                            ]}
+                            onPress={() => setCVoucherAudience(aud.id as any)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontFamily: 'PlusJakartaSans_700Bold',
+                                color: cVoucherAudience === aud.id ? '#FFC700' : '#475569',
+                              }}
+                            >
+                              {aud.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Channels */}
+                    <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 12, marginTop: 10 }}>
+                      <Text style={[styles.modalInputLabel, { marginTop: 0 }]}>{t('distribution_options')}</Text>
+                      
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                        onPress={() => setCVoucherAutoDrop(!cVoucherAutoDrop)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons 
+                          name={cVoucherAutoDrop ? "checkbox" : "square-outline"} 
+                          size={22} 
+                          color={cVoucherAutoDrop ? "#050505" : "#94A3B8"} 
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                            {t('auto_wallet_drop')}
+                          </Text>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                            {locale === 'en' ? 'Each customer gets a unique QR / code in My Vouchers.' : 'Setiap pelanggan dapat kod/QR unik di Baucar Saya.'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}
+                        onPress={() => setCVoucherAutoBlast(!cVoucherAutoBlast)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons 
+                          name={cVoucherAutoBlast ? "checkbox" : "square-outline"} 
+                          size={22} 
+                          color={cVoucherAutoBlast ? "#050505" : "#94A3B8"} 
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                            {t('auto_whatsapp_blast')}
+                          </Text>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                            {locale === 'en' ? 'Pre-fill message template & open WhatsApp Blast.' : 'Sediakan template mesej WhatsApp & buka tab Blast.'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* STEP 5: Review & Launch Campaign Summary */}
+                {wizardStep === 5 && (
+                  <View style={{ gap: 16 }}>
+                    <Text style={[styles.modalInputLabel, { marginBottom: 2 }]}>
+                      {locale === 'en' ? 'Campaign Summary' : 'Ringkasan Kempen'}
+                    </Text>
+
+                    <View style={{
+                      backgroundColor: '#050505',
+                      borderRadius: 20,
+                      padding: 18,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 199, 0, 0.3)',
+                    }}>
+                      {/* Name */}
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                        {cName}
+                      </Text>
+                      {cDesc ? (
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#BEC6E0', marginTop: 6 }}>
+                          {cDesc}
+                        </Text>
+                      ) : null}
+
+                      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 14 }} />
+
+                      {/* Details list */}
+                      <View style={{ gap: 10 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>PROMO TYPE</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
+                            {cType === 'voucher_discount' 
+                              ? '🎟️ VOUCHER DISCOUNT' 
+                              : cType === 'bonus_stamps' 
+                              ? '💮 BONUS STAMPS' 
+                              : cType === 'double_points' 
+                              ? '⚡ DOUBLE POINTS' 
+                              : '🎁 FLAT BONUS'}
+                          </Text>
+                        </View>
+
+                        {cType === 'voucher_discount' && (
+                          <>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>DISCOUNT VALUE</Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                                {cVoucherDiscountType === 'percentage' ? `${cVoucherDiscountVal}%` : `RM ${cVoucherDiscountVal}`} OFF
+                              </Text>
+                            </View>
+                            {cVoucherMinSpend ? (
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>MIN SPEND</Text>
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                                  RM {cVoucherMinSpend}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </>
+                        )}
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>PERIOD</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                            {cStartDate} to {cEndDate}
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>TARGET AUDIENCE</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                            {cVoucherAudience === 'all' ? 'All Customers' : cVoucherAudience === 'spenders' ? 'Top Spenders (VIP)' : cVoucherAudience === 'inactive' ? 'Inactive Customers' : 'Custom'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Navigation Footer Row */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginTop: 24, 
+                  gap: 12 
+                }}>
+                  {wizardStep > 1 ? (
                     <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.segmentBtn,
-                        cType === opt.value && styles.segmentBtnActive,
-                        { flex: 1, paddingHorizontal: 4 }
-                      ]}
-                      onPress={() => setCType(opt.value)}
+                      style={{
+                        flex: 1,
+                        height: 48,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        backgroundColor: '#F8FAFC',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onPress={() => setWizardStep(wizardStep - 1)}
                       activeOpacity={0.8}
                     >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          cType === opt.value && styles.segmentTextActive,
-                          { fontSize: 10 }
-                        ]}
-                      >
-                        {opt.label}
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                        {locale === 'en' ? 'Back' : 'Kembali'}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Conditional Fields */}
-                {cType === 'double_points' && (
-                  <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>{t('point_multiplier')}</Text>
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={cCMultiplier}
-                      onChangeText={setCMultiplier}
-                      placeholder={locale === 'en' ? "e.g. 2 for 2x points" : "cth. 2 untuk 2x mata"}
-                      placeholderTextColor="#BEC6E0"
-                      keyboardType="numeric"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  </View>
-                )}
-
-                {cType === 'flat_bonus' && (
-                  <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>{t('flat_points_value')}</Text>
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={cBonusValue}
-                      onChangeText={setCBonusValue}
-                      placeholder={locale === 'en' ? "e.g. 50 bonus points" : "cth. 50 mata bonus"}
-                      placeholderTextColor="#BEC6E0"
-                      keyboardType="number-pad"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  </View>
-                )}
-
-                {cType === 'bonus_stamps' && (
-                  <View style={styles.condFieldWrap}>
-                    <Text style={styles.modalInputLabel}>{t('bonus_stamps_awarded')}</Text>
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={cBonusValue}
-                      onChangeText={setCBonusValue}
-                      placeholder={locale === 'en' ? "e.g. 1 bonus stamp" : "cth. 1 setem bonus"}
-                      placeholderTextColor="#BEC6E0"
-                      keyboardType="number-pad"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  </View>
-                )}
-
-                {/* Dates selection */}
-                <View style={styles.datesRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalInputLabel}>{t('start_date')}</Text>
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={cStartDate}
-                      onChangeText={setCStartDate}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor="#BEC6E0"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalInputLabel}>{t('end_date')}</Text>
-                    <TextInput
-                      style={styles.modalTextInput}
-                      value={cEndDate}
-                      onChangeText={setCEndDate}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor="#BEC6E0"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.modalInputLabel}>{t('max_redemptions')}</Text>
-                <TextInput
-                  style={styles.modalTextInput}
-                  value={cMaxRedemptions}
-                  onChangeText={setCMaxRedemptions}
-                  placeholder={t('unlimited_placeholder')}
-                  placeholderTextColor="#BEC6E0"
-                  keyboardType="number-pad"
-                  {...Platform.select({
-                    web: {
-                      outlineStyle: 'none',
-                    } as any,
-                  })}
-                />
-
-                <TouchableOpacity 
-                  style={[styles.saveBtn, { marginTop: 12 }]} 
-                  onPress={handleCreateCampaign}
-                  disabled={isCreatingCampaign}
-                  activeOpacity={0.9}
-                >
-                  {isCreatingCampaign ? (
-                    <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.saveBtnText}>{t('launch_promotion_btn')}</Text>
+                    <View style={{ flex: wizardStep > 1 ? 1 : 0 }} />
                   )}
-                </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 2,
+                      height: 48,
+                      borderRadius: 16,
+                      backgroundColor: '#050505',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      shadowColor: '#050505',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 8,
+                      elevation: 3
+                    }}
+                    onPress={() => {
+                      if (wizardStep === 1) {
+                        if (!cName.trim()) {
+                          setShowValidationWarning(true);
+                          return;
+                        }
+                      }
+                      if (wizardStep < 5) {
+                        setWizardStep(wizardStep + 1);
+                      } else {
+                        handleCreateCampaign();
+                      }
+                    }}
+                    disabled={isCreatingCampaign}
+                    activeOpacity={0.9}
+                  >
+                    {isCreatingCampaign ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
+                        {wizardStep === 5 
+                          ? t('launch_promotion_btn') 
+                          : (locale === 'en' ? 'Next' : 'Seterusnya')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
               </View>
             </ScrollView>
           </View>
@@ -2612,9 +3229,9 @@ const styles = StyleSheet.create({
   },
   segmentRow: {
     flexDirection: 'row',
-    backgroundColor: '#171717',
+    backgroundColor: '#F1F5F9',
     borderRadius: 100,
-    padding: 6,
+    padding: 4,
   },
   segmentBtn: {
     flex: 1,
@@ -2625,16 +3242,16 @@ const styles = StyleSheet.create({
   },
   segmentBtnActive: {
     backgroundColor: '#FFC700',
-    shadowColor: '#050505',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
   segmentText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
   },
   segmentTextActive: {
     color: '#050505',
@@ -3136,20 +3753,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalTextInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#050505',
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 2,
   },
   condFieldWrap: {
     gap: 8,

@@ -66,6 +66,27 @@ export default function CustomersScreen() {
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState<any>(null);
+  const [selectedBranch, setSelectedBranch] = useState('All Branches');
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
+  const [branchList, setBranchList] = useState<string[]>(['All Branches']);
+
+  const fetchBranches = async () => {
+    if (!user?.merchant_id) return;
+    try {
+      const records = await pb.collection('branches').getFullList({
+        filter: `merchant = "${user.merchant_id}"`,
+        sort: '-is_hq,-created',
+        requestKey: null
+      });
+      if (records.length > 0) {
+        setBranchList(['All Branches', ...records.map((r: any) => r.name)]);
+      } else {
+        setBranchList(['All Branches']);
+      }
+    } catch (e) {
+      setBranchList(['All Branches']);
+    }
+  };
 
   const fetchMerchant = async () => {
     if (!user?.merchant_id) return;
@@ -514,6 +535,7 @@ export default function CustomersScreen() {
   useEffect(() => {
     fetchTransactions(true);
     fetchMerchant();
+    fetchBranches();
     if (user && user.merchant_id) {
       pb.collection('transactions').subscribe('*', (e) => {
         if (e.record && e.record.merchant === user.merchant_id) {
@@ -763,22 +785,40 @@ export default function CustomersScreen() {
         ]}>
           {/* Profile Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, marginBottom: 20, zIndex: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Image
-              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
-              style={{ width: 44, height: 44, borderRadius: 22, borderColor: '#050505', borderWidth: 2 }}
-            />
-            <View style={{ justifyContent: 'center' }}>
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>Customer Analytics</Text>
-              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant?.name || 'Boutique Royal'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+              <Image
+                source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+                style={{ width: 44, height: 44, borderRadius: 22, borderColor: '#050505', borderWidth: 2 }}
+              />
+              <View style={{ justifyContent: 'center' }}>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>Customer Analytics</Text>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant?.name || 'Boutique Royal'}</Text>
+              </View>
             </View>
+            
+            {/* 🏢 Branch Dropdown Pill */}
+            <TouchableOpacity
+              onPress={() => setBranchModalVisible(true)}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 16,
+                gap: 6,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.25)',
+              }}
+            >
+              <Ionicons name="business" size={13} color="#FFC700" />
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', maxWidth: 110 }} numberOfLines={1}>
+                {selectedBranch || 'All Branches'}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="rgba(255, 255, 255, 0.8)" />
+            </TouchableOpacity>
           </View>
-          
-          <Image
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
-        </View>
 
         {/* 💳 Replicated Transfer-style Stats Card */}
         <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, zIndex: 20, marginTop: -10, marginBottom: 8 }}>
@@ -2233,6 +2273,102 @@ export default function CustomersScreen() {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* 🏢 Branch Selection Modal */}
+      <Modal
+        visible={branchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBranchModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setBranchModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 400 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="business" size={16} color="#B45309" />
+                </View>
+                <Text style={styles.modalTitle}>
+                  {locale === 'en' ? 'Select Store Outlet' : 'Pilih Cawangan Kedai'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setBranchModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 8, marginTop: 12 }}>
+              {branchList.map((bName) => {
+                const isSelected = (selectedBranch || 'All Branches') === bName;
+                return (
+                  <TouchableOpacity
+                    key={bName}
+                    onPress={() => {
+                      setSelectedBranch(bName);
+                      setBranchModalVisible(false);
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isSelected ? '#FEF3C7' : '#F8FAFC',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: isSelected ? '#FFC700' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons 
+                        name={bName === 'All Branches' ? "business-outline" : "storefront-outline"} 
+                        size={18} 
+                        color={isSelected ? "#B45309" : "#050505"} 
+                      />
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                        color: isSelected ? '#B45309' : '#050505',
+                      }}>
+                        {bName}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color="#B45309" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setBranchModalVisible(false);
+                  router.push('/(merchant)/branches' as any);
+                }}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 12,
+                  marginTop: 4,
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={16} color="#B45309" />
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                  {locale === 'en' ? '+ Manage & Add Branches' : '+ Urus & Tambah Cawangan'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
