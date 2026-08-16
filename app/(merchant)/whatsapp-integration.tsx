@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Linking, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Linking, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import pb from '../../lib/pocketbase';
+import { pb } from '../../lib/pocketbase';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -27,6 +27,36 @@ export default function WhatsappIntegration() {
     if (!user) return;
     fetchMetaConfig();
   }, [user]);
+
+  // Listen for Meta Embedded Signup response events
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleMetaMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== 'https://www.facebook.com' &&
+        event.origin !== 'https://web.facebook.com'
+      ) {
+        return;
+      }
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data?.type === 'WA_EMBEDDED_SIGNUP') {
+          console.log('[META EMBEDDED SIGNUP EVENT]', data);
+          if (data.data?.waba_id) setMetaWabaId(data.data.waba_id);
+          if (data.data?.phone_number_id) setMetaPhoneId(data.data.phone_number_id);
+          if (data.data?.current_step) {
+            setConnectingStepText(`Step: ${String(data.data.current_step).replace(/_/g, ' ')}...`);
+          }
+        }
+      } catch (err) {}
+    };
+
+    window.addEventListener('message', handleMetaMessage);
+    return () => {
+      window.removeEventListener('message', handleMetaMessage);
+    };
+  }, []);
 
   const fetchMetaConfig = async () => {
     if (!user?.merchant_id) return;
@@ -53,52 +83,100 @@ export default function WhatsappIntegration() {
     }
   };
 
-  const handleQuickConnectMeta = async () => {
+  const handleQuickConnectMeta = () => {
     if (!user || !user.merchant_id) return;
     
-    setIsConnectingMeta(true);
-    try {
-      setConnectingStepText(locale === 'en' ? 'Authenticating with Meta...' : 'Menguruskan kebenaran dengan Meta...');
-      
-      const res = await pb.send('/api/risev/merchant/whatsapp/meta-connect', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + pb.authStore.token },
-        body: { merchant_id: user.merchant_id }
-      });
+    const fbAppId = process.env.EXPO_PUBLIC_META_APP_ID || '1040853298682209'; 
+    const fbConfigId = (process.env.EXPO_PUBLIC_META_CONFIG_ID || '1067718449538944').trim();
 
-      if (res && res.wabaId) {
-        setConnectingStepText(locale === 'en' ? 'Verifying Phone Number...' : 'Mengesahkan Nombor Telefon...');
-        setMetaWabaId(res.wabaId);
-        setMetaPhoneId(res.phoneNumberId);
-        setMetaToken(res.accessToken);
-        setMetaPhone(res.phoneNumber);
-        
-        await fetchMetaConfig();
-
-        Alert.alert(
-          locale === 'en' ? "Meta Linked Successfully" : "Berjaya Dipautkan ke Meta", 
-          locale === 'en' ? "Your WhatsApp Cloud API is now active!" : "API Cloud WhatsApp anda kini aktif!"
+    // Check if FB SDK is loaded and valid Configuration ID is provided
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).FB && fbConfigId) {
+      setIsConnectingMeta(true);
+      setConnectingStepText(locale === 'en' ? 'Connecting via Meta popup...' : 'Menyambung via tetingkap Meta...');
+      try {
+        (window as any).FB.login(
+          function (response: any) {
+            console.log('[META FB.LOGIN RESPONSE]', response);
+            if (response?.authResponse?.code) {
+              setConnectingStepText(locale === 'en' ? 'Configuring WhatsApp Business Account...' : 'Mengkonfigurasi Akaun Perniagaan WhatsApp...');
+              pb.send('/api/risev/merchant/whatsapp/meta-connect', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + pb.authStore.token },
+                body: {
+                  code: response.authResponse.code,
+                  wabaId: metaWabaId,
+                  phoneNumberId: metaPhoneId
+                }
+              })
+                .then(async (res: any) => {
+                  if (res && res.success) {
+                    await fetchMetaConfig();
+                    Alert.alert(
+                      locale === 'en' ? 'WhatsApp Connected! 🎉' : 'WhatsApp Disambungkan! 🎉',
+                      locale === 'en' 
+                        ? `Your WhatsApp Business API (${res.phone_number || 'verified number'}) is active and ready to deliver updates!` 
+                        : `API WhatsApp Business anda (${res.phone_number || 'nombor disahkan'}) kini aktif!`
+                    );
+                  } else {
+                    Alert.alert('Notice', res?.message || 'Meta connection received.');
+                    await fetchMetaConfig();
+                  }
+                })
+                .catch((err: any) => {
+                  Alert.alert('Connection Error', err.message || 'Failed to complete Meta setup.');
+                })
+                .finally(() => {
+                  setIsConnectingMeta(false);
+                  setConnectingStepText('');
+                });
+            } else {
+              setIsConnectingMeta(false);
+              setConnectingStepText('');
+            }
+          },
+          {
+            config_id: fbConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+            extras: {
+              feature: 'whatsapp_embedded_signup',
+              version: 2,
+              setup: {}
+            }
+          }
         );
-      } else {
-        throw new Error('Invalid response from Meta connect');
+        return;
+      } catch (fbErr) {
+        console.warn('FB.login error, using fallback:', fbErr);
+        setIsConnectingMeta(false);
+        setConnectingStepText('');
       }
-    } catch (err: any) {
-      console.error(err);
-      if (err?.message?.includes('OAuth') || err?.message?.includes('popup')) {
-        Alert.alert(
-          locale === 'en' ? "Meta Login" : "Log Masuk Meta",
-          locale === 'en' ? "Redirecting to Facebook login..." : "Ubah hala ke log masuk Facebook..."
-        );
-      } else {
-        Alert.alert(
-          locale === 'en' ? "Meta Connection Failed" : "Gagal Disambungkan", 
-          err.message || 'Unknown error'
-        );
-      }
-    } finally {
-      setIsConnectingMeta(false);
-      setConnectingStepText('');
     }
+
+    // Fallback standard OAuth redirection if SDK not ready or on native
+    const pbBaseUrl = (pb.baseUrl || '').replace(/\/$/, '');
+    const redirectUriRaw = pbBaseUrl + '/api/risev/merchant/whatsapp/callback';
+
+    const stateObj = {
+      merchantId: user.merchant_id,
+      redirectHost: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : 'https://risev.app',
+      callbackUrl: redirectUriRaw
+    };
+    
+    const encodedState = encodeURIComponent(JSON.stringify(stateObj));
+    const redirectUri = encodeURIComponent(redirectUriRaw);
+    
+    let oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${redirectUri}&state=${encodedState}&response_type=code`;
+    if (fbConfigId) {
+      const extrasObj = { setup: {} };
+      oauthUrl += `&config_id=${fbConfigId}&override_default_response_type=true&extras=${encodeURIComponent(JSON.stringify(extrasObj))}`;
+    } else {
+      oauthUrl += `&scope=whatsapp_business_management,whatsapp_business_messaging`;
+    }
+    
+    Linking.openURL(oauthUrl).catch(() => {
+      Alert.alert('Error', 'Unable to open Meta Embedded Signup portal.');
+    });
   };
 
   const handleDisconnectMeta = async () => {

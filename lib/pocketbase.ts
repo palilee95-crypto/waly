@@ -10,3 +10,5 @@ pb.autoCancellation(false);
 export const getCurrentUser = () => pb.authStore.record;
 export const isLoggedIn = () => pb.authStore.isValid;
 export const logout = () => pb.authStore.clear();
+
+export default pb;
