@@ -44,21 +44,21 @@ export default function SubscriptionScreen() {
   const getPriceDetails = () => {
     if (selectedPlan === 'starter') {
       return {
-        price: billingCycle === 'monthly' ? 'RM 79' : 'RM 63',
-        originalPrice: billingCycle === 'monthly' ? 'RM 119' : 'RM 95',
+        price: billingCycle === 'monthly' ? 'RM 39' : 'RM 31',
+        originalPrice: billingCycle === 'monthly' ? 'RM 59' : 'RM 49',
         label: 'Starter Plan'
       };
     } else if (selectedPlan === 'pro') {
       return {
-        price: billingCycle === 'monthly' ? 'RM 99' : 'RM 79',
-        originalPrice: billingCycle === 'monthly' ? 'RM 198' : 'RM 158',
-        label: 'Pro Plan'
+        price: billingCycle === 'monthly' ? 'RM 79' : 'RM 63',
+        originalPrice: billingCycle === 'monthly' ? 'RM 129' : 'RM 99',
+        label: 'PRO Plan'
       };
     } else {
       return {
-        price: billingCycle === 'monthly' ? 'RM 349' : 'RM 279',
+        price: billingCycle === 'monthly' ? 'RM 329' : 'RM 263',
         originalPrice: billingCycle === 'monthly' ? 'RM 499' : 'RM 399',
-        label: 'Enterprise Plan'
+        label: 'Business Plan'
       };
     }
   };
@@ -103,34 +103,38 @@ export default function SubscriptionScreen() {
   const getFeaturesList = () => {
     if (selectedPlan === 'starter') {
       return [
-        'Digital Loyalty Cards',
+        '500 new unique customers / mo (Quota resets monthly)',
         'Basic Analytics Dashboard',
-        '1 Free NFC VIP Stand',
+        'Up to 10 active vouchers',
+        '1 staff account',
         'Email support',
-        'Up to 100 active customers',
-        '[LOCK] WhatsApp Automations',
+        '[LOCK] Unlimited Customer Database',
+        '[LOCK] Official Meta WhatsApp Automation',
         '[LOCK] Promotional Broadcasts',
+        '[LOCK] Pro Sales & Gaps Analytics',
         '[LOCK] Up to 5 staff accounts'
       ];
     } else if (selectedPlan === 'pro') {
       return [
         'Everything in Starter',
+        'Unlimited customer database ♾️',
+        'Official Meta WhatsApp Automation',
+        'Promotional WhatsApp Broadcasts',
+        'Pro Sales & Opportunity Analytics',
+        'Unlimited active vouchers',
         'Up to 5 staff accounts',
-        'WhatsApp Automations',
-        'Promotional Broadcasts',
-        'Priority support',
-        'Unlimited active customers',
+        'Priority WhatsApp support',
         '[LOCK] Multi-Branch Support',
-        '[LOCK] Custom integration APIs'
+        '[LOCK] Custom integration & White-label'
       ];
     } else {
       return [
-        'Everything in Pro',
+        'Everything in PRO',
         'Unlimited staff accounts',
         'Multi-Branch Support',
-        'Custom integrations',
-        '24/7 dedicated support',
-        'Custom branding'
+        'Custom integration & APIs',
+        'Custom branding',
+        '24/7 dedicated account support'
       ];
     }
   };
@@ -160,7 +164,7 @@ export default function SubscriptionScreen() {
                 <Text style={styles.headerUpsellTitle}>Grow Your Shop on Autopilot</Text>
               </View>
               <Text style={styles.headerUpsellDesc}>
-                Turn one-time walk-ins into lifetime regular customers. Unlock automated WhatsApp alerts, custom loyalty programs, and detailed analytics to scale repeat sales without extra effort.
+                Turn one-time walk-ins into regular customers with automated loyalty, WhatsApp notifications, and sales analytics. (Software subscription only).
               </Text>
             </View>
           </View>
@@ -203,7 +207,7 @@ export default function SubscriptionScreen() {
             >
               <Text style={styles.planCardTitle}>Starter</Text>
               <Text style={styles.planCardPrice}>
-                {billingCycle === 'monthly' ? 'RM 79' : 'RM 63'}
+                {billingCycle === 'monthly' ? 'RM 39' : 'RM 31'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
@@ -223,12 +227,12 @@ export default function SubscriptionScreen() {
               </View>
               <Text style={styles.planCardTitle}>PRO</Text>
               <Text style={[styles.planCardPrice, { color: '#050505' }]}>
-                {billingCycle === 'monthly' ? 'RM 99' : 'RM 79'}
+                {billingCycle === 'monthly' ? 'RM 79' : 'RM 63'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
 
-            {/* Enterprise Plan */}
+            {/* Business Plan */}
             <TouchableOpacity
               style={[
                 styles.planCard,
@@ -239,7 +243,7 @@ export default function SubscriptionScreen() {
             >
               <Text style={styles.planCardTitle}>Business</Text>
               <Text style={styles.planCardPrice}>
-                {billingCycle === 'monthly' ? 'RM 349' : 'RM 279'}
+                {billingCycle === 'monthly' ? 'RM 329' : 'RM 263'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
@@ -257,14 +261,16 @@ export default function SubscriptionScreen() {
                 </View>
               </View>
               <View style={styles.highlightBadge}>
-                <Text style={styles.highlightBadgeText}>50% OFF</Text>
+                <Text style={styles.highlightBadgeText}>BEST VALUE</Text>
               </View>
             </View>
 
-            {/* Timer countdown row */}
-            <View style={styles.timerRow}>
-              <Ionicons name="time" size={13} color="#EA580C" />
-              <Text style={styles.timerText}>Offer ends in: 23h 41m 15s</Text>
+            {/* Info note */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+              <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                System subscription only. NFC VIP stands sold separately.
+              </Text>
             </View>
           </View>
 
@@ -285,7 +291,7 @@ export default function SubscriptionScreen() {
                   </View>
                   <Text style={[styles.featureText, isLocked && { color: '#94A3B8', textDecorationLine: 'line-through' }]}>
                     {cleanFeat}
-                    {cleanFeat === 'WhatsApp Automations' && <Text style={styles.inlineBadge}>  AI </Text>}
+                    {cleanFeat.includes('WhatsApp Automation') && <Text style={styles.inlineBadge}>  META API </Text>}
                   </Text>
                 </View>
               );
@@ -312,7 +318,13 @@ export default function SubscriptionScreen() {
           onPress={handlePurchase}
           activeOpacity={0.8}
         >
-          <Text style={styles.ctaButtonText}>Upgrade to PRO today</Text>
+          <Text style={styles.ctaButtonText}>
+            {selectedPlan === 'starter' 
+              ? 'Get Started with Starter' 
+              : selectedPlan === 'pro' 
+                ? 'Upgrade to PRO (Recommended)' 
+                : 'Subscribe to Business Plan'}
+          </Text>
         </TouchableOpacity>
 
         {/* Legal Row */}
