@@ -681,36 +681,8 @@ export default function MerchantLayout() {
     }
   };
 
-  const handleTelegramPayment = async () => {
-    let merchantId = user?.merchant_id;
-    if (!merchantId) {
-      try {
-        await refreshSession();
-        if (pb.authStore.record?.merchant_id) {
-          merchantId = pb.authStore.record.merchant_id;
-        }
-      } catch (e) {
-        console.error("Self-healing session refresh failed:", e);
-      }
-    }
-
-    if (!merchantId) {
-      Alert.alert('Error', 'Could not find Merchant ID. Please log in again.');
-      return;
-    }
-
-    const months = selectedMonths;
-    const cleanMerchantId = merchantId.replace('merchant-', '');
-    const promoSuffix = appliedPromo ? `_${appliedPromo.code}` : '';
-    
-    // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
-    const telegramUrl = `https://t.me/RisevBilling_bot?start=${cleanMerchantId}_${months}${promoSuffix}`;
-    
-    try {
-      await Linking.openURL(telegramUrl);
-    } catch (err) {
-      Alert.alert('Error', 'Could not open Telegram. Please open Telegram and search for @RisevBilling_bot.');
-    }
+  const handleProceedToSubscription = () => {
+    router.push('/(merchant)/subscription' as any);
   };
 
   if (isLoading || checkingProfile) {
@@ -892,11 +864,11 @@ export default function MerchantLayout() {
 
           <TouchableOpacity
             style={[styles.payBtn, { marginTop: 16 }]}
-            onPress={handleTelegramPayment}
+            onPress={handleProceedToSubscription}
             activeOpacity={0.8}
           >
-            <Ionicons name="paper-plane" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.payBtnText}>Upgrade via Telegram</Text>
+            <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.payBtnText}>Upgrade Plan</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

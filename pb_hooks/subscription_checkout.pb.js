@@ -1,5 +1,5 @@
 // pb_hooks/subscription_checkout.pb.js
-// In-App Subscription Checkout & Order Generation
+// In-App Subscription Checkout & Chip In Order Generation
 
 routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
   const authRecord = e.auth;
@@ -64,7 +64,62 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
   subRecord.set("plan", plan === "business" ? "business" : (plan === "starter" ? "starter" : "pro"));
   subRecord.set("chipin_payment_id", orderId);
   subRecord.set("chipin_customer_email", authRecord.getString("email") || "");
-  
+
+  // Call Chip In Direct API if credentials are configured
+  const chipinBrandId = process.env.CHIPIN_BRAND_ID || "";
+  const chipinApiKey = process.env.CHIPIN_API_KEY || "";
+  let paymentUrl = "";
+
+  if (chipinBrandId && chipinApiKey) {
+    try {
+      const priceInCents = Math.round(totalAmount * 100);
+      const chipRes = $http.send({
+        url: "https://gate.chip-in.asia/api/v1/purchases/",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${chipinApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          brand_id: chipinBrandId,
+          client: {
+            email: authRecord.getString("email") || "merchant@risev.app",
+            phone: authRecord.getString("phone") || "",
+            full_name: authRecord.getString("name") || "Store Owner"
+          },
+          purchase: {
+            currency: "MYR",
+            products: [
+              {
+                name: `Risev ${selectedTier.title} (${billingCycle.toUpperCase()})`,
+                price: priceInCents,
+                quantity: 1
+              }
+            ]
+          },
+          reference: orderId,
+          success_redirect: `https://risev.app/subscription?status=success&order_id=${orderId}`,
+          failure_redirect: `https://risev.app/subscription?status=failed&order_id=${orderId}`,
+          cancel_redirect: `https://risev.app/subscription?status=cancelled`
+        }),
+        timeout: 15
+      });
+
+      if (chipRes.statusCode === 200 || chipRes.statusCode === 201) {
+        const purchaseData = chipRes.json;
+        paymentUrl = purchaseData.checkout_url || "";
+        if (purchaseData.id) {
+          subRecord.set("chipin_payment_id", purchaseData.id);
+        }
+        console.log(`[CHIPIN CHECKOUT] Created purchase ${purchaseData.id} for order ${orderId}: ${paymentUrl}`);
+      } else {
+        console.log(`[CHIPIN CHECKOUT ERROR] Gateway returned ${chipRes.statusCode}:`, chipRes.raw);
+      }
+    } catch (chipErr) {
+      console.log("[CHIPIN API ERROR]", chipErr.message || chipErr);
+    }
+  }
+
   try {
     $app.save(subRecord);
   } catch (saveErr) {
@@ -76,6 +131,7 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
   return e.json(200, {
     success: true,
     order_id: orderId,
+    payment_url: paymentUrl,
     plan: plan,
     plan_title: selectedTier.title,
     billing_cycle: billingCycle,

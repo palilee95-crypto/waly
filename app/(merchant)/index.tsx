@@ -188,22 +188,7 @@ export default function MerchantDashboard() {
   const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
 
   const handleUpgradePress = () => {
-    setShowUpgradeModal(true);
-  };
-
-  const proceedTelegramUpgrade = async () => {
-    const months = selectedMonths;
-    const cleanMerchantId = (user?.merchant_id || '').replace('merchant-', '');
-    const promoSuffix = appliedPromo ? `_${appliedPromo.code}` : '';
-    
-    // Telegram start parameters can only have a-z, A-Z, 0-9, _ and -
-    const telegramUrl = `https://t.me/RisevBilling_bot?start=${cleanMerchantId}_${months}${promoSuffix}`;
-    
-    try {
-      await Linking.openURL(telegramUrl);
-    } catch (err) {
-      alert('Could not open Telegram. Please open Telegram and search for @RisevBilling_bot.');
-    }
+    router.push('/(merchant)/subscription' as any);
   };
 
   const [pendingClaims, setPendingClaims] = useState<any[]>([]);
@@ -1032,14 +1017,14 @@ export default function MerchantDashboard() {
 
             <TouchableOpacity
               style={[styles.payBtn, { marginTop: 20 }]}
-              onPress={async () => {
+              onPress={() => {
                 setShowUpgradeModal(false);
-                await proceedTelegramUpgrade();
+                router.push('/(merchant)/subscription' as any);
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="paper-plane" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.payBtnText}>Upgrade via Telegram</Text>
+              <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.payBtnText}>Upgrade Plan</Text>
             </TouchableOpacity>
           </View>
         </View>

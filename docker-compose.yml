@@ -41,6 +41,9 @@ services:
       - SMTP_SENDER_NAME=${SMTP_SENDER_NAME}
       - META_APP_ID=${META_APP_ID}
       - META_APP_SECRET=${META_APP_SECRET}
+      - CHIPIN_BRAND_ID=${CHIPIN_BRAND_ID}
+      - CHIPIN_API_KEY=${CHIPIN_API_KEY}
+      - CHIPIN_WEBHOOK_PUBLIC_KEY=${CHIPIN_WEBHOOK_PUBLIC_KEY}
     networks:
       - risev-network
 
@@ -60,30 +63,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY}
       - S3_BUCKET=${S3_BUCKET}
       - S3_REGION=${S3_REGION}
-    networks:
-      - risev-network
-
-  # Telegram Auto Payment & Gemini Receipt Verification Bot
-  payment-bot:
-    build:
-      context: ./payment-bot
-      dockerfile: Dockerfile
-    container_name: risev-payment-bot
-    restart: unless-stopped
-    depends_on:
-      - pocketbase
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL}
-      - POCKETBASE_URL=http://pocketbase:8090
-      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
-      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
-      - BANK_NAME=${BANK_NAME}
-      - BANK_ACC_NUM=${BANK_ACC_NUM}
-      - BANK_ACC_NAME=${BANK_ACC_NAME}
-      - QR_CODE_FILE=${QR_CODE_FILE}
-      - SUPPORT_WHATSAPP=${SUPPORT_WHATSAPP}
     networks:
       - risev-network
 
