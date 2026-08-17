@@ -11,12 +11,12 @@ onRecordCreate((e) => {
         throw new ForbiddenError('Your store account is suspended. Please contact support.');
       }
 
-      // Check if merchant has an active or trialing subscription record
+      // Check if merchant has an active subscription record
       let hasValidSub = false;
       let activeSub = null;
       try {
         const subs = $app.findRecordsByFilter('subscriptions',
-          `merchant = '${merchantId}' && (status = 'active' || status = 'trialing')`,
+          `merchant = '${merchantId}' && status = 'active'`,
           '-created', 1, 0);
         if (subs.length > 0) {
           activeSub = subs[0];
@@ -28,7 +28,7 @@ onRecordCreate((e) => {
       } catch (subErr) { /* ignore lookup error */ }
 
       if (!hasValidSub) {
-        throw new ForbiddenError('Your store subscription or trial has expired. Please upgrade your subscription to continue.');
+        throw new ForbiddenError('Your store subscription is inactive or expired. Please subscribe to continue.');
       }
 
       // Enforce Starter plan monthly 500-customer quota when adding new loyalty cards

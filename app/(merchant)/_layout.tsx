@@ -704,7 +704,7 @@ export default function MerchantLayout() {
   }
 
   // Gateway subscription gate blocker
-  if (user?.merchant_status !== 'active' && !isInTrial) {
+  if (user?.merchant_status !== 'active') {
     return (
       <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         {/* Top Header Actions for Trial/Subscription Screen */}

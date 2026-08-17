@@ -558,7 +558,7 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
                        </View>
 
                        <TouchableOpacity style={styles.accordionBtn}>
-                         <Text style={styles.accordionBtnText}>{p.price === 'Custom' ? 'Contact Sales →' : 'Start 7-Day Free Trial →'}</Text>
+                         <Text style={styles.accordionBtnText}>{p.price === 'Custom' ? 'Contact Sales →' : 'Get Started →'}</Text>
                        </TouchableOpacity>
                        <Text style={styles.accordionNoCC}>No credit card required</Text>
                     </View>

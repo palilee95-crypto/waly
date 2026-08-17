@@ -143,50 +143,6 @@ export default function MerchantDashboard() {
     setPromoError('');
   };
 
-  // Helper to determine trial status from subscriptions table or signup date
-  const getTrialStatus = () => {
-    if (activeSubscription) {
-      const subStatus = activeSubscription.status;
-      const periodEnd = activeSubscription.current_period_end;
-
-      if (subStatus === 'trialing' && periodEnd) {
-        const expiryTime = new Date(periodEnd.replace(' ', 'T')).getTime();
-        const now = Date.now();
-        const diffMs = expiryTime - now;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        const daysRemaining = Math.max(0, Math.ceil(diffDays));
-        return {
-          isInTrial: daysRemaining > 0,
-          daysRemaining: daysRemaining
-        };
-      }
-
-      if (subStatus === 'active') {
-        return {
-          isInTrial: false,
-          daysRemaining: 0
-        };
-      }
-    }
-
-    if (user?.merchant_status === 'pending' && user?.merchant_created) {
-      const formattedDate = user.merchant_created.replace(' ', 'T');
-      const createdTime = new Date(formattedDate).getTime();
-      const now = new Date().getTime();
-      const diffMs = now - createdTime;
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      if (diffDays >= 0 && diffDays < 7) {
-        return {
-          isInTrial: true,
-          daysRemaining: Math.max(0, Math.ceil(7 - diffDays))
-        };
-      }
-    }
-    return { isInTrial: false, daysRemaining: 0 };
-  };
-
-  const { isInTrial, daysRemaining: trialDaysRemaining } = getTrialStatus();
-
   const handleUpgradePress = () => {
     router.push('/(merchant)/subscription' as any);
   };
@@ -281,7 +237,7 @@ export default function MerchantDashboard() {
       // 0. Fetch active/trialing subscription
       try {
         const subList = await pb.collection('subscriptions').getList(1, 1, {
-          filter: `merchant = '${user.merchant_id}' && (status = 'active' || status = 'trialing')`,
+          filter: `merchant = '${user.merchant_id}' && status = 'active'`,
           sort: '-created',
         });
         if (subList.items.length > 0) {
@@ -578,97 +534,7 @@ export default function MerchantDashboard() {
           })()}
         </View>
 
-        {isInTrial && (
-          <View style={styles.trialBanner}>
-            <View style={styles.trialTopRow}>
-              <View style={styles.trialBadge}>
-                <Text style={styles.trialBadgeText}>FREE TRIAL</Text>
-              </View>
-              <Text style={styles.trialDays}>{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} remaining</Text>
-            </View>
-            <Text style={styles.trialTitle}>You're on the Pro plan</Text>
-            <Text style={styles.trialSub}>Unlock unlimited stamps, broadcasts & more</Text>
-            <View style={styles.trialBarWrap}>
-              <View style={[styles.trialBarFill, { width: `${Math.round(((7 - trialDaysRemaining) / 7) * 100)}%` }]} />
-            </View>
-            <View style={styles.trialFeatures}>
-              <View style={styles.trialFeat}>
-                <Ionicons name="checkmark-circle" size={14} color="#111827" />
-                  <Text style={styles.trialFeatText}>Unlimited stamps</Text>
-                </View>
-                <View style={styles.trialFeat}>
-                  <Ionicons name="checkmark-circle" size={14} color="#111827" />
-                <Text style={styles.trialFeatText}>WhatsApp blast</Text>
-              </View>
-            </View>
-            {activePromos.length > 0 && (
-              <View style={styles.trialPromoRow}>
-                {activePromos.map((promo) => {
-                  const isApplied = appliedPromo?.code === promo.code;
-                  return (
-                    <TouchableOpacity
-                      key={promo.id}
-                      style={[styles.trialPromoChip, isApplied && styles.trialPromoChipActive]}
-                      onPress={() => {
-                        if (isApplied) {
-                          setAppliedPromo(null);
-                          setPromoSuccess('');
-                        } else {
-                          setAppliedPromo({
-                            code: promo.code,
-                            discount_type: promo.discount_type,
-                            discount_value: promo.discount_value,
-                          });
-                          setPromoSuccess(
-                            promo.discount_type === 'percentage'
-                              ? `-${promo.discount_value}% off`
-                              : `-RM${promo.discount_value} off`
-                          );
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.trialPromoChipText, isApplied && styles.trialPromoChipTextActive]}>
-                        {promo.code}
-                      </Text>
-                      <Text style={[styles.trialPromoChipDesc, isApplied && styles.trialPromoChipDescActive]}>
-                        {promo.discount_type === 'percentage' ? `${promo.discount_value}% off` : `RM${promo.discount_value} off`}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-            {promoSuccess ? (
-              <Text style={styles.trialPromoSuccess}>{promoSuccess}</Text>
-            ) : promoError ? (
-              <Text style={styles.trialPromoError}>{promoError}</Text>
-            ) : null}
-            <View style={styles.trialBottomRow}>
-              <View>
-                {appliedPromo ? (
-                  <View style={styles.trialPriceRow}>
-                    <Text style={styles.trialPriceStrikethrough}>RM{pricing.base_price_1m}/mo</Text>
-                    <Text style={styles.trialPriceDiscounted}>
-                      RM{appliedPromo.discount_type === 'percentage'
-                        ? Math.round(pricing.base_price_1m * (1 - appliedPromo.discount_value / 100))
-                        : Math.max(0, pricing.base_price_1m - appliedPromo.discount_value)}/mo
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.trialPrice}>RM{pricing.base_price_1m}/mo</Text>
-                )}
-              </View>
-              <TouchableOpacity
-                style={styles.trialUpgradeBtn}
-                onPress={handleUpgradePress}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.trialUpgradeBtnText}>Upgrade</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>

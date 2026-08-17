@@ -147,26 +147,23 @@ routerAdd("POST", "/api/risev/register", (e) => {
           merchant.set("name", `${user.getString("name")}'s Shop`);
           merchant.set("owner", user.id);
           merchant.set("category", "food");
-          merchant.set("status", "active");
+          merchant.set("status", "pending");
           $app.save(merchant);
           user.set("merchant_id", merchant.id);
           $app.save(user);
 
-          // Auto-provision initial 7-day free trial in subscriptions collection
+          // Auto-provision initial pending subscription record in subscriptions collection
           try {
             const sc = $app.findCollectionByNameOrId("subscriptions");
             const sub = new Record(sc);
             sub.set("merchant", merchant.id);
             sub.set("plan", "pro");
-            sub.set("status", "trialing");
-            const expiry = new Date();
-            expiry.setDate(expiry.getDate() + 7);
-            sub.set("current_period_end", expiry.toISOString().replace('T', ' ').substring(0, 19));
-            sub.set("chipin_payment_id", `signup_free_trial_${Date.now()}`);
-            sub.set("chipin_customer_email", email || "signup_trial@risev.app");
+            sub.set("status", "pending");
+            sub.set("chipin_payment_id", `signup_${Date.now()}`);
+            sub.set("chipin_customer_email", email || "");
             $app.save(sub);
           } catch (subErr) {
-            console.log("Subscription trial provisioning failed: " + (subErr.message || subErr));
+            console.log("Subscription record initialization: " + (subErr.message || subErr));
           }
         }
       } catch (mErr) {
