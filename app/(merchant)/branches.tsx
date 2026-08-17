@@ -251,38 +251,53 @@ export default function BranchesScreen() {
     }
   };
 
+  const executeDelete = async (branch: Branch) => {
+    try {
+      if (branch.id && branch.id !== 'hq-default' && !branch.id.startsWith('branch-')) {
+        await pb.collection('branches').delete(branch.id);
+      }
+    } catch (e: any) {
+      console.log('PB delete branch error:', e);
+    }
+    setBranches(prev => {
+      const remaining = prev.filter(b => b.id !== branch.id);
+      if (branch.is_hq && remaining.length > 0) {
+        remaining[0].is_hq = true;
+        if (remaining[0].id && !remaining[0].id.startsWith('branch-')) {
+          pb.collection('branches').update(remaining[0].id, { is_hq: true }).catch(() => null);
+        }
+      }
+      return remaining;
+    });
+    setModalVisible(false);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
+    } else {
+      Alert.alert(locale === 'en' ? 'Deleted' : 'Dipadam', locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
+    }
+  };
+
   const handleDeleteBranch = (branch: Branch) => {
+    const confirmMsg = locale === 'en' 
+      ? `Are you sure you want to delete "${branch.name}"?${branch.is_hq ? ' (Note: This is currently set as HQ)' : ''}` 
+      : `Adakah anda pasti mahu memadam "${branch.name}"?${branch.is_hq ? ' (Nota: Cawangan ini ditetapkan sebagai HQ)' : ''}`;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(confirmMsg)) {
+        executeDelete(branch);
+      }
+      return;
+    }
+
     Alert.alert(
       locale === 'en' ? 'Delete Branch' : 'Padam Cawangan',
-      locale === 'en' 
-        ? `Are you sure you want to delete "${branch.name}"?${branch.is_hq ? ' (Note: This is currently set as HQ)' : ''}` 
-        : `Adakah anda pasti mahu memadam "${branch.name}"?${branch.is_hq ? ' (Nota: Cawangan ini ditetapkan sebagai HQ)' : ''}`,
+      confirmMsg,
       [
         { text: locale === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
         {
           text: locale === 'en' ? 'Delete' : 'Padam',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              if (branch.id && branch.id !== 'hq-default' && !branch.id.startsWith('branch-')) {
-                await pb.collection('branches').delete(branch.id);
-              }
-            } catch (e: any) {
-              console.log('PB delete branch error:', e);
-            }
-            setBranches(prev => {
-              const remaining = prev.filter(b => b.id !== branch.id);
-              if (branch.is_hq && remaining.length > 0) {
-                remaining[0].is_hq = true;
-                if (remaining[0].id && !remaining[0].id.startsWith('branch-')) {
-                  pb.collection('branches').update(remaining[0].id, { is_hq: true }).catch(() => null);
-                }
-              }
-              return remaining;
-            });
-            setModalVisible(false);
-            Alert.alert(locale === 'en' ? 'Deleted' : 'Dipadam', locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
-          }
+          onPress: () => executeDelete(branch)
         }
       ]
     );
