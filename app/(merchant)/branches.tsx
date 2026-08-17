@@ -98,6 +98,29 @@ export default function BranchesScreen() {
       if (records && records.length > 0) {
         setBranches(records);
       } else {
+        // Auto-provision default HQ branch from merchant profile for single-store merchants
+        try {
+          const merch = await pb.collection('merchants').getOne(user.merchant_id);
+          if (merch) {
+            const autoHq = await pb.collection('branches').create({
+              merchant: user.merchant_id,
+              name: merch.name ? `${merch.name} (HQ)` : 'Main Outlet',
+              address: merch.address || '',
+              city: merch.city || 'Malaysia',
+              phone: merch.phone || user.phone || '',
+              manager_name: user.name || 'Store Owner',
+              is_hq: true,
+              status: 'active'
+            });
+            if (autoHq?.id) {
+              setBranches([autoHq as any]);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (autoErr) {
+          console.log('Auto-provision HQ branch bypassed:', autoErr);
+        }
         setBranches([]);
       }
     } catch (err: any) {
