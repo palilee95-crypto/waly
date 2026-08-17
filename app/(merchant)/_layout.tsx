@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert, Linking, LayoutAnimation, UIManager } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -14,6 +14,7 @@ import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { LinearGradient } from 'expo-linear-gradient';
+import SubscriptionScreen from './subscription';
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
@@ -223,6 +224,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
 }
 
 export default function MerchantLayout() {
+  const router = useRouter();
   const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout, switchRole } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -703,191 +705,38 @@ export default function MerchantLayout() {
 
   // Gateway subscription gate blocker
   if (user?.merchant_status !== 'active' && !isInTrial) {
-    const basePrice = pricing.base_price_1m;
-    const months = selectedMonths;
-    const rawTotal = basePrice * months;
-    
-    let durationDiscountPercent = 0;
-    if (months === 3) durationDiscountPercent = pricing.discount_3m;
-    else if (months === 6) durationDiscountPercent = pricing.discount_6m;
-    else if (months === 9) durationDiscountPercent = pricing.discount_9m;
-    else if (months === 12) durationDiscountPercent = pricing.discount_12m;
-
-    const durationDiscountAmount = rawTotal * (durationDiscountPercent / 100);
-    const priceAfterDurationDiscount = rawTotal - durationDiscountAmount;
-
-    let promoDiscountAmount = 0;
-    if (appliedPromo) {
-      if (appliedPromo.discount_type === 'percentage') {
-        promoDiscountAmount = priceAfterDurationDiscount * (appliedPromo.discount_value / 100);
-      } else {
-        promoDiscountAmount = Math.min(priceAfterDurationDiscount, appliedPromo.discount_value);
-      }
-    }
-
-    const finalPrice = Math.max(0, priceAfterDurationDiscount - promoDiscountAmount);
-
     return (
-      <View style={styles.gateContainer}>
-        <View style={[styles.gateCard, { maxWidth: 420 }]}>
-          <View style={[styles.gateIconBg, { backgroundColor: '#F0FDF4' }]}>
-            <Ionicons name="sparkles" size={28} color="#10B981" />
-          </View>
-          <Text style={styles.gateTitle}>Unlock Merchant Pro</Text>
-          <Text style={[styles.gateSubtitle, { marginBottom: 12 }]}>
-            Grow your business with loyalty cards, broadcast blasts, staff management, and automatic WhatsApp notifications.
-          </Text>
-
-          {/* 1. Select Duration Dropdown */}
-          <Text style={[styles.sectionLabel, { alignSelf: 'flex-start', marginTop: 4, marginBottom: 8 }]}>SELECT PLAN DURATION</Text>
-          <View style={{ width: '100%', marginBottom: 12 }}>
-            <TouchableOpacity
-              style={styles.dropdownHeader}
-              onPress={() => setIsDropdownOpen(!isDropdownOpen)}
-              activeOpacity={0.8}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.dropdownHeaderText}>
-                  {selectedMonths === 1 ? '1 Month' : `${selectedMonths} Months`}
-                </Text>
-                {(() => {
-                  let disc = 0;
-                  if (selectedMonths === 3) disc = pricing.discount_3m;
-                  else if (selectedMonths === 6) disc = pricing.discount_6m;
-                  else if (selectedMonths === 9) disc = pricing.discount_9m;
-                  else if (selectedMonths === 12) disc = pricing.discount_12m;
-                  if (disc > 0) {
-                    return (
-                      <View style={[styles.planDiscountBadge, { marginTop: 0 }]}>
-                        <Text style={styles.planDiscountText}>-{disc}%</Text>
-                      </View>
-                    );
-                  }
-                  return null;
-                })()}
-              </View>
-              <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color="#64748B" />
-            </TouchableOpacity>
-
-            {isDropdownOpen && (
-              <View style={styles.dropdownList}>
-                {([1, 3, 6, 9, 12] as const)
-                  .filter((m) => {
-                    if (m === 1) return true;
-                    if (m === 3) return pricing.enable_3m;
-                    if (m === 6) return pricing.enable_6m;
-                    if (m === 9) return pricing.enable_9m;
-                    if (m === 12) return pricing.enable_12m;
-                    return false;
-                  })
-                  .map((m) => {
-                    const isSelected = selectedMonths === m;
-                    let disc = 0;
-                    if (m === 3) disc = pricing.discount_3m;
-                    else if (m === 6) disc = pricing.discount_6m;
-                    else if (m === 9) disc = pricing.discount_9m;
-                    else if (m === 12) disc = pricing.discount_12m;
-
-                    return (
-                      <TouchableOpacity
-                        key={m}
-                        style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
-                        onPress={() => {
-                          setSelectedMonths(m);
-                          setIsDropdownOpen(false);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
-                          {m === 1 ? '1 Month' : `${m} Months`}
-                        </Text>
-                        {disc > 0 && (
-                          <View style={[styles.planDiscountBadge, { marginTop: 0 }]}>
-                            <Text style={styles.planDiscountText}>-{disc}%</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            )}
-          </View>
-
-          {/* 2. Promo Code Input */}
-          <View style={styles.promoRow}>
-            <TextInput
-              style={[styles.promoInput, appliedPromo && { backgroundColor: '#F1F5F9', color: '#64748B' }]}
-              value={promoCode}
-              onChangeText={setPromoCode}
-              placeholder="Promo or voucher code"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="characters"
-              editable={!appliedPromo}
-              {...Platform.select({
-                web: { outlineStyle: 'none' } as any,
-              })}
-            />
-            <TouchableOpacity
-              style={[styles.promoBtn, appliedPromo && { backgroundColor: '#EF4444' }]}
-              onPress={appliedPromo ? handleRemovePromo : handleApplyPromo}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.promoBtnText}>{appliedPromo ? 'Remove' : 'Apply'}</Text>
-            </TouchableOpacity>
-          </View>
-          {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
-          {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
-
-          {/* 3. Pricing Summary */}
-          <View style={styles.summarySection}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subscription ({months === 1 ? '1 Month' : `${months} Months`})</Text>
-              <Text style={styles.summaryValue}>RM {rawTotal.toFixed(2)}</Text>
-            </View>
-            {durationDiscountAmount > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Plan Discount (-{durationDiscountPercent}%)</Text>
-                <Text style={[styles.summaryValue, { color: '#10B981' }]}>-RM {durationDiscountAmount.toFixed(2)}</Text>
-              </View>
-            )}
-            {promoDiscountAmount > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Voucher Discount</Text>
-                <Text style={[styles.summaryValue, { color: '#10B981' }]}>-RM {promoDiscountAmount.toFixed(2)}</Text>
-              </View>
-            )}
-            <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>Total Price</Text>
-              <Text style={styles.summaryTotalValue}>RM {finalPrice.toFixed(2)}</Text>
-            </View>
-          </View>
-
+      <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        {/* Top Header Actions for Trial/Subscription Screen */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          backgroundColor: '#FFFFFF',
+          borderBottomWidth: 1,
+          borderColor: '#F1F5F9'
+        }}>
           <TouchableOpacity
-            style={[styles.payBtn, { marginTop: 16 }]}
-            onPress={handleProceedToSubscription}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.payBtnText}>Upgrade Plan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.switchRoleBtn}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
             onPress={() => switchRole('customer')}
             activeOpacity={0.8}
           >
-            <Ionicons name="swap-horizontal" size={16} color="#0F172A" style={{ marginRight: 6 }} />
-            <Text style={styles.switchRoleBtnText}>Switch to Customer Mode</Text>
+            <Ionicons name="swap-horizontal" size={16} color="#0F172A" />
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Customer Mode</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            style={styles.logoutLink}
+            style={{ paddingHorizontal: 8, paddingVertical: 6 }}
             onPress={logout}
             activeOpacity={0.7}
           >
-            <Text style={styles.logoutLinkText}>Log Out Account</Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444' }}>Log Out</Text>
           </TouchableOpacity>
         </View>
+
+        <SubscriptionScreen />
       </View>
     );
   }
@@ -1089,8 +938,8 @@ export default function MerchantLayout() {
         tabBar={(props) => <CustomMerchantTabBar {...props} isSidebarExpanded={isSidebarExpanded} toggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} sidebarWidth={sidebarWidth} />}
         screenOptions={{
           headerShown: false,
-          sceneContainerStyle: { paddingLeft: isDesktop ? sidebarWidth : 0 }
-        }}
+          sceneStyle: { paddingLeft: isDesktop ? sidebarWidth : 0 }
+        } as any}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="customers" />

@@ -124,7 +124,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
   const handleOpenCreateModal = (preset?: typeof STARTER_PRESETS[0]) => {
     if (preset) {
       router.push({
-        pathname: '/(merchant)/create-template',
+        pathname: '/(merchant)/create-template' as any,
         params: {
           presetName: preset.name,
           presetCategory: preset.category,
@@ -134,7 +134,7 @@ export default function TemplateStudio({ onSelectTemplateForBroadcast }: Templat
         },
       });
     } else {
-      router.push('/(merchant)/create-template');
+      router.push('/(merchant)/create-template' as any);
     }
   };
 

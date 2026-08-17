@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, usePathname } from 'expo-router';
+// @ts-ignore
 import * as ImagePicker from 'expo-image-picker';
 import SmartFollowUp from './_components/SmartFollowUp';
 import TemplateStudio, { WhatsAppTemplate } from './_components/TemplateStudio';
