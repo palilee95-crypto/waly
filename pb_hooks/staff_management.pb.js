@@ -42,14 +42,63 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     console.log("Error querying staff members:", err.message || err);
   }
 
-  const result = staffMembers.map(u => ({
-    id: u.id,
-    name: u.getString("name"),
-    phone: u.getString("phone"),
-    email: u.getString("email"),
-    avatar: u.getString("avatar"),
-    role: u.getString("role")
-  }));
+  // Pre-fetch transactions for this merchant to aggregate staff performance
+  let merchantTxns = [];
+  try {
+    merchantTxns = $app.findRecordsByFilter(
+      "transactions",
+      `merchant = "${merchantId}"`,
+      "-created",
+      1000,
+      0
+    );
+  } catch (err) {
+    console.log("Error querying transactions for staff performance:", err.message || err);
+  }
+
+  const result = staffMembers.map(u => {
+    const staffId = u.id;
+    const staffName = u.getString("name");
+    const branchName = u.getString("branch_name") || "All Branches (HQ)";
+
+    // Calculate stamps issued and vouchers redeemed by this staff member
+    let stampsIssued = 0;
+    let vouchersRedeemed = 0;
+
+    merchantTxns.forEach(tx => {
+      let meta = {};
+      try {
+        const rawMeta = tx.get("metadata");
+        if (typeof rawMeta === "string" && rawMeta.trim()) {
+          meta = JSON.parse(rawMeta);
+        } else if (typeof rawMeta === "object" && rawMeta !== null) {
+          meta = rawMeta;
+        }
+      } catch (parseErr) {}
+
+      const matchesStaff = meta.staff_id === staffId || (meta.staff_name && meta.staff_name === staffName);
+      if (matchesStaff) {
+        const txType = tx.getString("type");
+        if (txType === "earn") {
+          stampsIssued += (parseInt(tx.get("stamps")) || 1);
+        } else if (txType === "redeem" || txType === "reward") {
+          vouchersRedeemed += 1;
+        }
+      }
+    });
+
+    return {
+      id: u.id,
+      name: staffName,
+      phone: u.getString("phone"),
+      email: u.getString("email"),
+      avatar: u.getString("avatar"),
+      role: u.getString("role"),
+      branch_name: branchName,
+      stamps_issued: stampsIssued,
+      vouchers_redeemed: vouchersRedeemed
+    };
+  });
 
   return e.json(200, result);
 }, $apis.requireAuth("users"));
@@ -82,8 +131,10 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
     return e.json(403, { message: "Forbidden. Only the store owner can add staff." });
   }
 
-  const body = e.requestInfo().body;
+  const body = e.requestInfo().body || {};
   const phone = body.phone || '';
+  const branch = (body.branch || body.branch_name || '').trim();
+
   if (!phone) {
     return e.json(400, { message: "Phone number is required." });
   }
@@ -143,6 +194,9 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
 
   // Update user
   targetUser.set("merchant_id", merchantId);
+  if (branch) {
+    targetUser.set("branch_name", branch);
+  }
   
   // Set role to 'both' so they can switch roles
   const currentRole = targetUser.getString("role");
@@ -164,7 +218,10 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
       phone: targetUser.getString("phone"),
       email: targetUser.getString("email"),
       avatar: targetUser.getString("avatar"),
-      role: targetUser.getString("role")
+      role: targetUser.getString("role"),
+      branch_name: targetUser.getString("branch_name") || branch || "All Branches (HQ)",
+      stamps_issued: 0,
+      vouchers_redeemed: 0
     }
   });
 }, $apis.requireAuth("users"));
@@ -197,7 +254,7 @@ routerAdd("DELETE", "/api/risev/merchant/staff", (e) => {
     return e.json(403, { message: "Forbidden. Only the store owner can remove staff." });
   }
 
-  const body = e.requestInfo().body;
+  const body = e.requestInfo().body || {};
   const userId = body.userId || '';
   if (!userId) {
     return e.json(400, { message: "User ID is required." });
@@ -221,6 +278,8 @@ routerAdd("DELETE", "/api/risev/merchant/staff", (e) => {
 
   // Update user
   targetUser.set("merchant_id", "");
+  targetUser.set("branch_name", "");
+  targetUser.set("branch", "");
   
   // Reset role to 'customer' if they were 'merchant' only
   if (targetUser.getString("role") === "merchant") {

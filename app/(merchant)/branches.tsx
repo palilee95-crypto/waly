@@ -117,7 +117,7 @@ export default function BranchesScreen() {
     setCity('');
     setPhone('');
     setManagerName('');
-    setIsHq(!isBusinessPlan ? true : branches.length === 0);
+    setIsHq(branches.length === 0);
     setModalVisible(true);
   };
 
@@ -128,7 +128,7 @@ export default function BranchesScreen() {
     setCity(branch.city);
     setPhone(branch.phone);
     setManagerName(branch.manager_name);
-    setIsHq(!isBusinessPlan ? true : branch.is_hq);
+    setIsHq(Boolean(branch.is_hq));
     setModalVisible(true);
   };
 
@@ -144,14 +144,14 @@ export default function BranchesScreen() {
       return;
     }
 
-    const finalIsHq = (!isBusinessPlan || branches.length === 0) ? true : isHq;
+    const finalIsHq = isHq;
 
     setSubmitting(true);
     try {
       if (editingBranch) {
-        // Try updating
+        // Try updating in PB
         try {
-          if (editingBranch.id !== 'hq-default') {
+          if (editingBranch.id && editingBranch.id !== 'hq-default' && !editingBranch.id.startsWith('branch-')) {
             await pb.collection('branches').update(editingBranch.id, {
               name: name.trim(),
               address: address.trim(),
@@ -160,6 +160,16 @@ export default function BranchesScreen() {
               manager_name: managerName.trim(),
               is_hq: finalIsHq,
             });
+          }
+
+          // If this branch became HQ, unset other branches
+          if (finalIsHq && user?.merchant_id) {
+            const otherHqs = branches.filter(b => b.is_hq && b.id !== editingBranch.id);
+            for (const o of otherHqs) {
+              if (o.id && !o.id.startsWith('branch-')) {
+                pb.collection('branches').update(o.id, { is_hq: false }).catch(() => null);
+              }
+            }
           }
         } catch (e) {
           console.log('PB update branch bypassed:', e);
@@ -177,10 +187,20 @@ export default function BranchesScreen() {
 
         Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'Branch updated successfully.' : 'Cawangan berjaya dikemaskini.');
       } else {
-        // Create new branch
+        // Create new branch in PB
         const newBranchId = `branch-${Date.now()}`;
         try {
           if (user?.merchant_id) {
+            // If new branch is HQ, unset others first
+            if (finalIsHq) {
+              const otherHqs = branches.filter(b => b.is_hq);
+              for (const o of otherHqs) {
+                if (o.id && !o.id.startsWith('branch-')) {
+                  pb.collection('branches').update(o.id, { is_hq: false }).catch(() => null);
+                }
+              }
+            }
+
             const created = await pb.collection('branches').create({
               merchant: user.merchant_id,
               name: name.trim(),
@@ -192,14 +212,18 @@ export default function BranchesScreen() {
               status: 'active'
             });
             if (created?.id) {
-              setBranches(prev => [...prev, created as any]);
+              setBranches(prev => finalIsHq 
+                ? [created as any, ...prev.map(b => ({ ...b, is_hq: false }))]
+                : [...prev, created as any]
+              );
               setModalVisible(false);
               setSubmitting(false);
+              Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'New branch added successfully.' : 'Cawangan baru berjaya ditambah.');
               return;
             }
           }
         } catch (e) {
-          console.log('PB create branch bypassed:', e);
+          console.log('PB create branch error:', e);
         }
 
         const newBranchObj: Branch = {
@@ -228,17 +252,11 @@ export default function BranchesScreen() {
   };
 
   const handleDeleteBranch = (branch: Branch) => {
-    if (branch.is_hq) {
-      Alert.alert(
-        locale === 'en' ? 'Cannot Delete HQ' : 'Tidak Boleh Padam HQ',
-        locale === 'en' ? 'The HQ outlet cannot be deleted. Please assign another HQ first.' : 'Cawangan utama HQ tidak boleh dipadam.'
-      );
-      return;
-    }
-
     Alert.alert(
       locale === 'en' ? 'Delete Branch' : 'Padam Cawangan',
-      locale === 'en' ? `Are you sure you want to remove "${branch.name}"?` : `Adakah anda pasti mahu memadam "${branch.name}"?`,
+      locale === 'en' 
+        ? `Are you sure you want to delete "${branch.name}"?${branch.is_hq ? ' (Note: This is currently set as HQ)' : ''}` 
+        : `Adakah anda pasti mahu memadam "${branch.name}"?${branch.is_hq ? ' (Nota: Cawangan ini ditetapkan sebagai HQ)' : ''}`,
       [
         { text: locale === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
         {
@@ -246,13 +264,24 @@ export default function BranchesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (branch.id !== 'hq-default' && !branch.id.startsWith('branch-')) {
+              if (branch.id && branch.id !== 'hq-default' && !branch.id.startsWith('branch-')) {
                 await pb.collection('branches').delete(branch.id);
               }
-            } catch (e) {
-              console.log('PB delete branch bypassed:', e);
+            } catch (e: any) {
+              console.log('PB delete branch error:', e);
             }
-            setBranches(prev => prev.filter(b => b.id !== branch.id));
+            setBranches(prev => {
+              const remaining = prev.filter(b => b.id !== branch.id);
+              if (branch.is_hq && remaining.length > 0) {
+                remaining[0].is_hq = true;
+                if (remaining[0].id && !remaining[0].id.startsWith('branch-')) {
+                  pb.collection('branches').update(remaining[0].id, { is_hq: true }).catch(() => null);
+                }
+              }
+              return remaining;
+            });
+            setModalVisible(false);
+            Alert.alert(locale === 'en' ? 'Deleted' : 'Dipadam', locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
           }
         }
       ]
@@ -391,15 +420,13 @@ export default function BranchesScreen() {
                       >
                         <Feather name="edit-2" size={14} color="#050505" />
                       </TouchableOpacity>
-                      {!branch.is_hq && (
-                        <TouchableOpacity 
-                          style={[styles.actionIconBtn, { backgroundColor: '#FEE2E2' }]} 
-                          onPress={() => handleDeleteBranch(branch)}
-                          activeOpacity={0.7}
-                        >
-                          <Feather name="trash-2" size={14} color="#EF4444" />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity 
+                        style={[styles.actionIconBtn, { backgroundColor: '#FEE2E2' }]} 
+                        onPress={() => handleDeleteBranch(branch)}
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="trash-2" size={14} color="#EF4444" />
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -592,21 +619,19 @@ export default function BranchesScreen() {
                 />
 
                 {/* Set as HQ Switch */}
-                {isBusinessPlan && (
-                  <TouchableOpacity
-                    style={styles.hqSwitchRow}
-                    onPress={() => setIsHq(!isHq)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.hqSwitchTitle}>{locale === 'en' ? 'Set as HQ / Main Outlet' : 'Tetapkan sebagai Cawangan Utama HQ'}</Text>
-                      <Text style={styles.hqSwitchSubtitle}>{locale === 'en' ? 'Primary branch for default staff assignments' : 'Cawangan utama untuk default staf'}</Text>
-                    </View>
-                    <View style={[styles.customToggle, isHq && styles.customToggleActive]}>
-                      <View style={[styles.toggleCircle, isHq && styles.toggleCircleActive]} />
-                    </View>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.hqSwitchRow}
+                  onPress={() => setIsHq(!isHq)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.hqSwitchTitle}>{locale === 'en' ? 'Set as HQ / Main Outlet' : 'Tetapkan sebagai Cawangan Utama HQ'}</Text>
+                    <Text style={styles.hqSwitchSubtitle}>{locale === 'en' ? 'Primary branch for default staff assignments' : 'Cawangan utama untuk default staf'}</Text>
+                  </View>
+                  <View style={[styles.customToggle, isHq && styles.customToggleActive]}>
+                    <View style={[styles.toggleCircle, isHq && styles.toggleCircleActive]} />
+                  </View>
+                </TouchableOpacity>
               </ScrollView>
 
               {/* Submit Button */}
@@ -624,6 +649,31 @@ export default function BranchesScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* Delete Branch Option in Edit Modal */}
+              {editingBranch && (
+                <TouchableOpacity
+                  style={{
+                    marginTop: 10,
+                    paddingVertical: 13,
+                    borderRadius: 14,
+                    backgroundColor: '#FEF2F2',
+                    borderWidth: 1,
+                    borderColor: '#FEE2E2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6
+                  }}
+                  onPress={() => handleDeleteBranch(editingBranch)}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="trash-2" size={15} color="#EF4444" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
+                    {locale === 'en' ? 'Delete This Branch' : 'Padam Cawangan Ini'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </Modal>

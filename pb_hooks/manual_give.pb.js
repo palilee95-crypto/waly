@@ -106,6 +106,9 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     $app.save(card);
 
     // 4. Record transaction
+    const branchName = (body.branch_name || authRecord.getString("branch_name") || "All Branches (HQ)").trim();
+    const branchId = (body.branch_id || authRecord.getString("branch") || "").trim();
+
     const txnCol = $app.findCollectionByNameOrId("transactions");
     const txn = new Record(txnCol);
     txn.set("id", $security.randomString(15).toLowerCase());
@@ -115,7 +118,15 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("customer", customer.id);
     txn.set("merchant", merchantId);
     txn.set("loyalty_card", card.id);
-    txn.set("metadata", JSON.stringify({ source: "manual_give" }));
+    
+    const txnMeta = {
+      source: "manual_give",
+      staff_id: authRecord.id,
+      staff_name: authRecord.getString("name") || "Merchant",
+      branch_name: branchName,
+      branch_id: branchId
+    };
+    txn.set("metadata", JSON.stringify(txnMeta));
     $app.save(txn);
 
     // 6. Transaction completed - welcome_notification.pb.js handles sending the WhatsApp receipt

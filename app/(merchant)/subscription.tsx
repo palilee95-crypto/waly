@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { pb } from '@/lib/pocketbase';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -168,25 +169,45 @@ export default function SubscriptionScreen() {
     setProcessingPayment(true);
     const summary = getOrderSummary();
     
-    // Simulate gateway checkout session initiation
-    setTimeout(() => {
+    try {
+      const res = await pb.send<{
+        success: boolean;
+        order_id: string;
+        payment_url?: string;
+        message?: string;
+      }>('/api/risev/merchant/subscription/checkout', {
+        method: 'POST',
+        body: {
+          plan: selectedPlan,
+          billing_cycle: billingCycle,
+          payment_method: selectedPaymentMethod,
+        }
+      });
+
       setProcessingPayment(false);
       setShowCheckoutModal(false);
-      
-      const methodNames: Record<string, string> = {
-        fpx: 'FPX Online Banking',
-        card: 'Credit / Debit Card',
-        duitnow: 'DuitNow QR / E-Wallet'
-      };
 
-      Alert.alert(
-        locale === 'en' ? 'Payment Gateway Ready' : 'Gerbang Pembayaran Sedia',
-        locale === 'en' 
-          ? `Order for ${summary.planTitle} (${summary.periodLabel}) total RM ${summary.total.toLocaleString()} prepared via ${methodNames[selectedPaymentMethod]}. Ready to connect with payment gateway.`
-          : `Pesanan untuk ${summary.planTitle} (${summary.periodLabel}) berjumlah RM ${summary.total.toLocaleString()} disediakan melalui ${methodNames[selectedPaymentMethod]}. Sedia untuk dihubungkan ke gerbang pembayaran.`,
-        [{ text: 'OK' }]
-      );
-    }, 1000);
+      if (res.payment_url) {
+        Linking.openURL(res.payment_url);
+      } else {
+        const methodNames: Record<string, string> = {
+          fpx: 'FPX Online Banking',
+          card: 'Credit / Debit Card',
+          duitnow: 'DuitNow QR / E-Wallet'
+        };
+
+        Alert.alert(
+          locale === 'en' ? 'Order Created' : 'Pesanan Dicipta',
+          locale === 'en' 
+            ? `Order #${res.order_id || 'PENDING'} for ${summary.planTitle} (${summary.periodLabel}) total RM ${summary.total.toLocaleString()} prepared via ${methodNames[selectedPaymentMethod]}.`
+            : `Pesanan #${res.order_id || 'PENDING'} untuk ${summary.planTitle} (${summary.periodLabel}) berjumlah RM ${summary.total.toLocaleString()} disediakan melalui ${methodNames[selectedPaymentMethod]}.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err: any) {
+      setProcessingPayment(false);
+      Alert.alert('Checkout Error', err.message || 'Failed to initialize checkout session.');
+    }
   };
 
   const getFeaturesList = () => {

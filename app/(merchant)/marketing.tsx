@@ -510,29 +510,47 @@ export default function MarketingScreen() {
           const audienceIds = getTargetCustomerIdsForAudience(cVoucherAudience);
           const prefix = (cVoucherPrefix || 'PROMO').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
           
-          await Promise.all(
-            audienceIds.map(async (custId) => {
-              try {
-                const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-                const uniqueCode = `${prefix}-${randSuffix}`;
-                await pb.collection('vouchers').create({
-                  customer: custId,
-                  reward: rewardRecord.id,
-                  code: uniqueCode,
-                  status: 'active',
-                  expires_at: new Date(cEndDate).toISOString(),
-                  metadata: {
-                    campaign_id: campaignRecord.id,
-                    discount_type: cVoucherDiscountType,
-                    discount_value: cVoucherDiscountVal,
-                    min_spend: cVoucherMinSpend,
-                  }
-                });
-              } catch (vErr) {
-                console.warn(`Failed to auto-issue voucher to ${custId}:`, vErr);
+          try {
+            await pb.send('/api/risev/merchant/campaigns/auto-drop', {
+              method: 'POST',
+              body: {
+                campaign_id: campaignRecord.id,
+                reward_id: rewardRecord.id,
+                prefix: prefix,
+                audience: cVoucherAudience,
+                customer_ids: audienceIds,
+                discount_type: cVoucherDiscountType,
+                discount_value: cVoucherDiscountVal,
+                min_spend: cVoucherMinSpend,
+                expires_at: new Date(cEndDate).toISOString(),
               }
-            })
-          );
+            });
+          } catch (autoDropErr) {
+            console.warn('Backend auto-drop API error, falling back to direct creation:', autoDropErr);
+            await Promise.all(
+              audienceIds.map(async (custId) => {
+                try {
+                  const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+                  const uniqueCode = `${prefix}-${randSuffix}`;
+                  await pb.collection('vouchers').create({
+                    customer: custId,
+                    reward: rewardRecord.id,
+                    code: uniqueCode,
+                    status: 'active',
+                    expires_at: new Date(cEndDate).toISOString(),
+                    metadata: {
+                      campaign_id: campaignRecord.id,
+                      discount_type: cVoucherDiscountType,
+                      discount_value: cVoucherDiscountVal,
+                      min_spend: cVoucherMinSpend,
+                    }
+                  });
+                } catch (vErr) {
+                  console.warn(`Failed to auto-issue voucher to ${custId}:`, vErr);
+                }
+              })
+            );
+          }
         }
 
         if (cVoucherAutoBlast) {

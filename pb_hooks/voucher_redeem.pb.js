@@ -37,7 +37,15 @@ onRecordUpdate((e) => {
       tx.set('type', 'redeem');
       tx.set('stamps', 0);
       tx.set('points', 0);
-      tx.set('metadata', JSON.stringify({ voucher_id: e.record.id, reward_id: rewardId }));
+      
+      const meta = {
+        voucher_id: e.record.id,
+        reward_id: rewardId,
+        staff_id: e.auth ? e.auth.id : '',
+        staff_name: e.auth ? (e.auth.getString('name') || 'Staff') : '',
+        branch_name: e.auth ? (e.auth.getString('branch_name') || 'All Branches (HQ)') : 'All Branches (HQ)',
+      };
+      tx.set('metadata', JSON.stringify(meta));
       
       $app.save(tx);
     } catch (err) {
