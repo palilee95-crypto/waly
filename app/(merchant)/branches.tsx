@@ -132,8 +132,8 @@ export default function BranchesScreen() {
   };
 
   const handleOpenAddModal = () => {
-    // If not business plan and already has 1 or more branches, show upgrade modal
-    if (!isBusinessPlan && branches.length >= 1) {
+    // If not business plan and already has 2 or more branches, show upgrade modal (Starter/PRO includes HQ + 1 extra branch)
+    if (!isBusinessPlan && branches.length >= 2) {
       setShowUpgradeModal(true);
       return;
     }
@@ -165,7 +165,7 @@ export default function BranchesScreen() {
       return;
     }
 
-    if (!editingBranch && !isBusinessPlan && branches.length >= 1) {
+    if (!editingBranch && !isBusinessPlan && branches.length >= 2) {
       setModalVisible(false);
       setShowUpgradeModal(true);
       return;

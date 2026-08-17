@@ -214,6 +214,7 @@ export default function SubscriptionScreen() {
     if (selectedPlan === 'starter') {
       return [
         '500 new unique customers / mo (Quota resets monthly)',
+        'Up to 2 store outlets (1 HQ + 1 Branch)',
         'Basic Analytics Dashboard',
         'Up to 10 active vouchers',
         '1 staff account',
@@ -221,27 +222,28 @@ export default function SubscriptionScreen() {
         '[LOCK] Unlimited Customer Database',
         '[LOCK] Official Meta WhatsApp Automation',
         '[LOCK] Promotional Broadcasts',
-        '[LOCK] Pro Sales & Gaps Analytics',
+        '[LOCK] 3+ Branch Outlets',
         '[LOCK] Up to 5 staff accounts'
       ];
     } else if (selectedPlan === 'pro') {
       return [
         'Everything in Starter',
         'Unlimited customer database ♾️',
+        'Up to 2 store outlets (1 HQ + 1 Branch)',
         'Official Meta WhatsApp Automation',
         'Promotional WhatsApp Broadcasts',
         'Pro Sales & Opportunity Analytics',
         'Unlimited active vouchers',
         'Up to 5 staff accounts',
         'Priority WhatsApp support',
-        '[LOCK] Multi-Branch Support',
+        '[LOCK] Unlimited (3+) Multi-Branch Engine',
         '[LOCK] Custom integration & White-label'
       ];
     } else {
       return [
         'Everything in PRO',
         'Unlimited staff accounts',
-        'Multi-Branch Support',
+        'Unlimited (3+) Multi-Branch Engine',
         'Custom integration & APIs',
         'Custom branding',
         '24/7 dedicated account support'
