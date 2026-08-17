@@ -58,6 +58,9 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
     subRecord = new Record(subCol);
     subRecord.set("id", $security.randomString(15).toLowerCase());
     subRecord.set("merchant", merchantId);
+    subRecord.set("status", "pending");
+  } else if (!subRecord.getString("status")) {
+    subRecord.set("status", "pending");
   }
 
   // Update subscription record with pending checkout intent
