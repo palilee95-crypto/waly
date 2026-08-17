@@ -49,6 +49,10 @@ export default function BranchesScreen() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
+  // Delete modal state
+  const [deleteConfirmBranch, setDeleteConfirmBranch] = useState<Branch | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // QR modal states
   const [activeQrUrl, setActiveQrUrl] = useState<string | null>(null);
   const [activeQrBranchName, setActiveQrBranchName] = useState<string | null>(null);
@@ -251,7 +255,15 @@ export default function BranchesScreen() {
     }
   };
 
-  const executeDelete = async (branch: Branch) => {
+  const handleDeleteBranch = (branch: Branch) => {
+    setModalVisible(false);
+    setDeleteConfirmBranch(branch);
+  };
+
+  const confirmExecuteDelete = async () => {
+    if (!deleteConfirmBranch) return;
+    const branch = deleteConfirmBranch;
+    setDeleting(true);
     try {
       if (branch.id && branch.id !== 'hq-default' && !branch.id.startsWith('branch-')) {
         await pb.collection('branches').delete(branch.id);
@@ -269,38 +281,8 @@ export default function BranchesScreen() {
       }
       return remaining;
     });
-    setModalVisible(false);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.alert(locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
-    } else {
-      Alert.alert(locale === 'en' ? 'Deleted' : 'Dipadam', locale === 'en' ? 'Branch removed successfully.' : 'Cawangan berjaya dipadam.');
-    }
-  };
-
-  const handleDeleteBranch = (branch: Branch) => {
-    const confirmMsg = locale === 'en' 
-      ? `Are you sure you want to delete "${branch.name}"?${branch.is_hq ? ' (Note: This is currently set as HQ)' : ''}` 
-      : `Adakah anda pasti mahu memadam "${branch.name}"?${branch.is_hq ? ' (Nota: Cawangan ini ditetapkan sebagai HQ)' : ''}`;
-
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm(confirmMsg)) {
-        executeDelete(branch);
-      }
-      return;
-    }
-
-    Alert.alert(
-      locale === 'en' ? 'Delete Branch' : 'Padam Cawangan',
-      confirmMsg,
-      [
-        { text: locale === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
-        {
-          text: locale === 'en' ? 'Delete' : 'Padam',
-          style: 'destructive',
-          onPress: () => executeDelete(branch)
-        }
-      ]
-    );
+    setDeleting(false);
+    setDeleteConfirmBranch(null);
   };
 
   return (
@@ -689,6 +671,113 @@ export default function BranchesScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Custom In-App Delete Confirmation Modal */}
+        <Modal
+          visible={!!deleteConfirmBranch}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => { if (!deleting) setDeleteConfirmBranch(null); }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxWidth: 380, alignItems: 'center', padding: 24, borderRadius: 28 }]}>
+              {/* Warning Icon Badge */}
+              <View style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: '#FEE2E2',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+              }}>
+                <Feather name="trash-2" size={28} color="#EF4444" />
+              </View>
+
+              {/* Modal Title */}
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', textAlign: 'center', marginBottom: 8 }}>
+                {locale === 'en' ? 'Delete Branch?' : 'Padam Cawangan?'}
+              </Text>
+
+              {/* Subtitle */}
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 19, marginBottom: 16 }}>
+                {locale === 'en'
+                  ? `Are you sure you want to permanently remove "${deleteConfirmBranch?.name}"?`
+                  : `Adakah anda pasti mahu memadam "${deleteConfirmBranch?.name}" secara kekal?`}
+              </Text>
+
+              {/* HQ Warning Badge */}
+              {deleteConfirmBranch?.is_hq ? (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: '#FEF3C7',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  marginBottom: 18,
+                  width: '100%',
+                }}>
+                  <Ionicons name="warning-outline" size={18} color="#B45309" />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309', flex: 1, lineHeight: 16 }}>
+                    {locale === 'en'
+                      ? 'This outlet is currently marked as HQ. The system will automatically designate another branch as HQ.'
+                      : 'Cawangan ini adalah HQ utama. Sistem akan menetapkan cawangan lain sebagai HQ.'}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    backgroundColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => setDeleteConfirmBranch(null)}
+                  disabled={deleting}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
+                    {locale === 'en' ? 'Cancel' : 'Batal'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    backgroundColor: '#EF4444',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#EF4444',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                  onPress={confirmExecuteDelete}
+                  disabled={deleting}
+                  activeOpacity={0.85}
+                >
+                  {deleting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      {locale === 'en' ? 'Delete' : 'Padam'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
