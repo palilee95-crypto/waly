@@ -31,9 +31,31 @@ onRecordCreate((e) => {
         throw new ForbiddenError('Your store subscription is inactive or expired. Please subscribe to continue.');
       }
 
-      // Enforce Starter plan monthly 500-customer quota when adding new loyalty cards
+      // Enforce customer quota limits when registering new customers (adding loyalty cards)
       if (e.collection && e.collection.name === 'loyalty_cards' && activeSub) {
         const plan = activeSub.getString('plan');
+        
+        // 1. Stand Bundle: Fixed 500 total customer capacity (Lifetime pool)
+        if (plan === 'stand_bundle') {
+          try {
+            const allCards = $app.findRecordsByFilter(
+              'loyalty_cards',
+              `merchant = '${merchantId}'`,
+              '-created',
+              505,
+              0
+            );
+            if (allCards.length >= 500) {
+              throw new ForbiddenError(
+                'You have reached the 500 customer limit included with your NFC Plate. Please subscribe to Starter (RM47/mo) or PRO (RM97/mo) to enroll new members.'
+              );
+            }
+          } catch (qErr) {
+            if (qErr.name === 'ForbiddenError') throw qErr;
+          }
+        }
+
+        // 2. Starter Plan: 500 new customers per month (Resets monthly)
         if (plan === 'starter') {
           const now = new Date();
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().replace('T', ' ').substring(0, 19);
@@ -47,7 +69,7 @@ onRecordCreate((e) => {
               0
             );
             if (monthlyCards.length >= 500) {
-              throw new ForbiddenError('Monthly customer quota reached (500/500). Please upgrade to PRO for unlimited customers.');
+              throw new ForbiddenError('Monthly customer quota reached (500/500). Quota resets next billing month, or upgrade to PRO for unlimited customers.');
             }
           } catch (qErr) {
             if (qErr.name === 'ForbiddenError') throw qErr;

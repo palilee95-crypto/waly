@@ -12,6 +12,7 @@ import {
   Linking,
   Modal,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +43,14 @@ export default function SubscriptionScreen() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeSub, setActiveSub] = useState<any>(null);
   const [customerCount, setCustomerCount] = useState(0);
+  const [monthlyCustomerCount, setMonthlyCustomerCount] = useState(0);
+
+  // Stand Activation Code States (TikTok Shop / Shopee fulfillment)
+  const [standCodeInput, setStandCodeInput] = useState('');
+  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
+  const [codeError, setCodeError] = useState('');
+  const [codeSuccess, setCodeSuccess] = useState('');
+  const [showCodeBox, setShowCodeBox] = useState(false);
 
   // Auto-refresh auth on payment success callback
   useEffect(() => {
@@ -51,7 +60,7 @@ export default function SubscriptionScreen() {
     }
   }, [params.status]);
 
-  // Load real subscription & customer database count
+  // Load real subscription & customer database count (Total & Monthly)
   useEffect(() => {
     if (!user?.merchant_id) return;
     const fetchSubData = async () => {
@@ -63,14 +72,54 @@ export default function SubscriptionScreen() {
         if (subs.items.length > 0) {
           setActiveSub(subs.items[0]);
         }
-        const cards = await pb.collection('loyalty_cards').getList(1, 1, {
+        
+        // Total customers ever registered
+        const allCards = await pb.collection('loyalty_cards').getList(1, 1, {
           filter: `merchant = "${user.merchant_id}"`,
         });
-        setCustomerCount(cards.totalItems);
+        setCustomerCount(allCards.totalItems);
+
+        // Monthly customers registered in current month
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().replace('T', ' ').substring(0, 19);
+        const monthlyCards = await pb.collection('loyalty_cards').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}" && created >= "${startOfMonth}"`,
+        });
+        setMonthlyCustomerCount(monthlyCards.totalItems);
       } catch (e) {}
     };
     fetchSubData();
   }, [user?.merchant_id]);
+
+  const handleRedeemCode = async () => {
+    if (!standCodeInput.trim()) {
+      setCodeError(locale === 'en' ? 'Please enter your stand activation code.' : 'Sila masukkan kod pengaktifan stand anda.');
+      return;
+    }
+    setIsRedeemingCode(true);
+    setCodeError('');
+    setCodeSuccess('');
+
+    try {
+      const res = await pb.send<{ success: boolean; message: string; plan?: string }>('/api/risev/merchant/redeem-stand-code', {
+        method: 'POST',
+        body: { code: standCodeInput.trim() },
+      });
+
+      if (res.success) {
+        setCodeSuccess(res.message || 'Activation code redeemed successfully!');
+        setStandCodeInput('');
+        await refreshSession();
+        setShowSuccessModal(true);
+      } else {
+        setCodeError(res.message || 'Invalid activation code.');
+      }
+    } catch (err: any) {
+      setCodeError(err.message || 'Failed to redeem activation code.');
+    } finally {
+      setIsRedeemingCode(false);
+    }
+  };
 
   // Auto-play benefits slider
   useEffect(() => {
@@ -247,15 +296,15 @@ export default function SubscriptionScreen() {
     if (selectedPlan === 'starter') {
       return [
         '500 new unique customers / mo (Quota resets monthly)',
-        'Up to 2 store outlets (1 HQ + 1 Branch)',
+        'Single Store Outlet (HQ)',
         'Basic Analytics Dashboard',
         'Up to 10 active vouchers',
         '1 staff account',
         'Email support',
         '[LOCK] Unlimited Customer Database',
         '[LOCK] Official Meta WhatsApp Automation',
+        '[LOCK] 1 Extra Branch (1 HQ + 1 Branch)',
         '[LOCK] Promotional Broadcasts',
-        '[LOCK] 3+ Branch Outlets',
         '[LOCK] Up to 5 staff accounts'
       ];
     } else if (selectedPlan === 'pro') {
@@ -330,7 +379,7 @@ export default function SubscriptionScreen() {
               backgroundColor: '#050505',
               borderRadius: 20,
               padding: 16,
-              marginBottom: 20,
+              marginBottom: 16,
               borderWidth: 1,
               borderColor: 'rgba(255, 199, 0, 0.3)',
               shadowColor: '#050505',
@@ -343,10 +392,16 @@ export default function SubscriptionScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                      {activeSub?.plan ? (activeSub.plan === 'starter' ? 'Starter Plan' : (activeSub.plan === 'business' ? 'Business Plan' : 'PRO Plan')) : 'Starter Plan'}
+                      {activeSub?.plan === 'stand_bundle'
+                        ? 'Stand Starter Bundle'
+                        : activeSub?.plan === 'starter'
+                          ? 'Starter Plan'
+                          : activeSub?.plan === 'business'
+                            ? 'Business Plan'
+                            : 'PRO Plan'}
                     </Text>
                     <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                      Current Active Plan
+                      {activeSub?.plan === 'stand_bundle' ? 'Included with NFC Plate' : 'Active Subscription'}
                     </Text>
                   </View>
                 </View>
@@ -360,16 +415,24 @@ export default function SubscriptionScreen() {
               <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
-                    Customer Database Quota
+                    {activeSub?.plan === 'starter' ? 'Monthly Customer Quota' : 'Customer Database Quota'}
                   </Text>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
-                    {customerCount.toLocaleString()} / {activeSub?.plan === 'starter' ? '500' : (activeSub?.plan === 'business' ? '10,000' : 'Unlimited')}
+                    {activeSub?.plan === 'starter'
+                      ? `${monthlyCustomerCount.toLocaleString()} / 500`
+                      : activeSub?.plan === 'stand_bundle'
+                        ? `${customerCount.toLocaleString()} / 500`
+                        : `${customerCount.toLocaleString()} (Unlimited ♾️)`}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
                   <View style={{ 
                     height: '100%', 
-                    width: `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'starter' ? 500 : 10000)) * 100))}%`, 
+                    width: activeSub?.plan === 'starter'
+                      ? `${Math.min(100, Math.round((monthlyCustomerCount / 500) * 100))}%`
+                      : activeSub?.plan === 'stand_bundle'
+                        ? `${Math.min(100, Math.round((customerCount / 500) * 100))}%`
+                        : '100%', 
                     backgroundColor: '#FFC700', 
                     borderRadius: 3 
                   }} />
@@ -379,11 +442,17 @@ export default function SubscriptionScreen() {
               {/* Expiry Details */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="calendar-outline" size={14} color="#10B981" />
+                  <Ionicons 
+                    name={activeSub?.plan === 'stand_bundle' ? "infinite" : "calendar-outline"} 
+                    size={14} 
+                    color="#10B981" 
+                  />
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#10B981' }}>
-                    {activeSub?.current_period_end 
-                      ? `Renews on ${new Date(activeSub.current_period_end.replace(' ', 'T')).toLocaleDateString()}` 
-                      : 'Active Subscription'}
+                    {activeSub?.plan === 'stand_bundle'
+                      ? 'No Expiry Date (500 capacity)'
+                      : activeSub?.current_period_end 
+                        ? `Renews on ${new Date(activeSub.current_period_end.replace(' ', 'T')).toLocaleDateString()}` 
+                        : 'Active Subscription'}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => router.replace('/(merchant)')}>
@@ -394,6 +463,96 @@ export default function SubscriptionScreen() {
               </View>
             </View>
           ) : null}
+
+          {/* Stand Code Redemption Box (TikTok Shop / Shopee package fulfillment) */}
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            padding: 14,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+          }}>
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              onPress={() => setShowCodeBox(!showCodeBox)}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="hardware-chip-outline" size={16} color="#D97706" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                    {locale === 'en' ? 'Have an NFC Stand Activation Code?' : 'Ada Kod Pengaktifan Stand NFC?'}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    {locale === 'en' ? 'TikTok Shop / Shopee / Package Box' : 'TikTok Shop / Shopee / Kotak Stand'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name={showCodeBox ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+            </TouchableOpacity>
+
+            {showCodeBox && (
+              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontSize: 13,
+                      fontFamily: 'PlusJakartaSans_700Bold',
+                      color: '#0F172A',
+                      letterSpacing: 1,
+                    }}
+                    placeholder="STAND-XXXX-XXXX"
+                    placeholderTextColor="#94A3B8"
+                    value={standCodeInput}
+                    onChangeText={setStandCodeInput}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#050505',
+                      borderRadius: 12,
+                      paddingHorizontal: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={handleRedeemCode}
+                    disabled={isRedeemingCode}
+                    activeOpacity={0.8}
+                  >
+                    {isRedeemingCode ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                        {locale === 'en' ? 'Redeem' : 'Tebus'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {codeError ? (
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444', marginTop: 6 }}>
+                    {codeError}
+                  </Text>
+                ) : null}
+
+                {codeSuccess ? (
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#16A34A', marginTop: 6 }}>
+                    {codeSuccess}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </View>
 
           {/* 2. Billing Toggle (Monthly / Annual) */}
           <View style={styles.billingToggleWrapper}>
