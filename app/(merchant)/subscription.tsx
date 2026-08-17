@@ -592,6 +592,11 @@ export default function SubscriptionScreen() {
               onPress={() => setSelectedPlan('starter')}
               activeOpacity={0.9}
             >
+              {activeSub?.status === 'active' && activeSub?.plan === 'starter' ? (
+                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
+                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
+                </View>
+              ) : null}
               <Text style={styles.planCardTitle}>Starter</Text>
               <Text style={styles.planCardPrice}>
                 {billingCycle === 'monthly' ? 'RM 47' : 'RM 38'}
@@ -609,9 +614,15 @@ export default function SubscriptionScreen() {
               onPress={() => setSelectedPlan('pro')}
               activeOpacity={0.9}
             >
-              <View style={styles.bestSellerTag}>
-                <Text style={styles.bestSellerTagText}>POPULAR</Text>
-              </View>
+              {activeSub?.status === 'active' && activeSub?.plan === 'pro' ? (
+                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
+                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
+                </View>
+              ) : (
+                <View style={styles.bestSellerTag}>
+                  <Text style={styles.bestSellerTagText}>POPULAR</Text>
+                </View>
+              )}
               <Text style={styles.planCardTitle}>PRO</Text>
               <Text style={[styles.planCardPrice, { color: '#050505' }]}>
                 {billingCycle === 'monthly' ? 'RM 97' : 'RM 78'}
@@ -628,6 +639,11 @@ export default function SubscriptionScreen() {
               onPress={() => setSelectedPlan('enterprise')}
               activeOpacity={0.9}
             >
+              {activeSub?.status === 'active' && (activeSub?.plan === 'enterprise' || activeSub?.plan === 'business') ? (
+                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
+                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
+                </View>
+              ) : null}
               <Text style={styles.planCardTitle}>Business</Text>
               <Text style={styles.planCardPrice}>
                 {billingCycle === 'monthly' ? 'RM 329' : 'RM 263'}
@@ -689,19 +705,44 @@ export default function SubscriptionScreen() {
 
       {/* 6. Sticky IAP Action Footer — inside SafeAreaView so it always shows */}
       <View style={styles.stickyFooter}>
-        <TouchableOpacity 
-          style={styles.ctaButton} 
-          onPress={handlePurchase}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.ctaButtonText}>
-            {selectedPlan === 'starter' 
-              ? 'Get Started with Starter' 
-              : selectedPlan === 'pro' 
-                ? 'Upgrade to PRO (Recommended)' 
-                : 'Subscribe to Business Plan'}
-          </Text>
-        </TouchableOpacity>
+        {(() => {
+          const activePlanRaw = (user?.merchant_status === 'active' && activeSub?.status === 'active') ? activeSub?.plan : 'none';
+          const activePlanNormalized = (activePlanRaw === 'enterprise' || activePlanRaw === 'business') ? 'enterprise' : activePlanRaw;
+          const planRank: Record<string, number> = { none: 0, stand_bundle: 1, starter: 2, pro: 3, enterprise: 4, business: 4 };
+          const isCurrentPlan = activePlanNormalized === selectedPlan;
+          const isUpgrade = planRank[selectedPlan] > (planRank[activePlanNormalized] || 0);
+
+          return (
+            <TouchableOpacity 
+              style={[
+                styles.ctaButton,
+                isCurrentPlan && { backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.2 }
+              ]} 
+              onPress={isCurrentPlan ? undefined : handlePurchase}
+              disabled={isCurrentPlan}
+              activeOpacity={isCurrentPlan ? 1 : 0.8}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                {isCurrentPlan && <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />}
+                <Text style={[styles.ctaButtonText, isCurrentPlan && { color: '#FFFFFF' }]}>
+                  {isCurrentPlan 
+                    ? (locale === 'en' ? 'Current Active Plan' : 'Pelan Aktif Semasa')
+                    : isUpgrade
+                      ? (selectedPlan === 'pro' 
+                          ? (locale === 'en' ? 'Upgrade to PRO (Recommended)' : 'Naik Taraf ke PRO (Disyorkan)')
+                          : selectedPlan === 'enterprise'
+                            ? (locale === 'en' ? 'Upgrade to Business Plan' : 'Naik Taraf ke Pelan Business')
+                            : (locale === 'en' ? 'Subscribe to Starter' : 'Langgan Pelan Starter'))
+                      : (selectedPlan === 'starter'
+                          ? (locale === 'en' ? 'Switch to Starter' : 'Tukar ke Starter')
+                          : selectedPlan === 'pro'
+                            ? (locale === 'en' ? 'Switch to PRO' : 'Tukar ke PRO')
+                            : (locale === 'en' ? 'Switch to Business' : 'Tukar ke Business'))}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* Legal Row */}
         <View style={styles.legalRow}>
