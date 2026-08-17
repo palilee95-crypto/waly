@@ -13,7 +13,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
@@ -30,14 +30,47 @@ const BENEFITS = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ status?: string; order_id?: string }>();
   const { user, refreshSession } = useAuth();
   const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'fpx' | 'card' | 'duitnow'>('fpx');
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [activeSub, setActiveSub] = useState<any>(null);
+  const [customerCount, setCustomerCount] = useState(0);
+
+  // Auto-refresh auth on payment success callback
+  useEffect(() => {
+    if (params.status === 'success') {
+      refreshSession();
+      setShowSuccessModal(true);
+    }
+  }, [params.status]);
+
+  // Load real subscription & customer database count
+  useEffect(() => {
+    if (!user?.merchant_id) return;
+    const fetchSubData = async () => {
+      try {
+        const subs = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}" && status = "active"`,
+          sort: '-created',
+        });
+        if (subs.items.length > 0) {
+          setActiveSub(subs.items[0]);
+        }
+        const cards = await pb.collection('loyalty_cards').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}"`,
+        });
+        setCustomerCount(cards.totalItems);
+      } catch (e) {}
+    };
+    fetchSubData();
+  }, [user?.merchant_id]);
 
   // Auto-play benefits slider
   useEffect(() => {
@@ -265,7 +298,19 @@ export default function SubscriptionScreen() {
           <View style={styles.header}>
             <View style={[styles.headerTop, { justifyContent: 'space-between' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                <TouchableOpacity 
+                  style={styles.closeBtn} 
+                  onPress={() => {
+                    if (user?.merchant_status === 'active') {
+                      router.replace('/(merchant)');
+                    } else if (router.canGoBack()) {
+                      router.back();
+                    } else {
+                      router.replace('/(merchant)');
+                    }
+                  }} 
+                  activeOpacity={0.8}
+                >
                   <Ionicons name="close" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerUpsellTitle}>Subscription Plan</Text>
@@ -280,64 +325,75 @@ export default function SubscriptionScreen() {
           <View style={styles.scrollContent}>
 
           {/* 1. Current Active Plan & Quota Status Card */}
-          <View style={{
-            backgroundColor: '#050505',
-            borderRadius: 20,
-            padding: 16,
-            marginBottom: 20,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 199, 0, 0.3)',
-            shadowColor: '#050505',
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.08,
-            shadowRadius: 12,
-            elevation: 3,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                    Stand Starter Bundle
-                  </Text>
-                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                    Current Active Plan
-                  </Text>
+          {user?.merchant_status === 'active' ? (
+            <View style={{
+              backgroundColor: '#050505',
+              borderRadius: 20,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 199, 0, 0.3)',
+              shadowColor: '#050505',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.08,
+              shadowRadius: 12,
+              elevation: 3,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      {activeSub?.plan ? (activeSub.plan === 'starter' ? 'Starter Plan' : (activeSub.plan === 'business' ? 'Business Plan' : 'PRO Plan')) : 'Starter Plan'}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                      Current Active Plan
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>ACTIVE</Text>
                 </View>
               </View>
 
-              <View style={{ backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>ACTIVE</Text>
+              {/* Quota Progress */}
+              <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
+                    Customer Database Quota
+                  </Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
+                    {customerCount.toLocaleString()} / {activeSub?.plan === 'starter' ? '500' : (activeSub?.plan === 'business' ? '10,000' : 'Unlimited')}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ 
+                    height: '100%', 
+                    width: `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'starter' ? 500 : 10000)) * 100))}%`, 
+                    backgroundColor: '#FFC700', 
+                    borderRadius: 3 
+                  }} />
+                </View>
               </View>
-            </View>
 
-            {/* Quota Progress */}
-            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
-                  Customer Database Quota
-                </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
-                  44 / 500
-                </Text>
-              </View>
-              <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <View style={{ height: '100%', width: '8.8%', backgroundColor: '#FFC700', borderRadius: 3 }} />
+              {/* Expiry Details */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="calendar-outline" size={14} color="#10B981" />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#10B981' }}>
+                    {activeSub?.current_period_end 
+                      ? `Renews on ${new Date(activeSub.current_period_end.replace(' ', 'T')).toLocaleDateString()}` 
+                      : 'Active Subscription'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => router.replace('/(merchant)')}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
+                    Dashboard →
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
-
-            {/* Expiry Details */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="infinite" size={14} color="#10B981" />
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#10B981' }}>
-                  No Expiry Date
-                </Text>
-              </View>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                Valid until 500 quota used
-              </Text>
-            </View>
-          </View>
+          ) : null}
 
           {/* 2. Billing Toggle (Monthly / Annual) */}
           <View style={styles.billingToggleWrapper}>
@@ -780,6 +836,96 @@ export default function SubscriptionScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Success Celebratory Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          router.replace('/(merchant)');
+        }}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+        }}>
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 28,
+            width: '100%',
+            maxWidth: 400,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.15,
+            shadowRadius: 20,
+            elevation: 10,
+          }}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: '#DCFCE7',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}>
+              <Ionicons name="checkmark-circle" size={40} color="#16A34A" />
+            </View>
+
+            <Text style={{
+              fontSize: 20,
+              fontFamily: 'PlusJakartaSans_800ExtraBold',
+              color: '#0F172A',
+              textAlign: 'center',
+              marginBottom: 8,
+            }}>
+              Payment Successful! 🎉
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_500Medium',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 20,
+              marginBottom: 24,
+            }}>
+              Your store subscription is now active. You can now issue stamps, create WhatsApp marketing broadcasts, and manage your staff!
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                backgroundColor: '#050505',
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.replace('/(merchant)');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontFamily: 'PlusJakartaSans_700Bold',
+                color: '#FFFFFF',
+              }}>
+                Enter Merchant Dashboard →
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
