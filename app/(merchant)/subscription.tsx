@@ -270,7 +270,11 @@ export default function SubscriptionScreen() {
       setShowCheckoutModal(false);
 
       if (res.payment_url) {
-        Linking.openURL(res.payment_url);
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.href = res.payment_url;
+        } else {
+          Linking.openURL(res.payment_url);
+        }
       } else {
         const methodNames: Record<string, string> = {
           fpx: 'FPX Online Banking',
@@ -821,86 +825,25 @@ export default function SubscriptionScreen() {
                       </View>
                     </View>
 
-                    {/* Payment Method Selector */}
-                    <View style={{ marginTop: 16, marginBottom: 16 }}>
-                      <Text style={styles.checkoutSectionLabel}>
-                        {locale === 'en' ? 'Select Payment Method' : 'Pilih Kaedah Pembayaran'}
-                      </Text>
-                      <View style={{ gap: 8 }}>
-                        {/* FPX */}
-                        <TouchableOpacity
-                          style={[
-                            styles.modernPaymentCard,
-                            selectedPaymentMethod === 'fpx' && styles.modernPaymentCardActive
-                          ]}
-                          onPress={() => setSelectedPaymentMethod('fpx')}
-                          activeOpacity={0.85}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'fpx' && styles.modernPaymentIconBgActive]}>
-                              <Ionicons name="business" size={18} color={selectedPaymentMethod === 'fpx' ? '#B45309' : '#475569'} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.modernPaymentTitle}>FPX Online Banking</Text>
-                                <View style={styles.instantPill}><Text style={styles.instantPillText}>POPULAR</Text></View>
-                              </View>
-                              <Text style={styles.modernPaymentSubtitle}>Maybank2u, CIMB, Bank Islam, RHB, Public Bank</Text>
+                    {/* Payment Method Notice Card (White-Labeled) */}
+                    <View style={{ marginTop: 14, marginBottom: 14 }}>
+                      <View style={styles.paymentMethodNoticeCard}>
+                        <View style={styles.paymentMethodNoticeIconWrap}>
+                          <Ionicons name="shield-checkmark" size={20} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <Text style={styles.paymentMethodNoticeTitle}>
+                              {locale === 'en' ? 'Secure Online Payment' : 'Pembayaran Atas Talian Selamat'}
+                            </Text>
+                            <View style={styles.feePill}>
+                              <Text style={styles.feePillText}>0% FEE</Text>
                             </View>
                           </View>
-                          <View style={[styles.modernRadio, selectedPaymentMethod === 'fpx' && styles.modernRadioActive]}>
-                            {selectedPaymentMethod === 'fpx' && <View style={styles.modernRadioDot} />}
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* Card */}
-                        <TouchableOpacity
-                          style={[
-                            styles.modernPaymentCard,
-                            selectedPaymentMethod === 'card' && styles.modernPaymentCardActive
-                          ]}
-                          onPress={() => setSelectedPaymentMethod('card')}
-                          activeOpacity={0.85}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'card' && styles.modernPaymentIconBgActive]}>
-                              <Ionicons name="card" size={18} color={selectedPaymentMethod === 'card' ? '#B45309' : '#475569'} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.modernPaymentTitle}>Credit / Debit Card</Text>
-                                <View style={styles.feePill}><Text style={styles.feePillText}>0% FEE</Text></View>
-                              </View>
-                              <Text style={styles.modernPaymentSubtitle}>Visa, Mastercard, MyDebit (Instant Setup)</Text>
-                            </View>
-                          </View>
-                          <View style={[styles.modernRadio, selectedPaymentMethod === 'card' && styles.modernRadioActive]}>
-                            {selectedPaymentMethod === 'card' && <View style={styles.modernRadioDot} />}
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* DuitNow QR */}
-                        <TouchableOpacity
-                          style={[
-                            styles.modernPaymentCard,
-                            selectedPaymentMethod === 'duitnow' && styles.modernPaymentCardActive
-                          ]}
-                          onPress={() => setSelectedPaymentMethod('duitnow')}
-                          activeOpacity={0.85}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modernPaymentIconBg, selectedPaymentMethod === 'duitnow' && styles.modernPaymentIconBgActive]}>
-                              <Ionicons name="qr-code" size={18} color={selectedPaymentMethod === 'duitnow' ? '#B45309' : '#475569'} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.modernPaymentTitle}>DuitNow QR & E-Wallet</Text>
-                              <Text style={styles.modernPaymentSubtitle}>Touch 'n Go, GrabPay, ShopeePay</Text>
-                            </View>
-                          </View>
-                          <View style={[styles.modernRadio, selectedPaymentMethod === 'duitnow' && styles.modernRadioActive]}>
-                            {selectedPaymentMethod === 'duitnow' && <View style={styles.modernRadioDot} />}
-                          </View>
-                        </TouchableOpacity>
+                          <Text style={styles.paymentMethodNoticeSubtitle}>
+                            FPX • Visa / Mastercard • DuitNow QR • Touch 'n Go
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -929,9 +872,7 @@ export default function SubscriptionScreen() {
                         <Text style={styles.invoiceRowLabel}>
                           {locale === 'en' ? 'Processing & Server Fee' : 'Yuran Pemprosesan & Server'}
                         </Text>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>
-                          {locale === 'en' ? 'WAIVED' : 'PERCUMA'}
-                        </Text>
+                        <Text style={styles.invoiceRowValue}>RM 0.00</Text>
                       </View>
 
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1716,6 +1657,34 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: '#050505',
+  },
+  paymentMethodNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  paymentMethodNoticeIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentMethodNoticeTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+  },
+  paymentMethodNoticeSubtitle: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#B45309',
   },
 
   // Invoice Breakdown
