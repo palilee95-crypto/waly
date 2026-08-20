@@ -530,6 +530,7 @@ export default function NfcPaywallScreen() {
         </View>
 
         {/* Stand Code Redemption Box */}
+        {!showPricingPackages && (
         <View style={styles.activationCard}>
           <View style={styles.activationHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
@@ -586,6 +587,7 @@ export default function NfcPaywallScreen() {
             ) : null}
           </View>
         </View>
+        )}
 
         {/* Curiosity Button (shown if pricing is hidden) */}
         {!showPricingPackages && (
@@ -607,28 +609,59 @@ export default function NfcPaywallScreen() {
         {/* Packages List (Vidart Pro Style) */}
         {showPricingPackages && (
         <View style={styles.packagesContainer}>
+          <TouchableOpacity 
+            style={{ alignSelf: 'center', marginBottom: 12, paddingVertical: 4 }}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowPricingPackages(false);
+            }}
+          >
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', textDecorationLine: 'underline' }}>
+              Already have an activation code?
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.trustBadgeRow}>
+            <View style={styles.trustBadge}>
+              <Ionicons name="sparkles" size={14} color="#FFD700" />
+              <Text style={styles.trustBadgeText}>One-Time Payment</Text>
+            </View>
+            <View style={styles.trustBadge}>
+              <Ionicons name="shield-checkmark" size={14} color="#FFD700" />
+              <Text style={styles.trustBadgeText}>No Monthly Fees</Text>
+            </View>
+          </View>
+
           {packages.map((pkg) => {
             const isSelected = selectedPackageId === pkg.id;
             return (
               <TouchableOpacity
                 key={pkg.id}
-                style={[styles.pkgCard, isSelected && styles.pkgCardSelected]}
+                style={[styles.pkgCard, isSelected && styles.pkgCardSelected, pkg.isPopular && { marginTop: 14 }]}
                 onPress={() => setSelectedPackageId(pkg.id)}
                 activeOpacity={0.9}
               >
+                {pkg.isPopular && (
+                  <View style={styles.recommendedBadge}>
+                    <Text style={styles.recommendedBadgeText}>RECOMMENDED</Text>
+                  </View>
+                )}
                 <View style={styles.pkgRow}>
                   <View style={styles.pkgLeft}>
                     <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                      {isSelected && <Ionicons name="checkmark-sharp" size={12} color="#000" />}
+                      {isSelected && <Ionicons name="checkmark-sharp" size={14} color="#000" />}
                     </View>
                     <View>
                       <Text style={[styles.pkgTitle, isSelected && { color: '#FFF' }]}>{pkg.title}</Text>
-                      <Text style={styles.pkgTagline}>{pkg.tagline}  <Text style={styles.pkgOriginalPrice}>RM{pkg.originalPrice}</Text></Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6 }}>
+                        <Text style={[styles.pkgFinalPrice, isSelected && { color: '#FFD700' }]}>RM {pkg.price}</Text>
+                        <Text style={styles.pkgOriginalPrice}>RM {pkg.originalPrice}</Text>
+                      </View>
                     </View>
                   </View>
 
                   <View style={[styles.discountPill, isSelected && styles.discountPillActive]}>
-                    <Text style={[styles.discountPillText, isSelected && { color: '#FFF' }]}>
+                    <Text style={[styles.discountPillText, isSelected && { color: '#000' }]}>
                       {pkg.discountBadge}
                     </Text>
                   </View>
@@ -638,7 +671,7 @@ export default function NfcPaywallScreen() {
                   <View style={styles.pkgDescriptionBox}>
                     {pkg.description.map((item, index) => (
                       <View key={index} style={styles.pkgDescRow}>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Ionicons name="checkmark-circle" size={14} color="#FFC700" />
                         <Text style={styles.pkgDescriptionText}>{item}</Text>
                       </View>
                     ))}
@@ -651,8 +684,8 @@ export default function NfcPaywallScreen() {
           <View style={styles.disclaimerBox}>
             <Ionicons name="information-circle" size={18} color="#64748B" style={{ marginTop: 2 }} />
             <Text style={styles.disclaimerText}>
-              <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>Note: </Text>
-              WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via monthly subscription plans in your dashboard.
+              <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>Optional Add-ons: </Text>
+              WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via your dashboard if needed.
             </Text>
           </View>
         </View>
@@ -675,14 +708,14 @@ export default function NfcPaywallScreen() {
             activeOpacity={0.88}
           >
             <LinearGradient
-              colors={['#FF4B72', '#E11D48']}
+              colors={['#FACC15', '#EAB308']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.massiveBtn}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <Text style={styles.massiveBtnText}>Order Smart Stand Now</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-forward" size={18} color="#000000" />
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -956,16 +989,32 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pkgCard: {
-    backgroundColor: '#141415',
+    position: 'relative',
+    backgroundColor: '#111114',
     borderRadius: 18,
     padding: 16,
     borderWidth: 1.5,
     borderColor: '#1C1C1E',
-    overflow: 'hidden',
   },
   pkgCardSelected: {
-    borderColor: '#333',
-    backgroundColor: '#1A1A1C',
+    borderColor: '#FFC700',
+    backgroundColor: 'rgba(255, 199, 0, 0.04)',
+  },
+  recommendedBadge: {
+    position: 'absolute',
+    top: -12,
+    alignSelf: 'center',
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  recommendedBadgeText: {
+    color: '#000',
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.5,
   },
   pkgRow: {
     flexDirection: 'row',
@@ -987,22 +1036,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioCircleSelected: {
-    borderColor: '#FFFFFF',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#FFC700',
+    backgroundColor: '#FFC700',
   },
   pkgTitle: {
-    fontSize: 14, // Smaller to be more compact
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#E5E5E5',
-    letterSpacing: -0.3, // Pull letters closer
+    letterSpacing: -0.3,
   },
-  pkgTagline: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#888',
-    marginTop: 4,
+  pkgFinalPrice: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#A1A1AA',
   },
   pkgOriginalPrice: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
     textDecorationLine: 'line-through',
     color: '#555',
   },
@@ -1013,7 +1063,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   discountPillActive: {
-    backgroundColor: '#FF3366', // Vidart hot pink
+    backgroundColor: '#FFC700',
   },
   discountPillText: {
     fontSize: 10,
@@ -1037,6 +1087,29 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#94A3B8',
     lineHeight: 18,
+  },
+  trustBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
+    paddingHorizontal: 10,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 199, 0, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.15)',
+  },
+  trustBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFC700',
   },
   disclaimerBox: {
     flexDirection: 'row',
@@ -1081,7 +1154,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#FF3366',
+    shadowColor: '#EAB308',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1090,7 +1163,7 @@ const styles = StyleSheet.create({
   massiveBtnText: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: 0.5,
   },
 
