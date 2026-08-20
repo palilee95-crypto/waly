@@ -98,6 +98,50 @@ export default function NfcPaywallScreen() {
   const [codeError, setCodeError] = useState('');
   const [codeSuccess, setCodeSuccess] = useState('');
 
+  // Existing Order State
+  const [existingOrder, setExistingOrder] = useState<any | null>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState<boolean>(true);
+  const [showOrderNewPurchase, setShowOrderNewPurchase] = useState<boolean>(false);
+
+  useEffect(() => {
+    async function checkExistingOrders() {
+      if (!user?.id && !user?.phone) {
+        setIsLoadingOrder(false);
+        return;
+      }
+
+      try {
+        let filterParts: string[] = [];
+        if (user?.id) filterParts.push(`user = "${user.id}"`);
+        if (user?.merchant_id) filterParts.push(`merchant = "${user.merchant_id}"`);
+        if (user?.phone) {
+          const rawDigits = user.phone.replace(/\D/g, '');
+          if (rawDigits.length >= 8) {
+            filterParts.push(`whatsapp_phone ~ "${rawDigits.slice(-8)}"`);
+          }
+        }
+
+        const filter = filterParts.join(' || ');
+        if (filter) {
+          const records = await pb.collection('hardware_orders').getList(1, 1, {
+            filter: filter,
+            sort: '-created',
+          });
+
+          if (records.items.length > 0) {
+            setExistingOrder(records.items[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('[NFC Marketplace] Error checking existing hardware orders:', err);
+      } finally {
+        setIsLoadingOrder(false);
+      }
+    }
+
+    checkExistingOrders();
+  }, [user]);
+
   // Form State
   const [storeName, setStoreName] = useState('');
   const [recipientName, setRecipientName] = useState(user?.name || '');
@@ -249,7 +293,115 @@ export default function NfcPaywallScreen() {
         </View>
       </TouchableOpacity>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      {isLoadingOrder ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#FFC700" />
+        </View>
+      ) : existingOrder && !showOrderNewPurchase ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: 60, paddingHorizontal: 20 }]}>
+          {/* Header */}
+          <View style={{ alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255, 199, 0, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.3)' }}>
+              <Ionicons name="cube" size={32} color="#FFC700" />
+            </View>
+            <Text style={{ fontSize: 21, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center' }}>
+              Your Stand is on its way! 🚚
+            </Text>
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', marginTop: 4 }}>
+              Order #{existingOrder.order_no} • {existingOrder.package_title}
+            </Text>
+          </View>
+
+          {/* Fulfillment Status Progress Box */}
+          <View style={{ backgroundColor: '#111114', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Shipment Status</Text>
+              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: existingOrder.fulfillment_status === 'shipped' ? 'rgba(139, 92, 246, 0.2)' : existingOrder.fulfillment_status === 'delivered' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: existingOrder.fulfillment_status === 'shipped' ? '#A78BFA' : existingOrder.fulfillment_status === 'delivered' ? '#34D399' : '#FBBF24', textTransform: 'uppercase' }}>
+                  {existingOrder.fulfillment_status || 'PROCESSING'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Courier & Tracking info */}
+            {existingOrder.tracking_number ? (
+              <View style={{ backgroundColor: '#18181B', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#27272A' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' }}>Courier Partner</Text>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
+                  {existingOrder.courier_name || 'Courier Express'}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'monospace', color: '#38BDF8', fontWeight: '700' }}>
+                    {existingOrder.tracking_number}
+                  </Text>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#0284C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                    onPress={() => {
+                      const url = `https://www.google.com/search?q=${encodeURIComponent(`${existingOrder.courier_name || ''} tracking ${existingOrder.tracking_number}`)}`;
+                      if (Platform.OS === 'web') window.open(url, '_blank');
+                      else Linking.openURL(url);
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Track Live 🌐</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: '#18181B', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#27272A' }}>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#E4E4E7' }}>
+                  📦 Parcel is being prepared at Risev HQ
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#71717A', marginTop: 2 }}>
+                  Tracking number will appear here once picked up by courier.
+                </Text>
+              </View>
+            )}
+
+            {/* Destination Address */}
+            <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 12 }}>
+              <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A', textTransform: 'uppercase' }}>Delivery To</Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', marginTop: 2 }}>{existingOrder.recipient_name} ({existingOrder.whatsapp_phone})</Text>
+              <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', marginTop: 2, lineHeight: 16 }}>
+                {existingOrder.full_address || `${existingOrder.address_line1}, ${existingOrder.postcode} ${existingOrder.city}`}
+              </Text>
+            </View>
+          </View>
+
+          {/* Primary Action: Go to Merchant Dashboard */}
+          <TouchableOpacity
+            style={[styles.finalPayBtn, { backgroundColor: '#FFC700', marginBottom: 12 }]}
+            activeOpacity={0.85}
+            onPress={async () => {
+              await switchRole('merchant');
+              router.replace('/(merchant)');
+            }}
+          >
+            <Text style={styles.finalPayBtnText}>Enter Merchant Console 🚀</Text>
+          </TouchableOpacity>
+
+          {/* Secondary Action: Order Additional Stand */}
+          <TouchableOpacity
+            style={{ alignItems: 'center', paddingVertical: 14 }}
+            onPress={() => setShowOrderNewPurchase(true)}
+          >
+            <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' }}>
+              Need more stands for extra branches? <Text style={{ color: '#FFC700', textDecorationLine: 'underline' }}>Order Another Bundle</Text>
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {/* Back to active order link if available */}
+          {existingOrder && showOrderNewPurchase && (
+            <TouchableOpacity 
+              style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 }} 
+              onPress={() => setShowOrderNewPurchase(false)}
+            >
+              <Text style={{ fontSize: 12, color: '#FFC700', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                ← View My Active Order ({existingOrder.order_no})
+              </Text>
+            </TouchableOpacity>
+          )}
         
         {/* Massive Hero Section Fading Into Black */}
         <View style={styles.heroWrapper}>
@@ -402,26 +554,29 @@ export default function NfcPaywallScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      )}
 
-      {/* Massive Bottom CTA */}
-      <View style={styles.bottomCtaArea}>
-        <TouchableOpacity
-          onPress={() => setShowCheckoutSheet(true)}
-          activeOpacity={0.88}
-        >
-          <LinearGradient
-            colors={['#FF4B72', '#E11D48']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.massiveBtn}
+      {/* Massive Bottom CTA (only shown if ordering new stand) */}
+      {(!existingOrder || showOrderNewPurchase) && (
+        <View style={styles.bottomCtaArea}>
+          <TouchableOpacity
+            onPress={() => setShowCheckoutSheet(true)}
+            activeOpacity={0.88}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Text style={styles.massiveBtnText}>Order Smart Stand Now</Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+            <LinearGradient
+              colors={['#FF4B72', '#E11D48']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.massiveBtn}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Text style={styles.massiveBtnText}>Order Smart Stand Now</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ======================================= */}
       {/* SHIPPING & PAYMENT BOTTOM SHEET MODAL */}
