@@ -194,6 +194,12 @@ routerAdd("POST", "/api/risev/login", (e) => {
     return e.json(401, { message: "Invalid credentials" });
   }
 
+  const userEmail = user.getString("email") || "";
+  const isShadowOrQuick = userEmail.startsWith("quick_") || userEmail.startsWith("shadow_");
+  if (!user.getBool("verified") && !isShadowOrQuick) {
+    return e.json(400, { message: "Please verify your email address before logging in." });
+  }
+
   return e.json(200, {
     success: true,
     record: {
