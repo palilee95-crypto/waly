@@ -177,10 +177,13 @@ export default function LoginScreen() {
       setStep('verify-email');
     } catch (e: any) {
       const rawMsg = e?.message || '';
-      if (rawMsg.toLowerCase().includes('email') || rawMsg.toLowerCase().includes('unique')) {
-        setErrorMsg('This email address is already registered to another account.');
-      } else if (rawMsg.toLowerCase().includes('phone')) {
-        setErrorMsg('This phone number is already registered.');
+      const lower = rawMsg.toLowerCase();
+      if (lower.includes('already registered') || lower.includes('unique') || lower.includes('already exists')) {
+        if (lower.includes('phone')) {
+          setErrorMsg('This phone number is already registered.');
+        } else {
+          setErrorMsg('This email address is already registered to another account.');
+        }
       } else {
         setErrorMsg(rawMsg || 'Failed to create account. Please try again.');
       }
