@@ -102,7 +102,11 @@ export default function NfcPaywallScreen() {
   const [storeName, setStoreName] = useState('');
   const [recipientName, setRecipientName] = useState(user?.name || '');
   const [whatsappPhone, setWhatsappPhone] = useState(user?.phone || '');
-  const [shippingAddress, setShippingAddress] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('Selangor');
   const [paymentMethod, setPaymentMethod] = useState<'fpx' | 'card' | 'whatsapp'>('fpx');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -150,10 +154,17 @@ export default function NfcPaywallScreen() {
   };
 
   const handleCheckout = async () => {
-    if (!recipientName.trim() || !whatsappPhone.trim() || !shippingAddress.trim()) {
-      Alert.alert('Perhatian', 'Sila lengkapkan semua butiran penghantaran.');
+    if (!recipientName.trim() || !whatsappPhone.trim() || !addressLine1.trim() || !postcode.trim() || !city.trim() || !state.trim()) {
+      Alert.alert('Perhatian', 'Sila lengkapkan semua butiran penghantaran (Nama, No Telefon, Alamat, Poskod, Bandar & Negeri).');
       return;
     }
+
+    const fullAddress = [
+      addressLine1.trim(),
+      addressLine2.trim(),
+      `${postcode.trim()} ${city.trim()}`,
+      state.trim(),
+    ].filter(Boolean).join(', ');
 
     setIsSubmitting(true);
     const orderData = {
@@ -163,7 +174,12 @@ export default function NfcPaywallScreen() {
       storeName: storeName.trim(),
       recipientName: recipientName.trim(),
       phone: whatsappPhone.trim(),
-      fullAddress: shippingAddress.trim(),
+      addressLine1: addressLine1.trim(),
+      addressLine2: addressLine2.trim(),
+      postcode: postcode.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      fullAddress: fullAddress,
       paymentMethod: paymentMethod,
     };
 
@@ -420,15 +436,66 @@ export default function NfcPaywallScreen() {
                 />
               </View>
 
+              {/* Address Line 1 */}
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>Full Address & Postcode</Text>
+                <Text style={styles.inputLabel}>Street Address (Line 1)</Text>
                 <TextInput
-                  style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
-                  value={shippingAddress}
-                  onChangeText={setShippingAddress}
-                  placeholder="Detailed shipping address..."
+                  style={styles.textInput}
+                  value={addressLine1}
+                  onChangeText={setAddressLine1}
+                  placeholder="House / Unit No, Building, Street Name"
                   placeholderTextColor="#475569"
-                  multiline
+                />
+              </View>
+
+              {/* Address Line 2 */}
+              <View style={styles.formField}>
+                <Text style={styles.inputLabel}>Unit / Area (Line 2 - Optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={addressLine2}
+                  onChangeText={setAddressLine2}
+                  placeholder="Floor, Taman, Apartment, Landmark"
+                  placeholderTextColor="#475569"
+                />
+              </View>
+
+              {/* Postcode & City (2 Columns) */}
+              <View style={styles.rowInputs}>
+                <View style={[styles.formField, { flex: 1 }]}>
+                  <Text style={styles.inputLabel}>Postcode</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={postcode}
+                    onChangeText={(t) => setPostcode(t.replace(/\D/g, '').slice(0, 5))}
+                    placeholder="e.g. 50470"
+                    placeholderTextColor="#475569"
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+                </View>
+
+                <View style={[styles.formField, { flex: 1.4 }]}>
+                  <Text style={styles.inputLabel}>City</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={city}
+                    onChangeText={setCity}
+                    placeholder="e.g. Kuala Lumpur"
+                    placeholderTextColor="#475569"
+                  />
+                </View>
+              </View>
+
+              {/* State */}
+              <View style={styles.formField}>
+                <Text style={styles.inputLabel}>State</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={state}
+                  onChangeText={setState}
+                  placeholder="e.g. Selangor / WP Kuala Lumpur"
+                  placeholderTextColor="#475569"
                 />
               </View>
 
@@ -756,7 +823,11 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   formField: {
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    gap: 12,
   },
   inputLabel: {
     fontSize: 11,
