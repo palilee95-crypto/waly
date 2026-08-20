@@ -120,6 +120,7 @@ interface AuthContextType {
   requestPasswordReset: (email: string) => Promise<void>;
   checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string; verified?: boolean }>;
   register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   quickRegister: (name: string, phone: string) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
@@ -260,6 +261,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('[AuthContext] initAuth checking pb.authStore - isValid:', pb.authStore.isValid, 'record:', pb.authStore.record ? 'present' : 'empty');
       if (pb.authStore.isValid && pb.authStore.record) {
         const record = pb.authStore.record;
+        const isShadowOrQuick = (record.email || '').startsWith('quick_') || (record.email || '').startsWith('shadow_');
+        
+        // Strict Mode: if user is not verified, clear session and force login after verification
+        if (!record.verified && !isShadowOrQuick) {
+          console.log('[AuthContext] Unverified user session detected, clearing for Strict Mode verification');
+          pb.authStore.clear();
+          await storage.deleteItem('risev_token');
+          await storage.deleteItem('risev_record');
+          await storage.deleteItem('risev_active_role');
+          setUser(null);
+          setActiveRole(null);
+          setIsLoading(false);
+          return;
+        }
+
         let role = (storedRole as UserRole) || record.role || 'customer';
         if (role === 'both') {
           role = 'customer';
@@ -347,8 +363,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       body,
       requestKey: null,
     });
-    // Auto-login after registration
-    await loginWithPassword(email, password);
+    // In Strict Mode, we do not auto-login unverified accounts. The user must verify via email first.
+  };
+
+  const resendVerificationEmail = async (email: string): Promise<void> => {
+    await pb.collection('users').requestVerification(email);
   };
 
   const quickRegister = async (name: string, phone: string): Promise<void> => {
@@ -382,8 +401,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await loginWithPassword(identifier, password);
       return;
-    } catch (e) {
-      // If email fails, try phone login via custom endpoint
+    } catch (e: any) {
+      if (e?.message === 'EMAIL_NOT_VERIFIED') {
+        throw e;
+      }
+      // If email fails with invalid credentials, try phone login via custom endpoint
     }
 
     // Phone-based login: get email from phone, then auth
@@ -414,6 +436,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Authenticate using the email and password
     const authData = await pb.collection('users').authWithPassword(email, password);
     const authRecord = authData.record;
+
+    // Strict Mode: require email verification before granting access
+    const isShadowOrQuick = (authRecord.email || '').startsWith('quick_') || (authRecord.email || '').startsWith('shadow_');
+    if (!authRecord.verified && !isShadowOrQuick) {
+      pb.authStore.clear();
+      await storage.deleteItem('risev_token');
+      await storage.deleteItem('risev_record');
+      await storage.deleteItem('risev_active_role');
+      throw new Error('EMAIL_NOT_VERIFIED');
+    }
+
     const rawRole = authRecord.role || 'customer';
     const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
     await storage.setItem('risev_active_role', role || 'customer');
@@ -550,6 +583,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       requestPasswordReset,
       checkPhone,
       register,
+      resendVerificationEmail,
       quickRegister,
       logout,
       switchRole,

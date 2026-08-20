@@ -1,33 +1,6 @@
 // otp_send.pb.js
 // Registration + SMTP Password Reset & Phone Login helper.
 
-// Helper to normalize phone numbers and build exact matching filter
-function normalizePhone(input) {
-  if (!input) return { cleanPhone: '', rawDigits: '', localDigits: '', filter: '' };
-  let digits = String(input).replace(/[^\d]/g, '');
-  if (!digits) return { cleanPhone: '', rawDigits: '', localDigits: '', filter: '' };
-  if (digits.startsWith('0')) digits = '6' + digits;
-  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-  const cleanPhone = '+' + digits;
-  const rawDigits = digits;
-  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
-  const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
-  return { cleanPhone, rawDigits, localDigits, filter };
-}
-globalThis.normalizePhone = normalizePhone;
-
-// Helper to find user by phone number using normalized exact matching
-function findUserByPhone(phoneInput) {
-  const norm = normalizePhone(phoneInput);
-  if (!norm.cleanPhone) return null;
-  try {
-    const users = $app.findRecordsByFilter("users", norm.filter, "-created", 1, 0);
-    if (users.length > 0) return users[0];
-  } catch (err) { /* not found */ }
-  return null;
-}
-globalThis.findUserByPhone = findUserByPhone;
-
 // ── Check if phone exists ──────────────────────────────────────────
 const checkPhoneHandler = (e) => {
   const reqInfo = e.requestInfo() || {};
@@ -39,7 +12,6 @@ const checkPhoneHandler = (e) => {
     return e.json(400, { message: "phone parameter is required" });
   }
 
-  // Normalize phone directly
   let digits = String(phone).replace(/[^\d]/g, '');
   if (!digits) return e.json(400, { message: "valid phone parameter is required" });
   if (digits.startsWith('0')) digits = '6' + digits;
@@ -72,7 +44,7 @@ routerAdd("POST", "/api/risev/check-phone", checkPhoneHandler);
 
 // ── Register (no OTP — direct account creation + SMTP verification) ────────────────────
 routerAdd("POST", "/api/risev/register", (e) => {
-  const body = e.requestInfo().body;
+  const body = e.requestInfo().body || {};
   const phone = body.phone || '';
   const email = body.email || '';
   const name = body.name || '';
@@ -87,11 +59,21 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
-  const norm = normalizePhone(phone);
-  const cleanPhone = norm.cleanPhone || phone;
+  let digits = String(phone).replace(/[^\d]/g, '');
+  if (digits.startsWith('0')) digits = '6' + digits;
+  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+  const cleanPhone = '+' + digits;
+  const rawDigits = digits;
+  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+  const phoneFilter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
 
   // Check phone uniqueness with normalized digits
-  const existingUser = findUserByPhone(phone);
+  let existingUser = null;
+  try {
+    const users = $app.findRecordsByFilter("users", phoneFilter, "-created", 1, 0);
+    if (users && users.length > 0) existingUser = users[0];
+  } catch (err) { /* not found */ }
+
   let isQuickUpgrade = false;
   if (existingUser) {
     const existingEmail = existingUser.getString("email") || "";
@@ -105,7 +87,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
   // Check email uniqueness
   try {
     const emailUser = $app.findFirstRecordByData("users", "email", email);
-    if (!isQuickUpgrade || emailUser.id !== existingUser.id) {
+    if (!isQuickUpgrade || (existingUser && emailUser.id !== existingUser.id)) {
       return e.json(400, { message: "Email address is already registered" });
     }
   } catch (err) { /* ok */ }
@@ -114,7 +96,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
 
   try {
     let user;
-    if (isQuickUpgrade) {
+    if (isQuickUpgrade && existingUser) {
       user = existingUser;
     } else {
       const collection = $app.findCollectionByNameOrId("users");
@@ -179,7 +161,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
 
 // ── Login with phone or email + password ───────────────────────────
 routerAdd("POST", "/api/risev/login", (e) => {
-  const body = e.requestInfo().body;
+  const body = e.requestInfo().body || {};
   const identifier = body.identifier || '';
   const password = body.password || '';
 
@@ -192,7 +174,20 @@ routerAdd("POST", "/api/risev/login", (e) => {
   try {
     user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    user = findUserByPhone(identifier);
+    // Try phone lookup with normalization
+    let digits = String(identifier).replace(/[^\d]/g, '');
+    if (digits) {
+      if (digits.startsWith('0')) digits = '6' + digits;
+      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+      const cleanPhone = '+' + digits;
+      const rawDigits = digits;
+      const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+      const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
+      try {
+        const users = $app.findRecordsByFilter("users", filter, "-created", 1, 0);
+        if (users && users.length > 0) user = users[0];
+      } catch (findErr) { /* not found */ }
+    }
   }
 
   if (!user || !user.validatePassword(password)) {
@@ -223,7 +218,19 @@ routerAdd("POST", "/api/risev/request-password-reset", (e) => {
   try {
     user = $app.findAuthRecordByEmail("users", identifier);
   } catch (err) {
-    user = findUserByPhone(identifier);
+    let digits = String(identifier).replace(/[^\d]/g, '');
+    if (digits) {
+      if (digits.startsWith('0')) digits = '6' + digits;
+      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+      const cleanPhone = '+' + digits;
+      const rawDigits = digits;
+      const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+      const filter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
+      try {
+        const users = $app.findRecordsByFilter("users", filter, "-created", 1, 0);
+        if (users && users.length > 0) user = users[0];
+      } catch (findErr) { /* not found */ }
+    }
   }
 
   if (!user) {

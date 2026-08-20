@@ -26,7 +26,7 @@ const COUNTRY_CODE = '+60';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { checkPhone, register, loginWithIdentifier, requestPasswordReset, isAuthenticated, isLoading: isAuthLoading, activeRole } = useAuth();
+  const { checkPhone, register, resendVerificationEmail, loginWithIdentifier, requestPasswordReset, isAuthenticated, isLoading: isAuthLoading, activeRole } = useAuth();
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function LoginScreen() {
   }, [params.prefill_phone, params.prefill_name]);
   
   // New Registration fields and state machine steps
-  const [step, setStep] = useState<'phone' | 'register' | 'password'>('phone');
+  const [step, setStep] = useState<'phone' | 'register' | 'password' | 'verify-email'>('phone');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -96,6 +96,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSuccess, setResendSuccess] = useState(false);
   
   const [emailFocused, setEmailFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
@@ -171,10 +173,8 @@ export default function LoginScreen() {
     try {
       const birthDateToUse = birthday && birthday.trim() ? birthday.trim() : '2000-01-01';
       await register(getFullPhone(), email.trim().toLowerCase(), name.trim(), password, role, birthDateToUse);
-      
-      const record = pb.authStore.record;
-      const userRole = record?.role || role || 'customer';
-      router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+      // Strict Mode: transition to Verify Email screen
+      setStep('verify-email');
     } catch (e: any) {
       const rawMsg = e?.message || '';
       if (rawMsg.toLowerCase().includes('email') || rawMsg.toLowerCase().includes('unique')) {
@@ -204,7 +204,12 @@ export default function LoginScreen() {
       router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
     } catch (e: any) {
       console.warn(e);
-      setErrorMsg('Invalid credentials. Please try again.');
+      const raw = e?.message || '';
+      if (raw === 'EMAIL_NOT_VERIFIED' || raw.includes('EMAIL_NOT_VERIFIED') || raw.includes('verified')) {
+        setErrorMsg('Please verify your email before logging in. Check your inbox for the link.');
+      } else {
+        setErrorMsg('Invalid credentials. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -254,6 +259,8 @@ export default function LoginScreen() {
                     ? 'Enter your password to access your account.'
                     : step === 'register'
                     ? 'Complete your profile to start earning rewards.'
+                    : step === 'verify-email'
+                    ? 'Check your inbox to verify your email.'
                     : 'Every visit, rewarded.'}
                 </Text>
               </View>
@@ -284,7 +291,7 @@ export default function LoginScreen() {
               {/* Input Form */}
               <View style={styles.form}>
                 {/* NFC Pre-fill Banner */}
-                {params.prefill_phone && step !== 'phone' && (
+                {params.prefill_phone && step !== 'phone' && step !== 'verify-email' && (
                   <View style={styles.nfcPrefillBanner}>
                     <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
                     <Text style={styles.nfcPrefillText}>
@@ -293,7 +300,7 @@ export default function LoginScreen() {
                   </View>
                 )}
 
-                {step !== 'password' && (
+                {step !== 'password' && step !== 'verify-email' && (
                   <>
                     <Text style={styles.inputLabel}>PHONE NUMBER</Text>
                     <View style={[
@@ -337,6 +344,132 @@ export default function LoginScreen() {
                       ) : null}
                     </View>
                   </>
+                )}
+
+                {step === 'verify-email' && (
+                  <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                    <View style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 32,
+                      backgroundColor: 'rgba(15, 23, 42, 0.08)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 14,
+                    }}>
+                      <Ionicons name="mail" size={32} color="#0F172A" />
+                    </View>
+
+                    <Text style={{
+                      fontSize: 18,
+                      fontFamily: 'PlusJakartaSans_800ExtraBold',
+                      color: '#0F172A',
+                      textAlign: 'center',
+                      marginBottom: 6,
+                    }}>
+                      Verify Your Email
+                    </Text>
+
+                    <Text style={{
+                      fontSize: 13,
+                      fontFamily: 'PlusJakartaSans_500Medium',
+                      color: '#475569',
+                      textAlign: 'center',
+                      lineHeight: 18,
+                      marginBottom: 12,
+                    }}>
+                      We sent a verification link to:
+                    </Text>
+
+                    <View style={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.06)',
+                      borderRadius: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      marginBottom: 14,
+                      borderWidth: 1,
+                      borderColor: 'rgba(15, 23, 42, 0.12)',
+                      width: '100%',
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: 'PlusJakartaSans_700Bold',
+                        color: '#0F172A',
+                      }}>
+                        {email}
+                      </Text>
+                    </View>
+
+                    <Text style={{
+                      fontSize: 12,
+                      fontFamily: 'PlusJakartaSans_400Regular',
+                      color: '#64748B',
+                      textAlign: 'center',
+                      lineHeight: 18,
+                      marginBottom: 20,
+                    }}>
+                      Click the link in your email to activate your account. Once verified, click below to log in.
+                    </Text>
+
+                    {resendSuccess && (
+                      <View style={[styles.errorContainer, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginBottom: 14 }]}>
+                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                        <Text style={[styles.errorText, { color: '#065F46' }]}>Verification link resent! Please check your inbox.</Text>
+                      </View>
+                    )}
+
+                    {/* Primary Login Button */}
+                    <TouchableOpacity
+                      style={styles.primaryBtn}
+                      onPress={() => {
+                        setErrorMsg('');
+                        setStep('password');
+                      }}
+                      activeOpacity={0.9}
+                    >
+                      <View style={styles.btnContent}>
+                        <Text style={styles.primaryBtnText}>I'VE VERIFIED — LOG IN</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Resend Verification Action */}
+                    <TouchableOpacity
+                      disabled={resendCooldown > 0 || isLoading}
+                      onPress={async () => {
+                        if (!email || resendCooldown > 0) return;
+                        setIsLoading(true);
+                        try {
+                          await resendVerificationEmail(email.trim().toLowerCase());
+                          setResendSuccess(true);
+                          setResendCooldown(60);
+                          const timer = setInterval(() => {
+                            setResendCooldown((prev) => {
+                              if (prev <= 1) {
+                                clearInterval(timer);
+                                return 0;
+                              }
+                              return prev - 1;
+                            });
+                          }, 1000);
+                        } catch (e: any) {
+                          Alert.alert('Error', e?.message || 'Failed to resend verification email.');
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      style={{ marginTop: 12, padding: 6 }}
+                    >
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: 'PlusJakartaSans_700Bold',
+                        color: resendCooldown > 0 ? '#94A3B8' : '#0F172A',
+                      }}>
+                        {resendCooldown > 0 ? `Resend email in ${resendCooldown}s` : 'Resend Verification Email'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {step === 'password' && (
