@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 
-// TODO: Replace with your PocketBase cloud URL
-const PB_URL = process.env.EXPO_PUBLIC_PB_URL || 'http://127.0.0.1:8090';
+// PocketBase URL (defaults to production Risev API)
+const PB_URL = process.env.EXPO_PUBLIC_PB_URL || 'https://api.risev.app';
 
 export const pb = new PocketBase(PB_URL);
 pb.autoCancellation(false);
