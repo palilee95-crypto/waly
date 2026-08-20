@@ -30,40 +30,55 @@ interface PackageOption {
   originalPrice: number;
   discountBadge: string;
   isPopular?: boolean;
-  description: string;
+  description: string[];
 }
 
 const PACKAGES: PackageOption[] = [
   {
     id: 'single',
     units: 1,
-    title: '1 Unit Smart Stand',
-    tagline: 'Lifetime / RM 49.00',
-    price: 49,
-    originalPrice: 89,
-    discountBadge: '45% OFF',
-    description: 'Perfect for a single cashier counter. Complete with digital card system.'
+    title: '1x Stand + 500 Customers',
+    tagline: 'RM 119',
+    price: 119,
+    originalPrice: 199,
+    discountBadge: '40% OFF',
+    description: [
+      'Perfect for a single counter',
+      '1x Premium NFC Stand',
+      '500 Lifetime Customer Quota',
+      'Digital Loyalty Card system'
+    ]
   },
   {
     id: 'duo',
     units: 2,
-    title: '2 Units Smart Stand',
-    tagline: 'Lifetime / RM 89.00',
-    price: 89,
-    originalPrice: 178,
+    title: '2x Stand + 1,000 Customers',
+    tagline: 'RM 198',
+    price: 198,
+    originalPrice: 396,
     discountBadge: '50% OFF',
     isPopular: true,
-    description: 'Most popular choice for multi-level stores or 2 branches. Shared database quota.'
+    description: [
+      'Most popular choice for 2 branches',
+      '2x Premium NFC Stands',
+      '1,000 Lifetime Customer Quota',
+      'Digital Loyalty Card system'
+    ]
   },
   {
     id: 'trio',
     units: 3,
-    title: '3 Units Smart Stand',
-    tagline: 'Lifetime / RM 129.00',
-    price: 129,
-    originalPrice: 267,
+    title: '3x Stand + 3,000 Customers',
+    tagline: 'RM 247',
+    price: 247,
+    originalPrice: 514,
     discountBadge: '52% OFF',
-    description: 'Best value for multi-outlet businesses. Place at every corner for maximum customer coverage.'
+    description: [
+      'Best value for maximum coverage',
+      '3x Premium NFC Stands',
+      '3,000 Lifetime Customer Quota',
+      'Digital Loyalty Card system'
+    ]
   }
 ];
 
@@ -181,7 +196,7 @@ export default function NfcPaywallScreen() {
           </View>
           <Text style={styles.subtitle}>
             Turn walk-ins into regulars.{"\n"}
-            Includes <Ionicons name="people" size={13} color="#94A3B8" /> <Text style={{ color: '#E2E8F0' }}>500 Customer Lifetime</Text>.
+            Includes <Ionicons name="people" size={13} color="#94A3B8" /> <Text style={{ color: '#E2E8F0' }}>Lifetime Customer Quota</Text>
           </Text>
         </View>
 
@@ -216,12 +231,21 @@ export default function NfcPaywallScreen() {
                 
                 {isSelected && (
                   <View style={styles.pkgDescriptionBox}>
-                    <Text style={styles.pkgDescriptionText}>{pkg.description}</Text>
+                    {pkg.description.map((item, index) => (
+                      <View key={index} style={styles.pkgDescRow}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.pkgDescriptionText}>{item}</Text>
+                      </View>
+                    ))}
                   </View>
                 )}
               </TouchableOpacity>
             );
           })}
+
+          <Text style={styles.disclaimerText}>
+            *Note: WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via monthly subscription plans in your dashboard.
+          </Text>
         </View>
 
         {/* Footer Links */}
@@ -481,7 +505,7 @@ const styles = StyleSheet.create({
   pkgLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
   },
   radioCircle: {
     width: 22,
@@ -497,9 +521,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   pkgTitle: {
-    fontSize: 15,
+    fontSize: 14, // Smaller to be more compact
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#E5E5E5',
+    letterSpacing: -0.3, // Pull letters closer
   },
   pkgTagline: {
     fontSize: 12,
@@ -531,11 +556,26 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#2C2C2E',
   },
+  pkgDescRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
   pkgDescriptionText: {
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#94A3B8',
     lineHeight: 18,
+  },
+  disclaimerText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 16,
+    paddingHorizontal: 10,
   },
   footerLinks: {
     flexDirection: 'row',
