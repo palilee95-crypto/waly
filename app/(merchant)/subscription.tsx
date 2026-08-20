@@ -32,7 +32,7 @@ const BENEFITS = [
 export default function SubscriptionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ status?: string; order_id?: string }>();
-  const { user, refreshSession } = useAuth();
+  const { user, refreshSession, switchRole } = useAuth();
   const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
@@ -353,13 +353,12 @@ export default function SubscriptionScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <TouchableOpacity 
                   style={styles.closeBtn} 
-                  onPress={() => {
+                  onPress={async () => {
                     if (user?.merchant_status === 'active') {
                       router.replace('/(merchant)');
-                    } else if (router.canGoBack()) {
-                      router.back();
                     } else {
-                      router.replace('/(merchant)');
+                      await switchRole('customer');
+                      router.replace('/(customer)');
                     }
                   }} 
                   activeOpacity={0.8}
@@ -557,6 +556,41 @@ export default function SubscriptionScreen() {
               </View>
             )}
           </View>
+
+          {/* Option B: Buy NFC Stand in-app */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#050505',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              shadowColor: '#FFC700',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+            activeOpacity={0.8}
+            onPress={() => router.push('/(merchant)/nfc-marketplace')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="cart" size={18} color="#FFC700" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                  {locale === 'en' ? "Don't have a Stand?" : "Belum ada NFC Stand?"}
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
+                  {locale === 'en' ? "Get RiseV NFC Bundle" : "Dapatkan Bundle NFC RiseV"}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="arrow-forward" size={20} color="#FFC700" />
+          </TouchableOpacity>
 
           {/* 2. Billing Toggle (Monthly / Annual) */}
           <View style={styles.billingToggleWrapper}>

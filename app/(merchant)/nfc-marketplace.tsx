@@ -84,29 +84,70 @@ const PACKAGES: PackageOption[] = [
 
 export default function NfcPaywallScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshSession, switchRole } = useAuth();
 
   // State
   const [selectedPackageId, setSelectedPackageId] = useState<string>('duo');
   const [showCheckoutSheet, setShowCheckoutSheet] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
 
+  // Activation Code States (TikTok / Shopee redemption)
+  const [showCodeBox, setShowCodeBox] = useState(false);
+  const [standCodeInput, setStandCodeInput] = useState('');
+  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
+  const [codeError, setCodeError] = useState('');
+  const [codeSuccess, setCodeSuccess] = useState('');
+
   // Form State
   const [storeName, setStoreName] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [recipientName, setRecipientName] = useState(user?.name || '');
+  const [whatsappPhone, setWhatsappPhone] = useState(user?.phone || '');
   const [shippingAddress, setShippingAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'fpx' | 'card' | 'whatsapp'>('fpx');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      if (user.name && !recipientName) setRecipientName(user.name);
-      if (user.phone && !whatsappPhone) setWhatsappPhone(user.phone);
-    }
-  }, [user]);
-
   const selectedPkg = PACKAGES.find(p => p.id === selectedPackageId) || PACKAGES[1];
+
+  const handleRedeemCode = async () => {
+    if (!standCodeInput.trim()) {
+      setCodeError('Please enter your stand activation code.');
+      return;
+    }
+    setIsRedeemingCode(true);
+    setCodeError('');
+    setCodeSuccess('');
+
+    try {
+      const res = await pb.send<{ success: boolean; message: string; plan?: string }>('/api/risev/merchant/redeem-stand-code', {
+        method: 'POST',
+        body: { code: standCodeInput.trim() },
+      });
+
+      if (res.success) {
+        setCodeSuccess(res.message || 'Activation code redeemed successfully!');
+        setStandCodeInput('');
+        await refreshSession();
+        await switchRole('merchant');
+        Alert.alert('Stand Activated! 🎉', 'Your NFC Stand & Merchant account are now active.', [
+          { text: 'Go to Dashboard', onPress: () => router.replace('/(merchant)') }
+        ]);
+      } else {
+        setCodeError(res.message || 'Invalid activation code.');
+      }
+    } catch (err: any) {
+      setCodeError(err.message || 'Failed to redeem activation code.');
+    } finally {
+      setIsRedeemingCode(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(customer)/profile');
+    }
+  };
 
   const handleCheckout = async () => {
     if (!recipientName.trim() || !whatsappPhone.trim() || !shippingAddress.trim()) {
@@ -157,7 +198,7 @@ export default function NfcPaywallScreen() {
       {/* Absolute Back Button */}
       <TouchableOpacity 
         style={styles.backBtnAbsolute} 
-        onPress={() => router.back()}
+        onPress={handleClose}
         activeOpacity={0.8}
       >
         <View style={styles.backBtnCircle}>
@@ -198,6 +239,67 @@ export default function NfcPaywallScreen() {
             Turn walk-ins into regulars.{"\n"}
             Includes <Ionicons name="people" size={13} color="#94A3B8" /> <Text style={{ color: '#E2E8F0' }}>Lifetime Customer Quota</Text>
           </Text>
+        </View>
+
+        {/* Stand Code Redemption Box (TikTok Shop / Shopee package fulfillment) */}
+        <View style={styles.activationCard}>
+          <TouchableOpacity 
+            style={styles.activationHeader}
+            onPress={() => setShowCodeBox(!showCodeBox)}
+            activeOpacity={0.85}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={styles.chipIconContainer}>
+                <Ionicons name="hardware-chip-outline" size={18} color="#FFC700" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.activationTitle}>
+                  Have an NFC Stand Activation Code?
+                </Text>
+                <Text style={styles.activationSubtitle}>
+                  TikTok Shop / Shopee / Package Box
+                </Text>
+              </View>
+            </View>
+            <View style={styles.chevronCircle}>
+              <Ionicons name={showCodeBox ? "chevron-up" : "chevron-down"} size={16} color="#CBD5E1" />
+            </View>
+          </TouchableOpacity>
+
+          {showCodeBox && (
+            <View style={styles.activationBody}>
+              <View style={styles.activationInputRow}>
+                <TextInput
+                  style={styles.activationInput}
+                  placeholder="STAND-XXXX-XXXX"
+                  placeholderTextColor="#64748B"
+                  value={standCodeInput}
+                  onChangeText={setStandCodeInput}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity
+                  style={styles.redeemBtn}
+                  onPress={handleRedeemCode}
+                  disabled={isRedeemingCode}
+                  activeOpacity={0.85}
+                >
+                  {isRedeemingCode ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Text style={styles.redeemBtnText}>Redeem</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {codeError ? (
+                <Text style={styles.codeErrorText}>{codeError}</Text>
+              ) : null}
+
+              {codeSuccess ? (
+                <Text style={styles.codeSuccessText}>{codeSuccess}</Text>
+              ) : null}
+            </View>
+          )}
         </View>
 
         {/* Packages List (Vidart Pro Style) */}
@@ -270,7 +372,10 @@ export default function NfcPaywallScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.massiveBtn}
           >
-            <Text style={styles.massiveBtnText}>Get Started (RM {selectedPkg.price})</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Text style={styles.massiveBtnText}>Order Smart Stand Now</Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </View>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -421,11 +526,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   heroWrapper: {
     width: '100%',
-    height: 480, // Taller to let the image show properly
+    height: 380, // Optimized height to showcase stand while bringing packages into view
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -441,54 +546,55 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     width: '100%',
-    height: 250, // Massive gradient to smooth out the edge
+    height: 180,
     zIndex: 3,
   },
   titleArea: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: -80, // Pull it way up into the gradient
+    marginTop: -55, // Smooth blend into gradient
     zIndex: 10,
+    marginBottom: 12,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   logoImage: {
-    height: 32,
-    width: 110,
-    tintColor: '#FFFFFF', // Make the logo white
+    height: 28,
+    width: 95,
+    tintColor: '#FFFFFF',
   },
   proBadge: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
   },
   proBadgeText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#94A3B8',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
     paddingHorizontal: 20,
   },
   packagesContainer: {
     paddingHorizontal: 20,
-    marginTop: 32,
-    gap: 12,
+    marginTop: 6,
+    gap: 10,
   },
   pkgCard: {
     backgroundColor: '#141415',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1.5,
     borderColor: '#1C1C1E',
     overflow: 'hidden',
@@ -756,5 +862,102 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 20,
+  },
+
+  // Stand Activation Code Card (Dark Aesthetic)
+  activationCard: {
+    backgroundColor: '#111113',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginHorizontal: 20,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.22)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  activationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chipIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 199, 0, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activationTitle: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  activationSubtitle: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  chevronCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activationBody: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  activationInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  activationInput: {
+    flex: 1,
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#242428',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  redeemBtn: {
+    backgroundColor: '#FFC700',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  redeemBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  codeErrorText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#EF4444',
+    marginTop: 6,
+  },
+  codeSuccessText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#10B981',
+    marginTop: 6,
   },
 });

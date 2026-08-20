@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, useRouter } from 'expo-router';
+import { Tabs, Redirect, useRouter, usePathname } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, useWindowDimensions, TextInput, ScrollView, Image, Alert, Linking, LayoutAnimation, UIManager } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -225,6 +225,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
 
 export default function MerchantLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout, switchRole } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -699,46 +700,15 @@ export default function MerchantLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (activeRole !== 'merchant') {
+  if (activeRole !== 'merchant' && !pathname.includes('nfc-marketplace')) {
     return <Redirect href="/(customer)" />;
   }
 
   // Gateway subscription gate blocker
   if (user?.merchant_status !== 'active') {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        {/* Top Header Actions for Trial/Subscription Screen */}
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: 20,
-          paddingVertical: 12,
-          backgroundColor: '#FFFFFF',
-          borderBottomWidth: 1,
-          borderColor: '#F1F5F9'
-        }}>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
-            onPress={() => switchRole('customer')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="swap-horizontal" size={16} color="#0F172A" />
-            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Customer Mode</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{ paddingHorizontal: 8, paddingVertical: 6 }}
-            onPress={logout}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444' }}>Log Out</Text>
-          </TouchableOpacity>
-        </View>
-
-        <SubscriptionScreen />
-      </View>
-    );
+    if (!pathname.includes('subscription') && !pathname.includes('nfc-marketplace')) {
+      return <Redirect href="/(merchant)/subscription" />;
+    }
   }
 
   // Blocker page for merchant profile onboarding
@@ -949,6 +919,13 @@ export default function MerchantLayout() {
         <Tabs.Screen name="staff" options={{ href: null }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />
         <Tabs.Screen name="subscription" options={{ href: null }} />
+        <Tabs.Screen name="nfc-marketplace" options={{ href: null }} />
+        <Tabs.Screen name="analytics" options={{ href: null }} />
+        <Tabs.Screen name="branches" options={{ href: null }} />
+        <Tabs.Screen name="create-template" options={{ href: null }} />
+        <Tabs.Screen name="edit-profile" options={{ href: null }} />
+        <Tabs.Screen name="onboarding-setup" options={{ href: null }} />
+        <Tabs.Screen name="whatsapp-integration" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
     </View>

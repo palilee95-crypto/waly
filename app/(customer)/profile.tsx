@@ -26,8 +26,6 @@ export default function CustomerProfile() {
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [supportFocused, setSupportFocused] = useState(false);
 
-  const [subscribeModalVisible, setSubscribeModalVisible] = useState(false);
-  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const [optInMarketing, setOptInMarketing] = useState(true);
 
@@ -66,56 +64,15 @@ export default function CustomerProfile() {
   };
 
   const handleSwitchToMerchant = async () => {
-    if ((user?.role === 'merchant' || (user?.role as any) === 'both') && user?.merchant_id) {
+    if (user?.merchant_id && user?.merchant_status === 'active') {
       await switchRole('merchant');
       router.replace('/(merchant)');
     } else {
-      setSubscribeModalVisible(true);
+      router.push('/(merchant)/nfc-marketplace');
     }
   };
 
-  const handleSubscribe = async () => {
-    if (!user) return;
-    setIsSubscribing(true);
-    try {
-      // Retrieve referral code from local storage
-      const refCode = await storage.getItem('risev_referral_code').catch(() => null);
 
-      // 1. Create merchant record with pending status (which starts their 7-day free trial)
-      const newMerchant = await pb.collection('merchants').create({
-        name: `${user.name}'s Shop`,
-        owner: user.id,
-        category: 'food',
-        status: 'pending',
-        referral_code: refCode || '',
-        metadata: {},
-      });
-
-      if (refCode) {
-        await storage.deleteItem('risev_referral_code').catch(() => null);
-      }
-
-      // 2. Link merchant profile to user and change role to merchant
-      await pb.collection('users').update(user.id, {
-        role: 'merchant',
-        merchant_id: newMerchant.id,
-      });
-
-      // 3. Refresh local authStore session to align updated records
-      await refreshSession();
-
-      // 4. Switch role locally
-      await switchRole('merchant');
-      
-      Alert.alert('Free Trial Started!', 'Welcome to RISEV Merchant Pro! Your 7-day free trial is now active.');
-      setSubscribeModalVisible(false);
-      router.replace('/(merchant)');
-    } catch (err: any) {
-      Alert.alert('Setup Error', err.message || 'Failed to start free trial.');
-    } finally {
-      setIsSubscribing(false);
-    }
-  };
 
   const handleOpenEdit = () => {
     setEditName(user?.name || '');
@@ -660,96 +617,7 @@ export default function CustomerProfile() {
           </View>
         </View>
       </Modal>
-      {/* Premium Subscription Bento Modal */}
-      <Modal
-        visible={subscribeModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSubscribeModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { height: 'auto', padding: 22, maxWidth: 440, borderRadius: 28 }]}>
-            {/* Top Bar: Badge + Close */}
-            <View style={styles.bentoHeaderRow}>
-              <View style={styles.bentoProBadge}>
-                <Ionicons name="sparkles" size={12} color="#B45309" />
-                <Text style={styles.bentoProBadgeText}>MERCHANT PRO</Text>
-              </View>
-              <TouchableOpacity onPress={() => setSubscribeModalVisible(false)} style={styles.bentoCloseBtn} activeOpacity={0.7}>
-                <Ionicons name="close" size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
 
-            {/* Bento Hero Box: The Offer */}
-            <View style={styles.bentoHeroBox}>
-              <View style={styles.bentoHeroTop}>
-                <Text style={styles.bentoHeroTag}>7-DAY TRIAL</Text>
-                <View style={styles.bentoPriceTag}>
-                  <Text style={styles.bentoPriceTagText}>RM 0 TODAY</Text>
-                </View>
-              </View>
-              <Text style={styles.bentoHeroTitle}>Turn Visitors Into Loyal Regulars.</Text>
-              <Text style={styles.bentoHeroSubtitle}>Then RM79/month billed manually  •  Cancel anytime</Text>
-            </View>
-
-            {/* Bento Feature Grid */}
-            <View style={styles.bentoGrid}>
-              {/* Feature 1: Wide Bento Tile */}
-              <View style={styles.bentoWideTile}>
-                <View style={styles.bentoIconCircle}>
-                  <Ionicons name="flash" size={18} color="#B45309" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bentoTileTitle}>Instant 2-Sec NFC Magic</Text>
-                  <Text style={styles.bentoTileDesc}>Award stamps at your counter with zero app install needed.</Text>
-                </View>
-              </View>
-
-              {/* Feature 2 & 3: 2-Column Bento Tiles */}
-              <View style={styles.bentoRow}>
-                <View style={styles.bentoHalfTile}>
-                  <View style={styles.bentoIconCircle}>
-                    <Ionicons name="chatbubbles" size={16} color="#B45309" />
-                  </View>
-                  <Text style={styles.bentoTileTitle}>WhatsApp Auto</Text>
-                  <Text style={styles.bentoTileDesc}>Auto-send stamp alerts & rewards.</Text>
-                </View>
-
-                <View style={styles.bentoHalfTile}>
-                  <View style={styles.bentoIconCircle}>
-                    <Ionicons name="bar-chart" size={16} color="#B45309" />
-                  </View>
-                  <Text style={styles.bentoTileTitle}>Live Analytics</Text>
-                  <Text style={styles.bentoTileDesc}>Track repeat visits & insights.</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Bento CTA Action */}
-            <TouchableOpacity 
-              style={styles.bentoCtaBtn}
-              onPress={handleSubscribe}
-              disabled={isSubscribing}
-              activeOpacity={0.85}
-            >
-              {isSubscribing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.bentoCtaBtnText}>START 7-DAY FREE TRIAL</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* Reassurance text */}
-            <View style={styles.bentoTrustRow}>
-              <Ionicons name="shield-checkmark" size={12} color="#94A3B8" />
-              <Text style={styles.bentoTrustText}>100% Risk-Free  •  No Credit Card Required</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       </SafeAreaView>
     </View>
