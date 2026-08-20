@@ -1,349 +1,378 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  Image, 
-  Modal, 
   TextInput, 
   Alert,
-  Platform
+  Platform,
+  Linking,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  SafeAreaView,
+  Image
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
+import { pb } from '@/lib/pocketbase';
 
-interface StandProduct {
+interface PackageOption {
   id: string;
-  name: string;
+  units: number;
+  title: string;
   tagline: string;
-  price: string;
-  originalPrice?: string;
+  price: number;
+  originalPrice: number;
+  discountBadge: string;
+  isPopular?: boolean;
   description: string;
-  material: string;
-  dimensions: string;
-  colors: { name: string; hex: string; previewBg: string }[];
-  icon: string;
-  gradient: string[];
-  discountTag?: string;
-  badge?: string;
 }
 
-const PRODUCTS: StandProduct[] = [
+const PACKAGES: PackageOption[] = [
   {
-    id: 'acrylic',
-    name: 'The Classic Acrylic',
-    tagline: 'VIP Countertop Stand',
-    price: 'RM 39',
-    originalPrice: 'RM 59',
-    discountTag: '33% OFF',
-    badge: '🏆 BEST SELLER',
-    description: 'High-gloss acrylic stand with a weighted base. Sleek, waterproof, and perfect for high-traffic cashier counters.',
-    material: 'Premium Acrylic & Brass Plate',
-    dimensions: '85 x 120 x 45 mm',
-    colors: [
-      { name: 'Piano Black', hex: '#050505', previewBg: '#050505' },
-      { name: 'Crystal Clear', hex: '#FFFFFF', previewBg: '#E2E8F0' }
-    ],
-    icon: 'flash-outline',
-    gradient: ['#050505', '#1E293B']
+    id: 'single',
+    units: 1,
+    title: '1 Unit Smart Stand',
+    tagline: 'Lifetime / RM 49.00',
+    price: 49,
+    originalPrice: 89,
+    discountBadge: '45% OFF',
+    description: 'Perfect for a single cashier counter. Complete with digital card system.'
   },
   {
-    id: 'walnut',
-    name: 'The Walnut Minimalist',
-    tagline: 'Eco Wood Stand',
-    price: 'RM 49',
-    originalPrice: 'RM 69',
-    discountTag: '28% OFF',
-    badge: '🌿 ECO-FRIENDLY',
-    description: 'Crafted from sustainable dark walnut wood. Features laser-engraved gold detailing. Best for modern cafes and upscale brands.',
-    material: 'Natural Walnut Wood & Gold Foil',
-    dimensions: '90 x 110 x 50 mm',
-    colors: [
-      { name: 'Dark Walnut', hex: '#5C4033', previewBg: '#5C4033' },
-      { name: 'Classic Oak', hex: '#C19A6B', previewBg: '#C19A6B' }
-    ],
-    icon: 'leaf-outline',
-    gradient: ['#451A03', '#78350F']
+    id: 'duo',
+    units: 2,
+    title: '2 Units Smart Stand',
+    tagline: 'Lifetime / RM 89.00',
+    price: 89,
+    originalPrice: 178,
+    discountBadge: '50% OFF',
+    isPopular: true,
+    description: 'Most popular choice for multi-level stores or 2 branches. Shared database quota.'
   },
   {
-    id: 'alloy',
-    name: 'The Metal Pro',
-    tagline: 'Space Alloy Stand',
-    price: 'RM 69',
-    originalPrice: 'RM 99',
-    discountTag: '30% OFF',
-    badge: '⚡ HEAVY DUTY',
-    description: 'Brushed anodized aluminum stand. Weighted with non-slip silicone feet. Beautiful metallic finish that stands out.',
-    material: 'Anodized Space-Grade Aluminum',
-    dimensions: '80 x 130 x 40 mm',
-    colors: [
-      { name: 'Space Gray', hex: '#4B5563', previewBg: '#4B5563' },
-      { name: 'Nordic Silver', hex: '#9CA3AF', previewBg: '#D1D5DB' },
-      { name: 'Champagne Gold', hex: '#D97706', previewBg: '#FCD34D' }
-    ],
-    icon: 'cube-outline',
-    gradient: ['#1F2937', '#4B5563']
+    id: 'trio',
+    units: 3,
+    title: '3 Units Smart Stand',
+    tagline: 'Lifetime / RM 129.00',
+    price: 129,
+    originalPrice: 267,
+    discountBadge: '52% OFF',
+    description: 'Best value for multi-outlet businesses. Place at every corner for maximum customer coverage.'
   }
 ];
 
-export default function NfcMarketplaceScreen() {
+export default function NfcPaywallScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('All Stands');
-  const [selectedColor, setSelectedColor] = useState<{ [key: string]: string }>({
-    acrylic: 'Piano Black',
-    walnut: 'Dark Walnut',
-    alloy: 'Space Gray'
-  });
-  const [selectedProduct, setSelectedProduct] = useState<StandProduct | null>(null);
+  const { user } = useAuth();
+
+  // State
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('duo');
+  const [showCheckoutSheet, setShowCheckoutSheet] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+
+  // Form State
+  const [storeName, setStoreName] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
-  const [shippingPhone, setShippingPhone] = useState('');
-  const [isOrdering, setIsOrdering] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'fpx' | 'card' | 'whatsapp'>('fpx');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleOrder = (product: StandProduct) => {
-    setSelectedProduct(product);
-  };
+  useEffect(() => {
+    if (user) {
+      if (user.name && !recipientName) setRecipientName(user.name);
+      if (user.phone && !whatsappPhone) setWhatsappPhone(user.phone);
+    }
+  }, [user]);
 
-  const submitOrder = () => {
-    if (!shippingAddress.trim() || !shippingPhone.trim()) {
-      Alert.alert('Error', 'Please fill in your address and phone number.');
+  const selectedPkg = PACKAGES.find(p => p.id === selectedPackageId) || PACKAGES[1];
+
+  const handleCheckout = async () => {
+    if (!recipientName.trim() || !whatsappPhone.trim() || !shippingAddress.trim()) {
+      Alert.alert('Perhatian', 'Sila lengkapkan semua butiran penghantaran.');
       return;
     }
-    setIsOrdering(true);
-    setTimeout(() => {
-      setIsOrdering(false);
-      setSelectedProduct(null);
-      setShippingAddress('');
-      setShippingPhone('');
-      Alert.alert(
-        'Order Received!',
-        'Thank you! Your custom NFC stand order has been placed successfully. Track delivery under notifications.',
-        [{ text: 'Great!' }]
+
+    setIsSubmitting(true);
+    const orderData = {
+      orderId: `NFC-${Date.now().toString(36).toUpperCase()}`,
+      package: selectedPkg.title,
+      amount: selectedPkg.price,
+      storeName: storeName.trim(),
+      recipientName: recipientName.trim(),
+      phone: whatsappPhone.trim(),
+      fullAddress: shippingAddress.trim(),
+      paymentMethod: paymentMethod,
+    };
+
+    if (paymentMethod === 'whatsapp') {
+      setIsSubmitting(false);
+      const textMsg = encodeURIComponent(
+        `*Tempahan RiseV Smart Stand*\n\n` +
+        `📦 *Pakej:* ${selectedPkg.title} (RM ${selectedPkg.price})\n` +
+        `👤 *Penerima:* ${orderData.recipientName}\n` +
+        `📞 *WhatsApp:* ${orderData.phone}\n` +
+        `📍 *Alamat:* ${orderData.fullAddress}\n\n` +
+        `Saya ingin sahkan tempahan ini.`
       );
-    }, 1500);
+      const waUrl = `https://wa.me/601156221568?text=${textMsg}`;
+      if (Platform.OS === 'web') window.open(waUrl, '_blank');
+      else Linking.openURL(waUrl);
+      
+      setShowCheckoutSheet(false);
+      setCompletedOrder(orderData);
+      return;
+    }
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setShowCheckoutSheet(false);
+      setCompletedOrder(orderData);
+    }, 1200);
   };
 
   return (
     <View style={styles.container}>
-      {/* Sticky Dark Header */}
-      <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>NFC Marketplace</Text>
+      {/* Absolute Back Button */}
+      <TouchableOpacity 
+        style={styles.backBtnAbsolute} 
+        onPress={() => router.back()}
+        activeOpacity={0.8}
+      >
+        <View style={styles.backBtnCircle}>
+          <Ionicons name="close" size={24} color="#FFFFFF" />
         </View>
-        <Image
-          source={require('../../assets/risev logo.png')}
-          style={{ width: 80, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-        />
-      </View>
+      </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>Premium NFC Stands</Text>
+        
+        {/* Massive Hero Section Fading Into Black */}
+        <View style={styles.heroWrapper}>
+          <Image 
+            source={require('../../assets/nfc-hero.png')} 
+            style={styles.heroImage} 
+            resizeMode="contain" 
+          />
+          {/* Smooth Gradient Fade Overlay */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
+            locations={[0, 0.6, 1]}
+            style={styles.fadeOverlayBottom}
+          />
+        </View>
 
-        {/* Horizontal Category Tabs */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          style={styles.tabsContainer}
-          contentContainerStyle={styles.tabsContent}
-        >
-          {['All Stands', 'Acrylic', 'Eco Wood', 'Premium Metal'].map((tab) => {
-            const isActive = activeTab === tab;
+        {/* Title & Subtitle Area */}
+        <View style={styles.titleArea}>
+          <View style={styles.titleRow}>
+            <Image 
+              source={require('../../assets/risev logo.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain" 
+            />
+            <View style={styles.proBadge}>
+              <Text style={styles.proBadgeText}>NFC Bundle</Text>
+            </View>
+          </View>
+          <Text style={styles.subtitle}>
+            Turn walk-ins into regulars.{"\n"}
+            Includes <Ionicons name="people" size={13} color="#94A3B8" /> <Text style={{ color: '#E2E8F0' }}>500 Customer Lifetime</Text>.
+          </Text>
+        </View>
+
+        {/* Packages List (Vidart Pro Style) */}
+        <View style={styles.packagesContainer}>
+          {PACKAGES.map((pkg) => {
+            const isSelected = selectedPackageId === pkg.id;
             return (
               <TouchableOpacity
-                key={tab}
-                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-                onPress={() => setActiveTab(tab)}
-                activeOpacity={0.8}
+                key={pkg.id}
+                style={[styles.pkgCard, isSelected && styles.pkgCardSelected]}
+                onPress={() => setSelectedPackageId(pkg.id)}
+                activeOpacity={0.9}
               >
-                <Text style={[styles.tabBtnText, isActive && styles.tabBtnTextActive]}>{tab}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Product Cards Stack */}
-        {PRODUCTS.filter(prod => {
-          if (activeTab === 'All Stands') return true;
-          if (activeTab === 'Acrylic') return prod.id === 'acrylic';
-          if (activeTab === 'Eco Wood') return prod.id === 'walnut';
-          if (activeTab === 'Premium Metal') return prod.id === 'alloy';
-          return true;
-        }).map((prod) => {
-          const activeColorName = selectedColor[prod.id];
-          const activeColor = prod.colors.find(c => c.name === activeColorName) || prod.colors[0];
-
-          return (
-            <View key={prod.id} style={styles.productCard}>
-              {/* Product Visual Frame */}
-              <View style={[styles.visualFrame, { backgroundColor: activeColor.previewBg }]}>
-                {/* Product Badge */}
-                {prod.badge && (
-                  <View style={styles.productBadgeContainer}>
-                    <Text style={styles.productBadgeText}>{prod.badge}</Text>
+                <View style={styles.pkgRow}>
+                  <View style={styles.pkgLeft}>
+                    <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                      {isSelected && <Ionicons name="checkmark-sharp" size={12} color="#000" />}
+                    </View>
+                    <View>
+                      <Text style={[styles.pkgTitle, isSelected && { color: '#FFF' }]}>{pkg.title}</Text>
+                      <Text style={styles.pkgTagline}>{pkg.tagline}  <Text style={styles.pkgOriginalPrice}>RM{pkg.originalPrice}</Text></Text>
+                    </View>
                   </View>
-                )}
 
-                {/* 3D-Like Stand representation with CSS */}
-                <View style={[styles.mockupStand, { backgroundColor: prod.id === 'walnut' ? '#5C4033' : prod.id === 'alloy' ? '#4B5563' : '#050505' }]}>
-                  {/* Stand Brass Plate / Logo Badge */}
-                  <View style={styles.mockupEmblem}>
-                    <Ionicons name="wifi" size={14} color="#FFC700" style={{ transform: [{ rotate: '90deg' }] }} />
-                    <Text style={styles.mockupEmblemText}>TAP HERE</Text>
+                  <View style={[styles.discountPill, isSelected && styles.discountPillActive]}>
+                    <Text style={[styles.discountPillText, isSelected && { color: '#FFF' }]}>
+                      {pkg.discountBadge}
+                    </Text>
                   </View>
                 </View>
                 
-                {/* Visual Accent Badge */}
-                <View style={styles.visualBadge}>
-                  <Text style={styles.visualBadgeText}>{activeColor.name}</Text>
-                </View>
-              </View>
-
-              {/* Product Metadata */}
-              <View style={styles.productInfo}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.productName}>{prod.name}</Text>
-                    <Text style={styles.productTagline}>{prod.tagline}</Text>
+                {isSelected && (
+                  <View style={styles.pkgDescriptionBox}>
+                    <Text style={styles.pkgDescriptionText}>{pkg.description}</Text>
                   </View>
-                  <View style={styles.priceColumn}>
-                    <Text style={styles.productPrice}>{prod.price}</Text>
-                    {prod.originalPrice && (
-                      <Text style={styles.productOriginalPrice}>{prod.originalPrice}</Text>
-                    )}
-                    {prod.discountTag && (
-                      <View style={styles.discountBadge}>
-                        <Text style={styles.discountBadgeText}>{prod.discountTag}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-                <Text style={styles.productDesc}>{prod.description}</Text>
+        {/* Footer Links */}
+        <View style={styles.footerLinks}>
+          <Text style={styles.footerLinkText}>How it works</Text>
+          <Text style={styles.footerLinkText}>Restore Purchase</Text>
+          <Text style={styles.footerLinkText}>Privacy Policy</Text>
+        </View>
 
-                {/* Specs */}
-                <View style={styles.specsContainer}>
-                  <View style={styles.specRow}>
-                    <Ionicons name="hammer-outline" size={12} color="#64748B" />
-                    <Text style={styles.specText}>{prod.material}</Text>
-                  </View>
-                  <View style={styles.specRow}>
-                    <Ionicons name="resize-outline" size={12} color="#64748B" />
-                    <Text style={styles.specText}>{prod.dimensions}</Text>
-                  </View>
-                </View>
-
-                {/* Color Selector */}
-                <View style={styles.colorSelectorRow}>
-                  <Text style={styles.colorLabel}>Color:</Text>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    {prod.colors.map((c) => {
-                      const isActive = selectedColor[prod.id] === c.name;
-                      return (
-                        <TouchableOpacity
-                          key={c.name}
-                          style={[
-                            styles.colorDotOutline,
-                            isActive && { borderColor: '#FFC700' }
-                          ]}
-                          onPress={() => setSelectedColor(prev => ({ ...prev, [prod.id]: c.name }))}
-                          activeOpacity={0.8}
-                        >
-                          <View style={[styles.colorDot, { backgroundColor: c.hex === '#FFFFFF' ? '#F8FAFC' : c.hex }]} />
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* Buy Button */}
-                <TouchableOpacity
-                  style={styles.orderBtn}
-                  onPress={() => handleOrder(prod)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.orderBtnText}>Order {prod.name}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Shipping address Confirmation Modal */}
-      <Modal
-        visible={selectedProduct !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSelectedProduct(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirm Order</Text>
-              <TouchableOpacity onPress={() => setSelectedProduct(null)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={24} color="#64748B" />
+      {/* Massive Bottom CTA */}
+      <View style={styles.bottomCtaArea}>
+        <TouchableOpacity
+          onPress={() => setShowCheckoutSheet(true)}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={['#FF4B72', '#E11D48']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.massiveBtn}
+          >
+            <Text style={styles.massiveBtnText}>Get Started (RM {selectedPkg.price})</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* ======================================= */}
+      {/* SHIPPING & PAYMENT BOTTOM SHEET MODAL */}
+      {/* ======================================= */}
+      <Modal visible={showCheckoutSheet} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowCheckoutSheet(false)} />
+          
+          <View style={styles.sheetCard}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Shipping Details</Text>
+              <TouchableOpacity onPress={() => setShowCheckoutSheet(false)} style={styles.sheetCloseBtn}>
+                <Ionicons name="close" size={24} color="#94A3B8" />
               </TouchableOpacity>
             </View>
-
-            {selectedProduct && (
-              <View style={styles.modalProductBrief}>
-                <View style={styles.briefText}>
-                  <Text style={styles.briefName}>{selectedProduct.name}</Text>
-                  <Text style={styles.briefColor}>Color: {selectedColor[selectedProduct.id]}</Text>
-                </View>
-                <Text style={styles.briefPrice}>{selectedProduct.price}</Text>
+            
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+              
+              <View style={styles.formField}>
+                <Text style={styles.inputLabel}>Recipient Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={recipientName}
+                  onChangeText={setRecipientName}
+                  placeholder="Full Name"
+                  placeholderTextColor="#475569"
+                />
               </View>
-            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Delivery Address</Text>
-              <TextInput
-                style={[styles.textInput, { height: 70, textAlignVertical: 'top' }]}
-                value={shippingAddress}
-                onChangeText={setShippingAddress}
-                placeholder="Enter complete shipping address"
-                placeholderTextColor="#94A3B8"
-                multiline={true}
-                numberOfLines={3}
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
+              <View style={styles.formField}>
+                <Text style={styles.inputLabel}>WhatsApp Number</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={whatsappPhone}
+                  onChangeText={setWhatsappPhone}
+                  placeholder="e.g. 012345678"
+                  placeholderTextColor="#475569"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.inputLabel}>Full Address & Postcode</Text>
+                <TextInput
+                  style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+                  value={shippingAddress}
+                  onChangeText={setShippingAddress}
+                  placeholder="Detailed shipping address..."
+                  placeholderTextColor="#475569"
+                  multiline
+                />
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 10, marginBottom: 8 }]}>Payment Method</Text>
+              <View style={styles.paymentGrid}>
+                {['fpx', 'card', 'whatsapp'].map((method) => {
+                  const isActive = paymentMethod === method;
+                  let icon = "business-outline";
+                  let label = "FPX Online";
+                  if (method === 'card') { icon = "card-outline"; label = "Card"; }
+                  if (method === 'whatsapp') { icon = "logo-whatsapp"; label = "WhatsApp"; }
+                  
+                  return (
+                    <TouchableOpacity
+                      key={method}
+                      style={[styles.payOption, isActive && styles.payOptionActive]}
+                      onPress={() => setPaymentMethod(method as any)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name={icon as any} size={20} color={isActive ? '#FFC700' : '#64748B'} />
+                      <Text style={[styles.payOptionText, isActive && { color: '#FFF' }]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
                 })}
-              />
-            </View>
+              </View>
+            </ScrollView>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Recipient Phone Number</Text>
-              <TextInput
-                style={styles.textInput}
-                value={shippingPhone}
-                onChangeText={setShippingPhone}
-                placeholder="e.g. +60123456789"
-                placeholderTextColor="#94A3B8"
-                keyboardType="phone-pad"
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
+            <View style={styles.sheetFooter}>
+              <TouchableOpacity
+                onPress={handleCheckout}
+                disabled={isSubmitting}
+                activeOpacity={0.88}
+              >
+                <LinearGradient
+                  colors={['#FFD700', '#F59E0B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.finalPayBtn, isSubmitting && { opacity: 0.8 }]}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text style={styles.finalPayBtnText}>Pay RM {selectedPkg.price} Now</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
+      {/* SUCCESS MODAL */}
+      <Modal visible={completedOrder !== null} transparent={true} animationType="fade">
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <View style={styles.successIconCircle}>
+              <Ionicons name="checkmark-sharp" size={32} color="#000" />
+            </View>
+            <Text style={styles.successTitle}>Order Placed!</Text>
+            <Text style={styles.successSub}>Thank you. Your smart stand will be shipped out within 24 hours.</Text>
             <TouchableOpacity
-              style={styles.submitBtn}
-              onPress={submitOrder}
-              disabled={isOrdering}
-              activeOpacity={0.8}
+              style={styles.finalPayBtn}
+              onPress={() => {
+                setCompletedOrder(null);
+                router.back();
+              }}
             >
-              <Text style={styles.submitBtnText}>
-                {isOrdering ? 'Processing...' : 'Confirm & Purchase'}
-              </Text>
+              <Text style={styles.finalPayBtnText}>Back to Home</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -351,423 +380,341 @@ export default function NfcMarketplaceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#000000', // Pure pitch black
   },
-  scrollHeaderBg: {
+  backBtnAbsolute: {
     position: 'absolute',
-    top: -20,
-    left: -20,
-    right: -20,
-    height: 210,
-    backgroundColor: '#050505',
-    zIndex: 0,
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 20,
+    zIndex: 100,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
-    backgroundColor: '#050505',
-    zIndex: 10,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  backBtnCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
-  promoBanner: {
-    backgroundColor: '#0F172A',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 24,
-    zIndex: 1,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  promoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  promoTextColumn: {
-    flex: 1,
-    marginRight: 12,
-  },
-  freeBadge: {
-    backgroundColor: '#FFC700',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  freeBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  promoTitle: {
-    fontSize: 17,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-  },
-  promoDesc: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 4,
-    lineHeight: 15,
-  },
-  promoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,199,0,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    marginBottom: 16,
-    marginTop: 8,
-    zIndex: 1,
-  },
-  productCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    marginBottom: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  visualFrame: {
-    height: 180,
+  heroWrapper: {
+    width: '100%',
+    height: 480, // Taller to let the image show properly
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    overflow: 'hidden',
+    backgroundColor: '#000',
   },
-  mockupStand: {
-    width: 76,
-    height: 105,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 8,
-    transform: [{ perspective: 350 }, { rotateX: '15deg' }, { rotateY: '-12deg' }],
-  },
-  mockupEmblem: {
-    width: 54,
-    height: 72,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  mockupEmblemText: {
-    fontSize: 7.5,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    marginTop: 4,
-  },
-  visualBadge: {
+  heroImage: {
+    width: '100%',
+    height: '100%',
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(5, 5, 5, 0.75)',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 20,
   },
-  visualBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  productInfo: {
-    padding: 18,
-  },
-  productName: {
-    fontSize: 17,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  productTagline: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    marginTop: 2,
-  },
-  tabsContainer: {
-    marginBottom: 20,
-    marginTop: -4,
-    zIndex: 1,
-  },
-  tabsContent: {
-    gap: 10,
-    paddingRight: 20,
-  },
-  tabBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tabBtnActive: {
-    backgroundColor: '#FFC700',
-    borderColor: '#FFC700',
-  },
-  tabBtnText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
-  },
-  tabBtnTextActive: {
-    color: '#050505',
-  },
-  productBadgeContainer: {
+  fadeOverlayBottom: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: '#FFC700',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    zIndex: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    bottom: 0,
+    width: '100%',
+    height: 250, // Massive gradient to smooth out the edge
+    zIndex: 3,
   },
-  productBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+  titleArea: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: -80, // Pull it way up into the gradient
+    zIndex: 10,
   },
-  priceColumn: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    marginBottom: 10,
   },
-  productPrice: {
-    fontSize: 19,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+  logoImage: {
+    height: 32,
+    width: 110,
+    tintColor: '#FFFFFF', // Make the logo white
   },
-  productOriginalPrice: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#94A3B8',
-    textDecorationLine: 'line-through',
-  },
-  discountBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
+  proBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  discountBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#15803D',
-  },
-  productDesc: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#475569',
-    marginTop: 10,
-    lineHeight: 18,
-  },
-  specsContainer: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 12,
-  },
-  specRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  specText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-  },
-  colorSelectorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  colorLabel: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#334155',
-  },
-  colorDotOutline: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  orderBtn: {
-    backgroundColor: '#050505',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  orderBtnText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 10,
-    marginBottom: 12,
-  },
-  modalTitle: {
+  proBadgeText: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#000000',
   },
-  modalProductBrief: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  briefText: {
-    flex: 1,
-  },
-  briefName: {
+  subtitle: {
     fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  packagesContainer: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+    gap: 12,
+  },
+  pkgCard: {
+    backgroundColor: '#141415',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#1C1C1E',
+    overflow: 'hidden',
+  },
+  pkgCardSelected: {
+    borderColor: '#333',
+    backgroundColor: '#1A1A1C',
+  },
+  pkgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pkgLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+  },
+  pkgTitle: {
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
+    color: '#E5E5E5',
   },
-  briefColor: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    marginTop: 1,
+  pkgTagline: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#888',
+    marginTop: 4,
   },
-  briefPrice: {
-    fontSize: 14,
+  pkgOriginalPrice: {
+    textDecorationLine: 'line-through',
+    color: '#555',
+  },
+  discountPill: {
+    backgroundColor: '#2A2A2A',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  discountPillActive: {
+    backgroundColor: '#FF3366', // Vidart hot pink
+  },
+  discountPillText: {
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#888',
   },
-  inputContainer: {
-    marginBottom: 16,
+  pkgDescriptionBox: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#2C2C2E',
+  },
+  pkgDescriptionText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    lineHeight: 18,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  footerLinkText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#666',
+    textDecorationLine: 'underline',
+  },
+  bottomCtaArea: {
+    position: 'absolute',
+    bottom: 0,
     width: '100%',
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    backgroundColor: 'rgba(0,0,0,0.85)', // Slight dark blur to contrast button
+  },
+  massiveBtn: {
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#FF3366',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  massiveBtnText: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+
+  /* MODAL STYLES */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'flex-end',
+  },
+  sheetCard: {
+    backgroundColor: '#111111',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 1,
+    borderTopColor: '#262626',
+    maxHeight: '88%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E1E',
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  sheetCloseBtn: {
+    position: 'absolute',
+    right: 20,
+    padding: 8,
+  },
+  sheetContent: {
+    padding: 24,
+  },
+  formField: {
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
-    marginBottom: 6,
+    color: '#94A3B8',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   textInput: {
+    backgroundColor: '#161618',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#050505',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#2C2C2E',
+    borderRadius: 14,
+    padding: 16,
+    color: '#FFF',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
   },
-  submitBtn: {
-    backgroundColor: '#FFC700',
-    borderRadius: 12,
-    paddingVertical: 12,
+  paymentGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  payOption: {
+    flex: 1,
+    backgroundColor: '#161618',
+    borderWidth: 1,
+    borderColor: '#2C2C2E',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 8,
+  },
+  payOptionActive: {
+    borderColor: '#FFC700',
+    backgroundColor: 'rgba(255,199,0,0.08)',
+    borderWidth: 1.5,
+  },
+  payOptionText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  sheetFooter: {
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    backgroundColor: '#111111',
+    borderTopWidth: 1,
+    borderTopColor: '#1E1E1E',
+  },
+  finalPayBtn: {
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  finalPayBtnText: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000',
+  },
+
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    padding: 20,
   },
-  submitBtnText: {
+  successCard: {
+    width: '100%',
+    backgroundColor: '#111111',
+    borderRadius: 24,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#262626',
+  },
+  successIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFF',
+    marginBottom: 8,
+  },
+  successSub: {
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 20,
   },
 });
