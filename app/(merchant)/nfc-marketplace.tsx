@@ -166,9 +166,35 @@ export default function NfcPaywallScreen() {
       state.trim(),
     ].filter(Boolean).join(', ');
 
-    setIsSubmitting(true);
+    const generatedOrderNo = `NFC-${Date.now().toString(36).toUpperCase()}`;
+
+    // Save to PocketBase hardware_orders collection
+    try {
+      await pb.collection('hardware_orders').create({
+        order_no: generatedOrderNo,
+        user: user?.id || null,
+        merchant: user?.merchant_id || null,
+        package_title: selectedPkg.title,
+        units: selectedPkg.units,
+        amount: selectedPkg.price,
+        payment_method: paymentMethod,
+        payment_status: paymentMethod === 'whatsapp' ? 'pending' : 'paid',
+        fulfillment_status: 'pending',
+        recipient_name: recipientName.trim(),
+        whatsapp_phone: whatsappPhone.trim(),
+        address_line1: addressLine1.trim(),
+        address_line2: addressLine2.trim(),
+        postcode: postcode.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        full_address: fullAddress,
+      });
+    } catch (saveErr) {
+      console.warn('[NFC Marketplace] Order record save notice:', saveErr);
+    }
+
     const orderData = {
-      orderId: `NFC-${Date.now().toString(36).toUpperCase()}`,
+      orderId: generatedOrderNo,
       package: selectedPkg.title,
       amount: selectedPkg.price,
       storeName: storeName.trim(),
@@ -187,6 +213,7 @@ export default function NfcPaywallScreen() {
       setIsSubmitting(false);
       const textMsg = encodeURIComponent(
         `*Tempahan RiseV Smart Stand*\n\n` +
+        `🔖 *No. Pesanan:* ${orderData.orderId}\n` +
         `📦 *Pakej:* ${selectedPkg.title} (RM ${selectedPkg.price})\n` +
         `👤 *Penerima:* ${orderData.recipientName}\n` +
         `📞 *WhatsApp:* ${orderData.phone}\n` +
@@ -206,7 +233,7 @@ export default function NfcPaywallScreen() {
       setIsSubmitting(false);
       setShowCheckoutSheet(false);
       setCompletedOrder(orderData);
-    }, 1200);
+    }, 800);
   };
 
   return (
