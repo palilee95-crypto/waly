@@ -98,10 +98,80 @@ export default function NfcPaywallScreen() {
   const [codeError, setCodeError] = useState('');
   const [codeSuccess, setCodeSuccess] = useState('');
 
+  // Dynamic Package State
+  const [packages, setPackages] = useState<PackageOption[]>(PACKAGES);
+
   // Existing Order State
   const [existingOrder, setExistingOrder] = useState<any | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState<boolean>(true);
   const [showOrderNewPurchase, setShowOrderNewPurchase] = useState<boolean>(false);
+
+  // Load Custom NFC Stand Pricing from PocketBase (pricesettings02)
+  useEffect(() => {
+    async function loadNfcPricing() {
+      try {
+        const pricing = await pb.collection('pricing_settings').getOne('pricesettings02');
+        if (pricing) {
+          const singlePrice = Number(pricing.base_price_1m) || 119;
+          const duoPrice = Number(pricing.discount_3m) || 198;
+          const enterprisePrice = Number(pricing.discount_6m) || 469;
+
+          setPackages([
+            {
+              id: 'single',
+              units: 1,
+              title: '1x Stand + 500 Customers',
+              tagline: `RM ${singlePrice}`,
+              price: singlePrice,
+              originalPrice: Math.round(singlePrice * 1.6),
+              discountBadge: '40% OFF',
+              description: [
+                'Perfect for a single counter',
+                '1x Premium NFC Stand',
+                '500 Lifetime Customer Quota',
+                'Digital Loyalty Card system'
+              ]
+            },
+            {
+              id: 'duo',
+              units: 2,
+              title: '2x Stand + 1,000 Customers',
+              tagline: `RM ${duoPrice}`,
+              price: duoPrice,
+              originalPrice: Math.round(duoPrice * 2),
+              discountBadge: '50% OFF',
+              isPopular: true,
+              description: [
+                'Most popular choice for 2 branches',
+                '2x Premium NFC Stands',
+                '1,000 Lifetime Customer Quota',
+                'Digital Loyalty Card system'
+              ]
+            },
+            {
+              id: 'enterprise',
+              units: 5,
+              title: '5x Stand + 5,000 Customers',
+              tagline: `RM ${enterprisePrice}`,
+              price: enterprisePrice,
+              originalPrice: Math.round(enterprisePrice * 1.8),
+              discountBadge: '55% OFF',
+              description: [
+                'Best for multi-outlet franchises',
+                '5x Premium NFC Stands',
+                '5,000 Lifetime Customer Quota',
+                'Digital Loyalty Card system'
+              ]
+            }
+          ]);
+        }
+      } catch (err) {
+        // Fallback to static PACKAGES if pricesettings02 not found
+      }
+    }
+
+    loadNfcPricing();
+  }, []);
 
   useEffect(() => {
     async function checkExistingOrders() {
@@ -154,7 +224,7 @@ export default function NfcPaywallScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'fpx' | 'card' | 'whatsapp'>('fpx');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedPkg = PACKAGES.find(p => p.id === selectedPackageId) || PACKAGES[1];
+  const selectedPkg = packages.find(p => p.id === selectedPackageId) || packages[1] || PACKAGES[1];
 
   const handleRedeemCode = async () => {
     if (!standCodeInput.trim()) {
@@ -499,7 +569,7 @@ export default function NfcPaywallScreen() {
 
         {/* Packages List (Vidart Pro Style) */}
         <View style={styles.packagesContainer}>
-          {PACKAGES.map((pkg) => {
+          {packages.map((pkg) => {
             const isSelected = selectedPackageId === pkg.id;
             return (
               <TouchableOpacity
