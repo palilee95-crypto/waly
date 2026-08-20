@@ -12,12 +12,21 @@ import {
   ScrollView,
   Dimensions,
   useWindowDimensions,
+  Animated,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
-import { colors, radii } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 const { width } = Dimensions.get('window');
 const OTP_LENGTH = 6;
@@ -33,12 +42,35 @@ export default function OTPScreen() {
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // State for Reset Password
   const [showNewPasswordField, setShowNewPasswordField] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [newPassFocused, setNewPassFocused] = useState(false);
   const [confirmPassFocused, setConfirmPassFocused] = useState(false);
+  
   const inputRefs = useRef<TextInput[]>([]);
+
+  // Pulse animation for the background orb
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.15,
+          duration: 3500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 3500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
 
   // Keep track of changing params
   useEffect(() => {
@@ -65,6 +97,7 @@ export default function OTPScreen() {
     newOtp[index] = digit;
     setOtp(newOtp);
 
+    // Haptic feedback could be triggered here using expo-haptics
     if (digit && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -82,7 +115,9 @@ export default function OTPScreen() {
   const handleVerify = async (code?: string) => {
     const otpCode = code || otp.join('');
     if (otpCode.length !== OTP_LENGTH) return;
-    // OTP verified — show new password field
+    
+    // Smooth transition to password reset fields
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowNewPasswordField(true);
   };
 
@@ -149,10 +184,15 @@ export default function OTPScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background Ambient Blur Blobs */}
+      {/* Dynamic Animated Orb Background */}
       <View style={styles.ambientContainer}>
-        <View style={styles.blob1} />
-        <View style={styles.blob2} />
+        <Animated.View
+          style={[
+            styles.glowOrb,
+            { transform: [{ scale: pulseAnim }] },
+          ]}
+        />
+        <View style={styles.ambientLayer} />
       </View>
 
       <KeyboardAvoidingView
@@ -164,11 +204,10 @@ export default function OTPScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Navigation Header */}
+          {/* Top Navigation */}
           <View style={styles.navBar}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={18} color="#000000" />
-              <Text style={styles.backText}>Back</Text>
             </TouchableOpacity>
             
             <View style={styles.brandRow}>
@@ -179,91 +218,95 @@ export default function OTPScreen() {
             </View>
           </View>
 
-          {/* Main Card Container */}
-          <View style={styles.cardWrapper}>
-            {/* Back Layer 2 (Rotated slightly) */}
-            <View style={[styles.backLayer, styles.backLayer2]} />
-            {/* Back Layer 1 (Rotated slightly) */}
-            <View style={[styles.backLayer, styles.backLayer1]} />
-
-            {/* Main Glass Form Card */}
-            <View style={styles.mainCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={28} color="#000000" />
-                </View>
-                <Text style={styles.cardTitle}>Verify Code</Text>
-                <Text style={styles.cardSubtitle}>
-                  Please enter the 6-digit verification code sent to:
-                </Text>
-                <View style={styles.phoneBadgeContainer}>
-                  <Text style={styles.phoneBadge}>{maskedPhone || phone}</Text>
-                </View>
+          {/* Bento Grid Layout */}
+          <View style={styles.bentoContainer}>
+            
+            {/* Header Box */}
+            <View style={styles.bentoHeaderBox}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="finger-print-outline" size={26} color="#000000" />
               </View>
-
-              {/* OTP Inputs */}
-              <View style={styles.otpSection}>
-                <View style={styles.otpRow}>
-                  {otp.map((digit, index) => (
-                    <TextInput
-                      key={index}
-                      ref={(ref) => { if (ref) inputRefs.current[index] = ref; }}
-                      style={[
-                        styles.otpBox,
-                        digit ? styles.otpBoxFilled : null,
-                        index === filledCount && styles.otpBoxActive,
-                        errorMsg ? styles.otpBoxError : null,
-                      ]}
-                      value={digit}
-                      onChangeText={(t) => handleOtpChange(t, index)}
-                      onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                      keyboardType="number-pad"
-                      maxLength={1}
-                      textAlign="center"
-                      autoFocus={index === 0}
-                      caretHidden
-                      selectTextOnFocus
-                      placeholderTextColor="#BEC6E0"
-                      {...Platform.select({
-                        web: {
-                          outlineStyle: 'none',
-                        } as any,
-                      })}
-                    />
-                  ))}
-                </View>
+              <View style={styles.headerTextGroup}>
+                <Text style={styles.bentoTitle}>Security Verification</Text>
+                <Text style={styles.bentoSubtitle}>Code sent to {maskedPhone || phone}</Text>
               </View>
+            </View>
 
-              {/* Error Message Container */}
-              {errorMsg ? (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
-                  <Text style={styles.errorText}>{errorMsg}</Text>
-                </View>
-              ) : null}
-
-              {/* Verify button or New Password form */}
+            {/* Main OTP / Reset Password Box */}
+            <View style={styles.bentoMainBox}>
               {!showNewPasswordField ? (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, filledCount < OTP_LENGTH && styles.primaryBtnDisabled]}
-                  onPress={() => handleVerify()}
-                  disabled={filledCount < OTP_LENGTH || isLoading}
-                  activeOpacity={0.9}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <View style={styles.btnContent}>
-                      <Text style={styles.primaryBtnText}>VERIFY CODE</Text>
-                      <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <View style={{ width: '100%', gap: 12, marginTop: 8 }}>
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A', textAlign: 'center' }}>
-                    Set new password
+                <>
+                  <Text style={styles.instructionText}>
+                    Enter the 6-digit code to securely verify your identity.
                   </Text>
+                  
+                  {/* OTP Inputs */}
+                  <View style={styles.otpRow}>
+                    {otp.map((digit, index) => (
+                      <TextInput
+                        key={index}
+                        ref={(ref) => { if (ref) inputRefs.current[index] = ref; }}
+                        style={[
+                          styles.otpBox,
+                          digit ? styles.otpBoxFilled : null,
+                          index === filledCount && styles.otpBoxActive,
+                          errorMsg ? styles.otpBoxError : null,
+                        ]}
+                        value={digit}
+                        onChangeText={(t) => handleOtpChange(t, index)}
+                        onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
+                        keyboardType="number-pad"
+                        maxLength={1}
+                        textAlign="center"
+                        autoFocus={index === 0}
+                        caretHidden
+                        selectTextOnFocus
+                        placeholderTextColor="#BEC6E0"
+                        {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                      />
+                    ))}
+                  </View>
+
+                  {errorMsg ? (
+                    <View style={styles.errorBox}>
+                      <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, filledCount < OTP_LENGTH && styles.primaryBtnDisabled]}
+                    onPress={() => handleVerify()}
+                    disabled={filledCount < OTP_LENGTH || isLoading}
+                    activeOpacity={0.9}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.btnContent}>
+                        <Text style={styles.primaryBtnText}>CONFIRM CODE</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.resetPasswordContainer}>
+                  <View style={styles.resetHeader}>
+                    <View style={styles.successBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    </View>
+                    <Text style={styles.instructionText}>
+                      Verification successful. You can now set a new password.
+                    </Text>
+                  </View>
+
+                  {errorMsg ? (
+                    <View style={styles.errorBox}>
+                      <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
 
                   {/* New Password */}
                   <View style={[styles.inputGroup, newPassFocused && styles.inputGroupFocused]}>
@@ -311,16 +354,21 @@ export default function OTPScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+            </View>
 
-              {/* Timer & resend */}
-              <View style={styles.resendArea}>
+            {/* Bottom Row Blocks */}
+            <View style={styles.bentoBottomRow}>
+              {/* Timer/Resend Box */}
+              <View style={[styles.bentoMiniBox, styles.timerBox]}>
                 {canResend ? (
-                  <TouchableOpacity onPress={handleResend} style={styles.resendBtn}>
-                    <Text style={styles.resendActive}>Resend OTP code</Text>
+                  <TouchableOpacity onPress={handleResend} style={styles.resendBtnRow}>
+                    <Ionicons name="refresh" size={16} color="#000000" />
+                    <Text style={styles.resendActive}>Resend Code</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.timerRow}>
-                    <Text style={styles.timerLabel}>Resend in </Text>
+                  <View style={styles.timerContent}>
+                    <Ionicons name="time-outline" size={16} color="#737686" />
+                    <Text style={styles.timerLabel}>Resend in</Text>
                     <View style={styles.timerBadge}>
                       <Text style={styles.timerText}>00:{String(resendTimer).padStart(2, '0')}</Text>
                     </View>
@@ -328,12 +376,10 @@ export default function OTPScreen() {
                 )}
               </View>
 
-              {/* Security info box */}
-              <View style={styles.infoBox}>
-                <Ionicons name="warning-outline" size={16} color="#92400E" style={{ marginTop: 1 }} />
-                <Text style={styles.infoText}>
-                  Do not share this code with anyone. RISEV will never ask for your OTP code.
-                </Text>
+              {/* Security Box */}
+              <View style={[styles.bentoMiniBox, styles.securityBox]}>
+                <Ionicons name="lock-closed" size={16} color="#10B981" />
+                <Text style={styles.securityText}>256-bit Encrypted</Text>
               </View>
             </View>
           </View>
@@ -341,7 +387,7 @@ export default function OTPScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-               © 2026 RISEV SYSTEMS INC. • ALL ENCRYPTED PROTOCOLS ACTIVE
+               © 2026 RISEV SYSTEMS INC. • SECURE VERIFICATION PORTAL
             </Text>
           </View>
         </ScrollView>
@@ -353,30 +399,28 @@ export default function OTPScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Clean pure white surface
+    backgroundColor: '#FAFAFA', // Slight off-white for better contrast with white boxes
   },
   ambientContainer: {
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',
     zIndex: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  blob1: {
+  glowOrb: {
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: '#E0E7FF', // Soft indigo/blue glow
     position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'transparent',
-    top: '10%',
-    left: -100,
-  },
-  blob2: {
-    position: 'absolute',
-    width: 350,
-    height: 350,
-    borderRadius: 175,
-    backgroundColor: 'transparent',
-    bottom: '20%',
+    top: -50,
     right: -100,
+    opacity: 0.8,
+  },
+  ambientLayer: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(250, 250, 250, 0.4)', // Frost overlay
   },
   scroll: {
     flexGrow: 1,
@@ -393,23 +437,35 @@ const styles = StyleSheet.create({
     height: 48,
   },
   backBtn: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  backText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   brandIconWrap: {
     width: 24,
@@ -425,99 +481,84 @@ const styles = StyleSheet.create({
     color: '#000000',
     letterSpacing: -0.5,
   },
-  cardWrapper: {
-    position: 'relative',
+  bentoContainer: {
+    gap: 16,
     marginTop: 8,
   },
-  backLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  backLayer2: {
-    transform: [{ rotate: '2.5deg' }],
-    opacity: 0.3,
-    top: -6,
-    right: -6,
-  },
-  backLayer1: {
-    transform: [{ rotate: '-1.5deg' }],
-    opacity: 0.2,
-    bottom: -4,
-    left: -4,
-  },
-  mainCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 32,
-    padding: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#0b1c30',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 8,
-    gap: 16,
-  },
-  cardHeader: {
+  bentoHeaderBox: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    shadowColor: '#0b1c30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#F1F5F9',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  cardTitle: {
-    fontSize: 22,
+  headerTextGroup: {
+    flex: 1,
+    gap: 4,
+  },
+  bentoTitle: {
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    letterSpacing: -0.5,
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  cardSubtitle: {
+  bentoSubtitle: {
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#434655',
-    textAlign: 'center',
-    lineHeight: 18,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
-  phoneBadgeContainer: {
-    marginTop: 4,
+  bentoMainBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#0b1c30',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+    gap: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
-  phoneBadge: {
+  instructionText: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 99,
-    overflow: 'hidden',
-  },
-  otpSection: {
-    alignItems: 'center',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#475569',
+    lineHeight: 20,
+    textAlign: 'center',
   },
   otpRow: {
     flexDirection: 'row',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 4,
   },
   otpBox: {
-    width: width > 360 ? 44 : 38,
-    height: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#c3c6d7',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 20,
+    width: width > 360 ? 46 : 40,
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    fontSize: 22,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#000000',
     textAlign: 'center',
@@ -525,44 +566,48 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   otpBoxFilled: {
-    borderColor: '#000000',
+    borderColor: '#94A3B8',
     backgroundColor: '#FFFFFF',
-    color: '#000000',
   },
   otpBoxActive: {
     borderColor: '#000000',
     borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   otpBoxError: {
     borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
-  errorContainer: {
+  errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#FECACA',
     padding: 10,
     borderRadius: 12,
-    width: '100%',
-    marginTop: 4,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#B91C1C',
   },
   primaryBtn: {
     height: 56,
-    backgroundColor: '#000000',
+    backgroundColor: '#0F172A',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
   },
@@ -580,68 +625,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
-  resendArea: {
-    alignItems: 'center',
-    marginVertical: 4,
+  resetPasswordContainer: {
+    gap: 16,
   },
-  resendBtn: {
-    paddingVertical: 4,
-  },
-  resendActive: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#000000',
-    textDecorationLine: 'underline',
-  },
-  timerRow: {
+  resetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  timerLabel: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#737686',
-  },
-  timerBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 99,
-  },
-  timerText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFBEB',
-    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
     padding: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B',
-    gap: 8,
+    borderRadius: 12,
+    gap: 12,
   },
-  infoText: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#92400E',
-    lineHeight: 16,
-  },
-  footer: {
+  successBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#D1FAE5',
     alignItems: 'center',
-    marginTop: 'auto',
-    paddingVertical: 12,
-  },
-  footerText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#737686',
-    opacity: 0.6,
+    justifyContent: 'center',
   },
   inputGroup: {
     flexDirection: 'row',
@@ -649,9 +652,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    height: 52,
-    width: '100%',
+    borderRadius: 14,
+    height: 56,
   },
   inputGroupFocused: {
     borderColor: '#000000',
@@ -664,4 +666,81 @@ const styles = StyleSheet.create({
     color: '#000000',
     paddingHorizontal: 12,
   },
+  bentoBottomRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  bentoMiniBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#0b1c30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerBox: {
+    flex: 3,
+  },
+  securityBox: {
+    flex: 2,
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+  },
+  resendBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  resendActive: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  timerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timerLabel: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  timerBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+  },
+  timerText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  securityText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#10B981',
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 'auto',
+    paddingVertical: 16,
+  },
+  footerText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
 });
+

@@ -13,8 +13,18 @@ import {
   Modal,
   KeyboardAvoidingView,
   SafeAreaView,
-  Image
+  Image,
+  LayoutAnimation,
+  UIManager,
+  Animated
 } from 'react-native';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -92,11 +102,24 @@ export default function NfcPaywallScreen() {
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
 
   // Activation Code States (TikTok / Shopee redemption)
-  const [showCodeBox, setShowCodeBox] = useState(false);
   const [standCodeInput, setStandCodeInput] = useState('');
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [codeError, setCodeError] = useState('');
   const [codeSuccess, setCodeSuccess] = useState('');
+
+  // UI States
+  const [showPricingPackages, setShowPricingPackages] = useState(false);
+
+  // Bouncing arrow animation
+  const bounceAnim = React.useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, { toValue: 6, duration: 800, useNativeDriver: true }),
+        Animated.timing(bounceAnim, { toValue: 0, duration: 800, useNativeDriver: true })
+      ])
+    ).start();
+  }, [bounceAnim]);
 
   // Dynamic Package State
   const [packages, setPackages] = useState<PackageOption[]>(PACKAGES);
@@ -476,7 +499,7 @@ export default function NfcPaywallScreen() {
         {/* Massive Hero Section Fading Into Black */}
         <View style={styles.heroWrapper}>
           <Image 
-            source={require('../../assets/nfc-hero.png')} 
+            source={require('../../assets/imej nfc.png')} 
             style={styles.heroImage} 
             resizeMode="contain" 
           />
@@ -506,13 +529,9 @@ export default function NfcPaywallScreen() {
           </Text>
         </View>
 
-        {/* Stand Code Redemption Box (TikTok Shop / Shopee package fulfillment) */}
+        {/* Stand Code Redemption Box */}
         <View style={styles.activationCard}>
-          <TouchableOpacity 
-            style={styles.activationHeader}
-            onPress={() => setShowCodeBox(!showCodeBox)}
-            activeOpacity={0.85}
-          >
+          <View style={styles.activationHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View style={styles.chipIconContainer}>
                 <Ionicons name="hardware-chip-outline" size={18} color="#FFC700" />
@@ -526,48 +545,67 @@ export default function NfcPaywallScreen() {
                 </Text>
               </View>
             </View>
-            <View style={styles.chevronCircle}>
-              <Ionicons name={showCodeBox ? "chevron-up" : "chevron-down"} size={16} color="#CBD5E1" />
-            </View>
-          </TouchableOpacity>
+          </View>
 
-          {showCodeBox && (
-            <View style={styles.activationBody}>
-              <View style={styles.activationInputRow}>
-                <TextInput
-                  style={styles.activationInput}
-                  placeholder="STAND-XXXX-XXXX"
-                  placeholderTextColor="#64748B"
-                  value={standCodeInput}
-                  onChangeText={setStandCodeInput}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
+          <View style={styles.activationBody}>
+            <View style={styles.activationInputRow}>
+              <TextInput
+                style={styles.activationInput}
+                placeholder="STAND-XXXX-XXXX"
+                placeholderTextColor="#64748B"
+                value={standCodeInput}
+                onChangeText={setStandCodeInput}
+                autoCapitalize="characters"
+              />
+              <TouchableOpacity
+                onPress={handleRedeemCode}
+                disabled={isRedeemingCode}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#FACC15', '#EAB308']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={styles.redeemBtn}
-                  onPress={handleRedeemCode}
-                  disabled={isRedeemingCode}
-                  activeOpacity={0.85}
                 >
                   {isRedeemingCode ? (
                     <ActivityIndicator size="small" color="#000000" />
                   ) : (
                     <Text style={styles.redeemBtnText}>Redeem</Text>
                   )}
-                </TouchableOpacity>
-              </View>
-
-              {codeError ? (
-                <Text style={styles.codeErrorText}>{codeError}</Text>
-              ) : null}
-
-              {codeSuccess ? (
-                <Text style={styles.codeSuccessText}>{codeSuccess}</Text>
-              ) : null}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {codeError ? (
+              <Text style={styles.codeErrorText}>{codeError}</Text>
+            ) : null}
+
+            {codeSuccess ? (
+              <Text style={styles.codeSuccessText}>{codeSuccess}</Text>
+            ) : null}
+          </View>
         </View>
 
+        {/* Curiosity Button (shown if pricing is hidden) */}
+        {!showPricingPackages && (
+          <TouchableOpacity 
+            style={styles.curiosityBtn}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowPricingPackages(true);
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.curiosityBtnText}>Don't have a stand? Get Yours Here</Text>
+            <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+              <Ionicons name="arrow-down-circle" size={20} color="#FFC700" />
+            </Animated.View>
+          </TouchableOpacity>
+        )}
+
         {/* Packages List (Vidart Pro Style) */}
+        {showPricingPackages && (
         <View style={styles.packagesContainer}>
           {packages.map((pkg) => {
             const isSelected = selectedPackageId === pkg.id;
@@ -610,24 +648,27 @@ export default function NfcPaywallScreen() {
             );
           })}
 
-          <Text style={styles.disclaimerText}>
-            *Note: WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via monthly subscription plans in your dashboard.
-          </Text>
+          <View style={styles.disclaimerBox}>
+            <Ionicons name="information-circle" size={18} color="#64748B" style={{ marginTop: 2 }} />
+            <Text style={styles.disclaimerText}>
+              <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>Note: </Text>
+              WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via monthly subscription plans in your dashboard.
+            </Text>
+          </View>
         </View>
+        )}
 
-        {/* Footer Links */}
         <View style={styles.footerLinks}>
           <Text style={styles.footerLinkText}>How it works</Text>
           <Text style={styles.footerLinkText}>Restore Purchase</Text>
           <Text style={styles.footerLinkText}>Privacy Policy</Text>
         </View>
 
-        <View style={{ height: 100 }} />
       </ScrollView>
       )}
 
-      {/* Massive Bottom CTA (only shown if ordering new stand) */}
-      {(!existingOrder || showOrderNewPurchase) && (
+      {/* Massive Bottom CTA (only shown if ordering new stand and pricing is shown) */}
+      {showPricingPackages && (!existingOrder || showOrderNewPurchase) && (
         <View style={styles.bottomCtaArea}>
           <TouchableOpacity
             onPress={() => setShowCheckoutSheet(true)}
@@ -887,23 +928,27 @@ const styles = StyleSheet.create({
     tintColor: '#FFFFFF',
   },
   proBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    backgroundColor: 'rgba(255, 199, 0, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.3)',
   },
   proBadgeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#FFD700',
+    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#CBD5E1',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
     paddingHorizontal: 20,
+    marginTop: 4,
   },
   packagesContainer: {
     paddingHorizontal: 20,
@@ -993,14 +1038,24 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     lineHeight: 18,
   },
+  disclaimerBox: {
+    flexDirection: 'row',
+    backgroundColor: '#131316',
+    borderWidth: 1,
+    borderColor: '#222225',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    marginHorizontal: 4,
+    gap: 10,
+    alignItems: 'flex-start',
+  },
   disclaimerText: {
-    fontSize: 10,
+    flex: 1,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 16,
-    paddingHorizontal: 10,
+    color: '#94A3B8',
+    lineHeight: 18,
   },
   footerLinks: {
     flexDirection: 'row',
@@ -1142,11 +1197,31 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   finalPayBtnText: {
+    color: '#000000',
     fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000',
+    letterSpacing: 0.5,
   },
-
+  curiosityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#18181B',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 30,
+    marginTop: 20,
+    borderRadius: 40,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  curiosityBtnText: {
+    color: '#FFC700',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    letterSpacing: 0.2,
+  },
   successOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',
@@ -1189,19 +1264,14 @@ const styles = StyleSheet.create({
 
   // Stand Activation Code Card (Dark Aesthetic)
   activationCard: {
-    backgroundColor: '#111113',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    backgroundColor: '#111114',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginHorizontal: 20,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 199, 0, 0.22)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
+    borderColor: '#27272A',
   },
   activationHeader: {
     flexDirection: 'row',
@@ -1211,76 +1281,69 @@ const styles = StyleSheet.create({
   chipIconContainer: {
     width: 32,
     height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 199, 0, 0.1)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 199, 0, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   activationTitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   activationSubtitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 1,
-  },
-  chevronCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#A1A1AA',
+    marginTop: 2,
   },
   activationBody: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: 'rgba(255, 255, 255, 0.04)',
   },
   activationInputRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   activationInput: {
     flex: 1,
-    backgroundColor: '#000000',
+    height: 48,
+    backgroundColor: '#18181B',
     borderWidth: 1,
-    borderColor: '#242428',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 12,
+    borderColor: '#27272A',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   redeemBtn: {
-    backgroundColor: '#FFC700',
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   redeemBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
+    letterSpacing: 0.5,
   },
   codeErrorText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#EF4444',
-    marginTop: 6,
+    marginTop: 8,
   },
   codeSuccessText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#10B981',
-    marginTop: 6,
+    marginTop: 8,
   },
 });
