@@ -169,7 +169,93 @@ routerAdd("POST", "/api/risev/easyparcel/book", (c) => {
   let trackingNumber = body.tracking_number;
   let awbUrl = null;
 
-  // Generate unique AWB tracking if not provided
+  const apiKey = $os.getenv("EASYPARCEL_API_KEY");
+  const env = $os.getenv("EASYPARCEL_ENV") || "live";
+  const baseUrl = env === "demo" ? "https://demo.connect.easyparcel.my" : "https://connect.easyparcel.my";
+
+  // If live EasyParcel API key is set, submit order to EasyParcel
+  if (apiKey && body.service_id) {
+    try {
+      const recipientName = orderRecord.getString("recipient_name") || "Valued Merchant";
+      const recipientPhone = orderRecord.getString("whatsapp_phone") || "+60123456789";
+      const addressLine1 = orderRecord.getString("address_line1") || orderRecord.getString("full_address") || "Commercial Unit";
+      const postcode = orderRecord.getString("postcode") || "50470";
+      const city = orderRecord.getString("city") || "Kuala Lumpur";
+      const state = orderRecord.getString("state") || "Kuala Lumpur";
+      const orderNo = orderRecord.getString("order_no");
+
+      const bulkItem = [{
+        content: "Risev Smart Stand Hardware Kit",
+        value: 119.00,
+        weight: "0.5",
+        pick_name: body.sender_name || "Risev Fulfillment Hub",
+        pick_contact: body.sender_phone || "+60123456789",
+        pick_addr1: body.sender_address || "No 1, Jalan Teknologi 2",
+        pick_code: body.sender_postcode || "50470",
+        pick_state: body.sender_state || "Kuala Lumpur",
+        pick_country: "MY",
+        send_name: recipientName,
+        send_contact: recipientPhone,
+        send_addr1: addressLine1,
+        send_code: postcode,
+        send_state: state,
+        send_country: "MY",
+        service_id: body.service_id,
+        reference: orderNo
+      }];
+
+      const submitResp = $http.send({
+        url: `${baseUrl}/?ac=EPSubmitOrderBulk`,
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `api=${encodeURIComponent(apiKey)}&bulk=${encodeURIComponent(JSON.stringify(bulkItem))}`,
+        timeout: 15
+      });
+
+      if (submitResp.statusCode === 200) {
+        const parsedSubmit = JSON.parse(submitResp.raw);
+        if (parsedSubmit && parsedSubmit.result && parsedSubmit.result[0]) {
+          const epOrder = parsedSubmit.result[0];
+          const epOrderNo = epOrder.order_number;
+          
+          if (epOrder.parcel_number) {
+            trackingNumber = epOrder.parcel_number;
+          }
+          if (epOrder.awb) {
+            trackingNumber = epOrder.awb;
+          }
+
+          // Auto-pay with EasyParcel credits
+          if (epOrderNo) {
+            try {
+              const payResp = $http.send({
+                url: `${baseUrl}/?ac=EPPayOrderBulk`,
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `api=${encodeURIComponent(apiKey)}&bulk=${encodeURIComponent(JSON.stringify([{ order_no: epOrderNo }]))}`,
+                timeout: 15
+              });
+              if (payResp.statusCode === 200) {
+                const parsedPay = JSON.parse(payResp.raw);
+                if (parsedPay && parsedPay.result && parsedPay.result[0]) {
+                  const payResult = parsedPay.result[0];
+                  if (payResult.parcel_number) trackingNumber = payResult.parcel_number;
+                  if (payResult.awb) trackingNumber = payResult.awb;
+                  if (payResult.awb_id_link) awbUrl = payResult.awb_id_link;
+                }
+              }
+            } catch (payErr) {
+              console.log("[EASYPARCEL PAY NOTICE]", payErr.message || payErr);
+            }
+          }
+        }
+      }
+    } catch (apiBookErr) {
+      console.log("[EASYPARCEL API BOOKING NOTICE]", apiBookErr.message || apiBookErr);
+    }
+  }
+
+  // Fallback AWB generation if offline or demo
   if (!trackingNumber) {
     const courierPrefix = courierName.toLowerCase().includes("ninja") ? "NVMY" 
       : courierName.toLowerCase().includes("pos") ? "ER" 
