@@ -13,6 +13,7 @@ import {
   Dimensions,
   Image,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -98,6 +99,65 @@ export default function LoginScreen() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false);
+  const [isVerifiedSuccess, setIsVerifiedSuccess] = useState(false);
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  // Pulsing animation for the verification waiting window
+  useEffect(() => {
+    if (step !== 'verify-email') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.12,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [step]);
+
+  // Live Auto-Detection: Polling verification status in real-time
+  useEffect(() => {
+    if (step !== 'verify-email' || isAutoLoggingIn || isVerifiedSuccess) return;
+
+    const fullPhone = getFullPhone();
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkPhone(fullPhone);
+        if (res && res.exists && res.verified) {
+          clearInterval(interval);
+          setIsVerifiedSuccess(true);
+          setIsAutoLoggingIn(true);
+
+          // Automatically log the user in once verified!
+          setTimeout(async () => {
+            try {
+              await loginWithIdentifier(email.trim().toLowerCase(), password);
+              const record = pb.authStore.record;
+              const userRole = record?.role || role || 'customer';
+              router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+            } catch (err: any) {
+              console.warn('[Auto-Login Error after Verify]:', err);
+              setIsAutoLoggingIn(false);
+              setStep('password');
+            }
+          }, 1200);
+        }
+      } catch (err) {
+        // Ignore transient background errors
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [step, email, password, role, isAutoLoggingIn, isVerifiedSuccess]);
   
   const [emailFocused, setEmailFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
@@ -350,128 +410,202 @@ export default function LoginScreen() {
                 )}
 
                 {step === 'verify-email' && (
-                  <View style={{ alignItems: 'center', paddingVertical: 10 }}>
-                    <View style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 32,
-                      backgroundColor: 'rgba(15, 23, 42, 0.08)',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: 14,
-                    }}>
-                      <Ionicons name="mail" size={32} color="#0F172A" />
-                    </View>
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    {isVerifiedSuccess ? (
+                      /* Success Celebration State */
+                      <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                        <View style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: 36,
+                          backgroundColor: '#DCFCE7',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: 16,
+                          borderWidth: 2,
+                          borderColor: '#86EFAC',
+                        }}>
+                          <Ionicons name="checkmark-circle" size={44} color="#16A34A" />
+                        </View>
 
-                    <Text style={{
-                      fontSize: 18,
-                      fontFamily: 'PlusJakartaSans_800ExtraBold',
-                      color: '#0F172A',
-                      textAlign: 'center',
-                      marginBottom: 6,
-                    }}>
-                      Verify Your Email
-                    </Text>
+                        <Text style={{
+                          fontSize: 20,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#0F172A',
+                          textAlign: 'center',
+                          marginBottom: 8,
+                        }}>
+                          Email Verified! 🎉
+                        </Text>
 
-                    <Text style={{
-                      fontSize: 13,
-                      fontFamily: 'PlusJakartaSans_500Medium',
-                      color: '#475569',
-                      textAlign: 'center',
-                      lineHeight: 18,
-                      marginBottom: 12,
-                    }}>
-                      We sent a verification link to:
-                    </Text>
+                        <Text style={{
+                          fontSize: 14,
+                          fontFamily: 'PlusJakartaSans_500Medium',
+                          color: '#475569',
+                          textAlign: 'center',
+                          marginBottom: 16,
+                        }}>
+                          Welcome to Risev! Logging you in now...
+                        </Text>
 
-                    <View style={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.06)',
-                      borderRadius: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      marginBottom: 14,
-                      borderWidth: 1,
-                      borderColor: 'rgba(15, 23, 42, 0.12)',
-                      width: '100%',
-                      alignItems: 'center',
-                    }}>
-                      <Text style={{
-                        fontSize: 13,
-                        fontFamily: 'PlusJakartaSans_700Bold',
-                        color: '#0F172A',
-                      }}>
-                        {email}
-                      </Text>
-                    </View>
-
-                    <Text style={{
-                      fontSize: 12,
-                      fontFamily: 'PlusJakartaSans_400Regular',
-                      color: '#64748B',
-                      textAlign: 'center',
-                      lineHeight: 18,
-                      marginBottom: 20,
-                    }}>
-                      Click the link in your email to activate your account. Once verified, click below to log in.
-                    </Text>
-
-                    {resendSuccess && (
-                      <View style={[styles.errorContainer, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginBottom: 14 }]}>
-                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                        <Text style={[styles.errorText, { color: '#065F46' }]}>Verification link resent! Please check your inbox.</Text>
+                        <ActivityIndicator size="small" color="#0F172A" />
                       </View>
+                    ) : (
+                      /* Live Waiting State with Radar Pulse */
+                      <>
+                        {/* Animated Pulsing Icon */}
+                        <Animated.View style={{
+                          transform: [{ scale: pulseAnim }],
+                          width: 76,
+                          height: 76,
+                          borderRadius: 38,
+                          backgroundColor: 'rgba(15, 23, 42, 0.08)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: 16,
+                          borderWidth: 2,
+                          borderColor: 'rgba(15, 23, 42, 0.15)',
+                        }}>
+                          <Ionicons name="mail-unread" size={38} color="#0F172A" />
+                        </Animated.View>
+
+                        <Text style={{
+                          fontSize: 19,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#0F172A',
+                          textAlign: 'center',
+                          marginBottom: 6,
+                        }}>
+                          Waiting for Verification
+                        </Text>
+
+                        <Text style={{
+                          fontSize: 13,
+                          fontFamily: 'PlusJakartaSans_500Medium',
+                          color: '#475569',
+                          textAlign: 'center',
+                          lineHeight: 18,
+                          marginBottom: 12,
+                        }}>
+                          We sent a verification link to:
+                        </Text>
+
+                        {/* Recipient Email Chip */}
+                        <View style={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.06)',
+                          borderRadius: 10,
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          marginBottom: 14,
+                          borderWidth: 1,
+                          borderColor: 'rgba(15, 23, 42, 0.12)',
+                          width: '100%',
+                          alignItems: 'center',
+                        }}>
+                          <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'PlusJakartaSans_700Bold',
+                            color: '#0F172A',
+                          }}>
+                            {email}
+                          </Text>
+                        </View>
+
+                        {/* Live Radar Polling Status Indicator */}
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: 'rgba(255, 255, 255, 0.65)',
+                          borderRadius: 20,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          marginBottom: 16,
+                          borderWidth: 1,
+                          borderColor: 'rgba(15, 23, 42, 0.1)',
+                          gap: 8,
+                        }}>
+                          <ActivityIndicator size="small" color="#0F172A" />
+                          <Text style={{
+                            fontSize: 12,
+                            fontFamily: 'PlusJakartaSans_600SemiBold',
+                            color: '#0F172A',
+                          }}>
+                            Listening for your confirmation...
+                          </Text>
+                        </View>
+
+                        <Text style={{
+                          fontSize: 12,
+                          fontFamily: 'PlusJakartaSans_400Regular',
+                          color: '#64748B',
+                          textAlign: 'center',
+                          lineHeight: 18,
+                          marginBottom: 18,
+                        }}>
+                          Click the link in your email on any phone or computer. This page will <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>automatically log you in</Text> once clicked.
+                        </Text>
+
+                        {resendSuccess && (
+                          <View style={[styles.errorContainer, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginBottom: 14 }]}>
+                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                            <Text style={[styles.errorText, { color: '#065F46' }]}>Verification email resent! Please check your inbox.</Text>
+                          </View>
+                        )}
+
+                        {/* Resend Action */}
+                        <TouchableOpacity
+                          disabled={resendCooldown > 0 || isLoading}
+                          onPress={async () => {
+                            if (!email || resendCooldown > 0) return;
+                            setIsLoading(true);
+                            try {
+                              await resendVerificationEmail(email.trim().toLowerCase());
+                              setResendSuccess(true);
+                              setResendCooldown(60);
+                              const timer = setInterval(() => {
+                                setResendCooldown((prev) => {
+                                  if (prev <= 1) {
+                                    clearInterval(timer);
+                                    return 0;
+                                  }
+                                  return prev - 1;
+                                });
+                              }, 1000);
+                            } catch (e: any) {
+                              Alert.alert('Error', e?.message || 'Failed to resend verification email.');
+                            } finally {
+                              setIsLoading(false);
+                            }
+                          }}
+                          style={[
+                            styles.primaryBtn,
+                            resendCooldown > 0 && styles.primaryBtnDisabled,
+                            { marginBottom: 10 }
+                          ]}
+                          activeOpacity={0.9}
+                        >
+                          <View style={styles.btnContent}>
+                            <Text style={[
+                              styles.primaryBtnText,
+                              resendCooldown > 0 && styles.primaryBtnTextDisabled
+                            ]}>
+                              {resendCooldown > 0 ? `RESEND IN ${resendCooldown}s` : 'RESEND VERIFICATION EMAIL'}
+                            </Text>
+                            <Ionicons name="refresh" size={16} color={resendCooldown > 0 ? 'rgba(255,255,255,0.45)' : '#FFFFFF'} />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Back to Phone Input */}
+                        <TouchableOpacity 
+                          onPress={() => setStep('phone')} 
+                          style={{ alignItems: 'center', marginTop: 4, padding: 8 }}
+                        >
+                          <Text style={{ fontSize: 13, color: '#451A03', fontFamily: 'PlusJakartaSans_700Bold' }}>
+                            ← Change Phone / Re-enter
+                          </Text>
+                        </TouchableOpacity>
+                      </>
                     )}
-
-                    {/* Primary Login Button */}
-                    <TouchableOpacity
-                      style={styles.primaryBtn}
-                      onPress={() => {
-                        setErrorMsg('');
-                        setStep('password');
-                      }}
-                      activeOpacity={0.9}
-                    >
-                      <View style={styles.btnContent}>
-                        <Text style={styles.primaryBtnText}>I'VE VERIFIED — LOG IN</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Resend Verification Action */}
-                    <TouchableOpacity
-                      disabled={resendCooldown > 0 || isLoading}
-                      onPress={async () => {
-                        if (!email || resendCooldown > 0) return;
-                        setIsLoading(true);
-                        try {
-                          await resendVerificationEmail(email.trim().toLowerCase());
-                          setResendSuccess(true);
-                          setResendCooldown(60);
-                          const timer = setInterval(() => {
-                            setResendCooldown((prev) => {
-                              if (prev <= 1) {
-                                clearInterval(timer);
-                                return 0;
-                              }
-                              return prev - 1;
-                            });
-                          }, 1000);
-                        } catch (e: any) {
-                          Alert.alert('Error', e?.message || 'Failed to resend verification email.');
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                      style={{ marginTop: 12, padding: 6 }}
-                    >
-                      <Text style={{
-                        fontSize: 13,
-                        fontFamily: 'PlusJakartaSans_700Bold',
-                        color: resendCooldown > 0 ? '#94A3B8' : '#0F172A',
-                      }}>
-                        {resendCooldown > 0 ? `Resend email in ${resendCooldown}s` : 'Resend Verification Email'}
-                      </Text>
-                    </TouchableOpacity>
                   </View>
                 )}
 
