@@ -20,15 +20,19 @@ routerAdd("GET", "/api/risev/easyparcel/status", (c) => {
 routerAdd("POST", "/api/risev/easyparcel/rate-check", (c) => {
   let body = {};
   try {
-    body = $apis.requestInfo(c).data || {};
+    body = c.requestInfo().body || {};
   } catch (e) {
-    body = {};
+    try {
+      body = $apis.requestInfo(c).data || {};
+    } catch (f) {
+      body = {};
+    }
   }
 
-  const destPostcode = (body.dest_postcode || "50470").trim();
-  const destState = (body.dest_state || "Kuala Lumpur").trim();
+  const destPostcode = (body.dest_postcode || "50470").toString().trim();
+  const destState = (body.dest_state || "Kuala Lumpur").toString().trim();
   const weight = parseFloat(body.weight) || 0.5; // default 0.5kg for smart stand
-  const senderPostcode = (body.sender_postcode || "50470").trim();
+  const senderPostcode = (body.sender_postcode || "50470").toString().trim();
 
   const apiKey = $os.getenv("EASYPARCEL_API_KEY");
   const env = $os.getenv("EASYPARCEL_ENV") || "live";
@@ -72,7 +76,6 @@ routerAdd("POST", "/api/risev/easyparcel/rate-check", (c) => {
 
   // Curated Malaysian standard rate matrix
   const isEastMalaysia = ["Sabah", "Sarawak", "Labuan"].some(s => destState.toLowerCase().includes(s.toLowerCase()));
-  const baseRate = isEastMalaysia ? 14.50 : 6.20;
 
   const standardRates = [
     {
@@ -134,12 +137,16 @@ routerAdd("POST", "/api/risev/easyparcel/rate-check", (c) => {
 routerAdd("POST", "/api/risev/easyparcel/book", (c) => {
   let body = {};
   try {
-    body = $apis.requestInfo(c).data || {};
+    body = c.requestInfo().body || {};
   } catch (e) {
-    body = {};
+    try {
+      body = $apis.requestInfo(c).data || {};
+    } catch (f) {
+      body = {};
+    }
   }
 
-  const orderId = body.order_id;
+  const orderId = body.order_id || body.id || "";
   if (!orderId) {
     return c.json(400, { success: false, message: "Order ID is required" });
   }
@@ -159,15 +166,10 @@ routerAdd("POST", "/api/risev/easyparcel/book", (c) => {
   }
 
   const courierName = body.courier_name || "J&T Express";
-  const courierService = body.service_id || "EP-JNT-STD";
-  const apiKey = $os.getenv("EASYPARCEL_API_KEY");
-  const env = $os.getenv("EASYPARCEL_ENV") || "live";
-  const baseUrl = env === "demo" ? "https://demo.connect.easyparcel.my" : "https://connect.easyparcel.my";
-
   let trackingNumber = body.tracking_number;
   let awbUrl = null;
 
-  // Generate unique AWB tracking if not provided or calling API
+  // Generate unique AWB tracking if not provided
   if (!trackingNumber) {
     const courierPrefix = courierName.toLowerCase().includes("ninja") ? "NVMY" 
       : courierName.toLowerCase().includes("pos") ? "ER" 
@@ -211,3 +213,74 @@ routerAdd("POST", "/api/risev/easyparcel/book", (c) => {
     return c.json(500, { success: false, message: "Failed to update order: " + (saveErr.message || saveErr) });
   }
 });
+
+// Route: POST /api/risev/easyparcel/webhook
+// Receives live courier milestone status updates (Picked Up, In Transit, Delivered)
+routerAdd("POST", "/api/risev/easyparcel/webhook", (c) => {
+  let body = {};
+  try {
+    body = c.requestInfo().body || {};
+  } catch (e) {
+    try {
+      body = $apis.requestInfo(c).data || {};
+    } catch (f) {
+      body = {};
+    }
+  }
+
+  const awb = (body.awb || body.tracking_no || body.airwaybill_no || body.tracking_number || "").toString().trim();
+  const orderNo = (body.order_no || body.order_id || "").toString().trim();
+  const rawStatus = (body.status || body.latest_status || body.event || "").toString().toLowerCase();
+
+  console.log(`[EASYPARCEL WEBHOOK RECEIVED] AWB: ${awb}, Order: ${orderNo}, Status: ${rawStatus}`);
+
+  if (!awb && !orderNo) {
+    return c.json(200, { success: true, message: "Webhook acknowledged (empty payload)" });
+  }
+
+  let orderRecord = null;
+  try {
+    if (awb) {
+      const records = $app.findRecordsByFilter("hardware_orders", `tracking_number = "${awb}"`, "-created", 1, 0);
+      if (records.length > 0) orderRecord = records[0];
+    }
+    if (!orderRecord && orderNo) {
+      const records = $app.findRecordsByFilter("hardware_orders", `order_no = "${orderNo}"`, "-created", 1, 0);
+      if (records.length > 0) orderRecord = records[0];
+    }
+  } catch (findErr) {
+    console.log("[EASYPARCEL WEBHOOK SEARCH ERROR]", findErr.message || findErr);
+  }
+
+  if (!orderRecord) {
+    console.log(`[EASYPARCEL WEBHOOK] No matching hardware order found for AWB: ${awb} / Order: ${orderNo}`);
+    return c.json(200, { success: true, message: "No matching record to update" });
+  }
+
+  try {
+    let newStatus = orderRecord.getString("fulfillment_status") || "processing";
+
+    if (rawStatus.includes("deliver") || rawStatus.includes("success") || rawStatus.includes("completed")) {
+      newStatus = "delivered";
+    } else if (rawStatus.includes("transit") || rawStatus.includes("picked") || rawStatus.includes("drop") || rawStatus.includes("out for delivery") || rawStatus.includes("ship")) {
+      newStatus = "shipped";
+    } else if (rawStatus.includes("cancel") || rawStatus.includes("fail") || rawStatus.includes("return")) {
+      newStatus = "cancelled";
+    }
+
+    orderRecord.set("fulfillment_status", newStatus);
+
+    const logNote = `[Webhook ${new Date().toISOString().substring(0, 16)}] Status: ${rawStatus}`;
+    const currentNotes = orderRecord.getString("notes") || "";
+    orderRecord.set("notes", currentNotes ? `${currentNotes}\n${logNote}` : logNote);
+
+    $app.save(orderRecord);
+    console.log(`[EASYPARCEL WEBHOOK UPDATED] Order ${orderRecord.getString("order_no")} updated to ${newStatus}`);
+
+    return c.json(200, { success: true, order_no: orderRecord.getString("order_no"), status: newStatus });
+  } catch (updateErr) {
+    console.log("[EASYPARCEL WEBHOOK SAVE ERROR]", updateErr.message || updateErr);
+    return c.json(200, { success: false, error: updateErr.message });
+  }
+});
+

@@ -15,8 +15,8 @@ migrate((app) => {
   nfcPricing.set("base_price_1m", 119); // 1x Stand Price (RM 119)
   nfcPricing.set("discount_3m", 198);   // 2x Stand (Duo) Price (RM 198)
   nfcPricing.set("discount_6m", 469);   // 5x Stand (Enterprise) Price (RM 469)
-  nfcPricing.set("discount_9m", 0);
-  nfcPricing.set("discount_12m", 0);
+  nfcPricing.set("discount_9m", 12);
+  nfcPricing.set("discount_12m", 15);
   nfcPricing.set("enable_3m", true);
   nfcPricing.set("enable_6m", true);
   nfcPricing.set("enable_9m", false);
