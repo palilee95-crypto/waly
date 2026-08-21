@@ -192,14 +192,16 @@ export default function StaffManagementScreen() {
 
         {/* Header */}
         <View style={[styles.header, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
-          <TouchableOpacity onPress={() => router.push('/(merchant)/branches' as any)} style={styles.branchHeaderLink}>
-            <Ionicons name="business-outline" size={16} color="#FFC700" />
-            <Text style={styles.branchHeaderLinkText}>{locale === 'en' ? 'Branches' : 'Cawangan'}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
+          </View>
+          <Image 
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
         </View>
 
         <Text style={styles.sectionSubtitle}>
@@ -450,18 +452,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64,
+    justifyContent: 'space-between',
+    height: 60,
     backgroundColor: 'transparent',
     zIndex: 1,
   },
   backBtn: {
-    padding: 4,
-    marginRight: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: -0.4,
   },
   scrollContent: {
     paddingHorizontal: 20,

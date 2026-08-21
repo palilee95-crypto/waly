@@ -737,17 +737,16 @@ export default function UnifiedRewardsScreen() {
 
         {/* Header Row */}
         <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('loyalty_settings')}</Text>
-          {activeTab === 'catalogue' ? (
-            <TouchableOpacity style={styles.addBtn} onPress={handleOpenCreate} activeOpacity={0.8}>
-              <Ionicons name="add" size={22} color="#050505" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
             </TouchableOpacity>
-          ) : (
-            <View style={{ width: 36 }} />
-          )}
+            <Text style={styles.headerTitle}>{t('loyalty_settings')}</Text>
+          </View>
+          <Image 
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
         </View>
 
         {/* Intro */}
@@ -1932,12 +1931,18 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   backBtn: {
-    padding: 6,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: -0.4,
   },
   addBtn: {
     width: 36,

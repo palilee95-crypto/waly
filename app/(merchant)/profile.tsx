@@ -122,11 +122,10 @@ export default function ProfileScreen() {
   const [metaPhoneId, setMetaPhoneId] = useState('');
   const [metaToken, setMetaToken] = useState('');
   const [metaPhone, setMetaPhone] = useState('');
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const handleProFeaturePress = (route: string) => {
     if (user?.merchant_status !== 'active') {
-      setShowUpgradeModal(true);
+      router.push('/(merchant)/subscription' as any);
     } else {
       router.push(route as any);
     }
@@ -1212,12 +1211,6 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color="#FECACA" />
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Modals */}
-      <UpgradeModal 
-        visible={showUpgradeModal} 
-        onClose={() => setShowUpgradeModal(false)} 
-      />
 
       {/* Custom Premium Log Out Confirmation Modal */}
       <Modal

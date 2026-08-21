@@ -322,26 +322,21 @@ export default function BranchesScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header Navigation */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <View style={styles.headerCenter}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
             <Text style={styles.headerTitle}>{locale === 'en' ? 'Branch Management' : 'Pengurusan Cawangan'}</Text>
-            <Text style={styles.headerSubtitle}>{branches.length} {locale === 'en' ? 'Active Outlets' : 'Cawangan Aktif'}</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.addHeaderBtn}
-            onPress={handleOpenAddModal}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={22} color="#050505" />
-          </TouchableOpacity>
+          <Image 
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
         </View>
 
         <ScrollView
@@ -376,9 +371,29 @@ export default function BranchesScreen() {
           {/* Section Header */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionHeaderTitle}>{locale === 'en' ? 'Registered Outlets' : 'Senarai Cawangan'}</Text>
-            <TouchableOpacity onPress={fetchBranches} activeOpacity={0.7}>
-              <Ionicons name="refresh-outline" size={18} color="#64748B" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity onPress={fetchBranches} activeOpacity={0.7} style={{ padding: 4 }}>
+                <Ionicons name="refresh-outline" size={18} color="#64748B" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#FFC700',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                onPress={handleOpenAddModal}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={16} color="#050505" />
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                  {locale === 'en' ? 'Add' : 'Tambah'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {loading ? (
@@ -1021,19 +1036,16 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerCenter: {
-    alignItems: 'center',
-  },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   headerSubtitle: {
     fontSize: 11,

@@ -17,14 +17,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
 
   const handleUpgrade = () => {
     onClose();
-    router.push({
-      pathname: '/(merchant)/subscription',
-      params: {
-        plan: 'pro',
-        cycle: selectedPlan === 'yearly' ? 'annually' : 'monthly',
-        checkout: 'true'
-      }
-    } as any);
+    router.push('/(merchant)/subscription' as any);
   };
 
   return (
