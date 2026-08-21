@@ -393,24 +393,39 @@ export default function NfcPaywallScreen() {
       ) : existingOrder && !showOrderNewPurchase ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: 60, paddingHorizontal: 20 }]}>
           {/* Header */}
-          <View style={{ alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255, 199, 0, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.3)' }}>
-              <Ionicons name="cube" size={32} color="#FFC700" />
+          <View style={{ alignItems: 'center', marginBottom: 24 }}>
+            <View style={{ 
+              width: 72, height: 72, borderRadius: 36, 
+              backgroundColor: 'rgba(255, 199, 0, 0.08)', 
+              alignItems: 'center', justifyContent: 'center', 
+              marginBottom: 16, 
+              borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.4)',
+              shadowColor: '#FFC700', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8
+            }}>
+              <Ionicons name="cube" size={36} color="#FFC700" />
             </View>
-            <Text style={{ fontSize: 21, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center' }}>
+            
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#E2E8F0', letterSpacing: 1 }}>
+                ORDER #{existingOrder.order_no}
+              </Text>
+            </View>
+
+            <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5 }}>
               Your Stand is on its way! 🚚
             </Text>
-            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', marginTop: 4 }}>
-              Order #{existingOrder.order_no} • {existingOrder.package_title}
+            
+            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFD700', textAlign: 'center', marginTop: 6 }}>
+              {existingOrder.package_title}
             </Text>
           </View>
 
           {/* Fulfillment Status Progress Box */}
-          <View style={{ backgroundColor: '#111114', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase' }}>Shipment Status</Text>
-              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: existingOrder.fulfillment_status === 'shipped' ? 'rgba(139, 92, 246, 0.2)' : existingOrder.fulfillment_status === 'delivered' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: existingOrder.fulfillment_status === 'shipped' ? '#A78BFA' : existingOrder.fulfillment_status === 'delivered' ? '#34D399' : '#FBBF24', textTransform: 'uppercase' }}>
+          <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#222225', marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Shipment Status</Text>
+              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: existingOrder.fulfillment_status === 'shipped' ? 'rgba(139, 92, 246, 0.2)' : existingOrder.fulfillment_status === 'delivered' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.15)' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: existingOrder.fulfillment_status === 'shipped' ? '#A78BFA' : existingOrder.fulfillment_status === 'delivered' ? '#34D399' : '#F59E0B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   {existingOrder.fulfillment_status || 'PROCESSING'}
                 </Text>
               </View>
@@ -440,21 +455,21 @@ export default function NfcPaywallScreen() {
                 </View>
               </View>
             ) : (
-              <View style={{ backgroundColor: '#18181B', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#27272A' }}>
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#E4E4E7' }}>
-                  📦 Parcel is being prepared at Risev HQ
+              <View style={{ backgroundColor: '#0A0A0A', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1C1C1E', borderLeftWidth: 3, borderLeftColor: '#FFC700' }}>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#F4F4F5' }}>
+                  📦 Parcel is being prepared at HQ
                 </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#71717A', marginTop: 2 }}>
-                  Tracking number will appear here once picked up by courier.
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', marginTop: 4, lineHeight: 18 }}>
+                  Tracking number will appear here once picked up by our courier partner.
                 </Text>
               </View>
             )}
 
             {/* Destination Address */}
-            <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 12 }}>
-              <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A', textTransform: 'uppercase' }}>Delivery To</Text>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', marginTop: 2 }}>{existingOrder.recipient_name} ({existingOrder.whatsapp_phone})</Text>
-              <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', marginTop: 2, lineHeight: 16 }}>
+            <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 16 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivery To</Text>
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 6 }}>{existingOrder.recipient_name} <Text style={{ color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12 }}>({existingOrder.whatsapp_phone})</Text></Text>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', marginTop: 4, lineHeight: 18 }}>
                 {existingOrder.full_address || `${existingOrder.address_line1}, ${existingOrder.postcode} ${existingOrder.city}`}
               </Text>
             </View>
@@ -462,14 +477,32 @@ export default function NfcPaywallScreen() {
 
           {/* Primary Action: Go to Merchant Dashboard */}
           <TouchableOpacity
-            style={[styles.finalPayBtn, { backgroundColor: '#FFC700', marginBottom: 12 }]}
             activeOpacity={0.85}
             onPress={async () => {
               await switchRole('merchant');
               router.replace('/(merchant)');
             }}
+            style={{ marginBottom: 16 }}
           >
-            <Text style={styles.finalPayBtnText}>Enter Merchant Console 🚀</Text>
+            <LinearGradient
+              colors={['#FACC15', '#EAB308']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                paddingVertical: 18,
+                borderRadius: 16,
+                alignItems: 'center',
+                shadowColor: '#EAB308',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.3,
+                shadowRadius: 16,
+                elevation: 8,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>
+                Enter Merchant Console 🚀
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Secondary Action: Order Additional Stand */}

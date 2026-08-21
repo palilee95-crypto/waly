@@ -31,7 +31,7 @@ const BENEFITS = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ status?: string; order_id?: string }>();
+  const params = useLocalSearchParams<{ status?: string; order_id?: string; plan?: string; cycle?: string; checkout?: string }>();
   const { user, refreshSession, switchRole } = useAuth();
   const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
@@ -51,6 +51,19 @@ export default function SubscriptionScreen() {
   const [codeError, setCodeError] = useState('');
   const [codeSuccess, setCodeSuccess] = useState('');
   const [showCodeBox, setShowCodeBox] = useState(false);
+
+  // Auto-open checkout modal if requested via route params
+  useEffect(() => {
+    if (params.plan === 'starter' || params.plan === 'pro' || params.plan === 'enterprise') {
+      setSelectedPlan(params.plan);
+    }
+    if (params.cycle === 'monthly' || params.cycle === 'annually') {
+      setBillingCycle(params.cycle);
+    }
+    if (params.checkout === 'true') {
+      setShowCheckoutModal(true);
+    }
+  }, [params.plan, params.cycle, params.checkout]);
 
   // Auto-refresh auth on payment success callback
   useEffect(() => {

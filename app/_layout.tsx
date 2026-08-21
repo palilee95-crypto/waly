@@ -26,12 +26,12 @@ import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 import { LogBox, Platform } from 'react-native';
 
-LogBox.ignoreLogs(['"shadow*" style props are deprecated']);
+LogBox.ignoreLogs(['"shadow*" style props are deprecated', '"elevation" style props are deprecated']);
 
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
   console.warn = (...args) => {
-    if (args[0] && typeof args[0] === 'string' && args[0].includes('shadow*')) {
+    if (args[0] && typeof args[0] === 'string' && (args[0].includes('shadow*') || args[0].includes('elevation'))) {
       return;
     }
     originalWarn(...args);

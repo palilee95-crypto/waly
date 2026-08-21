@@ -704,12 +704,8 @@ export default function MerchantLayout() {
     return <Redirect href="/(customer)" />;
   }
 
-  // Gateway subscription gate blocker
-  if (user?.merchant_status !== 'active') {
-    if (!pathname.includes('subscription') && !pathname.includes('nfc-marketplace')) {
-      return <Redirect href="/(merchant)/subscription" />;
-    }
-  }
+  // Gateway subscription gate blocker (REMOVED: Users can now access the dashboard for free)
+  // We use a soft paywall banner in the dashboard instead.
 
   // Blocker page for merchant profile onboarding
   if (isOnboardingRequired) {

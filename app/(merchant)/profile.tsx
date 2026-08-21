@@ -25,6 +25,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
+import UpgradeModal from './_components/UpgradeModal';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ type SettingItemProps = {
   iconColor?: string;
   badgeText?: string;
   badgeColor?: string;
+  isPro?: boolean;
 };
 
 const SettingItem = ({
@@ -46,16 +48,29 @@ const SettingItem = ({
   onPress,
   iconBgColor = '#F3F4F6',
   iconColor = '#565e74',
+  isPro
 }: SettingItemProps) => (
   <TouchableOpacity style={styles.settingCard} onPress={onPress} activeOpacity={0.8}>
     <View style={[styles.settingIconBg, { backgroundColor: iconBgColor }]}>
       <Ionicons name={iconName} size={20} color={iconColor} />
     </View>
-    <View style={styles.settingInfo}>
-      <Text style={styles.settingTitle}>{title}</Text>
+    <View style={[styles.settingInfo, { paddingRight: 8 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        {isPro && (
+          <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Ionicons name="star" size={9} color="#000000" />
+            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>PRO</Text>
+          </View>
+        )}
+      </View>
       <Text style={styles.settingSubtitle}>{subtitle}</Text>
     </View>
-    <Ionicons name="chevron-forward" size={18} color="#BEC6E0" />
+    {isPro ? (
+      <Ionicons name="lock-closed" size={16} color="#FFC700" />
+    ) : (
+      <Ionicons name="chevron-forward" size={18} color="#BEC6E0" />
+    )}
   </TouchableOpacity>
 );
 
@@ -107,6 +122,15 @@ export default function ProfileScreen() {
   const [metaPhoneId, setMetaPhoneId] = useState('');
   const [metaToken, setMetaToken] = useState('');
   const [metaPhone, setMetaPhone] = useState('');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  const handleProFeaturePress = (route: string) => {
+    if (user?.merchant_status !== 'active') {
+      setShowUpgradeModal(true);
+    } else {
+      router.push(route as any);
+    }
+  };
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [isDisconnectingMeta, setIsDisconnectingMeta] = useState(false);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
@@ -647,6 +671,9 @@ export default function ProfileScreen() {
       if (!user || !user.merchant_id) return;
       try {
         const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+        console.log('[DEBUG] Fetched merchant:', mRec);
+        console.log('[DEBUG] user.id:', user.id);
+        console.log('[DEBUG] merchant.owner:', mRec.owner);
         setMerchant(mRec);
 
         // Fetch WhatsApp status only if user is owner (Disabled - WhatsApp service decommissioned)
@@ -1068,15 +1095,14 @@ export default function ProfileScreen() {
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
-          {merchant && merchant.owner === user?.id && (
-            <>
               <SettingItem
                 iconName="business-outline"
                 title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
                 subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
                 iconBgColor="#FEF3C7"
                 iconColor="#B45309"
-                onPress={() => router.push('/(merchant)/branches' as any)}
+                isPro={true}
+                onPress={() => handleProFeaturePress('/(merchant)/branches')}
               />
 
               <SettingItem
@@ -1102,10 +1128,15 @@ export default function ProfileScreen() {
                 subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
                 iconBgColor="#E8F5E9"
                 iconColor="#4CAF50"
-                onPress={handleOpenMetaSetup}
+                isPro={true}
+                onPress={() => {
+                  if (user?.merchant_status !== 'active') {
+                    setShowUpgradeModal(true);
+                  } else {
+                    handleOpenMetaSetup();
+                  }
+                }}
               />
-            </>
-          )}
           <SettingItem
             iconName="color-palette-outline"
             title="Onboarding Setup"
@@ -1181,6 +1212,12 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color="#FECACA" />
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modals */}
+      <UpgradeModal 
+        visible={showUpgradeModal} 
+        onClose={() => setShowUpgradeModal(false)} 
+      />
 
       {/* Custom Premium Log Out Confirmation Modal */}
       <Modal
