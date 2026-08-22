@@ -717,18 +717,7 @@ export default function NfcLandingScreen() {
           <View style={styles.cardHeaderRow}>
             <TouchableOpacity 
               style={styles.iconCircleBtn} 
-              onPress={() => {
-                if (step === 'sent' || step === 'card' || isApproved) {
-                  setStep('form');
-                  setIsApproved(false);
-                  setIsWaitingConfirm(false);
-                  setClaimId('');
-                  setApprovedStamps(null);
-                  setNewlyEarnedIndices(new Set());
-                } else {
-                  router.replace('/');
-                }
-              }}
+              onPress={handleViewStampCard}
             >
               <Ionicons name="chevron-back" size={20} color="#000000" />
             </TouchableOpacity>

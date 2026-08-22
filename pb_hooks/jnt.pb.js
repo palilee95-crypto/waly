@@ -178,8 +178,6 @@ function handleJntStatus(c) {
 }
 routerAdd("GET", "/api/risev/jnt/status", handleJntStatus);
 routerAdd("GET", "/api/risev/shipping/status", handleJntStatus);
-routerAdd("GET", "/api/risev/delyva/status", handleJntStatus); // backward-compatible alias
-routerAdd("GET", "/api/risev/easyparcel/status", handleJntStatus); // backward-compatible alias
 
 // Route: POST /api/risev/jnt/rate-check (& aliases)
 function handleJntRateCheck(c) {
@@ -246,8 +244,6 @@ function handleJntRateCheck(c) {
 }
 routerAdd("POST", "/api/risev/jnt/rate-check", handleJntRateCheck);
 routerAdd("POST", "/api/risev/shipping/rate-check", handleJntRateCheck);
-routerAdd("POST", "/api/risev/delyva/rate-check", handleJntRateCheck); // backward-compatible alias
-routerAdd("POST", "/api/risev/easyparcel/rate-check", handleJntRateCheck); // backward-compatible alias
 
 // Route: POST /api/risev/jnt/book (& aliases)
 // Creates order via J&T Open API and updates hardware_orders record
@@ -263,19 +259,21 @@ function handleJntBook(c) {
     }
   }
 
-  const orderId = body.order_id || body.id || "";
+  const orderId = (body.order_id || "").toString().trim();
+  const serviceCode = (body.service_code || "EZ").toString().trim().toUpperCase();
+
   if (!orderId) {
-    return c.json(400, { success: false, message: "Order ID is required" });
+    return c.json(400, { success: false, message: "order_id is required" });
   }
 
   let orderRecord = null;
   try {
     orderRecord = $app.findRecordById("hardware_orders", orderId);
-  } catch (e) {
+  } catch (err) {
     try {
       const records = $app.findRecordsByFilter("hardware_orders", `order_no = "${orderId}"`, "-created", 1, 0);
       if (records.length > 0) orderRecord = records[0];
-    } catch (f) {}
+    } catch (fErr) {}
   }
 
   if (!orderRecord) {
@@ -283,8 +281,8 @@ function handleJntBook(c) {
   }
 
   const courierName = "J&T Express";
-  const serviceType = body.service_code || body.service_id || "EZ";
-  let trackingNumber = body.tracking_number || null;
+  const serviceType = serviceCode || "EZ";
+  let trackingNumber = null;
   let awbUrl = null;
 
   const config = getJntConfig();
@@ -421,8 +419,6 @@ function handleJntBook(c) {
 }
 routerAdd("POST", "/api/risev/jnt/book", handleJntBook);
 routerAdd("POST", "/api/risev/shipping/book", handleJntBook);
-routerAdd("POST", "/api/risev/delyva/book", handleJntBook); // backward-compatible alias
-routerAdd("POST", "/api/risev/easyparcel/book", handleJntBook); // backward-compatible alias
 
 // Route: POST /api/risev/jnt/webhook (& aliases)
 // Receives J&T live milestone tracking updates
@@ -496,5 +492,3 @@ function handleJntWebhook(c) {
 }
 routerAdd("POST", "/api/risev/jnt/webhook", handleJntWebhook);
 routerAdd("POST", "/api/risev/shipping/webhook", handleJntWebhook);
-routerAdd("POST", "/api/risev/delyva/webhook", handleJntWebhook); // backward-compatible alias
-routerAdd("POST", "/api/risev/easyparcel/webhook", handleJntWebhook); // backward-compatible alias
