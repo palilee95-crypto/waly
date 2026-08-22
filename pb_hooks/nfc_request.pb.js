@@ -83,11 +83,25 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
     }
 
+    // Find current stamps for this customer & merchant if already registered
+    let currentStamps = 0;
+    let stampGoal = 10;
+    try {
+      const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "-created", 1, 0);
+      if (programs.length > 0) stampGoal = programs[0].getInt("stamp_goal") || 10;
+      if (customerUser) {
+        const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = '${merchantId}' && customer = '${customerUser.id}' && status = 'active'`, "-created", 1, 0);
+        if (cards.length > 0) currentStamps = cards[0].getInt("stamps_collected") || 0;
+      }
+    } catch (err) {}
+
     return e.json(200, {
       success: true,
       claim_id: claim.id,
       session_code: sessionCode,
       status: "pending",
+      current_stamps: currentStamps,
+      stamp_goal: stampGoal,
       merchant_name: merchant.getString("name") || "Merchant"
     });
   } catch (err) {
@@ -115,5 +129,53 @@ routerAdd("POST", "/api/risev/nfc/whatsapp-sent", (e) => {
   } catch (err) {
     console.log("[NFC WHATSAPP SENT ERROR]", err.message || err);
     return e.json(500, { message: err.message || "Failed to update claim" });
+  }
+});
+
+// Endpoint to check NFC claim status without customer authentication
+routerAdd("GET", "/api/risev/nfc/claim-status", (e) => {
+  try {
+    let query = {};
+    try {
+      query = e.requestInfo().query || {};
+    } catch (qErr) {}
+    const claimId = (query.claim_id || "").trim();
+
+    if (!claimId) {
+      return e.json(400, { message: "claim_id is required" });
+    }
+
+    const claim = $app.findRecordById("nfc_claims", claimId);
+    if (!claim) {
+      return e.json(404, { message: "Claim not found" });
+    }
+
+    const merchantId = claim.getString("merchant");
+    const status = claim.getString("status");
+    let totalStamps = 0;
+    let stampGoal = 10;
+
+    try {
+      const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "-created", 1, 0);
+      if (programs.length > 0) stampGoal = programs[0].getInt("stamp_goal") || 10;
+
+      const customerId = claim.getString("customer");
+      if (customerId) {
+        const cards = $app.findRecordsByFilter("loyalty_cards", `merchant = '${merchantId}' && customer = '${customerId}'`, "-created", 1, 0);
+        if (cards.length > 0) totalStamps = cards[0].getInt("stamps_collected") || 0;
+      }
+    } catch (err) {}
+
+    return e.json(200, {
+      success: true,
+      claim_id: claim.id,
+      status: status,
+      stamp_amount: claim.getInt("stamp_amount") || 0,
+      total_stamps: totalStamps,
+      stamp_goal: stampGoal,
+      customer_name: claim.getString("customer_name")
+    });
+  } catch (err) {
+    return e.json(500, { message: err.message || "Failed to get claim status" });
   }
 });

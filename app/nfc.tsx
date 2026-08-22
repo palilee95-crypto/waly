@@ -155,7 +155,7 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
 export default function NfcLandingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ m: string }>();
-  const { user, quickRegister, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
 
@@ -184,6 +184,7 @@ export default function NfcLandingScreen() {
   const [program, setProgram] = useState<any>(null);
   const [reward, setReward] = useState<any>(null);
   const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
+  const [approvedStamps, setApprovedStamps] = useState<number | null>(null);
   const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
 
@@ -410,6 +411,11 @@ export default function NfcLandingScreen() {
           setHasSentWhatsapp(true);
         }
         if (record.status === 'completed') {
+          if (typeof record.total_stamps === 'number') {
+            setApprovedStamps(record.total_stamps);
+          } else if (typeof record.stamp_amount === 'number') {
+            setApprovedStamps(prev => (prev || 0) + record.stamp_amount);
+          }
           const currentCustId = user?.id || pb.authStore.record?.id;
           if (currentCustId) {
             fetchUserLoyaltyCard(merchant.id, currentCustId);
@@ -438,11 +444,18 @@ export default function NfcLandingScreen() {
 
     const checkApprovalStatus = async () => {
       try {
-        // 1. Check direct claim record status
+        // 1. Check claim status endpoint
         if (claimId) {
           try {
-            const claimRecord = await pb.collection('nfc_claims').getOne(claimId, { requestKey: null });
-            if (claimRecord && claimRecord.status === 'completed' && isMounted) {
+            const res = await pb.send<any>('/api/risev/nfc/claim-status', {
+              method: 'GET',
+              params: { claim_id: claimId },
+              requestKey: null,
+            });
+            if (res && res.status === 'completed' && isMounted) {
+              if (typeof res.total_stamps === 'number') {
+                setApprovedStamps(res.total_stamps);
+              }
               const currentCustId = user?.id || pb.authStore.record?.id;
               if (currentCustId) {
                 await fetchUserLoyaltyCard(merchant.id, currentCustId);
@@ -525,7 +538,7 @@ export default function NfcLandingScreen() {
 
   const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
   const stampGoal = program?.stamp_goal || 10;
-  const currentStamps = loyaltyCard?.stamps_collected || 0;
+  const currentStamps = approvedStamps !== null ? approvedStamps : (loyaltyCard?.stamps_collected || 0);
 
   // Detect newly-earned stamps and store their 0-based indices for animation
   useEffect(() => {
@@ -610,7 +623,7 @@ export default function NfcLandingScreen() {
           } else if (!res.exists) {
             // New customer — ask for their name
             setShowNameField(true);
-            setNameInput(''); // clear any pre-filled name from logged-in user
+            setNameInput('');
             setIsLoading(false);
             setIsCheckingPhone(false);
             return;
@@ -621,34 +634,19 @@ export default function NfcLandingScreen() {
           setIsCheckingPhone(false);
         }
       } else if (enteredPhoneMatchesUser && user?.name) {
-        // Phone matches logged-in user — use their name
         finalName = user.name;
       }
 
       // Fallback name if still empty
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
-
-      // Quick register or retrieve account:
-      // Run if nobody is logged in, OR if the entered phone doesn't match the logged-in user
-      const loggedInPhone = pb.authStore.record?.phone || '';
-      const isLoggedInUsersPhone = loggedInPhone === cleanPhone || loggedInPhone === cleanPhone.replace('+', '');
-      if (!pb.authStore.isValid || !pb.authStore.record || !isLoggedInUsersPhone) {
-        await quickRegister(finalName, cleanPhone);
-      }
-
-      const authRecord = pb.authStore.record;
-      // Only use logged-in user's name if the entered phone is THEIR OWN phone
-      const enteredPhoneIsOwnPhone = authRecord?.phone &&
-        (authRecord.phone === cleanPhone || authRecord.phone === cleanPhone.replace('+', ''));
-      const displayName = enteredPhoneIsOwnPhone
-        ? (authRecord?.name || finalName || ('Customer ' + digits.slice(-4)))
-        : (finalName || ('Customer ' + digits.slice(-4)));
+      const displayName = finalName;
 
       // 1. Send Direct API Request to PocketBase (INSTANT & FAIL-SAFE)
+      // NOTE: We do NOT auto-login or quickRegister session onto the browser to prevent security hijack.
       let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       let createdClaimId = '';
       try {
-        const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string }>('/api/risev/nfc/request', {
+        const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string; current_stamps?: number }>('/api/risev/nfc/request', {
           method: 'POST',
           body: {
             merchant_id: merchant.id,
@@ -661,6 +659,9 @@ export default function NfcLandingScreen() {
           createdClaimId = reqRes.claim_id;
         }
         if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
+        if (typeof reqRes?.current_stamps === 'number') {
+          setApprovedStamps(reqRes.current_stamps);
+        }
       } catch (apiErr) {
         console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
       }
@@ -668,11 +669,6 @@ export default function NfcLandingScreen() {
       setIsWaitingConfirm(true);
       setHasSentWhatsapp(true);
       setStep('sent');
-
-      // Fetch user's loyalty card
-      if (authRecord?.id) {
-        fetchUserLoyaltyCard(merchant.id, authRecord.id);
-      }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to submit NFC claim.');
     } finally {
@@ -719,15 +715,29 @@ export default function NfcLandingScreen() {
     <>
       {/* Top Navigation & Action Bar */}
           <View style={styles.cardHeaderRow}>
-            <TouchableOpacity style={styles.iconCircleBtn} onPress={() => router.replace('/')}>
+            <TouchableOpacity 
+              style={styles.iconCircleBtn} 
+              onPress={() => {
+                if (step === 'sent' || step === 'card' || isApproved) {
+                  setStep('form');
+                  setIsApproved(false);
+                  setIsWaitingConfirm(false);
+                  setClaimId('');
+                  setApprovedStamps(null);
+                  setNewlyEarnedIndices(new Set());
+                } else {
+                  router.replace('/');
+                }
+              }}
+            >
               <Ionicons name="chevron-back" size={20} color="#000000" />
             </TouchableOpacity>
             {step !== 'form' && (
               <TouchableOpacity 
                 style={[styles.iconCircleBtn, { backgroundColor: '#000000' }]} 
-                onPress={() => setStep(step === 'card' ? 'sent' : 'card')}
+                onPress={() => setShowBack(prev => !prev)}
               >
-                <Ionicons name={step === 'card' ? 'time-outline' : 'card-outline'} size={18} color="#FFFFFF" />
+                <Ionicons name={showBack ? 'time-outline' : 'card-outline'} size={18} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
