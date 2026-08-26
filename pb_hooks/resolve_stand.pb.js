@@ -2,12 +2,16 @@
 // Route: GET /api/risev/nfc/resolve
 // Public resolver for NFC stands (supports generic serial codes, self-pairing checks, and legacy merchant IDs)
 
-routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
+routerAdd("GET", "/api/risev/nfc/resolve", (e) => {
   let query = {};
   try {
-    query = $apis.requestInfo(c).query || {};
-  } catch (e) {
-    query = {};
+    query = e.requestInfo().query || {};
+  } catch (err) {
+    try {
+      query = $apis.requestInfo(e).query || {};
+    } catch (err2) {
+      query = {};
+    }
   }
 
   const rawCode = (query.c || query.s || query.code || "").trim().toUpperCase();
@@ -18,7 +22,7 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
     try {
       const merchant = $app.findRecordById("merchants", directMerchantId);
       if (merchant) {
-        return c.json(200, {
+        return e.json(200, {
           success: true,
           is_paired: true,
           merchant_id: merchant.id,
@@ -37,13 +41,13 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
     try {
       const codeRecords = $app.findRecordsByFilter(
         "activation_codes",
-        `code = "${rawCode}"`,
+        `code = '${rawCode}' || code = "${rawCode}"`,
         "-created",
         1,
         0
       );
 
-      if (codeRecords.length > 0) {
+      if (codeRecords && codeRecords.length > 0) {
         const codeRec = codeRecords[0];
         const isRedeemed = codeRec.getBool("is_redeemed");
         const redeemedBy = codeRec.getString("redeemed_by");
@@ -62,7 +66,7 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
             }
           } catch (findMerchErr) {}
 
-          return c.json(200, {
+          return e.json(200, {
             success: true,
             is_paired: true,
             merchant_id: redeemedBy,
@@ -75,7 +79,7 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
           });
         } else {
           // Unclaimed / Unpaired Stand (Fresh Out of Box)
-          return c.json(200, {
+          return e.json(200, {
             success: true,
             is_paired: false,
             code: rawCode,
@@ -93,7 +97,7 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
     try {
       const merchant = $app.findRecordById("merchants", rawCode);
       if (merchant) {
-        return c.json(200, {
+        return e.json(200, {
           success: true,
           is_paired: true,
           merchant_id: merchant.id,
@@ -105,7 +109,7 @@ routerAdd("GET", "/api/risev/nfc/resolve", (c) => {
     } catch (e2) {}
   }
 
-  return c.json(404, {
+  return e.json(404, {
     success: false,
     is_paired: false,
     message: "NFC Stand code or merchant not found",

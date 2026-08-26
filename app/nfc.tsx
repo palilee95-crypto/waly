@@ -323,8 +323,20 @@ export default function NfcLandingScreen() {
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      const rawCode = (params.c || params.s || params.code || params.tag || '').trim();
-      const rawMerchantId = (params.m || params.merchant || '').trim();
+      const getSearchParam = (key: string): string => {
+        if (params && (params as any)[key]) return String((params as any)[key]).trim();
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            const sp = new URLSearchParams(window.location.search);
+            const val = sp.get(key);
+            if (val) return val.trim();
+          } catch (e) {}
+        }
+        return '';
+      };
+
+      const rawCode = (getSearchParam('c') || getSearchParam('s') || getSearchParam('code') || getSearchParam('tag')).toUpperCase();
+      const rawMerchantId = getSearchParam('m') || getSearchParam('merchant');
 
       if (!rawCode && !rawMerchantId) {
         if (isMounted) {
