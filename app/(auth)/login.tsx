@@ -33,15 +33,34 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string }>();
+  const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string; redirect_to?: string }>();
+
+  const getRedirectUrl = () => {
+    if (params?.redirect_to) return params.redirect_to;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        return sp.get('redirect_to') || '';
+      } catch (e) {}
+    }
+    return '';
+  };
 
   useEffect(() => {
+    const redirectUrl = getRedirectUrl();
+    if (redirectUrl && (redirectUrl.includes('nfc') || redirectUrl.includes('activate'))) {
+      setRole('merchant');
+    }
     if (!isAuthLoading && isAuthenticated) {
       setTimeout(() => {
-        router.replace(activeRole === 'merchant' ? '/(merchant)' : '/(customer)');
+        if (redirectUrl) {
+          router.replace(redirectUrl as any);
+        } else {
+          router.replace(activeRole === 'merchant' ? '/(merchant)' : '/(customer)');
+        }
       }, 0);
     }
-  }, [isAuthLoading, isAuthenticated, activeRole]);
+  }, [isAuthLoading, isAuthenticated, activeRole, params.redirect_to]);
 
   useEffect(() => {
     if (params.ref) {
@@ -143,7 +162,12 @@ export default function LoginScreen() {
               await loginWithIdentifier(email.trim().toLowerCase(), password);
               const record = pb.authStore.record;
               const userRole = record?.role || role || 'customer';
-              router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+              const redirectUrl = getRedirectUrl();
+              if (redirectUrl) {
+                router.replace(redirectUrl as any);
+              } else {
+                router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+              }
             } catch (err: any) {
               console.warn('[Auto-Login Error after Verify]:', err);
               setIsAutoLoggingIn(false);
@@ -264,7 +288,12 @@ export default function LoginScreen() {
       await loginWithIdentifier(email.trim(), password);
       const record = pb.authStore.record;
       const userRole = record?.role || 'customer';
-      router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+      const redirectUrl = getRedirectUrl();
+      if (redirectUrl) {
+        router.replace(redirectUrl as any);
+      } else {
+        router.replace(userRole === 'merchant' ? '/(merchant)' : '/(customer)');
+      }
     } catch (e: any) {
       console.warn(e);
       const raw = e?.message || '';

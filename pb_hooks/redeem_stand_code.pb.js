@@ -7,9 +7,34 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
     return c.json(401, { success: false, message: "Authentication required" });
   }
 
-  const merchantId = authRecord.getString("merchant_id");
+  let merchantId = authRecord.getString("merchant_id");
   if (!merchantId) {
-    return c.json(400, { success: false, message: "Merchant profile not found" });
+    // User is a new merchant — auto-create store profile!
+    try {
+      const merchCol = $app.findCollectionByNameOrId("merchants");
+      const newMerch = new Record(merchCol);
+      const newMerchId = $security.randomString(15).toLowerCase();
+      const userName = authRecord.getString("name") || "My Store";
+      const storeName = userName.includes("Store") || userName.includes("Cafe") || userName.includes("Shop")
+        ? userName
+        : `${userName}'s Store`;
+
+      newMerch.set("id", newMerchId);
+      newMerch.set("owner", authRecord.id);
+      newMerch.set("name", storeName);
+      newMerch.set("status", "active");
+      newMerch.set("category", "retail");
+      $app.save(newMerch);
+
+      authRecord.set("merchant_id", newMerchId);
+      authRecord.set("role", "merchant");
+      $app.save(authRecord);
+
+      merchantId = newMerchId;
+    } catch (createErr) {
+      console.log("[REDEEM STAND AUTO-CREATE MERCHANT ERROR]", createErr.message || createErr);
+      return c.json(500, { success: false, message: "Failed to initialize store profile" });
+    }
   }
 
   let body = {};

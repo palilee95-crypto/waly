@@ -400,7 +400,7 @@ export default function NfcLandingScreen() {
   // Merchant Pairing Execution Handler
   const handlePairStand = async () => {
     if (!unclaimedStand?.code) return;
-    if (!user || !user.merchant_id) {
+    if (!user) {
       router.push({
         pathname: '/(auth)/login' as any,
         params: { redirect_to: `/nfc?c=${unclaimedStand.code}` },
@@ -417,8 +417,13 @@ export default function NfcLandingScreen() {
 
       if (res.success) {
         await refreshSession();
-        // Load the newly paired merchant stamp screen
-        await loadMerchantAndPrograms(user.merchant_id, true);
+        const updatedRec = pb.authStore.record;
+        const targetMerchId = updatedRec?.merchant_id || user?.merchant_id;
+        if (targetMerchId) {
+          await loadMerchantAndPrograms(targetMerchId, true);
+        } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.reload();
+        }
       } else {
         alert(res.message || 'Failed to activate stand code.');
       }
@@ -847,7 +852,7 @@ export default function NfcLandingScreen() {
               </View>
 
               {/* Action Buttons */}
-              {user?.merchant_id ? (
+              {user ? (
                 <View style={{ width: '100%', marginTop: 14 }}>
                   <TouchableOpacity
                     style={[styles.pairingBtnPrimary, isPairing && { opacity: 0.6 }]}
