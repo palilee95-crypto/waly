@@ -154,8 +154,8 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
 
 export default function NfcLandingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ m: string }>();
-  const { user, logout } = useAuth();
+  const params = useLocalSearchParams<{ m?: string; merchant?: string; c?: string; s?: string; code?: string; tag?: string }>();
+  const { user, logout, refreshSession } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
 
@@ -185,8 +185,12 @@ export default function NfcLandingScreen() {
   const [reward, setReward] = useState<any>(null);
   const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
   const [approvedStamps, setApprovedStamps] = useState<number | null>(null);
-  const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'invalid'>('loading');
+  const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'pairing' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
+
+  // Unclaimed stand pairing state
+  const [unclaimedStand, setUnclaimedStand] = useState<{ code: string; plan?: string; quota?: number } | null>(null);
+  const [isPairing, setIsPairing] = useState(false);
 
   const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
   const [nameInput, setNameInput] = useState(user?.name || '');
@@ -271,57 +275,107 @@ export default function NfcLandingScreen() {
     }
   };
 
-  // 1. Fetch Merchant, Program & Rewards on Mount
+  // Helper to load Merchant, Loyalty Program & Rewards
+  const loadMerchantAndPrograms = async (merchantId: string, isMounted: boolean) => {
+    try {
+      const m = await pb.collection('merchants').getOne(merchantId, { expand: 'owner' });
+      if (!m || m.status === 'suspended' || m.status === 'rejected') {
+        if (isMounted) {
+          setInvalidReason('This store is currently not accepting stamps.');
+          setStep('invalid');
+        }
+        return;
+      }
+      if (isMounted) setMerchant(m);
+
+      // Fetch primary loyalty program for this merchant (with linked_reward expansion)
+      try {
+        const progs = await pb.collection('loyalty_programs').getFullList({
+          filter: `merchant = "${merchantId}" && is_active = true`,
+          sort: '-created',
+          expand: 'linked_reward',
+        });
+        if (progs.length > 0 && isMounted) {
+          setProgram(progs[0]);
+          // Fetch rewards for this program
+          try {
+            const rws = await pb.collection('rewards').getFullList({
+              filter: `merchant = "${merchantId}"`,
+              sort: '-created',
+            });
+            if (rws.length > 0 && isMounted) setReward(rws[0]);
+          } catch (rErr) {}
+        }
+      } catch (pErr) {}
+
+      if (isMounted) {
+        setStep((prev) => (prev === 'loading' || prev === 'pairing' ? 'form' : prev));
+      }
+    } catch (err) {
+      if (isMounted) {
+        setInvalidReason('Invalid or expired NFC merchant link.');
+        setStep('invalid');
+      }
+    }
+  };
+
+  // 1. Fetch & Resolve Stand / Merchant on Mount
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      const merchantId = params.m;
-      if (!merchantId) {
+      const rawCode = (params.c || params.s || params.code || params.tag || '').trim();
+      const rawMerchantId = (params.m || params.merchant || '').trim();
+
+      if (!rawCode && !rawMerchantId) {
         if (isMounted) {
-          setInvalidReason('No merchant ID provided in NFC link.');
+          setInvalidReason('No NFC Stand code or merchant ID provided.');
           setStep('invalid');
         }
         return;
       }
 
       try {
-        const m = await pb.collection('merchants').getOne(merchantId, { expand: 'owner' });
-        if (!m || m.status === 'suspended' || m.status === 'rejected') {
+        const resolveRes = await pb.send<{
+          success: boolean;
+          is_paired: boolean;
+          merchant_id?: string;
+          code?: string;
+          quota?: number;
+          plan?: string;
+        }>(`/api/risev/nfc/resolve?c=${encodeURIComponent(rawCode)}&m=${encodeURIComponent(rawMerchantId)}`, {
+          method: 'GET',
+        });
+
+        if (resolveRes.success) {
+          if (resolveRes.is_paired && resolveRes.merchant_id) {
+            // Paired Stand: load merchant details
+            await loadMerchantAndPrograms(resolveRes.merchant_id, isMounted);
+          } else {
+            // Unpaired Stand (Fresh Out-of-Box: Merchant Pairing Mode)
+            if (isMounted) {
+              setUnclaimedStand({
+                code: resolveRes.code || rawCode,
+                quota: resolveRes.quota || 500,
+                plan: resolveRes.plan || 'stand_bundle',
+              });
+              setStep('pairing');
+            }
+          }
+        } else {
           if (isMounted) {
-            setInvalidReason('This store is currently not accepting stamps.');
+            setInvalidReason('NFC Stand code was not recognized.');
             setStep('invalid');
           }
-          return;
         }
-        if (isMounted) setMerchant(m);
-
-        // Fetch primary loyalty program for this merchant (with linked_reward expansion)
-        try {
-          const progs = await pb.collection('loyalty_programs').getFullList({
-            filter: `merchant = "${merchantId}" && is_active = true`,
-            sort: '-created',
-            expand: 'linked_reward',
-          });
-          if (progs.length > 0 && isMounted) {
-            setProgram(progs[0]);
-            // Fetch rewards for this program
-            try {
-              const rws = await pb.collection('rewards').getFullList({
-                filter: `merchant = "${merchantId}"`,
-                sort: '-created'
-              });
-              if (rws.length > 0 && isMounted) setReward(rws[0]);
-            } catch (rErr) {}
+      } catch (resErr) {
+        // Fallback: direct merchant lookup
+        if (rawMerchantId) {
+          await loadMerchantAndPrograms(rawMerchantId, isMounted);
+        } else {
+          if (isMounted) {
+            setInvalidReason('Invalid or unrecognized NFC Stand link.');
+            setStep('invalid');
           }
-        } catch (pErr) {}
-
-        if (isMounted) {
-          setStep((prev) => (prev === 'loading' ? 'form' : prev));
-        }
-      } catch (err) {
-        if (isMounted) {
-          setInvalidReason('Invalid or expired NFC merchant link.');
-          setStep('invalid');
         }
       }
     })();
@@ -329,7 +383,39 @@ export default function NfcLandingScreen() {
     return () => {
       isMounted = false;
     };
-  }, [params.m]);
+  }, [params.m, params.merchant, params.c, params.s, params.code, params.tag]);
+
+  // Merchant Pairing Execution Handler
+  const handlePairStand = async () => {
+    if (!unclaimedStand?.code) return;
+    if (!user || !user.merchant_id) {
+      router.push({
+        pathname: '/(auth)/login' as any,
+        params: { redirect_to: `/nfc?c=${unclaimedStand.code}` },
+      });
+      return;
+    }
+
+    setIsPairing(true);
+    try {
+      const res = await pb.send<{ success: boolean; message: string }>('/api/risev/merchant/redeem-stand-code', {
+        method: 'POST',
+        body: { code: unclaimedStand.code },
+      });
+
+      if (res.success) {
+        await refreshSession();
+        // Load the newly paired merchant stamp screen
+        await loadMerchantAndPrograms(user.merchant_id, true);
+      } else {
+        alert(res.message || 'Failed to activate stand code.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to pair stand.');
+    } finally {
+      setIsPairing(false);
+    }
+  };
 
   // 2. Fetch User Loyalty Card when Merchant & User are available
   useEffect(() => {
@@ -687,6 +773,121 @@ export default function NfcLandingScreen() {
           <ActivityIndicator size="large" color="#000000" />
           <Text style={styles.loadingText}>Loading store details...</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // UNCLAIMED STAND ACTIVATION & PAIRING STATE (MERCHANT UNBOXING)
+  // ══════════════════════════════════════════════════════════════════
+  if (step === 'pairing' && unclaimedStand) {
+    return (
+      <SafeAreaView style={styles.pairingContainer} edges={['top']}>
+        <ScrollView
+          contentContainerStyle={[styles.pairingScrollContent, isDesktop && styles.desktopScrollContent]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.pairingContentCard, isDesktop && styles.desktopCard]}>
+            {/* Header: Risev Logo & Chip Badge */}
+            <View style={styles.pairingHeader}>
+              <Image
+                source={require('../assets/risev logo.png')}
+                style={styles.pairingLogo}
+                resizeMode="contain"
+              />
+              <View style={styles.pairingHardwareBadge}>
+                <Ionicons name="hardware-chip" size={14} color="#D97706" />
+                <Text style={styles.pairingHardwareBadgeText}>SMART NFC STAND DETECTED</Text>
+              </View>
+            </View>
+
+            {/* Main Activation Card */}
+            <View style={styles.pairingCard}>
+              <View style={styles.pairingIconCircle}>
+                <Ionicons name="sparkles" size={30} color="#006d37" />
+              </View>
+              <Text style={styles.pairingTitle}>Unclaimed Stand Ready</Text>
+              <Text style={styles.pairingSubtitle}>
+                This physical NFC stand is ready to be paired with your store account.
+              </Text>
+
+              {/* Stand Code Display */}
+              <View style={styles.pairingCodeBox}>
+                <Text style={styles.pairingCodeLabel}>STAND SERIAL / ACTIVATION CODE</Text>
+                <Text style={styles.pairingCodeValue}>{unclaimedStand.code}</Text>
+              </View>
+
+              {/* Perks List */}
+              <View style={styles.pairingPerksList}>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>500 Customer Database Capacity</Text>
+                </View>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>Lifetime Hardware License • No Expiry</Text>
+                </View>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>Instant Counter Tap-to-Claim Stamps</Text>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              {user?.merchant_id ? (
+                <View style={{ width: '100%', marginTop: 14 }}>
+                  <TouchableOpacity
+                    style={[styles.pairingBtnPrimary, isPairing && { opacity: 0.6 }]}
+                    onPress={handlePairStand}
+                    disabled={isPairing}
+                    activeOpacity={0.85}
+                  >
+                    {isPairing ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="link-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.pairingBtnPrimaryText}>
+                          Bind Stand to My Store
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={styles.pairingHelperText}>
+                    Logged in as {user.name || user.email || 'Store Owner'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ width: '100%', marginTop: 14, gap: 10 }}>
+                  <TouchableOpacity
+                    style={styles.pairingBtnPrimary}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(auth)/login' as any,
+                        params: { redirect_to: `/nfc?c=${unclaimedStand.code}` },
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.pairingBtnPrimaryText}>
+                      Store Owner Log In / Register →
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pairingHelperText}>
+                    Are you the business owner? Log in to pair this stand to your store.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Trust Footer */}
+            <View style={styles.fakeTrustFooter}>
+              <Ionicons name="lock-closed" size={10} color="#94A3B8" />
+              <Text style={styles.fakeTrustText}>Official Risev Hardware Onboarding • risev.app</Text>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -2115,5 +2316,156 @@ const styles = StyleSheet.create({
     marginTop: 50,
     marginBottom: 50,
     tintColor: '#FFFFFF',
+  },
+  // ─── SMART PAIRING / ONBOARDING STYLES ───────────────────────────
+  pairingContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  pairingScrollContent: {
+    flexGrow: 1,
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pairingContentCard: {
+    width: '100%',
+    maxWidth: 440,
+    alignItems: 'center',
+  },
+  pairingHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pairingLogo: {
+    height: 36,
+    width: 140,
+    marginBottom: 12,
+  },
+  pairingHardwareBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pairingHardwareBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+    letterSpacing: 0.5,
+  },
+  pairingCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
+    marginBottom: 16,
+  },
+  pairingIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#DEF7EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pairingTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  pairingSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  pairingCodeBox: {
+    width: '100%',
+    backgroundColor: '#002d1e',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#004d30',
+  },
+  pairingCodeLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#6bfe9c',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  pairingCodeValue: {
+    fontFamily: 'monospace',
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+  },
+  pairingPerksList: {
+    width: '100%',
+    gap: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  pairingPerkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pairingPerkText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#334155',
+  },
+  pairingBtnPrimary: {
+    width: '100%',
+    height: 48,
+    backgroundColor: '#006d37',
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#006d37',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  pairingBtnPrimaryText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  pairingHelperText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

@@ -1130,7 +1130,7 @@ export default function ProfileScreen() {
                 isPro={true}
                 onPress={() => {
                   if (user?.merchant_status !== 'active') {
-                    setShowUpgradeModal(true);
+                    router.push('/(merchant)/subscription' as any);
                   } else {
                     handleOpenMetaSetup();
                   }
