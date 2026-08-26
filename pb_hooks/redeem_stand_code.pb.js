@@ -80,12 +80,16 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
 
   let body = {};
   try {
-    body = $apis.requestInfo(c).data || {};
+    body = c.requestInfo().body || {};
   } catch (e) {
-    body = {};
+    try {
+      body = $apis.requestInfo(c).data || {};
+    } catch (e2) {
+      body = {};
+    }
   }
 
-  const rawCode = (body.code || "").trim().toUpperCase();
+  const rawCode = (body.code || body.stand_code || "").trim().toUpperCase();
   if (!rawCode) {
     return c.json(400, { success: false, message: "Activation code is required" });
   }
@@ -94,7 +98,7 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
     // 1. Search for matching unredeemed activation code
     const codes = $app.findRecordsByFilter(
       "activation_codes",
-      `code = "${rawCode}" && is_redeemed = false`,
+      `code = '${rawCode}' && is_redeemed = false`,
       "-created",
       1,
       0
