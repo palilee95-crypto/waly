@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pb } from '@/lib/pocketbase';
@@ -20,13 +20,25 @@ import { useLanguage } from '@/context/LanguageContext';
 
 export default function ActivateStandPage() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ code?: string; c?: string }>();
   const { user, refreshSession } = useAuth();
   const { locale } = useLanguage();
 
-  const [code, setCode] = useState('');
+  const incomingCode = (params.code || params.c || '').trim().toUpperCase();
+  const [code, setCode] = useState(incomingCode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (incomingCode) {
+      // Forward directly to the smart NFC self-pairing & stamp card screen
+      router.replace({
+        pathname: '/nfc' as any,
+        params: { c: incomingCode },
+      });
+    }
+  }, [incomingCode]);
 
   const handleRedeem = async () => {
     const formattedCode = code.trim().toUpperCase();
