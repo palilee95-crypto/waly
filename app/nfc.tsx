@@ -828,250 +828,65 @@ export default function NfcLandingScreen() {
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // UNCLAIMED STAND ACTIVATION & PAIRING (RISEV BRAND GOLD TEMPLATE)
+  // UNCLAIMED STAND ACTIVATION & PAIRING (MINIMALIST)
   // ══════════════════════════════════════════════════════════════════
   if (step === 'pairing' && unclaimedStand) {
-    const standUrl = `https://risev.app/nfc?c=${unclaimedStand.code}`;
     const storeDisplayName = user?.name || user?.email?.split('@')[0] || 'My Store';
 
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#050505' }} edges={['top', 'left', 'right', 'bottom']}>
-        <StatusBar style="light" />
-        <ScrollView
-          style={{ backgroundColor: '#FFFFFF' }}
-          contentContainerStyle={[
-            { paddingBottom: 60, minHeight: '100%' },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Dark Header Background spanning top */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 0, backgroundColor: '#050505' }} />
-
-          {/* Centered Content Container */}
-          <View style={[
-            { paddingTop: 16, paddingHorizontal: 20, gap: 18 },
-            isDesktop && { maxWidth: 520, alignSelf: 'center', width: '100%' }
-          ]}>
-            {/* 1. Header Bar: Profile / Store Name + White Risev Logo */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A1A1A', borderWidth: 2, borderColor: '#333333', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="storefront" size={20} color="#FFC700" />
-                </View>
-                <View>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)' }}>
-                    {user ? 'Welcome back' : 'Smart NFC Stand'}
-                  </Text>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                    {user ? storeDisplayName : 'New Hardware Pairing'}
-                  </Text>
-                </View>
-              </View>
-
-              <Image
-                source={require('../assets/risev logo.png')}
-                style={{ width: 92, height: 30, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-              />
-            </View>
-
-            {/* 2. Hero Gold Card (Matching Template 1:1) */}
-            <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 22, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10 }}>
-              {/* Top Row: Serial Code & Radio Icon */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Ionicons name="radio" size={14} color="#050505" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                      NFC STAND DETECTED
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 24, fontFamily: 'monospace', fontWeight: '900', color: '#050505', letterSpacing: 1 }}>
-                    {unclaimedStand.code}
-                  </Text>
-                </View>
-
-                {/* Dark Radio / NFC Badge Button */}
-                <View style={{ backgroundColor: '#050505', borderRadius: 16, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}>
-                  <Ionicons name="qr-code" size={26} color="#FFC700" />
-                </View>
-              </View>
-
-              {/* Inner Dark Box: Quota & Quick Copy Actions */}
-              <View style={{ backgroundColor: '#050505', borderRadius: 16, padding: 14 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="people" size={14} color="#FFC700" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>Customer Database</Text>
-                  </View>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(255,255,255,0.7)' }}>
-                    Quota: 500 Capacity
-                  </Text>
-                </View>
-
-                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 10 }}>
-                  500 Members • Lifetime Access
-                </Text>
-
-                {/* Copy Buttons Row */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
-                    onPress={() => handleCopyText(standUrl, 'link')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name={copiedType === 'link' ? 'checkmark' : 'link-outline'} size={13} color="#FFC700" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                      {copiedType === 'link' ? 'Link Copied!' : 'Copy Stand Link'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
-                    onPress={() => handleCopyText(unclaimedStand.code, 'code')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name={copiedType === 'code' ? 'checkmark' : 'copy-outline'} size={13} color="#FFC700" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                      {copiedType === 'code' ? 'Code Copied!' : 'Copy Code'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* 3. Customer Quota Card (Matching Template 1:1) */}
-            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="people" size={20} color="#D97706" />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      Customer Quota
-                    </Text>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                      Stand Welcome Bundle • No Expiry
-                    </Text>
-                  </View>
-                </View>
-
-                {user ? (
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#050505', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                    onPress={handlePairStand}
-                    disabled={isPairing}
-                    activeOpacity={0.8}
-                  >
-                    {isPairing ? (
-                      <ActivityIndicator size="small" color="#FFC700" />
-                    ) : (
-                      <>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>Bind Stand</Text>
-                        <Ionicons name="arrow-forward" size={13} color="#FFC700" />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#050505', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                    onPress={() => router.push({ pathname: '/(auth)/login' as any, params: { redirect_to: `/nfc?c=${unclaimedStand.code}` } })}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>Activate</Text>
-                    <Ionicons name="arrow-forward" size={13} color="#FFC700" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Quota Progress Bar */}
-              <View style={{ width: '100%', height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                <View style={{ height: '100%', width: '0%', backgroundColor: '#FFC700', borderRadius: 3 }} />
-              </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                  0 / 500 <Text style={{ color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium' }}>Customers</Text>
-                </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#006D37' }}>
-                  500 remaining
-                </Text>
-              </View>
-            </View>
-
-            {/* 4. Ready for Customer NFC Taps (Matching Template 1:1) */}
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                Ready for Customer Taps
-              </Text>
-
-              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', gap: 14, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="radio-outline" size={22} color="#050505" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginBottom: 2 }}>
-                    Ready for Counter Customer Taps
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16 }}>
-                    Once paired, customer stamp claim requests will pop up in your merchant portal in real-time.
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 5. Primary Action Button */}
-            {user ? (
-              <View style={{ marginTop: 4 }}>
-                <TouchableOpacity
-                  style={{ width: '100%', height: 50, backgroundColor: '#050505', borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, opacity: isPairing ? 0.7 : 1 }}
-                  onPress={handlePairStand}
-                  disabled={isPairing}
-                  activeOpacity={0.85}
-                >
-                  {isPairing ? (
-                    <ActivityIndicator color="#FFC700" />
-                  ) : (
-                    <>
-                      <Ionicons name="link-sharp" size={18} color="#FFC700" />
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                        Bind Stand to {storeDisplayName}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 8 }}>
-                  Logged in as {user.name || user.email || 'Store Owner'}
-                </Text>
-              </View>
-            ) : (
-              <View style={{ marginTop: 4, gap: 8 }}>
-                <TouchableOpacity
-                  style={{ width: '100%', height: 50, backgroundColor: '#050505', borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
-                  onPress={() => router.push({ pathname: '/(auth)/login' as any, params: { redirect_to: `/nfc?c=${unclaimedStand.code}` } })}
-                  activeOpacity={0.85}
-                >
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
-                    Store Owner Log In / Register →
-                  </Text>
-                </TouchableOpacity>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
-                  Are you the business owner? Log in to pair this stand to your store.
-                </Text>
-              </View>
-            )}
-
-            {/* Official Hardware Trust Footnote */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 }}>
-              <Ionicons name="shield-checkmark-outline" size={11} color="#94A3B8" />
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                Official Risev Hardware Onboarding • risev.app
-              </Text>
-            </View>
-
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right', 'bottom']}>
+        <StatusBar style="dark" />
+        <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', maxWidth: 400, alignSelf: 'center', width: '100%' }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
+            <Ionicons name="radio" size={40} color="#0F172A" />
           </View>
-        </ScrollView>
+          
+          <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
+            Pair Smart Stand
+          </Text>
+          
+          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 8, textAlign: 'center' }}>
+            Stand Code
+          </Text>
+          
+          <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginBottom: 40 }}>
+            <Text style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 'bold', color: '#0F172A', letterSpacing: 2 }}>
+              {unclaimedStand.code}
+            </Text>
+          </View>
+
+          {user ? (
+            <>
+              <TouchableOpacity
+                style={{ backgroundColor: '#0F172A', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}
+                onPress={handlePairStand}
+                disabled={isPairing}
+                activeOpacity={0.8}
+              >
+                {isPairing ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    Pair to {storeDisplayName}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 16 }}>
+                Logged in as {user.name || user.email || 'Store Owner'}
+              </Text>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={{ backgroundColor: '#0F172A', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}
+              onPress={() => router.push({ pathname: '/(auth)/login' as any, params: { redirect_to: `/nfc?c=${unclaimedStand.code}` } })}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                Log in to Pair
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </SafeAreaView>
     );
   }
