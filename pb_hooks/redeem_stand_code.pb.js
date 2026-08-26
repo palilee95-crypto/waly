@@ -2,9 +2,50 @@
 // Route: POST /api/risev/merchant/redeem-stand-code
 
 routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
-  const authRecord = c.get("authRecord");
+  let authRecord = c.auth || null;
+  if (!authRecord && typeof c.get === "function") {
+    try {
+      authRecord = c.get("authRecord");
+    } catch (e) {}
+  }
+  if (!authRecord && c.httpContext) {
+    try {
+      authRecord = c.httpContext.get("authRecord");
+    } catch (e) {}
+  }
+
+  // Fallback: If token was passed in Authorization header, resolve user directly
   if (!authRecord) {
-    return c.json(401, { success: false, message: "Authentication required" });
+    let authHeader = "";
+    try {
+      if (c.requestInfo && c.requestInfo().headers) {
+        authHeader = c.requestInfo().headers["authorization"] || "";
+      }
+    } catch (e) {}
+
+    if (!authHeader) {
+      try {
+        authHeader = c.request().header.get("Authorization") || "";
+      } catch (e) {}
+    }
+
+    if (authHeader) {
+      const parts = authHeader.split(" ");
+      const token = parts.length === 2 ? parts[1] : parts[0];
+      if (token) {
+        try {
+          authRecord = $app.findAuthRecordByToken(token, $app.settings().recordAuthToken.secret);
+        } catch (tokErr) {
+          try {
+            authRecord = $app.findAuthRecordByToken(token);
+          } catch (tokErr2) {}
+        }
+      }
+    }
+  }
+
+  if (!authRecord) {
+    return c.json(401, { success: false, message: "Authentication required. Please log in first." });
   }
 
   let merchantId = authRecord.getString("merchant_id");

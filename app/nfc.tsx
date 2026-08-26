@@ -410,9 +410,11 @@ export default function NfcLandingScreen() {
 
     setIsPairing(true);
     try {
+      const token = pb.authStore.token;
       const res = await pb.send<{ success: boolean; message: string }>('/api/risev/merchant/redeem-stand-code', {
         method: 'POST',
         body: { code: unclaimedStand.code },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (res.success) {
