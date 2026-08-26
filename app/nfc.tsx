@@ -191,37 +191,6 @@ export default function NfcLandingScreen() {
   // Unclaimed stand pairing state
   const [unclaimedStand, setUnclaimedStand] = useState<{ code: string; plan?: string; quota?: number } | null>(null);
   const [isPairing, setIsPairing] = useState(false);
-  const [copiedType, setCopiedType] = useState<string | null>(null);
-  const nfcPulse = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (step === 'pairing') {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(nfcPulse, {
-            toValue: 1.15,
-            duration: 1200,
-            useNativeDriver: Platform.OS !== 'web',
-          }),
-          Animated.timing(nfcPulse, {
-            toValue: 1,
-            duration: 1200,
-            useNativeDriver: Platform.OS !== 'web',
-          }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-  }, [step]);
-
-  const handleCopyText = (text: string, type: string) => {
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedType(type);
-      setTimeout(() => setCopiedType(null), 2500);
-    }
-  };
 
   const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
   const [nameInput, setNameInput] = useState(user?.name || '');
@@ -828,65 +797,116 @@ export default function NfcLandingScreen() {
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // UNCLAIMED STAND ACTIVATION & PAIRING (MINIMALIST)
+  // UNCLAIMED STAND ACTIVATION & PAIRING STATE (MERCHANT UNBOXING)
   // ══════════════════════════════════════════════════════════════════
   if (step === 'pairing' && unclaimedStand) {
-    const storeDisplayName = user?.name || user?.email?.split('@')[0] || 'My Store';
-
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right', 'bottom']}>
-        <StatusBar style="dark" />
-        <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', maxWidth: 400, alignSelf: 'center', width: '100%' }}>
-          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
-            <Ionicons name="radio" size={40} color="#0F172A" />
-          </View>
-          
-          <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
-            Pair Smart Stand
-          </Text>
-          
-          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 8, textAlign: 'center' }}>
-            Stand Code
-          </Text>
-          
-          <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginBottom: 40 }}>
-            <Text style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 'bold', color: '#0F172A', letterSpacing: 2 }}>
-              {unclaimedStand.code}
-            </Text>
-          </View>
+      <SafeAreaView style={styles.pairingContainer} edges={['top']}>
+        <ScrollView
+          contentContainerStyle={[styles.pairingScrollContent, isDesktop && styles.desktopScrollContent]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.pairingContentCard, isDesktop && styles.desktopCard]}>
+            {/* Header: Risev Logo & Chip Badge */}
+            <View style={styles.pairingHeader}>
+              <Image
+                source={require('../assets/risev logo.png')}
+                style={styles.pairingLogo}
+                resizeMode="contain"
+              />
+              <View style={styles.pairingHardwareBadge}>
+                <Ionicons name="hardware-chip" size={14} color="#D97706" />
+                <Text style={styles.pairingHardwareBadgeText}>SMART NFC STAND DETECTED</Text>
+              </View>
+            </View>
 
-          {user ? (
-            <>
-              <TouchableOpacity
-                style={{ backgroundColor: '#0F172A', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}
-                onPress={handlePairStand}
-                disabled={isPairing}
-                activeOpacity={0.8}
-              >
-                {isPairing ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                    Pair to {storeDisplayName}
+            {/* Main Activation Card */}
+            <View style={styles.pairingCard}>
+              <View style={styles.pairingIconCircle}>
+                <Ionicons name="sparkles" size={30} color="#006d37" />
+              </View>
+              <Text style={styles.pairingTitle}>Unclaimed Stand Ready</Text>
+              <Text style={styles.pairingSubtitle}>
+                This physical NFC stand is ready to be paired with your store account.
+              </Text>
+
+              {/* Stand Code Display */}
+              <View style={styles.pairingCodeBox}>
+                <Text style={styles.pairingCodeLabel}>STAND SERIAL / ACTIVATION CODE</Text>
+                <Text style={styles.pairingCodeValue}>{unclaimedStand.code}</Text>
+              </View>
+
+              {/* Perks List */}
+              <View style={styles.pairingPerksList}>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>500 Customer Database Capacity</Text>
+                </View>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>Lifetime Hardware License • No Expiry</Text>
+                </View>
+                <View style={styles.pairingPerkItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.pairingPerkText}>Instant Counter Tap-to-Claim Stamps</Text>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              {user ? (
+                <View style={{ width: '100%', marginTop: 14 }}>
+                  <TouchableOpacity
+                    style={[styles.pairingBtnPrimary, isPairing && { opacity: 0.6 }]}
+                    onPress={handlePairStand}
+                    disabled={isPairing}
+                    activeOpacity={0.85}
+                  >
+                    {isPairing ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="link-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.pairingBtnPrimaryText}>
+                          Bind Stand to My Store
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={styles.pairingHelperText}>
+                    Logged in as {user.name || user.email || 'Store Owner'}
                   </Text>
-                )}
-              </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 16 }}>
-                Logged in as {user.name || user.email || 'Store Owner'}
-              </Text>
-            </>
-          ) : (
-            <TouchableOpacity
-              style={{ backgroundColor: '#0F172A', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}
-              onPress={() => router.push({ pathname: '/(auth)/login' as any, params: { redirect_to: `/nfc?c=${unclaimedStand.code}` } })}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                Log in to Pair
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+                </View>
+              ) : (
+                <View style={{ width: '100%', marginTop: 14, gap: 10 }}>
+                  <TouchableOpacity
+                    style={styles.pairingBtnPrimary}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(auth)/login' as any,
+                        params: { redirect_to: `/nfc?c=${unclaimedStand.code}` },
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.pairingBtnPrimaryText}>
+                      Store Owner Log In / Register →
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pairingHelperText}>
+                    Are you the business owner? Log in to pair this stand to your store.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Trust Footer */}
+            <View style={styles.fakeTrustFooter}>
+              <Ionicons name="lock-closed" size={10} color="#94A3B8" />
+              <Text style={styles.fakeTrustText}>Official Risev Hardware Onboarding • risev.app</Text>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -2316,16 +2336,14 @@ const styles = StyleSheet.create({
     marginBottom: 50,
     tintColor: '#FFFFFF',
   },
-  // ─── SMART PAIRING / ONBOARDING CLEAN STYLES ───────────────────────
+  // ─── SMART PAIRING / ONBOARDING STYLES ───────────────────────────
   pairingContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
   pairingScrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 32,
-    paddingBottom: 40,
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2334,201 +2352,139 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignItems: 'center',
   },
-  pairingHeaderClean: {
+  pairingHeader: {
     alignItems: 'center',
     marginBottom: 20,
-    gap: 8,
   },
-  pairingLogoClean: {
+  pairingLogo: {
     height: 36,
-    width: 130,
+    width: 140,
+    marginBottom: 12,
   },
-  pairingHardwareBadgeClean: {
+  pairingHardwareBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#DEF7EC',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#BCF0DA',
+    borderColor: '#FDE68A',
   },
-  pulsingGreenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  pairingHardwareBadgeTextClean: {
-    fontSize: 9.5,
+  pairingHardwareBadgeText: {
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#03543F',
-    letterSpacing: 0.6,
+    color: '#92400E',
+    letterSpacing: 0.5,
   },
-  pairingMainCard: {
+  pairingCard: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: 28,
+    padding: 24,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
+    marginBottom: 16,
   },
-  pairingIconCircleClean: {
+  pairingIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#DEF7EC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
+    marginBottom: 16,
   },
-  pairingTitleClean: {
+  pairingTitle: {
     fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
     textAlign: 'center',
     marginBottom: 6,
   },
-  pairingSubtitleClean: {
-    fontSize: 12.5,
+  pairingSubtitle: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_400Regular',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 18,
-    paddingHorizontal: 6,
+    marginBottom: 20,
   },
-  serialBoxClean: {
+  pairingCodeBox: {
     width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 16,
-  },
-  serialBoxHeader: {
-    flexDirection: 'row',
+    backgroundColor: '#002d1e',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#004d30',
   },
-  serialBoxLabel: {
+  pairingCodeLabel: {
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#64748B',
-    letterSpacing: 0.8,
+    color: '#6bfe9c',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  serialBoxCapacity: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#03543F',
-    backgroundColor: '#DEF7EC',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  serialCodeRowClean: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  serialCodeTextClean: {
+  pairingCodeValue: {
     fontFamily: 'monospace',
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#006D37',
-    letterSpacing: 1.2,
+    color: '#FFFFFF',
+    letterSpacing: 2,
   },
-  serialActionBtnsClean: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  serialIconBtnClean: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  serialIconBtnTextClean: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
-  },
-  cleanPerksList: {
+  pairingPerksList: {
     width: '100%',
     gap: 10,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#F1F5F9',
   },
-  cleanPerkItem: {
+  pairingPerkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  cleanPerkText: {
+  pairingPerkText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#334155',
   },
-  cleanPrimaryBtn: {
+  pairingBtnPrimary: {
     width: '100%',
     height: 48,
-    backgroundColor: '#006D37',
-    borderRadius: 14,
+    backgroundColor: '#006d37',
+    borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#006D37',
+    shadowColor: '#006d37',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 3,
   },
-  cleanPrimaryBtnText: {
+  pairingBtnPrimaryText: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
-  cleanHelperText: {
+  pairingHelperText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     textAlign: 'center',
-    marginTop: 6,
-  },
-  cleanTrustFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 18,
-  },
-  cleanTrustText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    marginTop: 8,
   },
 });
