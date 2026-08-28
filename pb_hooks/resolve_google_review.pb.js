@@ -30,7 +30,6 @@ function convertHexPairToPlaceId(hex1, hex2) {
     if (typeof btoa === "function") {
       base64 = btoa(binary);
     } else {
-      // Pure JS fallback base64
       const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
       for (let i = 0; i < binary.length; i += 3) {
         const b0 = binary.charCodeAt(i);
@@ -100,8 +99,8 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
     });
   }
 
-  // 4. Check if direct hex feature ID pair is inside URL (e.g., !1s0x304b...:0x54cd... or ftid=0x...:0x...)
-  const hexPairMatch = input.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+  // 4. Check if direct hex feature ID pair is inside URL (e.g., !1s0x304b...:0x54cd... or %3A)
+  const hexPairMatch = input.match(/(0x[0-9a-fA-F]+)(?:%3A|:)(0x[0-9a-fA-F]+)/i);
   if (hexPairMatch && hexPairMatch[1] && hexPairMatch[2]) {
     const generatedPlaceId = convertHexPairToPlaceId(hexPairMatch[1], hexPairMatch[2]);
     if (generatedPlaceId) {
@@ -137,16 +136,15 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
       method: "GET",
       url: fetchUrl,
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
+        "User-Agent": "curl/7.68.0",
+        "Accept": "*/*"
       }
     });
 
     const rawHtml = (res.raw || res.rawText || res.body || "") + " " + JSON.stringify(res.headers || {});
 
-    // 6a. Check if hex pair exists inside response HTML or redirect URL
-    const htmlHexMatch = rawHtml.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+    // 6a. Check if hex pair exists inside response HTML or redirect URL (including %3A)
+    const htmlHexMatch = rawHtml.match(/(0x[0-9a-fA-F]+)(?:%3A|:)(0x[0-9a-fA-F]+)/i);
     if (htmlHexMatch && htmlHexMatch[1] && htmlHexMatch[2]) {
       const generatedPid = convertHexPairToPlaceId(htmlHexMatch[1], htmlHexMatch[2]);
       if (generatedPid) {

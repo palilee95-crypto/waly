@@ -84,8 +84,8 @@ export default function OnboardingSetupScreen() {
       }
     };
 
-    // Check if URL has feature ID hex pair (e.g. !1s0x304b...:0x54cd...)
-    const hexMatch = clean.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+    // Check if URL has feature ID hex pair (e.g. !1s0x304b...:0x54cd... or %3A)
+    const hexMatch = clean.match(/(0x[0-9a-fA-F]+)(?:%3A|:)(0x[0-9a-fA-F]+)/i);
     if (hexMatch && hexMatch[1] && hexMatch[2]) {
       const generatedPid = convertHexPairToPlaceId(hexMatch[1], hexMatch[2]);
       if (generatedPid) {
