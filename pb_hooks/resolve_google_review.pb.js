@@ -2,35 +2,32 @@
 // Route: POST /api/risev/google-review/resolve
 // Resolves any Google Maps short link (maps.app.goo.gl), Place link, or Place ID into a 1-click Direct Review URL
 
-function convertHexPairToPlaceId(hex1, hex2) {
-  try {
-    const h1 = hex1.replace(/^0x/i, '').padStart(16, '0');
-    const h2 = hex2.replace(/^0x/i, '').padStart(16, '0');
+routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
+  function convertHexPairToPlaceId(hex1, hex2) {
+    try {
+      const h1 = hex1.replace(/^0x/i, '').padStart(16, '0');
+      const h2 = hex2.replace(/^0x/i, '').padStart(16, '0');
 
-    const bytes = [];
-    // hex1 in little endian (8 bytes)
-    for (let i = 14; i >= 0; i -= 2) {
-      bytes.push(parseInt(h1.substr(i, 2), 16));
-    }
-    // Protobuf tag 2 (fixed64 = 0x11)
-    bytes.push(0x11);
-    // hex2 in little endian (8 bytes)
-    for (let i = 14; i >= 0; i -= 2) {
-      bytes.push(parseInt(h2.substr(i, 2), 16));
-    }
+      const bytes = [];
+      // hex1 in little endian (8 bytes)
+      for (let i = 14; i >= 0; i -= 2) {
+        bytes.push(parseInt(h1.substr(i, 2), 16));
+      }
+      // Protobuf tag 2 (fixed64 = 0x11)
+      bytes.push(0x11);
+      // hex2 in little endian (8 bytes)
+      for (let i = 14; i >= 0; i -= 2) {
+        bytes.push(parseInt(h2.substr(i, 2), 16));
+      }
 
-    // Base64 encode bytes
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    
-    // Base64url encode
-    let base64 = "";
-    if (typeof btoa === "function") {
-      base64 = btoa(binary);
-    } else {
+      // Base64 encode bytes
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      
       const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      let base64 = "";
       for (let i = 0; i < binary.length; i += 3) {
         const b0 = binary.charCodeAt(i);
         const b1 = i + 1 < binary.length ? binary.charCodeAt(i + 1) : 0;
@@ -41,16 +38,14 @@ function convertHexPairToPlaceId(hex1, hex2) {
         base64 += (i + 1 < binary.length) ? chars.charAt((triple >> 6) & 63) : '=';
         base64 += (i + 2 < binary.length) ? chars.charAt(triple & 63) : '=';
       }
+
+      base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return 'ChIJ' + base64;
+    } catch (err) {
+      return null;
     }
-
-    base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return 'ChIJ' + base64;
-  } catch (err) {
-    return null;
   }
-}
 
-routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
   let body = {};
   try {
     body = e.requestInfo().body || {};

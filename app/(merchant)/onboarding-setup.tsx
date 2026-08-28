@@ -680,18 +680,19 @@ export default function OnboardingSetupScreen() {
 
                 {/* Quick 1-Click Action Buttons */}
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                  {merchant?.name && !googleReviewUrl ? (
+                  {merchant?.name ? (
                     <TouchableOpacity
-                      style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#CBD5E1' }}
+                      style={{ backgroundColor: '#FFFBEB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#FDE68A' }}
                       onPress={() => {
-                        const storeQuery = `${merchant.name} review`;
-                        handleAutoConvertGoogleUrl(`https://www.google.com/search?q=${encodeURIComponent(storeQuery)}`);
+                        const storeQuery = `${merchant.name} ${merchant?.city || ''}`.trim();
+                        const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeQuery)}`;
+                        Linking.openURL(mapsSearchUrl).catch(() => Alert.alert('Error', 'Could not open Google Maps'));
                       }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="flash-outline" size={13} color="#050505" />
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                        Use Store Name: "{merchant.name}"
+                      <Ionicons name="map-outline" size={14} color="#D97706" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                        Find "{merchant.name}" on Google Maps ↗
                       </Text>
                     </TouchableOpacity>
                   ) : null}
