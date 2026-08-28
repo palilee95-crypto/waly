@@ -97,7 +97,7 @@ export default function OnboardingSetupScreen() {
     setGoogleReviewUrl(clean);
 
     // 2. Server-side auto resolver for maps.app.goo.gl or standard Google Maps URLs
-    if (clean.includes('maps.app.goo.gl') || clean.includes('goo.gl/maps') || clean.includes('google.com/maps')) {
+    if (clean.includes('maps.app.goo.gl') || clean.includes('goo.gl/maps') || clean.includes('google.com/maps') || clean.startsWith('http')) {
       try {
         setIsResolvingUrl(true);
         const res = await fetch(`${pb.baseUrl}/api/risev/google-review/resolve`, {
@@ -678,28 +678,30 @@ export default function OnboardingSetupScreen() {
                   ) : null}
                 </View>
 
-                {/* Quick 1-Click Action Buttons */}
-                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                  {merchant?.name ? (
+                {/* Dynamic Google Maps Search Button for typed keyword */}
+                {trimmed && !trimmed.startsWith('http') && !trimmed.startsWith('ChIJ') ? (
+                  <View style={{ gap: 6 }}>
                     <TouchableOpacity
-                      style={{ backgroundColor: '#FFFBEB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#FDE68A' }}
+                      style={{ backgroundColor: '#FFFBEB', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#FDE68A' }}
                       onPress={() => {
-                        const storeQuery = `${merchant.name} ${merchant?.city || ''}`.trim();
-                        const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeQuery)}`;
+                        const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}`;
                         Linking.openURL(mapsSearchUrl).catch(() => Alert.alert('Error', 'Could not open Google Maps'));
                       }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="map-outline" size={14} color="#D97706" />
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                        Find "{merchant.name}" on Google Maps ↗
+                      <Ionicons name="search" size={14} color="#D97706" />
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                        Search "{trimmed}" on Google Maps ↗
                       </Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
+                      💡 Search your shop, click "Share" on your pin, and paste the link here.
+                    </Text>
+                  </View>
+                ) : null}
 
-                {/* Result Card Preview */}
-                {googleReviewUrl ? (
+                {/* Result Card Preview (Only for valid URL or Place ID) */}
+                {googleReviewUrl && (googleReviewUrl.startsWith('http') || googleReviewUrl.startsWith('ChIJ')) ? (
                   <View style={{ backgroundColor: isDirectPopup ? '#F0FDF4' : '#F8FAFC', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: isDirectPopup ? '#BBF7D0' : '#E2E8F0' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
