@@ -143,7 +143,7 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
       }
     });
 
-    const rawHtml = res.rawText || "";
+    const rawHtml = (res.raw || res.rawText || res.body || "") + " " + JSON.stringify(res.headers || {});
 
     // 6a. Check if hex pair exists inside response HTML or redirect URL
     const htmlHexMatch = rawHtml.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
