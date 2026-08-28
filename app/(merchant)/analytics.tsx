@@ -941,7 +941,7 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* ⭐ Customer Ratings & Google Review Funnel */}
-        <View style={styles.card}>
+        <View style={styles.chartCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View style={[styles.iconBg, { backgroundColor: '#FFFBEB' }]}>
@@ -949,12 +949,12 @@ export default function AnalyticsScreen() {
               </View>
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={styles.cardTitle}>Customer Ratings & Feedback</Text>
+                  <Text style={styles.sectionTitle}>Customer Ratings & Feedback</Text>
                   <TouchableOpacity onPress={() => showHelp('Ratings & Feedback', 'Shows customer ratings gathered after NFC stamp claims. 5-star reviews were directed to your Google Business page, while lower ratings are captured here privately.')}>
                     <Ionicons name="help-circle-outline" size={14} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.cardSubtitle}>
+                <Text style={styles.sectionSubtitle}>
                   {feedbacks.length > 0 ? `${reviewStats.totalCount} total customer ratings` : 'Ratings from NFC stamp claims'}
                 </Text>
               </View>

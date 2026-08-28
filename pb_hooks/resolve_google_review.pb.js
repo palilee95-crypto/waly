@@ -2,6 +2,55 @@
 // Route: POST /api/risev/google-review/resolve
 // Resolves any Google Maps short link (maps.app.goo.gl), Place link, or Place ID into a 1-click Direct Review URL
 
+function convertHexPairToPlaceId(hex1, hex2) {
+  try {
+    const h1 = hex1.replace(/^0x/i, '').padStart(16, '0');
+    const h2 = hex2.replace(/^0x/i, '').padStart(16, '0');
+
+    const bytes = [];
+    // hex1 in little endian (8 bytes)
+    for (let i = 14; i >= 0; i -= 2) {
+      bytes.push(parseInt(h1.substr(i, 2), 16));
+    }
+    // Protobuf tag 2 (fixed64 = 0x11)
+    bytes.push(0x11);
+    // hex2 in little endian (8 bytes)
+    for (let i = 14; i >= 0; i -= 2) {
+      bytes.push(parseInt(h2.substr(i, 2), 16));
+    }
+
+    // Base64 encode bytes
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    
+    // Base64url encode
+    let base64 = "";
+    if (typeof btoa === "function") {
+      base64 = btoa(binary);
+    } else {
+      // Pure JS fallback base64
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      for (let i = 0; i < binary.length; i += 3) {
+        const b0 = binary.charCodeAt(i);
+        const b1 = i + 1 < binary.length ? binary.charCodeAt(i + 1) : 0;
+        const b2 = i + 2 < binary.length ? binary.charCodeAt(i + 2) : 0;
+        const triple = (b0 << 16) | (b1 << 8) | b2;
+        base64 += chars.charAt((triple >> 18) & 63);
+        base64 += chars.charAt((triple >> 12) & 63);
+        base64 += (i + 1 < binary.length) ? chars.charAt((triple >> 6) & 63) : '=';
+        base64 += (i + 2 < binary.length) ? chars.charAt(triple & 63) : '=';
+      }
+    }
+
+    base64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return 'ChIJ' + base64;
+  } catch (err) {
+    return null;
+  }
+}
+
 routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
   let body = {};
   try {
@@ -51,7 +100,21 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
     });
   }
 
-  // 4. If URL has placeid= parameter directly
+  // 4. Check if direct hex feature ID pair is inside URL (e.g., !1s0x304b...:0x54cd... or ftid=0x...:0x...)
+  const hexPairMatch = input.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+  if (hexPairMatch && hexPairMatch[1] && hexPairMatch[2]) {
+    const generatedPlaceId = convertHexPairToPlaceId(hexPairMatch[1], hexPairMatch[2]);
+    if (generatedPlaceId) {
+      return e.json(200, {
+        success: true,
+        place_id: generatedPlaceId,
+        direct_url: `https://search.google.com/local/writereview?placeid=${generatedPlaceId}`,
+        type: "converted_from_hex_feature_id"
+      });
+    }
+  }
+
+  // 5. If URL has placeid= parameter directly
   const placeIdParamMatch = input.match(/placeid=([a-zA-Z0-9_-]+)/i);
   if (placeIdParamMatch && placeIdParamMatch[1]) {
     const pid = placeIdParamMatch[1];
@@ -63,7 +126,7 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
     });
   }
 
-  // 5. Short link (maps.app.goo.gl, goo.gl/maps) or standard google.com/maps URL -> Fetch and resolve
+  // 6. Short link (maps.app.goo.gl, goo.gl/maps) or standard google.com/maps URL -> Fetch and resolve
   let fetchUrl = input;
   if (!fetchUrl.startsWith("http://") && !fetchUrl.startsWith("https://")) {
     fetchUrl = `https://${fetchUrl}`;
@@ -82,11 +145,23 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
 
     const rawHtml = res.rawText || "";
 
-    // 5a. Look for standard ChIJ Place ID inside response HTML
-    // Google places often embed: ["ChIJ..."] or data-placeid="ChIJ..." or "/maps/place/.../data=...1s(ChIJ...)"
+    // 6a. Check if hex pair exists inside response HTML or redirect URL
+    const htmlHexMatch = rawHtml.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+    if (htmlHexMatch && htmlHexMatch[1] && htmlHexMatch[2]) {
+      const generatedPid = convertHexPairToPlaceId(htmlHexMatch[1], htmlHexMatch[2]);
+      if (generatedPid) {
+        return e.json(200, {
+          success: true,
+          place_id: generatedPid,
+          direct_url: `https://search.google.com/local/writereview?placeid=${generatedPid}`,
+          type: "resolved_from_html_hex"
+        });
+      }
+    }
+
+    // 6b. Look for standard ChIJ Place ID inside response HTML
     const placeIdMatches = rawHtml.match(/ChIJ[a-zA-Z0-9_-]{20,}/g);
     if (placeIdMatches && placeIdMatches.length > 0) {
-      // Pick the first valid Place ID
       const detectedPlaceId = placeIdMatches[0];
       return e.json(200, {
         success: true,
@@ -96,7 +171,7 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
       });
     }
 
-    // 5b. Look for writereview link in HTML
+    // 6c. Look for writereview link in HTML
     const writeReviewMatch = rawHtml.match(/https:\/\/search\.google\.com\/local\/writereview\?placeid=([a-zA-Z0-9_-]+)/);
     if (writeReviewMatch && writeReviewMatch[1]) {
       return e.json(200, {
@@ -107,7 +182,7 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
       });
     }
 
-    // 5c. Look for g.page link in HTML
+    // 6d. Look for g.page link in HTML
     const gpageMatch = rawHtml.match(/https:\/\/g\.page\/r\/[a-zA-Z0-9_-]+/);
     if (gpageMatch && gpageMatch[0]) {
       return e.json(200, {

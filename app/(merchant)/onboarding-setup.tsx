@@ -66,10 +66,30 @@ export default function OnboardingSetupScreen() {
       setGoogleReviewUrl(`${clean}/review`);
       return;
     }
-    if (clean.includes('placeid=')) {
-      const match = clean.match(/placeid=([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) {
-        setGoogleReviewUrl(`https://search.google.com/local/writereview?placeid=${match[1]}`);
+    // Helper: Convert Google Feature ID hex pair (0x...:0x...) to official Place ID (ChIJ...)
+    const convertHexPairToPlaceId = (hex1: string, hex2: string) => {
+      try {
+        const h1 = hex1.replace(/^0x/i, '').padStart(16, '0');
+        const h2 = hex2.replace(/^0x/i, '').padStart(16, '0');
+        const bytes: number[] = [];
+        for (let i = 14; i >= 0; i -= 2) bytes.push(parseInt(h1.substr(i, 2), 16));
+        bytes.push(0x11);
+        for (let i = 14; i >= 0; i -= 2) bytes.push(parseInt(h2.substr(i, 2), 16));
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return 'ChIJ' + base64;
+      } catch {
+        return null;
+      }
+    };
+
+    // Check if URL has feature ID hex pair (e.g. !1s0x304b...:0x54cd...)
+    const hexMatch = clean.match(/(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)/);
+    if (hexMatch && hexMatch[1] && hexMatch[2]) {
+      const generatedPid = convertHexPairToPlaceId(hexMatch[1], hexMatch[2]);
+      if (generatedPid) {
+        setGoogleReviewUrl(`https://search.google.com/local/writereview?placeid=${generatedPid}`);
         return;
       }
     }
@@ -1375,6 +1395,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     letterSpacing: 0.5,
+  },
+  fieldSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 18,
   },
   copyBtnGold: {
     flexDirection: 'row',
