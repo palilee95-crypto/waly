@@ -51,9 +51,9 @@ export default function OnboardingSetupScreen() {
   const [isResolvingUrl, setIsResolvingUrl] = useState(false);
 
   const handleAutoConvertGoogleUrl = async (rawUrl: string) => {
+    setGoogleReviewUrl(rawUrl);
     let clean = rawUrl.trim();
     if (!clean) {
-      setGoogleReviewUrl('');
       return;
     }
 
@@ -93,8 +93,6 @@ export default function OnboardingSetupScreen() {
         return;
       }
     }
-
-    setGoogleReviewUrl(clean);
 
     // 2. Server-side auto resolver for maps.app.goo.gl or standard Google Maps URLs
     if (clean.includes('maps.app.goo.gl') || clean.includes('goo.gl/maps') || clean.includes('google.com/maps') || clean.startsWith('http')) {
