@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   Modal,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ export default function AnalyticsScreen() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loyaltyCards, setLoyaltyCards] = useState<any[]>([]);
   const [merchant, setMerchant] = useState<any>(null);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
 
   // Timeframe states
   const [timeframe, setTimeframe] = useState<'daily' | 'monthly' | 'yearly' | 'custom'>('monthly');
@@ -89,6 +91,13 @@ export default function AnalyticsScreen() {
           requestKey: null
         }).catch(() => []);
         setBranchList(branches);
+
+        const fbs = await pb.collection('store_feedbacks').getFullList({
+          filter: `merchant = '${user.merchant_id}'`,
+          sort: '-created',
+          requestKey: null,
+        }).catch(() => []);
+        setFeedbacks(fbs);
       } catch (err) {
         console.warn('Failed to fetch analytics data:', err);
       } finally {
@@ -100,6 +109,24 @@ export default function AnalyticsScreen() {
   }, [user?.merchant_id]);
 
   // Dynamic Transaction Filter
+  const reviewStats = useMemo(() => {
+    if (feedbacks.length === 0) {
+      return { 
+        avgRating: '5.0', 
+        totalCount: 0, 
+        googleRedirects: 0, 
+        privateFeedbacks: 0,
+      };
+    }
+    const totalCount = feedbacks.length;
+    const sumRating = feedbacks.reduce((acc, f) => acc + (Number(f.rating) || 5), 0);
+    const avgRating = (sumRating / totalCount).toFixed(1);
+    const googleRedirects = feedbacks.filter(f => f.redirected_to_google || f.rating === 5).length;
+    const privateFeedbacks = feedbacks.filter(f => f.rating < 5 || Boolean(f.feedback)).length;
+
+    return { avgRating, totalCount, googleRedirects, privateFeedbacks };
+  }, [feedbacks]);
+
   const filteredTransactions = useMemo(() => {
     const now = new Date();
     return transactions.filter(tx => {
@@ -909,6 +936,161 @@ export default function AnalyticsScreen() {
                   </View>
                 </View>
               ))
+            )}
+          </View>
+        </View>
+
+        {/* ⭐ Customer Ratings & Google Review Funnel */}
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={[styles.iconBg, { backgroundColor: '#FFFBEB' }]}>
+                <Ionicons name="star" size={20} color="#F59E0B" />
+              </View>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.cardTitle}>Customer Ratings & Feedback</Text>
+                  <TouchableOpacity onPress={() => showHelp('Ratings & Feedback', 'Shows customer ratings gathered after NFC stamp claims. 5-star reviews were directed to your Google Business page, while lower ratings are captured here privately.')}>
+                    <Ionicons name="help-circle-outline" size={14} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.cardSubtitle}>
+                  {feedbacks.length > 0 ? `${reviewStats.totalCount} total customer ratings` : 'Ratings from NFC stamp claims'}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => router.push('/(merchant)/onboarding-setup' as any)}
+              style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={12} color="#64748B" />
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Setup Link</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Rating Highlight Banner */}
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            <View style={{ flex: 1.2, backgroundColor: '#050505', borderRadius: 16, padding: 14, justifyContent: 'center' }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', marginBottom: 4 }}>AVERAGE SCORE</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
+                  {reviewStats.avgRating}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 2 }}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <Ionicons 
+                      key={s} 
+                      name={s <= Math.round(Number(reviewStats.avgRating)) ? "star" : "star-outline"} 
+                      size={12} 
+                      color="#FFC700" 
+                    />
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={{ flex: 1, backgroundColor: '#F0FDF4', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#DCFCE7', justifyContent: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <Ionicons name="logo-google" size={12} color="#16A34A" />
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#16A34A' }}>5-STAR GOOGLE</Text>
+              </View>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#15803D' }}>
+                {reviewStats.googleRedirects}
+              </Text>
+              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#166534' }}>redirected to maps</Text>
+            </View>
+
+            <View style={{ flex: 1, backgroundColor: '#FFFBEB', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#FEF3C7', justifyContent: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <Ionicons name="chatbubble-ellipses" size={12} color="#D97706" />
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706' }}>PRIVATE</Text>
+              </View>
+              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                {reviewStats.privateFeedbacks}
+              </Text>
+              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E' }}>direct feedback</Text>
+            </View>
+          </View>
+
+          {/* Feedback List */}
+          <View style={{ gap: 10 }}>
+            {feedbacks.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 24, gap: 6, backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <Ionicons name="star-outline" size={26} color="#94A3B8" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                  No Customer Reviews Yet
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', paddingHorizontal: 20 }}>
+                  Add your Google Business review link in Onboarding Setup. Customers will automatically be prompted after stamping!
+                </Text>
+              </View>
+            ) : (
+              feedbacks.slice(0, 10).map((fb, idx) => {
+                const isPositive = Number(fb.rating) === 5;
+                const cleanPhone = (fb.customer_phone || '').replace(/\D/g, '');
+                return (
+                  <View key={fb.id || idx} style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', gap: 2 }}>
+                          {[1, 2, 3, 4, 5].map(s => (
+                            <Ionicons 
+                              key={s} 
+                              name={s <= fb.rating ? "star" : "star-outline"} 
+                              size={13} 
+                              color={s <= fb.rating ? "#F59E0B" : "#CBD5E1"} 
+                            />
+                          ))}
+                        </View>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                          {fb.rating}.0
+                        </Text>
+                        {isPositive ? (
+                          <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="logo-google" size={9} color="#15803D" />
+                            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#15803D' }}>Google</Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Private</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                        {fb.created ? new Date(fb.created).toLocaleDateString() : ''}
+                      </Text>
+                    </View>
+
+                    {fb.feedback ? (
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#334155', lineHeight: 18, marginBottom: 8, fontStyle: 'italic' }}>
+                        "{fb.feedback}"
+                      </Text>
+                    ) : null}
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: fb.feedback ? 2 : 4 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {fb.customer_name || fb.customer_phone || 'Anonymous Customer'}
+                      </Text>
+                      {cleanPhone ? (
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E2FBE8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                          onPress={() => {
+                            const waNumber = cleanPhone.startsWith('60') ? cleanPhone : `60${cleanPhone.replace(/^0/, '')}`;
+                            const msg = encodeURIComponent(`Hi! Thank you for your visit to ${merchant?.name || 'our store'}. We noticed your feedback and would love to assist you!`);
+                            Linking.openURL(`https://wa.me/${waNumber}?text=${msg}`).catch(() => {});
+                          }}
+                        >
+                          <Ionicons name="logo-whatsapp" size={12} color="#16A34A" />
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#16A34A' }}>WhatsApp</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })
             )}
           </View>
         </View>

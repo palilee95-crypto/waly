@@ -13,6 +13,8 @@ import {
   Image,
   ImageBackground,
   Animated,
+  Easing,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -201,6 +203,7 @@ export default function NfcLandingScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   
   const pulseAnim = useRef(new Animated.Value(0.2)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (step === 'pairing') {
@@ -213,12 +216,36 @@ export default function NfcLandingScreen() {
     }
   }, [step]);
 
+  useEffect(() => {
+    if (step === 'sent') {
+      rotateAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      rotateAnim.setValue(0);
+    }
+  }, [step]);
+
   // Realtime listening & WhatsApp state
   const [isWaitingConfirm, setIsWaitingConfirm] = useState(false);
   const [claimId, setClaimId] = useState<string>('');
   const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
   const [isApproved, setIsApproved] = useState<boolean>(false);
   const [showBack, setShowBack] = useState<boolean>(false);
+  
+  // 🌟 Store & Google Review Funnel State
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
+  const [reviewRating, setReviewRating] = useState<number>(0);
+  const [reviewFeedback, setReviewFeedback] = useState<string>('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState<boolean>(false);
+
   // Tracks which stamp slot indices are "newly earned" this session for animation
   const [newlyEarnedIndices, setNewlyEarnedIndices] = useState<Set<number>>(new Set());
   const prevStampsRef = useRef<number>(-1); // -1 = not yet initialised
@@ -228,8 +255,133 @@ export default function NfcLandingScreen() {
   useEffect(() => {
     if (isApproved) {
       setShowBack(true);
+
+      // Trigger Review Funnel if customer hasn't reviewed yet and merchant has configured reviews
+      if (merchant?.id) {
+        const checkAndTriggerReview = async () => {
+          const phone = phoneInput || user?.phone || '';
+          const storageKey = `risev_reviewed_${merchant.id}_${phone}`;
+          
+          let hasReviewedLocal = false;
+          if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+            hasReviewedLocal = localStorage.getItem(storageKey) === 'true';
+          }
+          
+          if (hasReviewedLocal) return;
+
+          if (phone) {
+            try {
+              const existing = await pb.collection('store_feedbacks').getList(1, 1, {
+                filter: `merchant = "${merchant.id}" && customer_phone = "${phone}"`,
+                requestKey: null,
+              }).catch(() => null);
+
+              if (existing && existing.items && existing.items.length > 0) {
+                if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+                  localStorage.setItem(storageKey, 'true');
+                }
+                return;
+              }
+            } catch (e) {}
+          }
+
+          // Delay popup ~1.2s to let customer celebrate their stamp first
+          const timer = setTimeout(() => {
+            setShowReviewModal(true);
+          }, 1200);
+          return () => clearTimeout(timer);
+        };
+
+        checkAndTriggerReview();
+      }
     }
-  }, [isApproved]);
+  }, [isApproved, merchant?.id, phoneInput, user?.phone]);
+
+  const handleSelectStar = async (star: number) => {
+    setReviewRating(star);
+    const phone = phoneInput || user?.phone || '';
+    const name = nameInput || user?.name || '';
+    const storageKey = `risev_reviewed_${merchant?.id}_${phone}`;
+
+    if (star === 5) {
+      // 1. Prepare target Google URL
+      let targetUrl = (merchant?.google_review_url || '').trim();
+      if (!targetUrl) {
+        const storeName = merchant?.name ? `${merchant.name} review` : 'google review';
+        targetUrl = `https://www.google.com/search?q=${encodeURIComponent(storeName)}`;
+      } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = `https://${targetUrl}`;
+      }
+
+      // 2. Open Google Review immediately on user click
+      try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const opened = window.open(targetUrl, '_blank');
+          if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+            window.location.href = targetUrl;
+          }
+        } else {
+          Linking.openURL(targetUrl).catch(() => {});
+        }
+      } catch (err) {
+        Linking.openURL(targetUrl).catch(() => {});
+      }
+
+      // 3. Mark as reviewed locally
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem(storageKey, 'true');
+      }
+
+      // 4. Save feedback in database
+      if (merchant?.id) {
+        pb.collection('store_feedbacks').create({
+          merchant: merchant.id,
+          customer_phone: phone,
+          customer_name: name,
+          rating: 5,
+          feedback: '',
+          redirected_to_google: true,
+        }).catch(() => {});
+      }
+
+      setShowReviewModal(false);
+    }
+  };
+
+  const handleSubmitPrivateFeedback = async () => {
+    if (reviewRating === 0) return;
+    setIsSubmittingReview(true);
+    const phone = phoneInput || user?.phone || '';
+    const name = nameInput || user?.name || '';
+    const storageKey = `risev_reviewed_${merchant?.id}_${phone}`;
+
+    try {
+      if (merchant?.id) {
+        await pb.collection('store_feedbacks').create({
+          merchant: merchant.id,
+          customer_phone: phone,
+          customer_name: name,
+          rating: reviewRating,
+          feedback: reviewFeedback.trim(),
+          redirected_to_google: false,
+        });
+      }
+
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem(storageKey, 'true');
+      }
+
+      setReviewSubmitted(true);
+      setTimeout(() => {
+        setShowReviewModal(false);
+        setReviewSubmitted(false);
+      }, 1600);
+    } catch (err) {
+      setShowReviewModal(false);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     Animated.spring(flipAnim, {
@@ -1347,7 +1499,11 @@ export default function NfcLandingScreen() {
 
             return (
               <>
-                <View style={[styles.innerFormCard, { backgroundColor: primaryColor, borderColor: brandInputBorderColor, borderWidth: isLightBrandColor ? 1 : 0 }]}>
+                <View style={[styles.innerFormCard, { 
+                  backgroundColor: isLightBrandColor ? '#FFFFFF' : 'rgba(0, 0, 0, 0.25)', 
+                  borderColor: isLightBrandColor ? brandInputBorderColor : 'rgba(255, 255, 255, 0.08)', 
+                  borderWidth: 1 
+                }]}>
                   <View style={[styles.nfcBadgeRow, { backgroundColor: isLightBrandColor ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.15)' }]}>
                     <View style={[styles.nfcBadgeDot, { backgroundColor: isLightBrandColor ? '#10B981' : '#FFFFFF' }]} />
                     <Text style={[styles.nfcBadgeTitle, { color: isLightBrandColor ? '#10B981' : '#FFFFFF' }]}>VERIFIED NFC SCAN</Text>
@@ -1506,11 +1662,20 @@ export default function NfcLandingScreen() {
             const syncText = isLightBrandColor ? '#854D0E' : '#FEF08A';
             const syncSpinner = isLightBrandColor ? '#A16207' : '#FFC700';
 
-            const instructionBg = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
-            const instructionBorder = isLightBrandColor ? '#E2E8F0' : 'rgba(255, 255, 255, 0.15)';
+            const instructionBg = isLightBrandColor ? '#F8FAFC' : 'rgba(0, 0, 0, 0.15)';
+            const instructionBorder = isLightBrandColor ? '#E2E8F0' : 'rgba(255, 255, 255, 0.06)';
+
+            const spin = rotateAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['0deg', '360deg'],
+            });
 
             return (
-              <View style={[styles.innerFormCard, { backgroundColor: primaryColor, borderColor: brandInputBorderColor, borderWidth: isLightBrandColor ? 1 : 0 }]}>
+              <View style={[styles.innerFormCard, { 
+                backgroundColor: isLightBrandColor ? '#FFFFFF' : 'rgba(0, 0, 0, 0.25)', 
+                borderColor: isLightBrandColor ? brandInputBorderColor : 'rgba(255, 255, 255, 0.08)', 
+                borderWidth: 1 
+              }]}>
                 {/* Header Status Row */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: badgeBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -1546,7 +1711,9 @@ export default function NfcLandingScreen() {
                       marginBottom: 12,
                     }}
                   >
-                    <ActivityIndicator size="small" color={syncSpinner} />
+                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                      <Ionicons name="sync" size={16} color={syncSpinner} />
+                    </Animated.View>
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: syncText, flex: 1 }}>
                       Keep this screen open for real-time sync
                     </Text>
@@ -1903,11 +2070,262 @@ export default function NfcLandingScreen() {
           </SafeAreaView>
         </View>
       )}
+
+      {/* 🌟 GOOGLE & STORE REVIEW MODAL */}
+      <Modal
+        visible={showReviewModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowReviewModal(false)}
+      >
+        <View style={styles.reviewModalBackdrop}>
+          <View style={[styles.reviewModalCard, isDesktop && { maxWidth: 420 }]}>
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.reviewCloseBtn}
+              onPress={() => setShowReviewModal(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Store Avatar Icon */}
+            <View style={styles.reviewAvatar}>
+              {merchant?.logo ? (
+                <Image 
+                  source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` }}
+                  style={{ width: '100%', height: '100%', borderRadius: 28 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="storefront" size={26} color="#FFC700" />
+              )}
+            </View>
+
+            <Text style={styles.reviewTitle}>
+              {reviewSubmitted ? 'Thank you for your feedback!' : `How was your visit at ${merchant?.name || 'our store'}?`}
+            </Text>
+            
+            <Text style={styles.reviewSubtitle}>
+              {reviewSubmitted 
+                ? 'Your feedback helps us continuously improve our service.'
+                : 'Tap a star to rate your experience today'}
+            </Text>
+
+            {!reviewSubmitted && (
+              <>
+                {/* 5-Star Rating Row */}
+                <View style={styles.reviewStarsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleSelectStar(star)}
+                      activeOpacity={0.7}
+                      style={styles.reviewStarBtn}
+                    >
+                      <Ionicons 
+                        name={star <= reviewRating ? "star" : "star-outline"} 
+                        size={38} 
+                        color={star <= reviewRating ? "#FFC700" : "#475569"} 
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Rating Guide / Caption */}
+                {reviewRating > 0 && reviewRating < 5 && (
+                  <View style={styles.reviewLowRatingSection}>
+                    <Text style={styles.reviewFeedbackPrompt}>
+                      What could we do better? (Private to store manager)
+                    </Text>
+                    <TextInput
+                      style={styles.reviewFeedbackInput}
+                      placeholder="Share your thoughts, suggestions or issues..."
+                      placeholderTextColor="#64748B"
+                      multiline={true}
+                      numberOfLines={3}
+                      value={reviewFeedback}
+                      onChangeText={setReviewFeedback}
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.reviewSubmitBtn, isSubmittingReview && { opacity: 0.7 }]}
+                      onPress={handleSubmitPrivateFeedback}
+                      disabled={isSubmittingReview}
+                      activeOpacity={0.85}
+                    >
+                      {isSubmittingReview ? (
+                        <ActivityIndicator size="small" color="#050505" />
+                      ) : (
+                        <Text style={styles.reviewSubmitBtnText}>Send Private Feedback</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* 5-Star Note */}
+                {reviewRating === 5 && (
+                  <View style={styles.review5StarRedirecting}>
+                    <ActivityIndicator size="small" color="#FFC700" style={{ marginRight: 8 }} />
+                    <Text style={styles.review5StarText}>Opening Google Review...</Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Skip Option */}
+            {!reviewSubmitted && reviewRating === 0 && (
+              <TouchableOpacity 
+                style={styles.reviewSkipBtn} 
+                onPress={() => setShowReviewModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.reviewSkipText}>Maybe later</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  reviewModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 99999,
+  },
+  reviewModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#121212',
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 10,
+    position: 'relative',
+  },
+  reviewCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  reviewAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    overflow: 'hidden',
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 8,
+  },
+  reviewSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  reviewStarBtn: {
+    padding: 4,
+  },
+  reviewLowRatingSection: {
+    width: '100%',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  reviewFeedbackPrompt: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#E2E8F0',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  reviewFeedbackInput: {
+    width: '100%',
+    minHeight: 74,
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    borderRadius: 14,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    textAlignVertical: 'top',
+    marginBottom: 14,
+  },
+  reviewSubmitBtn: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#FFC700',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewSubmitBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  review5StarRedirecting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  review5StarText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFC700',
+  },
+  reviewSkipBtn: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  reviewSkipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
   fullPageContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
