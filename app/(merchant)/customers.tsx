@@ -176,6 +176,11 @@ export default function CustomersScreen() {
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
 
+  // WhatsApp Composer State
+  const [whatsappModalVisible, setWhatsappModalVisible] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [activeWhatsappPreset, setActiveWhatsappPreset] = useState<'balance' | 'voucher' | 'winback' | 'custom'>('balance');
+
   useEffect(() => {
     setMainPage(0);
   }, [activeTab, searchQuery, dateFilter, sortBy]);
@@ -426,7 +431,118 @@ export default function CustomersScreen() {
     }
   };
 
-  const handleOpenWhatsApp = () => {
+  const generateWhatsappPresetMessage = (presetType: 'balance' | 'voucher' | 'winback' | 'custom') => {
+    const custName = (selectedCustomer?.name || '').replace(/ Walk-in/i, '').trim() || 'there';
+    const storeName = merchant?.name || 'kami';
+    const currentStamps = customerCard?.stamps_collected || 0;
+    const goal = customerCard?.expand?.program?.stamp_goal || 10;
+    const remaining = Math.max(0, goal - currentStamps);
+    const activeVouchers = customerVouchers.filter(v => v.status === 'active');
+
+    if (presetType === 'custom') {
+      return locale === 'en' ? `Hi ${custName}! 👋\n\n` : `Hai ${custName}! 👋\n\n`;
+    }
+
+    if (presetType === 'voucher') {
+      if (activeVouchers.length > 0) {
+        let vList = '';
+        activeVouchers.slice(0, 3).forEach(v => {
+          const rewardName = v.expand?.reward?.name || (locale === 'en' ? 'Free Reward' : 'Hadiah Percuma');
+          vList += `• *${rewardName}* (Code: \`${v.code}\`)\n`;
+        });
+        if (locale === 'en') {
+          return `Hi ${custName}! 👋\n\nYou have an Active Reward Voucher ready to redeem at ${storeName}! 🎁✨\n\n${vList}\nVisit us to claim your reward before it expires!\n👉 https://risev.app`;
+        } else {
+          return `Hai ${custName}! 👋\n\nAnda mempunyai baucar ganjaran sedia untuk ditebus di ${storeName}! 🎁✨\n\n${vList}\nJom singgah tebus sebelum tarikh luput!\n👉 https://risev.app`;
+        }
+      } else {
+        if (locale === 'en') {
+          return `Hi ${custName}! 👋\n\nCollect stamps at ${storeName} to earn free rewards! 🎁\n\n📊 Current Balance: ${currentStamps}/${goal} Stamps\n👉 https://risev.app`;
+        } else {
+          return `Hai ${custName}! 👋\n\nKumpulkan cop di ${storeName} untuk dapatkan ganjaran percuma! 🎁\n\n📊 Baki Semasa: ${currentStamps}/${goal} Cop\n👉 https://risev.app`;
+        }
+      }
+    }
+
+    if (presetType === 'winback') {
+      if (locale === 'en') {
+        return `Hi ${custName}! 👋\n\nWe haven't seen you at ${storeName} in a while, and we miss you! 😊✨\n\nDrop by this week and enjoy your loyalty perks:\n📊 Your Balance: ${currentStamps}/${goal} Stamps\n\nView your wallet anytime:\n👉 https://risev.app`;
+      } else {
+        return `Hai ${custName}! 👋\n\nDah lama kami tak nampak anda di ${storeName}, kami rindu anda! 😊✨\n\nJemput singgah minggu ini dan nikmati ganjaran istimewa untuk pelanggan setia seperti anda:\n📊 Baki Kad Cop: ${currentStamps}/${goal} Cop\n\nSemak kad cop anda di:\n👉 https://risev.app`;
+      }
+    }
+
+    // Default: 'balance'
+    if (locale === 'en') {
+      let msg = `Hi ${custName}! 👋\n\nThank you for supporting ${storeName}! ✨\n\n`;
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *You have an Active Reward Voucher ready to redeem:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Free Reward';
+          msg += `• *${rewardName}* (Code: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+      msg += `📊 *Stamp Card Progress:* ${currentStamps}/${goal} Stamps\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Almost there!* Just ${remaining} more stamp${remaining > 1 ? 's' : ''} to unlock your next reward!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 ${remaining} more stamp${remaining > 1 ? 's' : ''} to complete your card.\n`;
+      } else {
+        msg += `🎉 Your stamp card is complete! Ready to claim your reward.\n`;
+      }
+      msg += `\nCheck your card & vouchers anytime here:\n👉 https://risev.app`;
+      return msg;
+    } else {
+      let msg = `Hai ${custName}! 👋\n\nTerima kasih kerana sentiasa menyokong ${storeName}! ✨\n\n`;
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *Anda mempunyai baucar ganjaran sedia untuk ditebus:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Hadiah Percuma';
+          msg += `• *${rewardName}* (Kod: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+      msg += `📊 *Status Kad Cop:* ${currentStamps}/${goal} Cop\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Sikit lagi!* Hanya ${remaining} cop lagi untuk menebus ganjaran anda!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 Kumpulkan ${remaining} cop lagi untuk lengkapkan kad.\n`;
+      } else {
+        msg += `🎉 Kad cop anda telah lengkap! Sedia untuk tebus hadiah.\n`;
+      }
+      msg += `\nSemak baki cop & baucar anda di:\n👉 https://risev.app`;
+      return msg;
+    }
+  };
+
+  const handleOpenWhatsAppComposer = () => {
+    if (!selectedCustomer?.customerPhone) return;
+    const initialPreset = customerVouchers.some(v => v.status === 'active') ? 'voucher' : 'balance';
+    setActiveWhatsappPreset(initialPreset);
+    setWhatsappMessage(generateWhatsappPresetMessage(initialPreset));
+    setWhatsappModalVisible(true);
+  };
+
+  const handleInsertVariable = (tag: string) => {
+    const custName = (selectedCustomer?.name || '').replace(/ Walk-in/i, '').trim() || 'there';
+    const storeName = merchant?.name || 'kami';
+    const currentStamps = customerCard?.stamps_collected || 0;
+    const goal = customerCard?.expand?.program?.stamp_goal || 10;
+    const activeVouchers = customerVouchers.filter(v => v.status === 'active');
+    const voucherText = activeVouchers.length > 0 ? activeVouchers[0].code : 'WV-XXXX-XXXX';
+
+    let insertVal = '';
+    if (tag === 'name') insertVal = custName;
+    else if (tag === 'store') insertVal = storeName;
+    else if (tag === 'stamps') insertVal = `${currentStamps}/${goal} Cop`;
+    else if (tag === 'voucher') insertVal = voucherText;
+    else if (tag === 'link') insertVal = 'https://risev.app';
+
+    setWhatsappMessage(prev => prev + (prev.endsWith(' ') || prev.endsWith('\n') || !prev ? '' : ' ') + insertVal);
+  };
+
+  const handleSendWhatsApp = () => {
     if (!selectedCustomer?.customerPhone) return;
 
     let cleanPhone = selectedCustomer.customerPhone.replace(/[^0-9]/g, '');
@@ -436,66 +552,13 @@ export default function CustomersScreen() {
       cleanPhone = '60' + cleanPhone;
     }
 
-    const custName = (selectedCustomer.name || '').replace(/ Walk-in/i, '').trim() || 'there';
-    const storeName = merchant?.name || 'kami';
-    const currentStamps = customerCard?.stamps_collected || 0;
-    const goal = customerCard?.expand?.program?.stamp_goal || 10;
-    const remaining = Math.max(0, goal - currentStamps);
-    const activeVouchers = customerVouchers.filter(v => v.status === 'active');
-
-    let msg = '';
-    if (locale === 'en') {
-      msg += `Hi ${custName}! 👋\n\nThank you for supporting ${storeName}! ✨\n\n`;
-
-      if (activeVouchers.length > 0) {
-        msg += `🎁 *You have an Active Reward Voucher ready to redeem:*\n`;
-        activeVouchers.slice(0, 2).forEach(v => {
-          const rewardName = v.expand?.reward?.name || 'Free Reward';
-          msg += `• *${rewardName}* (Code: \`${v.code}\`)\n`;
-        });
-        msg += `\n`;
-      }
-
-      msg += `📊 *Stamp Card Progress:* ${currentStamps}/${goal} Stamps\n`;
-      if (remaining > 0 && remaining <= 2) {
-        msg += `🔥 *Almost there!* Just ${remaining} more stamp${remaining > 1 ? 's' : ''} to unlock your next reward!\n`;
-      } else if (remaining > 0) {
-        msg += `🎯 ${remaining} more stamp${remaining > 1 ? 's' : ''} to complete your card.\n`;
-      } else {
-        msg += `🎉 Your stamp card is complete! Ready to claim your reward.\n`;
-      }
-
-      msg += `\nCheck your card & vouchers anytime here:\n👉 https://risev.app`;
-    } else {
-      msg += `Hai ${custName}! 👋\n\nTerima kasih kerana sentiasa menyokong ${storeName}! ✨\n\n`;
-
-      if (activeVouchers.length > 0) {
-        msg += `🎁 *Anda mempunyai baucar ganjaran sedia untuk ditebus:*\n`;
-        activeVouchers.slice(0, 2).forEach(v => {
-          const rewardName = v.expand?.reward?.name || 'Hadiah Percuma';
-          msg += `• *${rewardName}* (Kod: \`${v.code}\`)\n`;
-        });
-        msg += `\n`;
-      }
-
-      msg += `📊 *Status Kad Cop:* ${currentStamps}/${goal} Cop\n`;
-      if (remaining > 0 && remaining <= 2) {
-        msg += `🔥 *Sikit lagi!* Hanya ${remaining} cop lagi untuk menebus ganjaran anda!\n`;
-      } else if (remaining > 0) {
-        msg += `🎯 Kumpulkan ${remaining} cop lagi untuk lengkapkan kad.\n`;
-      } else {
-        msg += `🎉 Kad cop anda telah lengkap! Sedia untuk tebus hadiah.\n`;
-      }
-
-      msg += `\nSemak baki cop & baucar anda di:\n👉 https://risev.app`;
-    }
-
-    const targetUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+    const targetUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(whatsappMessage)}`;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(targetUrl, '_blank');
     } else {
       Linking.openURL(targetUrl);
     }
+    setWhatsappModalVisible(false);
   };
 
   const handleDownloadCSV = async (csvContent: string, fileName: string) => {
@@ -1575,7 +1638,7 @@ export default function CustomersScreen() {
                   </View>
 
                   <TouchableOpacity
-                    onPress={handleOpenWhatsApp}
+                    onPress={handleOpenWhatsAppComposer}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -2181,6 +2244,162 @@ export default function CustomersScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* WhatsApp Message Customizer / Composer Modal */}
+      <Modal
+        visible={whatsappModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setWhatsappModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', maxHeight: '90%', paddingBottom: 24, maxWidth: 520 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="logo-whatsapp" size={20} color="#16A34A" />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>WhatsApp Composer</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    {selectedCustomer?.name} ({selectedCustomer?.customerPhone})
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setWhatsappModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ paddingHorizontal: 20, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+              {/* Presets Header */}
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5, marginBottom: 8 }}>
+                CHOOSE A TEMPLATE PRESET:
+              </Text>
+              
+              {/* Template Presets Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
+                {[
+                  { id: 'balance', label: '📊 Stamp Balance' },
+                  { id: 'voucher', label: '🎁 Voucher Code' },
+                  { id: 'winback', label: '🔥 Win-Back' },
+                  { id: 'custom', label: '✍️ Custom Text' },
+                ].map((preset) => {
+                  const isActive = activeWhatsappPreset === preset.id;
+                  return (
+                    <TouchableOpacity
+                      key={preset.id}
+                      onPress={() => {
+                        setActiveWhatsappPreset(preset.id as any);
+                        setWhatsappMessage(generateWhatsappPresetMessage(preset.id as any));
+                      }}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        backgroundColor: isActive ? '#050505' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: isActive ? '#050505' : '#E2E8F0',
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#FFFFFF' : '#475569' }}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Message Box */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5 }}>
+                    CUSTOMIZE MESSAGE:
+                  </Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                    {whatsappMessage.length} characters
+                  </Text>
+                </View>
+                <TextInput
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                    borderColor: '#E2E8F0',
+                    padding: 14,
+                    fontSize: 13,
+                    fontFamily: 'PlusJakartaSans_500Medium',
+                    color: '#0F172A',
+                    minHeight: 180,
+                    textAlignVertical: 'top',
+                    lineHeight: 20,
+                  }}
+                  multiline={true}
+                  value={whatsappMessage}
+                  onChangeText={setWhatsappMessage}
+                  placeholder="Type your WhatsApp message..."
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              {/* Quick Variable Injectors */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5, marginBottom: 6 }}>
+                  TAP TO INSERT LIVE DATA:
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    { tag: 'name', label: '+ Customer Name' },
+                    { tag: 'store', label: '+ Store Name' },
+                    { tag: 'stamps', label: '+ Stamp Balance' },
+                    { tag: 'voucher', label: '+ Voucher Code' },
+                    { tag: 'link', label: '+ App Link' },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.tag}
+                      onPress={() => handleInsertVariable(item.tag)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        backgroundColor: '#FEF3C7',
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 10 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}
+                  onPress={() => setWhatsappModalVisible(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ flex: 2, flexDirection: 'row', gap: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center', shadowColor: '#22C55E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+                  onPress={handleSendWhatsApp}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Open in WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
