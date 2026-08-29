@@ -49,8 +49,10 @@ evolution_db_data/
 evolution_redis_data/
 pocketbase.exe
 
-# agent scratchpads
+# agent scratchpads & documentation
 scratch/
+AGENTS.md
+
 
 # documentation
 docs/
