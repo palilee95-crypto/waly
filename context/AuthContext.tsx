@@ -231,10 +231,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (err) {
           console.error("Self-healing merchant profile creation failed:", err);
         }
-      } else {
+      }
+      if (merchantRecord) {
         merchantId = merchantRecord.id;
         status = (merchantRecord.status as any) || 'pending';
         created = merchantRecord.created;
+
+        // Auto-check and auto-sync active subscription status (e.g. stand_bundle, starter, pro)
+        try {
+          const subs = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${merchantRecord.id}" && (status = "active" || status = "trialing")`,
+            requestKey: null,
+          });
+          if (subs.items.length > 0) {
+            status = 'active';
+            if (merchantRecord.status !== 'active') {
+              pb.collection('merchants').update(merchantRecord.id, { status: 'active' }).catch(() => {});
+            }
+          }
+        } catch (subErr) {
+          // Keep current status if subscription check encounters network/filter error
+        }
       }
     }
     return { id: merchantId, status, created };

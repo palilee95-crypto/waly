@@ -357,21 +357,6 @@ export default function MerchantLayout() {
         const daysRemaining = Math.max(0, Math.ceil(diffDays));
         return { isInTrial: daysRemaining > 0, daysRemaining: daysRemaining };
       }
-      if (subStatus === 'active') return { isInTrial: false, daysRemaining: 0 };
-    }
-
-    if (user?.merchant_status === 'pending' && user?.merchant_created) {
-      const formattedDate = user.merchant_created.replace(' ', 'T');
-      const createdTime = new Date(formattedDate).getTime();
-      const now = new Date().getTime();
-      const diffMs = now - createdTime;
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      if (diffDays >= 0 && diffDays < 7) {
-        return {
-          isInTrial: true,
-          daysRemaining: Math.max(0, Math.ceil(7 - diffDays))
-        };
-      }
     }
     return { isInTrial: false, daysRemaining: 0 };
   };
@@ -380,7 +365,7 @@ export default function MerchantLayout() {
 
   React.useEffect(() => {
     async function checkMerchantProfile() {
-      const isAllowed = user?.merchant_status === 'active' || isInTrial;
+      const isAllowed = user?.merchant_status === 'active' || activeSub?.status === 'active' || isInTrial;
       if (!user || !user.merchant_id || !isAllowed) {
         setCheckingProfile(false);
         return;
