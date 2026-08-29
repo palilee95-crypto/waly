@@ -489,8 +489,12 @@ export default function CustomersScreen() {
       msg += `\nSemak baki cop & baucar anda di:\n👉 https://risev.app`;
     }
 
-    const encoded = encodeURIComponent(msg);
-    Linking.openURL(`https://wa.me/${cleanPhone}?text=${encoded}`);
+    const targetUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(targetUrl, '_blank');
+    } else {
+      Linking.openURL(targetUrl);
+    }
   };
 
   const handleDownloadCSV = async (csvContent: string, fileName: string) => {
