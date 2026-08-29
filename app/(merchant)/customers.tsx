@@ -25,6 +25,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Svg, { Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
+import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 
 const { width } = Dimensions.get('window');
 
@@ -245,7 +246,18 @@ export default function CustomersScreen() {
       if (customerCard?.id) {
         updatedCard = await pb.collection('loyalty_cards').update(customerCard.id, {
           stamps_collected: newStamps
+        }, {
+          expand: 'program,merchant',
+          requestKey: null
         });
+        if (!updatedCard.expand?.program && customerCard.expand?.program) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.program = customerCard.expand.program;
+        }
+        if (!updatedCard.expand?.merchant && customerCard.expand?.merchant) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.merchant = customerCard.expand.merchant;
+        }
       } else {
         updatedCard = await pb.collection('loyalty_cards').create({
           customer: selectedCustomer.customerId,
@@ -253,6 +265,9 @@ export default function CustomersScreen() {
           stamps_collected: newStamps,
           completions: 0,
           status: 'active'
+        }, {
+          expand: 'program,merchant',
+          requestKey: null
         });
       }
       setCustomerCard(updatedCard);
@@ -362,10 +377,30 @@ export default function CustomersScreen() {
     setLoadingDetails(true);
 
     try {
-      // 1. Fetch loyalty card for this merchant
-      const card = await pb.collection('loyalty_cards')
-        .getFirstListItem(`customer = "${tx.customerId}" && merchant = "${user?.merchant_id}"`)
+      // 1. Fetch loyalty card for this merchant with expanded program & merchant
+      let card = await pb.collection('loyalty_cards')
+        .getFirstListItem(`customer = "${tx.customerId}" && merchant = "${user?.merchant_id}"`, {
+          expand: 'program,merchant',
+          requestKey: null
+        })
         .catch(() => null);
+
+      if (card && !card.expand?.program && user?.merchant_id) {
+        const prog = await pb.collection('loyalty_programs')
+          .getFirstListItem(`merchant = "${user.merchant_id}" && is_active = true`, {
+            requestKey: null
+          })
+          .catch(() => null);
+        if (prog) {
+          if (!card.expand) card.expand = {};
+          card.expand.program = prog;
+        }
+      }
+
+      if (card && !card.expand?.merchant && user?.merchant_id) {
+        if (!card.expand) card.expand = {};
+        card.expand.merchant = merchant;
+      }
       setCustomerCard(card);
 
       // 2. Fetch vouchers for this merchant
@@ -1539,38 +1574,109 @@ export default function CustomersScreen() {
                     )}
 
                     {/* Loyalty Card Info */}
-                    <Text style={styles.sectionTitle}>{t('stamp_card_progress')}</Text>
-                    {customerCard ? (
-                      <View style={styles.progCard}>
-                        <View style={styles.progHeader}>
-                          <Text style={styles.progLabel}>{t('current_stamps')}</Text>
-                          <Text style={styles.progValue}>
-                            {customerCard.stamps_collected || 0} / 10
-                          </Text>
-                        </View>
-                        {/* Progress Bar */}
-                        <View style={styles.progressBarBg}>
-                          <View 
-                            style={[
-                              styles.progressBarFill, 
-                              { width: `${Math.min(((customerCard.stamps_collected || 0) / 10) * 100, 100)}%` }
-                            ]} 
-                          />
-                        </View>
-                        <View style={styles.progFooter}>
-                          <Text style={styles.completionsLabel}>{t('total_completions')}</Text>
-                          <View style={styles.completionsBadge}>
-                            <Text style={styles.completionsBadgeText}>
-                              {customerCard.completions || 0} {t('completed')}
-                            </Text>
+                    {(() => {
+                      const mappedLoyaltyCard = customerCard ? {
+                        id: customerCard.id,
+                        merchantName: customerCard.expand?.merchant?.name || merchant?.name || 'Store',
+                        category: customerCard.expand?.merchant?.category || merchant?.category || 'General',
+                        logo: (customerCard.expand?.merchant?.logo || merchant?.logo)
+                          ? `${pb.baseUrl}/api/files/merchants/${customerCard.expand?.merchant?.id || merchant?.id}/${customerCard.expand?.merchant?.logo || merchant?.logo}`
+                          : undefined,
+                        collectedStamps: customerCard.stamps_collected || 0,
+                        totalStamps: customerCard.expand?.program?.stamp_goal || 10,
+                        rewardName: customerCard.expand?.program?.reward_description || customerCard.expand?.program?.name || 'Free Reward',
+                        cardNumber: `•••• •••• •••• ${customerCard.id.substring(customerCard.id.length - 4).toUpperCase()}`,
+                        points: customerCard.points_balance || 0,
+                        tier: customerCard.tier || 'bronze',
+                        gradientColors: customerCard.expand?.program?.card_color ? [customerCard.expand?.program?.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+                        cardIcon: customerCard.expand?.program?.card_icon || 'coffee',
+                        stampColor: customerCard.expand?.program?.stamp_color || '#3B82F6',
+                        fontColor: customerCard.expand?.program?.font_color || '#FFFFFF',
+                        cardBackground: customerCard.expand?.program?.card_background
+                          ? `${pb.baseUrl}/api/files/loyalty_programs/${customerCard.expand.program.id}/${customerCard.expand.program.card_background}`
+                          : undefined,
+                        cardBackgroundBack: customerCard.expand?.program?.card_background_back
+                          ? `${pb.baseUrl}/api/files/loyalty_programs/${customerCard.expand.program.id}/${customerCard.expand.program.card_background_back}`
+                          : undefined,
+                        validUntil: (() => {
+                          const expDate = new Date(customerCard.created);
+                          expDate.setDate(expDate.getDate() + (customerCard.expand?.program?.expiry_days || 30));
+                          return `${String(expDate.getMonth() + 1).padStart(2, '0')}/${String(expDate.getFullYear()).slice(-2)}`;
+                        })(),
+                      } : null;
+
+                      return (
+                        <View style={{ marginBottom: 20 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>{t('stamp_card_progress')}</Text>
+                            {customerCard && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setAdjustStampsCount(customerCard.stamps_collected || 0);
+                                  setAdjustReason('');
+                                  setAdjustStampsModalVisible(true);
+                                }}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#FFFBEA', borderRadius: 8, borderWidth: 1, borderColor: '#FFE38F' }}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="create-outline" size={13} color="#B38B00" />
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B38B00' }}>Adjust Stamps</Text>
+                              </TouchableOpacity>
+                            )}
                           </View>
+
+                          {customerCard && mappedLoyaltyCard ? (
+                            <View style={{ gap: 14 }}>
+                              {/* Real Flippable Loyalty Card */}
+                              <View style={{ width: '100%', alignItems: 'center' }}>
+                                <FlippableLoyaltyCard 
+                                  card={mappedLoyaltyCard} 
+                                  user={{ name: selectedCustomer?.name || 'Customer' }} 
+                                  startFlipped={true} 
+                                />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                                  <Ionicons name="swap-horizontal" size={13} color="#94A3B8" />
+                                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                                    Tap card to flip front / back
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Progress Card Summary */}
+                              <View style={styles.progCard}>
+                                <View style={styles.progHeader}>
+                                  <Text style={styles.progLabel}>{t('current_stamps')}</Text>
+                                  <Text style={styles.progValue}>
+                                    {customerCard.stamps_collected || 0} / {mappedLoyaltyCard.totalStamps}
+                                  </Text>
+                                </View>
+                                {/* Progress Bar */}
+                                <View style={styles.progressBarBg}>
+                                  <View 
+                                    style={[
+                                      styles.progressBarFill, 
+                                      { width: `${Math.min(((customerCard.stamps_collected || 0) / mappedLoyaltyCard.totalStamps) * 100, 100)}%` }
+                                    ]} 
+                                  />
+                                </View>
+                                <View style={styles.progFooter}>
+                                  <Text style={styles.completionsLabel}>{t('total_completions')}</Text>
+                                  <View style={styles.completionsBadge}>
+                                    <Text style={styles.completionsBadgeText}>
+                                      {customerCard.completions || 0} {t('completed')}
+                                    </Text>
+                                  </View>
+                                </View>
+                              </View>
+                            </View>
+                          ) : (
+                            <View style={styles.noCardBox}>
+                              <Text style={styles.noCardText}>{t('no_active_card_desc')}</Text>
+                            </View>
+                          )}
                         </View>
-                      </View>
-                    ) : (
-                      <View style={styles.noCardBox}>
-                        <Text style={styles.noCardText}>{t('no_active_card_desc')}</Text>
-                      </View>
-                    )}
+                      );
+                    })()}
 
                     {/* Vouchers Section */}
                     <Text style={styles.sectionTitle}>{t('rewards_vouchers')}</Text>
