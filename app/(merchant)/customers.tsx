@@ -160,28 +160,6 @@ export default function CustomersScreen() {
   const [detailsOrigin, setDetailsOrigin] = useState<'main' | 'spenders' | 'inactive'>('main');
   const [leaderboardRankBy, setLeaderboardRankBy] = useState<'spend' | 'visits'>('spend');
 
-  // Card Flip Animation State
-  const [flipAnimation] = useState(new Animated.Value(0));
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  const flipCard = () => {
-    Animated.spring(flipAnimation, {
-      toValue: isFlipped ? 0 : 180,
-      friction: 8,
-      tension: 10,
-      useNativeDriver: true,
-    }).start(() => setIsFlipped(!isFlipped));
-  };
-
-  const frontInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['0deg', '180deg'],
-  });
-  const backInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['180deg', '360deg'],
-  });
-
   // Edit Info & Stamp Adjustment & Delete states
   const [editInfoModalVisible, setEditInfoModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -445,6 +423,78 @@ export default function CustomersScreen() {
       console.warn('Failed to fetch customer details:', err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleOpenWhatsApp = () => {
+    if (!selectedCustomer?.customerPhone) return;
+
+    let cleanPhone = selectedCustomer.customerPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '60' + cleanPhone.slice(1);
+    } else if (!cleanPhone.startsWith('60') && cleanPhone.length >= 9) {
+      cleanPhone = '60' + cleanPhone;
+    }
+
+    const custName = (selectedCustomer.name || '').replace(/ Walk-in/i, '').trim() || 'there';
+    const storeName = merchant?.name || 'kami';
+    const currentStamps = customerCard?.stamps_collected || 0;
+    const goal = customerCard?.expand?.program?.stamp_goal || 10;
+    const remaining = Math.max(0, goal - currentStamps);
+    const activeVouchers = customerVouchers.filter(v => v.status === 'active');
+
+    let msg = '';
+    if (locale === 'en') {
+      msg += `Hi ${custName}! 👋\n\nThank you for supporting ${storeName}! ✨\n\n`;
+
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *You have an Active Reward Voucher ready to redeem:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Free Reward';
+          msg += `• *${rewardName}* (Code: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+
+      msg += `📊 *Stamp Card Progress:* ${currentStamps}/${goal} Stamps\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Almost there!* Just ${remaining} more stamp${remaining > 1 ? 's' : ''} to unlock your next reward!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 ${remaining} more stamp${remaining > 1 ? 's' : ''} to complete your card.\n`;
+      } else {
+        msg += `🎉 Your stamp card is complete! Ready to claim your reward.\n`;
+      }
+
+      msg += `\nCheck your card & vouchers anytime here:\n👉 https://risev.app`;
+    } else {
+      msg += `Hai ${custName}! 👋\n\nTerima kasih kerana sentiasa menyokong ${storeName}! ✨\n\n`;
+
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *Anda mempunyai baucar ganjaran sedia untuk ditebus:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Hadiah Percuma';
+          msg += `• *${rewardName}* (Kod: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+
+      msg += `📊 *Status Kad Cop:* ${currentStamps}/${goal} Cop\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Sikit lagi!* Hanya ${remaining} cop lagi untuk menebus ganjaran anda!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 Kumpulkan ${remaining} cop lagi untuk lengkapkan kad.\n`;
+      } else {
+        msg += `🎉 Kad cop anda telah lengkap! Sedia untuk tebus hadiah.\n`;
+      }
+
+      msg += `\nSemak baki cop & baucar anda di:\n👉 https://risev.app`;
+    }
+
+    const targetUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(targetUrl, '_blank');
+    } else {
+      Linking.openURL(targetUrl);
     }
   };
 
@@ -1525,12 +1575,7 @@ export default function CustomersScreen() {
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => {
-                      if (!selectedCustomer.customerPhone) return;
-                      const cleanPhone = selectedCustomer.customerPhone.replace(/\D/g, '');
-                      const waNumber = cleanPhone.startsWith('60') ? cleanPhone : `60${cleanPhone.replace(/^0/, '')}`;
-                      Linking.openURL(`https://wa.me/${waNumber}?text=Hi%20${encodeURIComponent(selectedCustomer.name)}!`).catch(() => {});
-                    }}
+                    onPress={handleOpenWhatsApp}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1551,114 +1596,104 @@ export default function CustomersScreen() {
                 </View>
 
                 {/* 2. Stamp Card Progress Section */}
-                <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 24 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>STAMP CARD PROGRESS</Text>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setAdjustStampsCount(customerCard?.stamps_collected || 0);
-                      setAdjustReason('');
-                      setAdjustStampsModalVisible(true);
-                    }}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFBEB', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}
-                  >
-                    <Ionicons name="create-outline" size={14} color="#B45309" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Stamps</Text>
-                  </TouchableOpacity>
-                </View>
+                {(() => {
+                  const prog = customerCard?.expand?.program;
+                  const merch = customerCard?.expand?.merchant || merchant;
+                  const mappedLoyaltyCard = customerCard ? {
+                    id: customerCard.id,
+                    merchantName: merch?.name || 'Store',
+                    category: merch?.category || 'General',
+                    logo: merch?.logo
+                      ? `${pb.baseUrl}/api/files/merchants/${merch.id}/${merch.logo}`
+                      : undefined,
+                    collectedStamps: customerCard.stamps_collected || 0,
+                    totalStamps: prog?.stamp_goal || 10,
+                    rewardName: prog?.reward_description || prog?.name || 'Free Reward',
+                    cardNumber: `•••• •••• •••• ${customerCard.id.substring(customerCard.id.length - 4).toUpperCase()}`,
+                    points: customerCard.points_balance || 0,
+                    tier: customerCard.tier || 'bronze',
+                    gradientColors: prog?.card_color ? [prog.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+                    cardIcon: prog?.card_icon || 'coffee',
+                    stampColor: prog?.stamp_color || '#3B82F6',
+                    fontColor: prog?.font_color || '#FFFFFF',
+                    cardBackground: prog?.card_background
+                      ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background}`
+                      : undefined,
+                    cardBackgroundBack: prog?.card_background_back
+                      ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background_back}`
+                      : undefined,
+                    validUntil: (() => {
+                      const expDate = new Date(customerCard.created);
+                      expDate.setDate(expDate.getDate() + (prog?.expiry_days || 30));
+                      return `${String(expDate.getMonth() + 1).padStart(2, '0')}/${String(expDate.getFullYear()).slice(-2)}`;
+                    })(),
+                  } : null;
 
-                {/* Mockup Stamp Card Container */}
-                <View style={{ width: '100%', marginBottom: 12, height: 220 }}>
-                  {/* FRONT OF CARD */}
-                  <Animated.View style={[{ width: '100%', height: '100%', backfaceVisibility: 'hidden' }, { transform: [{ rotateY: frontInterpolate }] }]}>
-                    <View style={{ flex: 1, backgroundColor: '#FFED4A', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                      
-                      {/* Diagonal Glassmorphism Effect */}
-                      <View style={{ position: 'absolute', top: -50, left: -50, right: -50, bottom: -50, transform: [{ rotate: '-15deg' }] }}>
-                        <View style={{ width: '200%', height: '50%', backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
+                  return (
+                    <View style={{ width: '100%', marginBottom: 24, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 24 }}>
+                      <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>STAMP CARD PROGRESS</Text>
+                        {customerCard && (
+                          <TouchableOpacity 
+                            onPress={() => {
+                              setAdjustStampsCount(customerCard?.stamps_collected || 0);
+                              setAdjustReason('');
+                              setAdjustStampsModalVisible(true);
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFBEB', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}
+                          >
+                            <Ionicons name="create-outline" size={14} color="#B45309" />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Stamps</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
 
-                      {/* Header */}
-                      <View style={{ backgroundColor: '#1F2937', paddingVertical: 18, alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <View style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, backgroundColor: 'rgba(255,255,255,0.05)', transform: [{ rotate: '45deg' }] }} />
-                        <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#4B5563', letterSpacing: 4, textTransform: 'uppercase' }}>
-                          {merchant?.name || 'SCOOP CREAMY'}
-                        </Text>
-                      </View>
-
-                      {/* Body */}
-                      <View style={{ padding: 20, alignItems: 'center', flex: 1, justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309', marginBottom: 8 }}>
-                          YOUR STAMPS <Text style={{ fontSize: 18, color: '#050505' }}>{customerCard?.stamps_collected || 0}/10</Text>
-                        </Text>
-                        
-                        <View style={{ width: '100%', alignItems: 'center', gap: 10 }}>
-                          {/* Top Row (6 Stamps) */}
-                          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, width: '100%' }}>
-                            {[...Array(6)].map((_, i) => (
-                              <View key={`top-${i}`} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: i < (customerCard?.stamps_collected || 0) ? '#050505' : 'transparent', borderWidth: 1.5, borderStyle: i < (customerCard?.stamps_collected || 0) ? 'solid' : 'dashed', borderColor: i < (customerCard?.stamps_collected || 0) ? '#050505' : '#FCD34D', alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="ice-cream" size={16} color={i < (customerCard?.stamps_collected || 0) ? "#FFFFFF" : "rgba(180, 83, 9, 0.2)"} />
-                              </View>
-                            ))}
+                      {customerCard && mappedLoyaltyCard ? (
+                        <View style={{ gap: 14 }}>
+                          {/* Real Interactive Flippable Stamp Card */}
+                          <View style={{ width: '100%', alignItems: 'center' }}>
+                            <FlippableLoyaltyCard 
+                              card={mappedLoyaltyCard} 
+                              user={{ name: selectedCustomer?.name || 'Customer' }} 
+                              startFlipped={true} 
+                            />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                              <Ionicons name="swap-horizontal" size={13} color="#94A3B8" />
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                                Tap card to flip front / back
+                              </Text>
+                            </View>
                           </View>
-                          {/* Bottom Row (4 Stamps) */}
-                          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, width: '100%' }}>
-                            {[...Array(4)].map((_, i) => {
-                              const stampIndex = i + 6;
-                              return (
-                                <View key={`bottom-${i}`} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: stampIndex < (customerCard?.stamps_collected || 0) ? '#050505' : 'transparent', borderWidth: 1.5, borderStyle: stampIndex < (customerCard?.stamps_collected || 0) ? 'solid' : 'dashed', borderColor: stampIndex < (customerCard?.stamps_collected || 0) ? '#050505' : '#FCD34D', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name="ice-cream" size={16} color={stampIndex < (customerCard?.stamps_collected || 0) ? "#FFFFFF" : "rgba(180, 83, 9, 0.2)"} />
-                                </View>
-                              );
-                            })}
+
+                          {/* Progress Summary Card */}
+                          <View style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Current Stamps</Text>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                                {customerCard.stamps_collected || 0} / {mappedLoyaltyCard.totalStamps}
+                              </Text>
+                            </View>
+                            <View style={{ width: '100%', height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
+                              <View style={{ width: `${Math.min(((customerCard.stamps_collected || 0) / mappedLoyaltyCard.totalStamps) * 100, 100)}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 4 }} />
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Total Completions</Text>
+                              <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>
+                                  {customerCard.completions || 0} Completed
+                                </Text>
+                              </View>
+                            </View>
                           </View>
                         </View>
-                        
-                        <Image source={require('../../assets/risev logo.png')} style={{ width: 50, height: 16, resizeMode: 'contain', tintColor: '#050505', position: 'absolute', bottom: 16, right: 16 }} />
-                      </View>
+                      ) : (
+                        <View style={styles.noCardBox}>
+                          <Text style={styles.noCardText}>{t('no_active_card_desc')}</Text>
+                        </View>
+                      )}
                     </View>
-                  </Animated.View>
-
-                  {/* BACK OF CARD */}
-                  <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backfaceVisibility: 'hidden' }, { transform: [{ rotateY: backInterpolate }] }]}>
-                    <View style={{ flex: 1, backgroundColor: '#1F2937', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 16 }}>
-                        {merchant?.name || 'SCOOP CREAMY'}
-                      </Text>
-                      <View style={{ backgroundColor: '#FFFFFF', padding: 12, borderRadius: 12, marginBottom: 16 }}>
-                        <Ionicons name="qr-code" size={64} color="#050505" />
-                      </View>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', paddingHorizontal: 20 }}>
-                        Customer ID: {selectedCustomer.customerId.toUpperCase()}
-                      </Text>
-                    </View>
-                  </Animated.View>
-                </View>
-
-                <TouchableOpacity 
-                  onPress={flipCard}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 32, paddingVertical: 8, paddingHorizontal: 16 }}
-                >
-                  <Ionicons name="swap-horizontal" size={14} color="#64748B" />
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Tap card to flip front / back</Text>
-                </TouchableOpacity>
-
-                {/* Progress Bar */}
-                <View style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 32 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Current Stamps</Text>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{customerCard?.stamps_collected || 0} / 10</Text>
-                  </View>
-                  <View style={{ width: '100%', height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
-                    <View style={{ width: `${((customerCard?.stamps_collected || 0) / 10) * 100}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 4 }} />
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Total Completions</Text>
-                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>{customerCard?.completions || 0} Completed</Text>
-                    </View>
-                  </View>
-                </View>
+                  );
+                })()}
 
                 {/* 3. Rewards & Vouchers */}
                 <View style={{ width: '100%', marginBottom: 32 }}>
