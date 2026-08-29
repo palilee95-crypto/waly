@@ -99,6 +99,7 @@ interface AuthUser {
   name: string;
   email: string;
   avatar?: string;
+  birthday?: string;
   role: UserRole;
   activeRole: UserRole; // currently active mode
   merchant_id?: string; // linked merchant ID
@@ -125,7 +126,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
-  updateProfile: (name: string, avatarFile?: any, password?: string, passwordConfirm?: string) => Promise<void>;
+  updateProfile: (name: string, avatarFile?: any, password?: string, passwordConfirm?: string, birthday?: string) => Promise<void>;
   refreshSession: () => Promise<void>;
 }
 
@@ -288,6 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: record.name || '',
           email: record.email || '',
           avatar: record.avatar || undefined,
+          birthday: record.birthday ? String(record.birthday).slice(0, 10) : undefined,
           role: record.role,
           activeRole: role,
           merchant_status: 'active',
@@ -309,6 +311,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name: freshRecord.name || '',
             email: freshRecord.email || '',
             avatar: freshRecord.avatar || undefined,
+            birthday: freshRecord.birthday ? String(freshRecord.birthday).slice(0, 10) : undefined,
             role: freshRecord.role,
             activeRole: role,
             merchant_id: merchantData.id,
@@ -514,7 +517,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setActiveRole(role);
   };
 
-  const updateProfile = async (name: string, avatarFile?: any, password?: string, passwordConfirm?: string) => {
+  const updateProfile = async (name: string, avatarFile?: any, password?: string, passwordConfirm?: string, birthday?: string) => {
     if (!user) return;
     const formData = new FormData();
     formData.append('name', name);
@@ -527,11 +530,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (passwordConfirm) {
       formData.append('passwordConfirm', passwordConfirm);
     }
+    if (birthday) {
+      formData.append('birthday', birthday);
+    }
     const record = await pb.collection('users').update(user.id, formData);
     setUser(prev => prev ? {
       ...prev,
       name: record.name,
       avatar: record.avatar || undefined,
+      birthday: record.birthday ? String(record.birthday).slice(0, 10) : prev.birthday,
       tier: record.tier || undefined,
       total_points: record.total_points || 0,
     } : null);
@@ -557,6 +564,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         name: record.name || '',
         email: record.email || '',
         avatar: record.avatar || undefined,
+        birthday: record.birthday ? String(record.birthday).slice(0, 10) : undefined,
         role: record.role,
         activeRole: role,
         merchant_id: merchantData.id,

@@ -15,6 +15,7 @@ export default function CustomerProfile() {
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editBirthday, setEditBirthday] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editConfirmPassword, setEditConfirmPassword] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
@@ -76,6 +77,7 @@ export default function CustomerProfile() {
 
   const handleOpenEdit = () => {
     setEditName(user?.name || '');
+    setEditBirthday(user?.birthday && user.birthday !== '2000-01-01' ? user.birthday : '');
     setEditPassword('');
     setEditConfirmPassword('');
     setAvatarPreview(avatarUrl);
@@ -160,13 +162,22 @@ export default function CustomerProfile() {
       }
     }
 
+    if (editBirthday && editBirthday.trim()) {
+      const birthRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!birthRegex.test(editBirthday.trim())) {
+        Alert.alert('Validation Error', 'Please enter a valid birthday format (YYYY-MM-DD).');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await updateProfile(
         editName.trim(), 
         avatarFile, 
         editPassword ? editPassword : undefined, 
-        editPassword ? editConfirmPassword : undefined
+        editPassword ? editConfirmPassword : undefined,
+        editBirthday.trim() || undefined
       );
       setEditModalVisible(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -433,6 +444,34 @@ export default function CustomerProfile() {
                   } as any,
                 })}
               />
+            </View>
+
+            {/* Birthday field */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Birthday (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editBirthday}
+                onChangeText={(t) => {
+                  let cleaned = t.replace(/[^0-9]/g, '');
+                  let formatted = cleaned;
+                  if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+                  if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
+                  setEditBirthday(formatted.slice(0, 10));
+                }}
+                placeholder="YYYY-MM-DD (e.g. 1998-05-24)"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={10}
+                {...Platform.select({
+                  web: {
+                    outlineStyle: 'none',
+                  } as any,
+                })}
+              />
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
+                🎁 Needed for merchants to send you birthday surprise rewards!
+              </Text>
             </View>
 
             {/* Optional Change Password Section */}

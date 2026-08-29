@@ -253,6 +253,14 @@ export default function LoginScreen() {
       return;
     }
 
+    if (birthday && birthday.trim()) {
+      const birthRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!birthRegex.test(birthday.trim())) {
+        setErrorMsg('Please enter a valid birthday format (YYYY-MM-DD).');
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const birthDateToUse = birthday && birthday.trim() ? birthday.trim() : '2000-01-01';
@@ -778,6 +786,36 @@ export default function LoginScreen() {
                     {email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (
                       <Text style={styles.fieldHelperError}>⚠️ Please enter a valid email format</Text>
                     )}
+
+                    <Text style={styles.inputLabel}>
+                      {role === 'merchant' ? 'FOUNDED / BIRTH DATE (OPTIONAL)' : 'BIRTHDAY (FOR REWARDS)'}
+                    </Text>
+                    <View style={[
+                      styles.inputGroup,
+                      birthdayFocused && styles.inputGroupFocused,
+                    ]}>
+                      <TextInput
+                        style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                        placeholder="YYYY-MM-DD (e.g. 1998-05-24)"
+                        placeholderTextColor="#94A3B8"
+                        value={birthday}
+                        onChangeText={(t) => {
+                          let cleaned = t.replace(/[^0-9]/g, '');
+                          let formatted = cleaned;
+                          if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+                          if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
+                          setBirthday(formatted.slice(0, 10));
+                          setErrorMsg('');
+                        }}
+                        keyboardType="numeric"
+                        maxLength={10}
+                        onFocus={() => setBirthdayFocused(true)}
+                        onBlur={() => setBirthdayFocused(false)}
+                      />
+                    </View>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: -4, marginBottom: 12 }}>
+                      🎁 Receive exclusive surprise vouchers on your birthday!
+                    </Text>
 
                     <Text style={styles.inputLabel}>PASSWORD</Text>
                     <View style={[
