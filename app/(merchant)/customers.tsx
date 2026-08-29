@@ -425,6 +425,74 @@ export default function CustomersScreen() {
     }
   };
 
+  const handleOpenWhatsApp = () => {
+    if (!selectedCustomer?.customerPhone) return;
+
+    let cleanPhone = selectedCustomer.customerPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '60' + cleanPhone.slice(1);
+    } else if (!cleanPhone.startsWith('60') && cleanPhone.length >= 9) {
+      cleanPhone = '60' + cleanPhone;
+    }
+
+    const custName = (selectedCustomer.name || '').replace(/ Walk-in/i, '').trim() || 'there';
+    const storeName = merchant?.name || 'kami';
+    const currentStamps = customerCard?.stamps_collected || 0;
+    const goal = customerCard?.expand?.program?.stamp_goal || 10;
+    const remaining = Math.max(0, goal - currentStamps);
+    const activeVouchers = customerVouchers.filter(v => v.status === 'active');
+
+    let msg = '';
+    if (locale === 'en') {
+      msg += `Hi ${custName}! 👋\n\nThank you for supporting ${storeName}! ✨\n\n`;
+
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *You have an Active Reward Voucher ready to redeem:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Free Reward';
+          msg += `• *${rewardName}* (Code: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+
+      msg += `📊 *Stamp Card Progress:* ${currentStamps}/${goal} Stamps\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Almost there!* Just ${remaining} more stamp${remaining > 1 ? 's' : ''} to unlock your next reward!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 ${remaining} more stamp${remaining > 1 ? 's' : ''} to complete your card.\n`;
+      } else {
+        msg += `🎉 Your stamp card is complete! Ready to claim your reward.\n`;
+      }
+
+      msg += `\nCheck your card & vouchers anytime here:\n👉 https://risev.app`;
+    } else {
+      msg += `Hai ${custName}! 👋\n\nTerima kasih kerana sentiasa menyokong ${storeName}! ✨\n\n`;
+
+      if (activeVouchers.length > 0) {
+        msg += `🎁 *Anda mempunyai baucar ganjaran sedia untuk ditebus:*\n`;
+        activeVouchers.slice(0, 2).forEach(v => {
+          const rewardName = v.expand?.reward?.name || 'Hadiah Percuma';
+          msg += `• *${rewardName}* (Kod: \`${v.code}\`)\n`;
+        });
+        msg += `\n`;
+      }
+
+      msg += `📊 *Status Kad Cop:* ${currentStamps}/${goal} Cop\n`;
+      if (remaining > 0 && remaining <= 2) {
+        msg += `🔥 *Sikit lagi!* Hanya ${remaining} cop lagi untuk menebus ganjaran anda!\n`;
+      } else if (remaining > 0) {
+        msg += `🎯 Kumpulkan ${remaining} cop lagi untuk lengkapkan kad.\n`;
+      } else {
+        msg += `🎉 Kad cop anda telah lengkap! Sedia untuk tebus hadiah.\n`;
+      }
+
+      msg += `\nSemak baki cop & baucar anda di:\n👉 https://risev.app`;
+    }
+
+    const encoded = encodeURIComponent(msg);
+    Linking.openURL(`https://wa.me/${cleanPhone}?text=${encoded}`);
+  };
+
   const handleDownloadCSV = async (csvContent: string, fileName: string) => {
     try {
       if (Platform.OS === 'web') {
@@ -1529,7 +1597,7 @@ export default function CustomersScreen() {
                         {/* 5. WhatsApp Button Underneath */}
                         <TouchableOpacity 
                           style={{ backgroundColor: '#25D366', paddingVertical: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginVertical: 10 }}
-                          onPress={() => Linking.openURL(`https://wa.me/${selectedCustomer.customerPhone.replace(/[^0-9]/g, '')}`)}
+                          onPress={handleOpenWhatsApp}
                           activeOpacity={0.8}
                         >
                           <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
