@@ -12,15 +12,17 @@ import {
   Modal,
   Linking,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, G, Defs, LinearGradient, Stop, Path, Polyline } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
+import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 
 export default function AnalyticsScreen() {
   const { user } = useAuth();
@@ -40,6 +42,7 @@ export default function AnalyticsScreen() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loyaltyCards, setLoyaltyCards] = useState<any[]>([]);
   const [merchant, setMerchant] = useState<any>(null);
+  const [activeProgram, setActiveProgram] = useState<any>(null);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
 
   // Timeframe states
@@ -58,28 +61,205 @@ export default function AnalyticsScreen() {
   // Customer Profile State
   const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<any>(null);
   const [customerProfileModalVisible, setCustomerProfileModalVisible] = useState(false);
+  const [customerCard, setCustomerCard] = useState<any>(null);
+  const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
+  const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Card Flip Animation State
-  const [flipAnimation] = useState(new Animated.Value(0));
-  const [isFlipped, setIsFlipped] = useState(false);
+  // Edit Info State
+  const [editInfoModalVisible, setEditInfoModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const flipCard = () => {
-    Animated.spring(flipAnimation, {
-      toValue: isFlipped ? 0 : 180,
-      friction: 8,
-      tension: 10,
-      useNativeDriver: true,
-    }).start(() => setIsFlipped(!isFlipped));
+  // Adjust Stamps State
+  const [adjustStampsModalVisible, setAdjustStampsModalVisible] = useState(false);
+  const [adjustStampsCount, setAdjustStampsCount] = useState(0);
+  const [adjustReason, setAdjustReason] = useState('');
+  const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
+
+  const openCustomerProfile = async (c: any) => {
+    setSelectedCustomerProfile(c);
+    setEditName(c.name && c.name !== 'Anonymous' ? c.name : '');
+    setEditPhone(c.phone || '');
+    setCustomerProfileModalVisible(true);
+    setLoadingDetails(true);
+
+    try {
+      let card = await pb.collection('loyalty_cards')
+        .getFirstListItem(`customer = "${c.id}" && merchant = "${user?.merchant_id}"`, {
+          expand: 'program,merchant',
+          requestKey: null
+        })
+        .catch(() => null);
+
+      if (card && !card.expand?.program && activeProgram) {
+        if (!card.expand) card.expand = {};
+        card.expand.program = activeProgram;
+      }
+
+      if (card && !card.expand?.merchant && merchant) {
+        if (!card.expand) card.expand = {};
+        card.expand.merchant = merchant;
+      }
+
+      setCustomerCard(card);
+
+      const vouchersList = await pb.collection('vouchers').getFullList({
+        filter: `customer = "${c.id}" && reward.merchant = "${user?.merchant_id}"`,
+        expand: 'reward',
+        sort: '-created',
+        requestKey: null
+      }).catch(() => []);
+      setCustomerVouchers(vouchersList);
+
+      const txList = await pb.collection('transactions').getFullList({
+        filter: `customer = "${c.id}" && merchant = "${user?.merchant_id}"`,
+        sort: '-created',
+        requestKey: null
+      }).catch(() => []);
+      setCustomerTransactions(txList);
+    } catch (err) {
+      console.warn('Failed to fetch customer profile details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
-  const frontInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['0deg', '180deg'],
-  });
-  const backInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 180],
-    outputRange: ['180deg', '360deg'],
-  });
+  const handleSaveEditInfo = async () => {
+    if (!selectedCustomerProfile?.id) return;
+    if (!editName.trim()) {
+      Alert.alert('Validation Error', 'Customer name cannot be empty.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await pb.collection('users').update(selectedCustomerProfile.id, {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+      });
+
+      setSelectedCustomerProfile((prev: any) => prev ? {
+        ...prev,
+        name: editName.trim(),
+        phone: editPhone.trim(),
+      } : null);
+
+      setEditInfoModalVisible(false);
+      Alert.alert('Success', 'Customer information updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update customer info.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleSaveStampAdjustment = async () => {
+    if (!selectedCustomerProfile?.id || !user?.merchant_id) return;
+    setIsSavingAdjustment(true);
+    try {
+      const newStamps = Math.max(0, Math.min(100, adjustStampsCount));
+      const oldStamps = customerCard?.stamps_collected || selectedCustomerProfile.stamps || 0;
+      const delta = newStamps - oldStamps;
+
+      let updatedCard = null;
+      if (customerCard?.id) {
+        updatedCard = await pb.collection('loyalty_cards').update(customerCard.id, {
+          stamps_collected: newStamps
+        }, {
+          expand: 'program,merchant',
+          requestKey: null
+        });
+        if (!updatedCard.expand?.program && (customerCard.expand?.program || activeProgram)) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.program = customerCard.expand?.program || activeProgram;
+        }
+        if (!updatedCard.expand?.merchant && (customerCard.expand?.merchant || merchant)) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.merchant = customerCard.expand?.merchant || merchant;
+        }
+      } else {
+        updatedCard = await pb.collection('loyalty_cards').create({
+          customer: selectedCustomerProfile.id,
+          merchant: user.merchant_id,
+          program: activeProgram?.id || undefined,
+          stamps_collected: newStamps,
+          completions: 0,
+          status: 'active'
+        }, {
+          expand: 'program,merchant',
+          requestKey: null
+        });
+        if (!updatedCard.expand?.program && activeProgram) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.program = activeProgram;
+        }
+        if (!updatedCard.expand?.merchant && merchant) {
+          if (!updatedCard.expand) updatedCard.expand = {};
+          updatedCard.expand.merchant = merchant;
+        }
+      }
+      setCustomerCard(updatedCard);
+      setSelectedCustomerProfile((prev: any) => prev ? { ...prev, stamps: newStamps } : null);
+
+      if (delta !== 0) {
+        try {
+          const newTx = await pb.collection('transactions').create({
+            customer: selectedCustomerProfile.id,
+            merchant: user.merchant_id,
+            type: 'adjustment',
+            stamps_earned: delta,
+            bill_amount: 0,
+            notes: adjustReason.trim() || 'Manual stamp adjustment by merchant'
+          });
+          setCustomerTransactions(prev => [newTx, ...prev]);
+        } catch (txErr) {}
+      }
+
+      setAdjustStampsModalVisible(false);
+      Alert.alert('Success', `Stamp balance updated to ${newStamps}.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to adjust stamps.');
+    } finally {
+      setIsSavingAdjustment(false);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = () => {
+    if (!selectedCustomerProfile?.id || !user?.merchant_id) return;
+    const custName = selectedCustomerProfile.name || 'Customer';
+
+    Alert.alert(
+      'Remove Customer?',
+      `Are you sure you want to remove ${custName} from your store? This will delete their active loyalty card and unused vouchers for your store.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Customer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (customerCard?.id) {
+                await pb.collection('loyalty_cards').delete(customerCard.id);
+              }
+              if (customerVouchers.length > 0) {
+                for (const v of customerVouchers) {
+                  try { await pb.collection('vouchers').delete(v.id); } catch (_) {}
+                }
+              }
+
+              setCustomerProfileModalVisible(false);
+              setSelectedCustomerProfile(null);
+              Alert.alert('Removed', `${custName} has been removed from your store.`);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to remove customer.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // Prefill default dates for custom filter
   useEffect(() => {
@@ -106,6 +286,9 @@ export default function AnalyticsScreen() {
         const merch = await pb.collection('merchants').getOne(user.merchant_id).catch(() => null);
         setMerchant(merch);
 
+        const prog = await pb.collection('loyalty_programs').getFirstListItem(`merchant = '${user.merchant_id}' && is_active = true`, { requestKey: null }).catch(() => null);
+        setActiveProgram(prog);
+
         const txs = await pb.collection('transactions').getFullList({
           filter: `merchant = '${user.merchant_id}'`,
           sort: '-created',
@@ -114,7 +297,7 @@ export default function AnalyticsScreen() {
 
         const cards = await pb.collection('loyalty_cards').getFullList({
           filter: `merchant = '${user.merchant_id}'`,
-          expand: 'customer',
+          expand: 'customer,program,merchant',
         });
         setLoyaltyCards(cards);
 
@@ -1172,10 +1355,7 @@ export default function AnalyticsScreen() {
                   <TouchableOpacity 
                     key={c.id} 
                     activeOpacity={0.6}
-                    onPress={() => {
-                      setSelectedCustomerProfile(c);
-                      setCustomerProfileModalVisible(true);
-                    }}
+                    onPress={() => openCustomerProfile(c)}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: '#F1F5F9' }}
                   >
                     {c.avatar ? (
@@ -1651,7 +1831,7 @@ export default function AnalyticsScreen() {
                 Customer Profile
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                <TouchableOpacity onPress={() => {}}>
+                <TouchableOpacity onPress={handleConfirmDeleteCustomer}>
                   <Ionicons name="trash-outline" size={20} color="#EF4444" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setCustomerProfileModalVisible(false)}>
@@ -1679,11 +1859,21 @@ export default function AnalyticsScreen() {
 
                 {/* Action Buttons */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <TouchableOpacity 
+                    onPress={() => setEditInfoModalVisible(true)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}
+                  >
                     <Ionicons name="create-outline" size={14} color="#050505" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Edit Info</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#050505', borderRadius: 20 }}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setAdjustStampsCount(customerCard?.stamps_collected ?? selectedCustomerProfile.stamps ?? 0);
+                      setAdjustReason('');
+                      setAdjustStampsModalVisible(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#050505', borderRadius: 20 }}
+                  >
                     <Ionicons name="flash" size={14} color="#FFC700" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Adjust Stamps</Text>
                   </TouchableOpacity>
@@ -1754,132 +1944,169 @@ export default function AnalyticsScreen() {
                 </View>
 
                 {/* 2. Stamp Card Progress Section */}
-                <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 24 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>STAMP CARD PROGRESS</Text>
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFBEB', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
-                    <Ionicons name="create-outline" size={14} color="#B45309" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Stamps</Text>
-                  </TouchableOpacity>
-                </View>
+                {(() => {
+                  const prog = customerCard?.expand?.program || activeProgram;
+                  const merch = customerCard?.expand?.merchant || merchant;
+                  const mappedLoyaltyCard = (customerCard || (prog && selectedCustomerProfile)) ? {
+                    id: customerCard?.id || selectedCustomerProfile?.id || 'temp',
+                    merchantName: merch?.name || 'Store',
+                    category: merch?.category || 'General',
+                    logo: merch?.logo
+                      ? `${pb.baseUrl}/api/files/merchants/${merch.id}/${merch.logo}`
+                      : undefined,
+                    collectedStamps: customerCard?.stamps_collected ?? selectedCustomerProfile?.stamps ?? 0,
+                    totalStamps: prog?.stamp_goal || 10,
+                    rewardName: prog?.reward_description || prog?.name || 'Free Reward',
+                    cardNumber: `•••• •••• •••• ${(customerCard?.id || selectedCustomerProfile?.id || '0000').slice(-4).toUpperCase()}`,
+                    points: customerCard?.points_balance || 0,
+                    tier: customerCard?.tier || 'bronze',
+                    gradientColors: prog?.card_color ? [prog.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
+                    cardIcon: prog?.card_icon || 'coffee',
+                    stampColor: prog?.stamp_color || '#3B82F6',
+                    fontColor: prog?.font_color || '#FFFFFF',
+                    cardBackground: prog?.card_background
+                      ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background}`
+                      : undefined,
+                    cardBackgroundBack: prog?.card_background_back
+                      ? `${pb.baseUrl}/api/files/loyalty_programs/${prog.id}/${prog.card_background_back}`
+                      : undefined,
+                    validUntil: (() => {
+                      const expDate = new Date(customerCard?.created || selectedCustomerProfile?.lastVisit || Date.now());
+                      expDate.setDate(expDate.getDate() + (prog?.expiry_days || 30));
+                      return `${String(expDate.getMonth() + 1).padStart(2, '0')}/${String(expDate.getFullYear()).slice(-2)}`;
+                    })(),
+                  } : null;
 
-                {/* Mockup Stamp Card Container */}
-                <View style={{ width: '100%', marginBottom: 12, height: 220 }}>
-                  {/* FRONT OF CARD */}
-                  <Animated.View style={[{ width: '100%', height: '100%', backfaceVisibility: 'hidden' }, { transform: [{ rotateY: frontInterpolate }] }]}>
-                    <View style={{ flex: 1, backgroundColor: '#FFED4A', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                      
-                      {/* Diagonal Glassmorphism Effect */}
-                      <View style={{ position: 'absolute', top: -50, left: -50, right: -50, bottom: -50, transform: [{ rotate: '-15deg' }] }}>
-                        <View style={{ width: '200%', height: '50%', backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
+                  return (
+                    <View style={{ width: '100%', marginBottom: 24, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 24 }}>
+                      <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>STAMP CARD PROGRESS</Text>
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setAdjustStampsCount(customerCard?.stamps_collected ?? selectedCustomerProfile.stamps ?? 0);
+                            setAdjustReason('');
+                            setAdjustStampsModalVisible(true);
+                          }}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFBEB', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}
+                        >
+                          <Ionicons name="create-outline" size={14} color="#B45309" />
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Stamps</Text>
+                        </TouchableOpacity>
                       </View>
 
-                      {/* Header */}
-                      <View style={{ backgroundColor: '#1F2937', paddingVertical: 18, alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <View style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, backgroundColor: 'rgba(255,255,255,0.05)', transform: [{ rotate: '45deg' }] }} />
-                        <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#4B5563', letterSpacing: 4, textTransform: 'uppercase' }}>
-                          {merchant?.name || 'SCOOP CREAMY'}
-                        </Text>
-                      </View>
-
-                      {/* Body */}
-                      <View style={{ padding: 20, alignItems: 'center', flex: 1, justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309', marginBottom: 8 }}>
-                          YOUR STAMPS <Text style={{ fontSize: 18, color: '#050505' }}>{selectedCustomerProfile.stamps}/10</Text>
-                        </Text>
-                        
-                        <View style={{ width: '100%', alignItems: 'center', gap: 10 }}>
-                          {/* Top Row (6 Stamps) */}
-                          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, width: '100%' }}>
-                            {[...Array(6)].map((_, i) => (
-                              <View key={`top-${i}`} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: i < selectedCustomerProfile.stamps ? '#050505' : 'transparent', borderWidth: 1.5, borderStyle: i < selectedCustomerProfile.stamps ? 'solid' : 'dashed', borderColor: i < selectedCustomerProfile.stamps ? '#050505' : '#FCD34D', alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="ice-cream" size={16} color={i < selectedCustomerProfile.stamps ? "#FFFFFF" : "rgba(180, 83, 9, 0.2)"} />
-                              </View>
-                            ))}
+                      {loadingDetails ? (
+                        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                          <ActivityIndicator size="small" color="#050505" />
+                        </View>
+                      ) : mappedLoyaltyCard ? (
+                        <View style={{ gap: 14 }}>
+                          {/* Real Interactive Flippable Stamp Card */}
+                          <View style={{ width: '100%', alignItems: 'center' }}>
+                            <FlippableLoyaltyCard 
+                              card={mappedLoyaltyCard} 
+                              user={{ name: selectedCustomerProfile.name || 'Customer' }} 
+                              startFlipped={true} 
+                            />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                              <Ionicons name="swap-horizontal" size={13} color="#94A3B8" />
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                                Tap card to flip front / back
+                              </Text>
+                            </View>
                           </View>
-                          {/* Bottom Row (4 Stamps) */}
-                          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, width: '100%' }}>
-                            {[...Array(4)].map((_, i) => {
-                              const stampIndex = i + 6;
-                              return (
-                                <View key={`bottom-${i}`} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: stampIndex < selectedCustomerProfile.stamps ? '#050505' : 'transparent', borderWidth: 1.5, borderStyle: stampIndex < selectedCustomerProfile.stamps ? 'solid' : 'dashed', borderColor: stampIndex < selectedCustomerProfile.stamps ? '#050505' : '#FCD34D', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name="ice-cream" size={16} color={stampIndex < selectedCustomerProfile.stamps ? "#FFFFFF" : "rgba(180, 83, 9, 0.2)"} />
-                                </View>
-                              );
-                            })}
+
+                          {/* Progress Summary Card */}
+                          <View style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Current Stamps</Text>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                                {mappedLoyaltyCard.collectedStamps} / {mappedLoyaltyCard.totalStamps}
+                              </Text>
+                            </View>
+                            <View style={{ width: '100%', height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
+                              <View style={{ width: `${Math.min((mappedLoyaltyCard.collectedStamps / mappedLoyaltyCard.totalStamps) * 100, 100)}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 4 }} />
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Total Completions</Text>
+                              <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>
+                                  {customerCard?.completions || 0} Completed
+                                </Text>
+                              </View>
+                            </View>
                           </View>
                         </View>
-                        
-                        <Image source={require('../../assets/risev logo.png')} style={{ width: 50, height: 16, resizeMode: 'contain', tintColor: '#050505', position: 'absolute', bottom: 16, right: 16 }} />
-                      </View>
+                      ) : (
+                        <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>No active loyalty card found.</Text>
+                        </View>
+                      )}
                     </View>
-                  </Animated.View>
-
-                  {/* BACK OF CARD */}
-                  <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backfaceVisibility: 'hidden' }, { transform: [{ rotateY: backInterpolate }] }]}>
-                    <View style={{ flex: 1, backgroundColor: '#1F2937', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 16 }}>
-                        {merchant?.name || 'SCOOP CREAMY'}
-                      </Text>
-                      <View style={{ backgroundColor: '#FFFFFF', padding: 12, borderRadius: 12, marginBottom: 16 }}>
-                        <Ionicons name="qr-code" size={64} color="#050505" />
-                      </View>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', paddingHorizontal: 20 }}>
-                        Customer ID: {selectedCustomerProfile.id.toUpperCase()}
-                      </Text>
-                    </View>
-                  </Animated.View>
-                </View>
-
-                <TouchableOpacity 
-                  onPress={flipCard}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 32, paddingVertical: 8, paddingHorizontal: 16 }}
-                >
-                  <Ionicons name="swap-horizontal" size={14} color="#64748B" />
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Tap card to flip front / back</Text>
-                </TouchableOpacity>
-
-                {/* Progress Bar */}
-                <View style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 32 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Current Stamps</Text>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{selectedCustomerProfile.stamps} / 10</Text>
-                  </View>
-                  <View style={{ width: '100%', height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
-                    <View style={{ width: `${(selectedCustomerProfile.stamps / 10) * 100}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 4 }} />
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Total Completions</Text>
-                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>0 Completed</Text>
-                    </View>
-                  </View>
-                </View>
+                  );
+                })()}
 
                 {/* 3. Rewards & Vouchers */}
                 <View style={{ width: '100%', marginBottom: 32 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>REWARDS & VOUCHERS</Text>
-                  <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>No vouchers issued for this customer.</Text>
-                  </View>
+                  {customerVouchers.length > 0 ? (
+                    <View style={{ gap: 12, width: '100%' }}>
+                      {customerVouchers.map((voucher) => (
+                        <View key={voucher.id} style={{ 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          backgroundColor: '#FFFFFF', 
+                          padding: 12, 
+                          borderRadius: 16, 
+                          borderWidth: 1, 
+                          borderColor: voucher.status === 'valid' || voucher.status === 'active' ? '#BBF7D0' : '#E2E8F0',
+                          shadowColor: '#050505',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.02,
+                          shadowRadius: 4,
+                          elevation: 1
+                        }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: voucher.status === 'valid' || voucher.status === 'active' ? '#DCFCE7' : '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <Ionicons name="gift-outline" size={20} color={voucher.status === 'valid' || voucher.status === 'active' ? '#16A34A' : '#94A3B8'} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: voucher.status === 'valid' || voucher.status === 'active' ? '#050505' : '#64748B' }}>
+                              {voucher.expand?.reward?.title || voucher.expand?.reward?.name || 'Reward Voucher'}
+                            </Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              Issued: {new Date(voucher.created).toLocaleDateString()}
+                            </Text>
+                          </View>
+                          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: voucher.status === 'valid' || voucher.status === 'active' ? '#16A34A' : '#E2E8F0' }}>
+                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: voucher.status === 'valid' || voucher.status === 'active' ? '#FFFFFF' : '#64748B', textTransform: 'uppercase' }}>
+                              {voucher.status}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>No vouchers issued for this customer.</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* 4. Visit History */}
                 <View style={{ width: '100%', marginBottom: 16 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>VISIT HISTORY</Text>
-                  {filteredTransactions.filter(tx => tx.customer === selectedCustomerProfile.id).length > 0 ? (
-                    filteredTransactions.filter(tx => tx.customer === selectedCustomerProfile.id).sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()).map((tx, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                  {customerTransactions.length > 0 ? (
+                    customerTransactions.map((tx, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', width: '100%' }}>
                         <View>
                           <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 4 }}>
-                            {tx.type === 'earn' ? 'Earned Stamp' : 'Redeemed Reward'}
+                            {tx.type === 'earn' || tx.type === 'PURCHASE' ? 'Earned Stamp' : tx.type === 'redeem' || tx.type === 'REDEMPTION' ? 'Redeemed Reward' : 'Stamp Adjustment'}
                           </Text>
                           <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
                             {new Date(tx.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(tx.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: tx.type === 'earn' ? '#10B981' : '#EF4444' }}>
-                          {tx.type === 'earn' ? `+${tx.stamps} stamps` : '-10 stamps'}
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (tx.type === 'earn' || tx.type === 'PURCHASE' || tx.stamps_earned > 0) ? '#10B981' : '#EF4444' }}>
+                          {(tx.type === 'earn' || tx.type === 'PURCHASE' || tx.stamps_earned > 0) ? `+${tx.stamps_earned || tx.stamps || 0} stamps` : `${tx.stamps_earned || tx.stamps || 0} stamps`}
                         </Text>
                       </View>
                     ))
@@ -1891,6 +2118,153 @@ export default function AnalyticsScreen() {
             )}
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Edit Info Modal */}
+      <Modal
+        visible={editInfoModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setEditInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Customer Info</Text>
+              <TouchableOpacity onPress={() => setEditInfoModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 14 }}>
+              <View>
+                <Text style={styles.inputFieldLabel}>CUSTOMER NAME</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="e.g. Fizah"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.inputFieldLabel}>PHONE NUMBER</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  placeholder="e.g. +60123456789"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveActionBtn, isSavingEdit && { opacity: 0.7 }]}
+                onPress={handleSaveEditInfo}
+                disabled={isSavingEdit}
+                activeOpacity={0.85}
+              >
+                {isSavingEdit ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <Text style={styles.saveActionBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Adjust Stamps Modal */}
+      <Modal
+        visible={adjustStampsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAdjustStampsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Adjust Stamp Balance</Text>
+              <TouchableOpacity onPress={() => setAdjustStampsModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'center', gap: 16 }}>
+              {/* Stamp Counter Stepper */}
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustStampsCount(prev => Math.max(0, prev - 1))}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="remove" size={22} color="#0F172A" />
+                </TouchableOpacity>
+
+                <View style={styles.stepperValueBox}>
+                  <Text style={styles.stepperValueText}>{adjustStampsCount}</Text>
+                  <Text style={styles.stepperValueSub}>stamps</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustStampsCount(prev => prev + 1)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={22} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Increment Chips */}
+              <View style={styles.quickChipsRow}>
+                {['+1', '+2', '+5', '-1', 'Reset 0'].map((chip) => (
+                  <TouchableOpacity
+                    key={chip}
+                    style={styles.quickChipBtn}
+                    onPress={() => {
+                      if (chip === '+1') setAdjustStampsCount(c => c + 1);
+                      if (chip === '+2') setAdjustStampsCount(c => c + 2);
+                      if (chip === '+5') setAdjustStampsCount(c => c + 5);
+                      if (chip === '-1') setAdjustStampsCount(c => Math.max(0, c - 1));
+                      if (chip === 'Reset 0') setAdjustStampsCount(0);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.quickChipText}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Reason Input (Optional) */}
+              <View style={{ width: '100%' }}>
+                <Text style={styles.inputFieldLabel}>REASON / NOTE (OPTIONAL)</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={adjustReason}
+                  onChangeText={setAdjustReason}
+                  placeholder="e.g. Customer forgot phone, refund correction"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveActionBtn, { width: '100%' }, isSavingAdjustment && { opacity: 0.7 }]}
+                onPress={handleSaveStampAdjustment}
+                disabled={isSavingAdjustment}
+                activeOpacity={0.85}
+              >
+                {isSavingAdjustment ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <Text style={styles.saveActionBtnText}>Update Stamp Balance</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -2229,5 +2603,117 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 10,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 520,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.15,
+    shadowRadius: 32,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  inputFieldLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  customTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+  },
+  saveActionBtn: {
+    backgroundColor: '#FFC700',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  saveActionBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 18,
+    marginVertical: 6,
+  },
+  stepperBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValueBox: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  stepperValueText: {
+    fontSize: 32,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  stepperValueSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: -2,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  quickChipBtn: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  quickChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
   },
 });
