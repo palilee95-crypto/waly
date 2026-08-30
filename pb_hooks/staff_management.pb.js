@@ -387,11 +387,24 @@ routerAdd("GET", "/api/risev/merchant/staff/permissions", (e) => {
   try {
     const rawMeta = merchant.get("metadata");
     if (typeof rawMeta === "string" && rawMeta.trim()) {
-      meta = JSON.parse(rawMeta);
-    } else if (typeof rawMeta === "object" && rawMeta !== null) {
-      meta = rawMeta;
+      const parsed = JSON.parse(rawMeta);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        meta = Object.assign({}, parsed);
+      }
+    } else if (rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)) {
+      try {
+        meta = JSON.parse(JSON.stringify(rawMeta));
+      } catch (e) {
+        meta = Object.assign({}, rawMeta);
+      }
     }
-  } catch (mErr) {}
+  } catch (mErr) {
+    meta = {};
+  }
+
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+    meta = {};
+  }
 
   const defaultPermissions = {
     can_view_analytics: false,
@@ -440,11 +453,24 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
   try {
     const rawMeta = merchant.get("metadata");
     if (typeof rawMeta === "string" && rawMeta.trim()) {
-      meta = JSON.parse(rawMeta);
-    } else if (typeof rawMeta === "object" && rawMeta !== null) {
-      meta = rawMeta;
+      const parsed = JSON.parse(rawMeta);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        meta = Object.assign({}, parsed);
+      }
+    } else if (rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)) {
+      try {
+        meta = JSON.parse(JSON.stringify(rawMeta));
+      } catch (e) {
+        meta = Object.assign({}, rawMeta);
+      }
     }
-  } catch (mErr) {}
+  } catch (mErr) {
+    meta = {};
+  }
+
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+    meta = {};
+  }
 
   meta.staff_permissions = {
     can_view_analytics: !!newPermissions.can_view_analytics,
@@ -455,7 +481,7 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
     can_manage_branches: !!newPermissions.can_manage_branches
   };
 
-  merchant.set("metadata", JSON.stringify(meta));
+  merchant.set("metadata", meta);
 
   try {
     $app.save(merchant);
