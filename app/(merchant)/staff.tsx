@@ -11,14 +11,15 @@ import {
   Platform,
   useWindowDimensions,
   Modal,
-  Image
+  Image,
+  Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface StaffMember {
@@ -51,7 +52,12 @@ export default function StaffManagementScreen() {
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'performance'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'performance' | 'settings'>('members');
+
+  // Permissions State
+  const [permissionsState, setPermissionsState] = useState<StaffPermissions>(defaultStaffPermissions);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
 
   // Warning Modal States
   const [warningModalVisible, setWarningModalVisible] = useState(false);
@@ -90,9 +96,54 @@ export default function StaffManagementScreen() {
     }
   };
 
+  const fetchPermissions = async () => {
+    try {
+      setLoadingPermissions(true);
+      const res = await pb.send<{ isOwner: boolean; permissions: StaffPermissions }>('/api/risev/merchant/staff/permissions', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      if (res?.permissions) {
+        setPermissionsState(res.permissions);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch staff permissions:", err);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
   useEffect(() => {
     fetchStaff();
+    fetchPermissions();
   }, []);
+
+  const handleTogglePermission = async (key: keyof StaffPermissions, val: boolean) => {
+    const updated = { ...permissionsState, [key]: val };
+    setPermissionsState(updated);
+    try {
+      setSavingPermissions(true);
+      await pb.send('/api/risev/merchant/staff/permissions', {
+        method: 'POST',
+        body: { permissions: updated },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+    } catch (err: any) {
+      console.warn("Failed to save staff permissions:", err);
+      Alert.alert(
+        locale === 'en' ? "Error" : "Ralat",
+        err?.data?.message || err?.message || (locale === 'en' ? "Failed to save permissions." : "Gagal menyimpan kebenaran.")
+      );
+      // Revert on error
+      fetchPermissions();
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
 
   const handleOpenAddModal = () => {
     const cleanPhone = phoneInput.trim();
@@ -241,6 +292,17 @@ export default function StaffManagementScreen() {
               {locale === 'en' ? 'Performance Rank' : 'Prestasi Staf'}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tabBtn, activeTab === 'settings' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('settings')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="shield-checkmark" size={16} color={activeTab === 'settings' ? '#050505' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'settings' && styles.tabBtnTextActive]}>
+              {locale === 'en' ? 'Permissions' : 'Kebenaran'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {activeTab === 'members' ? (
@@ -339,7 +401,7 @@ export default function StaffManagementScreen() {
               </View>
             )}
           </>
-        ) : (
+        ) : activeTab === 'performance' ? (
           /* Staff Performance & Leaderboard View */
           <View style={{ gap: 14 }}>
             <View style={styles.leaderboardHeaderCard}>
@@ -370,6 +432,180 @@ export default function StaffManagementScreen() {
                 </View>
               </View>
             ))}
+          </View>
+        ) : (
+          /* Staff Permissions & Settings View */
+          <View style={{ gap: 16 }}>
+            {/* Header Banner Card */}
+            <View style={styles.permHeaderCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.permHeaderIconBg}>
+                  <Ionicons name="shield-checkmark" size={22} color="#050505" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.permHeaderTitle}>
+                    {locale === 'en' ? 'Staff Role & Permissions' : 'Peranan & Kebenaran Staf'}
+                  </Text>
+                  <Text style={styles.permHeaderSubtitle}>
+                    {locale === 'en'
+                      ? 'Control which console sections your staff can access.'
+                      : 'Kawal bahagian konsol yang boleh diakses oleh staf anda.'}
+                  </Text>
+                </View>
+              </View>
+              {savingPermissions && (
+                <View style={styles.savingBadge}>
+                  <ActivityIndicator size="small" color="#B45309" />
+                  <Text style={styles.savingBadgeText}>{locale === 'en' ? 'Saving...' : 'Menyimpan...'}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Always Enabled Notice */}
+            <View style={styles.permNoticeCard}>
+              <Ionicons name="information-circle-outline" size={20} color="#0284C7" />
+              <Text style={styles.permNoticeText}>
+                {locale === 'en'
+                  ? 'Cashier Mode (Issue Stamps, Scan QR, & Redeem Vouchers) and Customer Lookup are always unlocked for all active staff.'
+                  : 'Mod Juruwang (Beri Stamp, Imbas QR, & Tebus Baucar) dan Carian Pelanggan sentiasa dibuka untuk semua staf aktif.'}
+              </Text>
+            </View>
+
+            {/* Permission Toggles List */}
+            <View style={styles.permListCard}>
+              {/* 1. Financial Analytics */}
+              <View style={styles.permRow}>
+                <View style={[styles.permIconBg, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="bar-chart" size={18} color="#0284C7" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'Financial Analytics & Revenue' : 'Analitik Kewangan & Hasil'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Allow staff to view sales figures, daily turnover, and revenue charts.'
+                      : 'Benarkan staf melihat angka jualan, pusingan harian, dan carta hasil.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={permissionsState.can_view_analytics ?? false}
+                  onValueChange={(val) => handleTogglePermission('can_view_analytics', val)}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={permissionsState.can_view_analytics ? '#050505' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.permDivider} />
+
+              {/* 2. WhatsApp Marketing */}
+              <View style={styles.permRow}>
+                <View style={[styles.permIconBg, { backgroundColor: '#DCFCE7' }]}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'WhatsApp Blasts & Campaigns' : 'Hebahan WhatsApp & Kempen'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Allow staff to send broadcast messages, create templates, and trigger automations.'
+                      : 'Benarkan staf menghantar mesej hebahan, cipta templat, dan memulakan automasi.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={permissionsState.can_view_marketing ?? false}
+                  onValueChange={(val) => handleTogglePermission('can_view_marketing', val)}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={permissionsState.can_view_marketing ? '#050505' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.permDivider} />
+
+              {/* 3. Loyalty Programs & Rewards */}
+              <View style={styles.permRow}>
+                <View style={[styles.permIconBg, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="gift" size={18} color="#D97706" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'Loyalty Programs & Reward Editing' : 'Program Kesetiaan & Hadiah'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Allow staff to create new rewards, modify stamp card goals, and edit tiers.'
+                      : 'Benarkan staf mencipta hadiah baharu, mengubah sasaran stamp, dan sunting tahap.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={permissionsState.can_manage_rewards ?? false}
+                  onValueChange={(val) => handleTogglePermission('can_manage_rewards', val)}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={permissionsState.can_manage_rewards ? '#050505' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.permDivider} />
+
+              {/* 4. Customer Stamp Adjustments */}
+              <View style={styles.permRow}>
+                <View style={[styles.permIconBg, { backgroundColor: '#F3E8FF' }]}>
+                  <Ionicons name="create-outline" size={18} color="#9333EA" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'Customer Stamp Adjustments' : 'Pelarasan Stamp Pelanggan'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Allow staff to manually increase/decrease customer stamp counts in CRM.'
+                      : 'Benarkan staf menambah atau mengurangkan baki stamp pelanggan dalam CRM.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={permissionsState.can_manage_customers ?? false}
+                  onValueChange={(val) => handleTogglePermission('can_manage_customers', val)}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={permissionsState.can_manage_customers ? '#050505' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.permDivider} />
+
+              {/* 5. Store Profile & Branches */}
+              <View style={styles.permRow}>
+                <View style={[styles.permIconBg, { backgroundColor: '#F1F5F9' }]}>
+                  <Ionicons name="business" size={18} color="#475569" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'Store Profile & Branch Management' : 'Profil Kedai & Cawangan'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Allow staff to edit store address, logos, Google review links, and branch outlets.'
+                      : 'Benarkan staf menyunting alamat kedai, logo, pautan Google review, dan cawangan.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={permissionsState.can_edit_store_profile ?? false}
+                  onValueChange={(val) => handleTogglePermission('can_edit_store_profile', val)}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={permissionsState.can_edit_store_profile ? '#050505' : '#FFFFFF'}
+                />
+              </View>
+            </View>
+
+            {/* Owner Only Notice */}
+            <View style={styles.ownerOnlyFooter}>
+              <Ionicons name="lock-closed" size={14} color="#64748B" />
+              <Text style={styles.ownerOnlyFooterText}>
+                {locale === 'en'
+                  ? 'Subscription billing, invoices, and staff account management are strictly restricted to the Store Owner.'
+                  : 'Pengebilan langganan, invois, dan pengurusan akaun staf adalah terhad kepada Pemilik Kedai sahaja.'}
+              </Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -1003,5 +1239,117 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
+  },
+  permHeaderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  permHeaderIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permHeaderTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  permHeaderSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  savingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  savingBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  permNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#F0F9FF',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  permNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#0369A1',
+    lineHeight: 18,
+  },
+  permListCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  permRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  permIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  permSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  permDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: -4,
+  },
+  ownerOnlyFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  ownerOnlyFooterText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

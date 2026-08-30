@@ -361,3 +361,111 @@ routerAdd("DELETE", "/api/risev/merchant/staff", (e) => {
 
   return e.json(200, { message: "Staff member removed successfully." });
 }, $apis.requireAuth("users"));
+
+// ── Staff Permissions API ──────────────────────────────────────────
+routerAdd("GET", "/api/risev/merchant/staff/permissions", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  let merchant;
+  try {
+    merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
+  } catch (err) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+
+  const isOwner = merchant.getString("owner") === authRecord.id;
+
+  let meta = {};
+  try {
+    const rawMeta = merchant.get("metadata");
+    if (typeof rawMeta === "string" && rawMeta.trim()) {
+      meta = JSON.parse(rawMeta);
+    } else if (typeof rawMeta === "object" && rawMeta !== null) {
+      meta = rawMeta;
+    }
+  } catch (mErr) {}
+
+  const defaultPermissions = {
+    can_view_analytics: false,
+    can_view_marketing: false,
+    can_manage_rewards: false,
+    can_manage_customers: false,
+    can_edit_store_profile: false,
+    can_manage_branches: false
+  };
+
+  const permissions = Object.assign({}, defaultPermissions, meta.staff_permissions || {});
+
+  return e.json(200, {
+    isOwner: isOwner,
+    permissions: permissions
+  });
+}, $apis.requireAuth("users"));
+
+routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  let merchant;
+  try {
+    merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
+  } catch (err) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+
+  // Only store owner can update staff permissions
+  if (merchant.getString("owner") !== authRecord.id) {
+    return e.json(403, { message: "Forbidden. Only the store owner can modify staff permissions." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const newPermissions = body.permissions || {};
+
+  let meta = {};
+  try {
+    const rawMeta = merchant.get("metadata");
+    if (typeof rawMeta === "string" && rawMeta.trim()) {
+      meta = JSON.parse(rawMeta);
+    } else if (typeof rawMeta === "object" && rawMeta !== null) {
+      meta = rawMeta;
+    }
+  } catch (mErr) {}
+
+  meta.staff_permissions = {
+    can_view_analytics: !!newPermissions.can_view_analytics,
+    can_view_marketing: !!newPermissions.can_view_marketing,
+    can_manage_rewards: !!newPermissions.can_manage_rewards,
+    can_manage_customers: !!newPermissions.can_manage_customers,
+    can_edit_store_profile: !!newPermissions.can_edit_store_profile,
+    can_manage_branches: !!newPermissions.can_manage_branches
+  };
+
+  merchant.set("metadata", JSON.stringify(meta));
+
+  try {
+    $app.save(merchant);
+  } catch (saveErr) {
+    return e.json(500, { message: "Failed to save permissions: " + saveErr.message });
+  }
+
+  return e.json(200, {
+    message: "Staff permissions updated successfully.",
+    permissions: meta.staff_permissions
+  });
+}, $apis.requireAuth("users"));
+

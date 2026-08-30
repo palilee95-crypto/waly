@@ -19,7 +19,7 @@ import SubscriptionScreen from './subscription';
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const { logout, user, isOwner, staffPermissions } = useAuth();
   const { width } = useWindowDimensions();
   const { t } = useLanguage();
   const isDesktop = width >= 768;
@@ -28,6 +28,11 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   // Hide tab bar on sub-screens like subscription paywall or nfc-marketplace
   if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace') {
     return null;
+  }
+
+  const allowedTabs = ['index', 'customers', 'give', 'profile'];
+  if (isOwner || staffPermissions?.can_view_marketing) {
+    allowedTabs.push('marketing');
   }
 
   if (isDesktop) {
@@ -57,7 +62,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
 
         {/* Navigation Links */}
         <View style={styles.sidebarLinks}>
-          {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
+          {state.routes.filter((route: any) => allowedTabs.includes(route.name)).map((route: any) => {
             const isFocused = state.routes[state.index]?.name === route.name;
 
             const onPress = () => {
@@ -142,7 +147,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
     <View style={[styles.mobileTabBarWrap, { bottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
       <GooeyTabBarBackground width={tabBarWidth} color="#121214" />
       <View style={styles.mobileTabBar}>
-        {state.routes.filter((route: any) => ['index', 'customers', 'give', 'marketing', 'profile'].includes(route.name)).map((route: any) => {
+        {state.routes.filter((route: any) => allowedTabs.includes(route.name)).map((route: any) => {
           const isFocused = state.routes[state.index]?.name === route.name;
           const onPress = () => {
             const event = navigation.emit({

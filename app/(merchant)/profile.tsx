@@ -101,7 +101,7 @@ const BentoSquareItem = ({
 );
 
 export default function ProfileScreen() {
-  const { logout, user, switchRole, updateProfile } = useAuth();
+  const { logout, user, isOwner, isStaff, staffPermissions, switchRole, updateProfile } = useAuth();
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -1073,56 +1073,68 @@ export default function ProfileScreen() {
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
-              <SettingItem
-                iconName="business-outline"
-                title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
-                subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
-                iconBgColor="#FEF3C7"
-                iconColor="#B45309"
-                isPro={true}
-                onPress={() => handleProFeaturePress('/(merchant)/branches')}
-              />
+          {(isOwner || staffPermissions?.can_manage_branches) && (
+            <SettingItem
+              iconName="business-outline"
+              title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
+              subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
+              iconBgColor="#FEF3C7"
+              iconColor="#B45309"
+              isPro={true}
+              onPress={() => handleProFeaturePress('/(merchant)/branches')}
+            />
+          )}
 
-              <SettingItem
-                iconName="people-outline"
-                title={t('manage_staff')}
-                subtitle={t('manage_staff_desc')}
-                iconBgColor="#F1F5F9"
-                iconColor="#050505"
-                onPress={() => router.push('/(merchant)/staff' as any)}
-              />
+          {isOwner && (
+            <SettingItem
+              iconName="people-outline"
+              title={t('manage_staff')}
+              subtitle={t('manage_staff_desc')}
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+              onPress={() => router.push('/(merchant)/staff' as any)}
+            />
+          )}
 
-              <SettingItem
-                iconName="gift-outline"
-                title={t('manage_rewards')}
-                subtitle={t('manage_rewards_desc')}
-                iconBgColor="#FFF3E0"
-                iconColor="#FF9800"
-                onPress={() => router.push('/(merchant)/rewards' as any)}
-              />
-              <SettingItem
-                iconName="logo-whatsapp"
-                title="WhatsApp Cloud API"
-                subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
-                iconBgColor="#E8F5E9"
-                iconColor="#4CAF50"
-                isPro={true}
-                onPress={() => {
-                  if (user?.merchant_status !== 'active') {
-                    router.push('/(merchant)/subscription' as any);
-                  } else {
-                    handleOpenMetaSetup();
-                  }
-                }}
-              />
-          <SettingItem
-            iconName="color-palette-outline"
-            title="Onboarding Setup"
-            subtitle="Customize your customer-facing onboarding page"
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            onPress={() => router.push('/(merchant)/onboarding-setup' as any)}
-          />
+          {(isOwner || staffPermissions?.can_manage_rewards) && (
+            <SettingItem
+              iconName="gift-outline"
+              title={t('manage_rewards')}
+              subtitle={t('manage_rewards_desc')}
+              iconBgColor="#FFF3E0"
+              iconColor="#FF9800"
+              onPress={() => router.push('/(merchant)/rewards' as any)}
+            />
+          )}
+
+          {(isOwner || staffPermissions?.can_view_marketing) && (
+            <SettingItem
+              iconName="logo-whatsapp"
+              title="WhatsApp Cloud API"
+              subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
+              iconBgColor="#E8F5E9"
+              iconColor="#4CAF50"
+              isPro={true}
+              onPress={() => {
+                if (user?.merchant_status !== 'active') {
+                  router.push('/(merchant)/subscription' as any);
+                } else {
+                  handleOpenMetaSetup();
+                }
+              }}
+            />
+          )}
+
+          {(isOwner || staffPermissions?.can_edit_store_profile) && (
+            <SettingItem
+              iconName="color-palette-outline"
+              title="Onboarding Setup"
+              subtitle="Customize your customer-facing onboarding page"
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+              onPress={() => router.push('/(merchant)/onboarding-setup' as any)}
+            />
+          )}
           
           <View style={styles.bentoRow}>
             <BentoSquareItem
@@ -1152,26 +1164,39 @@ export default function ProfileScreen() {
               iconColor="#050505"
               onPress={() => setLanguageModalVisible(true)}
             />
-            <BentoSquareItem
-              iconName="card-outline"
-              title="My Subscription"
-              subtitle="Manage your plan & billing"
-              iconBgColor="#EEF2FF"
-              iconColor="#4F46E5"
-              badgeText="PRO"
-              badgeColor="#4F46E5"
-              onPress={() => router.push('/(merchant)/subscription' as any)}
-            />
+            {isOwner ? (
+              <BentoSquareItem
+                iconName="card-outline"
+                title="My Subscription"
+                subtitle="Manage your plan & billing"
+                iconBgColor="#EEF2FF"
+                iconColor="#4F46E5"
+                badgeText="PRO"
+                badgeColor="#4F46E5"
+                onPress={() => router.push('/(merchant)/subscription' as any)}
+              />
+            ) : (
+              <BentoSquareItem
+                iconName="document-text-outline"
+                title={t('privacy_policy')}
+                subtitle={t('privacy_policy_desc')}
+                iconBgColor="#F1F5F9"
+                iconColor="#050505"
+                onPress={handlePrivacyPress}
+              />
+            )}
           </View>
           
-          <SettingItem
-            iconName="document-text-outline"
-            title={t('privacy_policy')}
-            subtitle={t('privacy_policy_desc')}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            onPress={handlePrivacyPress}
-          />
+          {isOwner && (
+            <SettingItem
+              iconName="document-text-outline"
+              title={t('privacy_policy')}
+              subtitle={t('privacy_policy_desc')}
+              iconBgColor="#F1F5F9"
+              iconColor="#050505"
+              onPress={handlePrivacyPress}
+            />
+          )}
         </View>
 
         {/* Logout Button Card */}

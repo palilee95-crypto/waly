@@ -93,6 +93,24 @@ export const storage = {
 
 export type UserRole = 'customer' | 'merchant' | null;
 
+export interface StaffPermissions {
+  can_view_analytics?: boolean;
+  can_view_marketing?: boolean;
+  can_manage_rewards?: boolean;
+  can_manage_customers?: boolean;
+  can_edit_store_profile?: boolean;
+  can_manage_branches?: boolean;
+}
+
+export const defaultStaffPermissions: StaffPermissions = {
+  can_view_analytics: false,
+  can_view_marketing: false,
+  can_manage_rewards: false,
+  can_manage_customers: false,
+  can_edit_store_profile: false,
+  can_manage_branches: false,
+};
+
 interface AuthUser {
   id: string;
   phone: string;
@@ -105,6 +123,9 @@ interface AuthUser {
   merchant_id?: string; // linked merchant ID
   merchant_status?: 'active' | 'suspended' | 'pending';
   merchant_created?: string;
+  is_owner?: boolean;
+  is_staff?: boolean;
+  staff_permissions?: StaffPermissions;
   tier?: string;
   total_points?: number;
 }
@@ -114,6 +135,10 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   activeRole: UserRole;
+  isOwner: boolean;
+  isStaff: boolean;
+  staffPermissions: StaffPermissions;
+  fetchStaffPermissions: () => Promise<StaffPermissions>;
   loginWithIdentifier: (identifier: string, password: string) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
@@ -136,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeRole, setActiveRole] = useState<UserRole>(null);
+  const [staffPermissions, setStaffPermissions] = useState<StaffPermissions>(defaultStaffPermissions);
 
   const params = useLocalSearchParams<{ ref?: string }>();
 
@@ -145,8 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .then(() => {
           console.log('[AuthContext] Stored referral code:', params.ref);
           pb.send(`/api/risev/agent/click?ref=${encodeURIComponent(params.ref || '')}`, { method: 'GET' })
-            .then(res => console.log('[AuthContext] Click recorded successfully:', res))
-            .catch(err => console.warn('[AuthContext] Failed to record agent click:', err));
+            .catch(err => console.warn('[AuthContext] Failed to record click:', err));
         })
         .catch(err => console.error('[AuthContext] Failed to store referral code:', err));
     }
@@ -179,10 +204,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const ensureMerchantProfile = async (record: any): Promise<{ id?: string; status?: 'active' | 'suspended' | 'pending'; created?: string }> => {
+  const ensureMerchantProfile = async (record: any): Promise<{ id?: string; status?: 'active' | 'suspended' | 'pending'; created?: string; is_owner?: boolean; is_staff?: boolean; staff_permissions?: StaffPermissions }> => {
     let merchantId = record.merchant_id;
     let status: 'active' | 'suspended' | 'pending' = 'pending';
     let created: string | undefined = undefined;
+    let is_owner = false;
+    let is_staff = false;
+    let permissions: StaffPermissions = { ...defaultStaffPermissions };
     
     if (record.role === 'merchant' || record.role === 'both') {
       let merchantRecord = null;
@@ -217,6 +245,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         merchantId = merchantRecord.id;
         status = (merchantRecord.status as any) || 'pending';
         created = merchantRecord.created;
+        is_owner = merchantRecord.owner === record.id;
+        is_staff = merchantRecord.owner !== record.id;
+
+        // Parse staff_permissions from metadata
+        try {
+          const rawMeta = merchantRecord.metadata;
+          let meta = typeof rawMeta === 'string' && rawMeta.trim() ? JSON.parse(rawMeta) : (rawMeta || {});
+          if (meta.staff_permissions) {
+            permissions = { ...defaultStaffPermissions, ...meta.staff_permissions };
+          }
+        } catch (mErr) {}
 
         // Auto-check and auto-sync active subscription status (e.g. stand_bundle, starter, pro)
         try {
@@ -235,7 +274,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-    return { id: merchantId, status, created };
+    setStaffPermissions(permissions);
+    return { id: merchantId, status, created, is_owner, is_staff, staff_permissions: permissions };
   };
 
   const initAuth = async () => {
@@ -315,6 +355,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             merchant_id: merchantData.id,
             merchant_status: merchantData.status,
             merchant_created: merchantData.created,
+            is_owner: merchantData.is_owner,
+            is_staff: merchantData.is_staff,
+            staff_permissions: merchantData.staff_permissions,
             tier: freshRecord.tier || undefined,
             total_points: freshRecord.total_points || 0,
           });
@@ -463,6 +506,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       merchant_id: merchantData.id,
       merchant_status: merchantData.status,
       merchant_created: merchantData.created,
+      is_owner: merchantData.is_owner,
+      is_staff: merchantData.is_staff,
+      staff_permissions: merchantData.staff_permissions,
       tier: authRecord.tier || undefined,
       total_points: authRecord.total_points || 0,
     });
@@ -568,6 +614,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         merchant_id: merchantData.id,
         merchant_status: merchantData.status,
         merchant_created: merchantData.created,
+        is_owner: merchantData.is_owner,
+        is_staff: merchantData.is_staff,
+        staff_permissions: merchantData.staff_permissions,
         tier: record.tier || undefined,
         total_points: record.total_points || 0,
       });
@@ -576,12 +625,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchStaffPermissions = async (): Promise<StaffPermissions> => {
+    try {
+      const res = await pb.send<{ isOwner: boolean; permissions: StaffPermissions }>('/api/risev/merchant/staff/permissions', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        },
+        requestKey: null
+      });
+      if (res?.permissions) {
+        setStaffPermissions(res.permissions);
+        return res.permissions;
+      }
+    } catch (err) {}
+    return staffPermissions;
+  };
+
+  const isOwner = !!(user && user.merchant_id && (user.is_owner ?? (user.role === 'merchant')));
+  const isStaff = !!(user && user.merchant_id && user.is_staff);
+
   return (
     <AuthContext.Provider value={{
       user,
       isLoading,
       isAuthenticated: !!user,
       activeRole,
+      isOwner,
+      isStaff,
+      staffPermissions,
+      fetchStaffPermissions,
       loginWithIdentifier,
       loginWithPassword,
       requestOTP,
