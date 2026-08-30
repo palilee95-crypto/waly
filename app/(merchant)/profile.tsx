@@ -1098,8 +1098,8 @@ export default function ProfileScreen() {
 
 
 
-        {/* Account Settings Section Header */}
-        <Text style={styles.sectionHeader}>{t('account_settings')}</Text>
+        {/* Section 1: Store & Operations Header */}
+        <Text style={styles.sectionHeader}>{locale === 'en' ? 'Store & Business Settings' : 'Tetapan Kedai & Operasi'}</Text>
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
@@ -1170,58 +1170,108 @@ export default function ProfileScreen() {
               ? () => handleLockedItemPress('Onboarding Setup')
               : () => router.push('/(merchant)/onboarding-setup' as any)}
           />
-          
-          <View style={styles.bentoRow}>
-            <BentoSquareItem
-              iconName="cart-outline"
-              title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
-              subtitle={locale === 'en' ? 'Explore NFC stand marketplace' : 'Teroka pasaran stand NFC'}
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
-            />
-            <BentoSquareItem
-              iconName="shield-checkmark-outline"
-              title={t('security')}
-              subtitle={t('security_desc')}
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={() => setPasswordModalVisible(true)}
-            />
-          </View>
 
-          <View style={styles.bentoRow}>
-            <BentoSquareItem
-              iconName="globe-outline"
-              title={t('language')}
-              subtitle={locale === 'en' ? 'English' : 'Bahasa Melayu'}
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={() => setLanguageModalVisible(true)}
-            />
-            <BentoSquareItem
-              iconName="card-outline"
-              title="My Subscription"
-              subtitle="Manage your plan & billing"
-              iconBgColor="#EEF2FF"
-              iconColor="#4F46E5"
-              badgeText={isOwner ? "PRO" : undefined}
-              badgeColor="#4F46E5"
-              isLocked={!isOwner}
-              onPress={!isOwner
-                ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
-                : () => router.push('/(merchant)/subscription' as any)}
-            />
-          </View>
-          
           <SettingItem
-            iconName="document-text-outline"
-            title={t('privacy_policy')}
-            subtitle={t('privacy_policy_desc')}
+            iconName="cart-outline"
+            title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
+            subtitle={locale === 'en' ? 'Explore NFC stand marketplace & plates' : 'Teroka pasaran stand & plat NFC'}
             iconBgColor="#F1F5F9"
             iconColor="#050505"
-            onPress={handlePrivacyPress}
+            onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
           />
+
+          <SettingItem
+            iconName="card-outline"
+            title="My Subscription"
+            subtitle="Manage your plan & billing"
+            iconBgColor="#EEF2FF"
+            iconColor="#4F46E5"
+            badgeText={isOwner ? "PRO" : undefined}
+            badgeColor="#4F46E5"
+            isLocked={!isOwner}
+            onPress={!isOwner
+              ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
+              : () => router.push('/(merchant)/subscription' as any)}
+          />
+        </View>
+
+        {/* Section 2: Personal Account Header */}
+        <Text style={styles.sectionHeader}>{locale === 'en' ? 'My Personal Account' : 'Akaun Peribadi Saya'}</Text>
+
+        {/* Personal Identity Card */}
+        <View style={styles.personalUserCard}>
+          <View style={styles.personalUserHeader}>
+            <View style={styles.personalAvatarBg}>
+              <Text style={styles.personalAvatarInitial}>{user?.name ? user.name[0].toUpperCase() : 'U'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Text style={styles.personalUserName}>{user?.name || 'User'}</Text>
+                <View style={styles.personalRoleBadge}>
+                  <Ionicons name={isOwner ? "briefcase" : "person"} size={10} color={isOwner ? "#B45309" : "#0284C7"} />
+                  <Text style={[styles.personalRoleBadgeText, { color: isOwner ? "#B45309" : "#0284C7" }]}>
+                    {isOwner ? (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai') : (locale === 'en' ? 'Staff Member' : 'Staf Kedai')}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.personalUserPhone}>{user?.phone || ''}</Text>
+              {user?.email && !user.email.includes('@risev.app') ? (
+                <Text style={styles.personalUserEmail}>{user.email}</Text>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.personalDivider} />
+
+          {/* Personal Settings Actions */}
+          <View style={{ gap: 4 }}>
+            <TouchableOpacity 
+              style={styles.personalActionRow} 
+              onPress={() => setPasswordModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.personalActionIconBg, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="key-outline" size={18} color="#B45309" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalActionTitle}>{locale === 'en' ? 'My Login Password' : 'Kata Laluan Log Masuk'}</Text>
+                <Text style={styles.personalActionSubtitle}>
+                  {locale === 'en' ? 'Change your personal login password' : 'Tukar kata laluan log masuk peribadi anda'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.personalActionRow} 
+              onPress={() => setLanguageModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.personalActionIconBg, { backgroundColor: '#F1F5F9' }]}>
+                <Ionicons name="globe-outline" size={18} color="#050505" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalActionTitle}>{t('language')}</Text>
+                <Text style={styles.personalActionSubtitle}>{locale === 'en' ? 'English (US)' : 'Bahasa Melayu'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.personalActionRow} 
+              onPress={handlePrivacyPress}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.personalActionIconBg, { backgroundColor: '#F1F5F9' }]}>
+                <Ionicons name="document-text-outline" size={18} color="#050505" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.personalActionTitle}>{t('privacy_policy')}</Text>
+                <Text style={styles.personalActionSubtitle}>{t('privacy_policy_desc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Logout Button Card */}
@@ -1636,6 +1686,18 @@ export default function ProfileScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ width: '100%', alignItems: 'stretch', paddingBottom: 16 }}
             >
+              {/* User Identity Info Badge */}
+              <View style={styles.passwordUserBadge}>
+                <Ionicons name="person-circle" size={32} color="#050505" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.passwordUserBadgeName}>{user?.name || 'My Account'}</Text>
+                  <Text style={styles.passwordUserBadgePhone}>{user?.phone || ''}</Text>
+                </View>
+                <View style={styles.personalScopeBadge}>
+                  <Text style={styles.personalScopeBadgeText}>PERSONAL</Text>
+                </View>
+              </View>
+
               {/* New Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>{t('new_password')}</Text>
@@ -2348,5 +2410,126 @@ const styles = StyleSheet.create({
   languageOptionTextActive: {
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
+  },
+  personalUserCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  personalUserHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  personalAvatarBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalAvatarInitial: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+  },
+  personalUserName: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  personalRoleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  personalRoleBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  personalUserPhone: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  personalUserEmail: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  personalDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 14,
+  },
+  personalActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 12,
+  },
+  personalActionIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalActionTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  personalActionSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  passwordUserBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    width: '100%',
+  },
+  passwordUserBadgeName: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  passwordUserBadgePhone: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  personalScopeBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  personalScopeBadgeText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#16A34A',
+    letterSpacing: 0.5,
   },
 });
