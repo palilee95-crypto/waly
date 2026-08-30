@@ -47,6 +47,7 @@ export default function StaffManagementScreen() {
   const [selectedBranchName, setSelectedBranchName] = useState('All Branches (HQ)');
   const [branchList, setBranchList] = useState<string[]>(['All Branches (HQ)']);
   const [isAdding, setIsAdding] = useState(false);
+  const [addNameModalVisible, setAddNameModalVisible] = useState(false);
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -93,7 +94,7 @@ export default function StaffManagementScreen() {
     fetchStaff();
   }, []);
 
-  const handleAddStaff = async () => {
+  const handleOpenAddModal = () => {
     const cleanPhone = phoneInput.trim();
     if (!cleanPhone) {
       Alert.alert(
@@ -102,6 +103,20 @@ export default function StaffManagementScreen() {
       );
       return;
     }
+    const digits = cleanPhone.replace(/\D/g, '');
+    if (digits.length < 8) {
+      Alert.alert(
+        locale === 'en' ? "Invalid Phone" : "Nombor Tidak Sah", 
+        locale === 'en' ? "Please enter a valid phone number." : "Sila masukkan nombor telefon yang sah."
+      );
+      return;
+    }
+    setAddNameModalVisible(true);
+  };
+
+  const handleConfirmAddStaff = async () => {
+    const cleanPhone = phoneInput.trim();
+    if (!cleanPhone) return;
 
     setIsAdding(true);
     try {
@@ -116,6 +131,7 @@ export default function StaffManagementScreen() {
           'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
+      setAddNameModalVisible(false);
       setPhoneInput('');
       setNameInput('');
       Alert.alert(
@@ -126,6 +142,7 @@ export default function StaffManagementScreen() {
     } catch (err: any) {
       console.warn("Failed to add staff member:", err.response || err);
       const errMsg = err?.data?.message || err?.response?.message || err?.message || (locale === 'en' ? "Failed to add staff member." : "Gagal menambah kakitangan.");
+      setAddNameModalVisible(false);
       setWarningTitle(locale === 'en' ? "Unable to Add Staff" : "Tidak Dapat Menambah Kakitangan");
       setWarningMessage(errMsg);
       setWarningModalVisible(true);
@@ -252,20 +269,6 @@ export default function StaffManagementScreen() {
                 ))}
               </View>
 
-              {/* Staff Name Input */}
-              <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'STAFF NAME / NICKNAME (OPTIONAL)' : 'NAMA STAF / PANGGILAN (PILIHAN)'}</Text>
-              <TextInput
-                style={[styles.input, { marginBottom: 12 }]}
-                placeholder={locale === 'en' ? "e.g. Daniel Irfan" : "cth. Daniel Irfan"}
-                placeholderTextColor="#94A3B8"
-                value={nameInput}
-                onChangeText={setNameInput}
-                autoCapitalize="words"
-                {...Platform.select({
-                  web: { outlineStyle: 'none' } as any,
-                })}
-              />
-
               <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'PHONE NUMBER' : 'NOMBOR TELEFON'}</Text>
               <View style={styles.formRow}>
                 <TextInput
@@ -282,18 +285,11 @@ export default function StaffManagementScreen() {
                 />
                 <TouchableOpacity
                   style={styles.addBtn}
-                  onPress={handleAddStaff}
-                  disabled={isAdding}
+                  onPress={handleOpenAddModal}
                   activeOpacity={0.8}
                 >
-                  {isAdding ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="add" size={20} color="#FFFFFF" />
-                      <Text style={styles.addBtnText}>{t('add_btn_label')}</Text>
-                    </>
-                  )}
+                  <Ionicons name="add" size={20} color="#FFFFFF" />
+                  <Text style={styles.addBtnText}>{t('add_btn_label')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -377,6 +373,85 @@ export default function StaffManagementScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Add Staff Name Modal */}
+      <Modal
+        visible={addNameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddNameModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconBg, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="person-add" size={26} color="#050505" />
+            </View>
+            <Text style={styles.modalTitle}>
+              {locale === 'en' ? 'Staff Member Details' : 'Maklumat Kakitangan'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {locale === 'en'
+                ? 'Enter a name or nickname for this staff member. This will appear on receipts and leaderboards.'
+                : 'Masukkan nama atau panggilan staf ini. Nama ini akan dipaparkan pada resit dan rekod staf.'}
+            </Text>
+
+            {/* Selected Info Badges */}
+            <View style={styles.modalInfoBadgeRow}>
+              <View style={styles.modalInfoBadge}>
+                <Ionicons name="call-outline" size={12} color="#0F172A" />
+                <Text style={styles.modalInfoBadgeText}>{phoneInput}</Text>
+              </View>
+              <View style={styles.modalInfoBadge}>
+                <Ionicons name="location-outline" size={12} color="#B45309" />
+                <Text style={[styles.modalInfoBadgeText, { color: '#B45309' }]}>{selectedBranchName}</Text>
+              </View>
+            </View>
+
+            {/* Name Input */}
+            <View style={{ width: '100%', marginBottom: 20 }}>
+              <Text style={styles.inputMiniLabel}>
+                {locale === 'en' ? 'NAME (OPTIONAL)' : 'NAMA (PILIHAN)'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder={locale === 'en' ? "Name" : "Nama"}
+                placeholderTextColor="#94A3B8"
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoFocus
+                autoCapitalize="words"
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setAddNameModalVisible(false)}
+                disabled={isAdding}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#050505' }]}
+                onPress={handleConfirmAddStaff}
+                disabled={isAdding}
+                activeOpacity={0.8}
+              >
+                {isAdding ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>{locale === 'en' ? 'Add Staff' : 'Tambah Staf'}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Remove Confirmation Modal */}
       <Modal
@@ -905,5 +980,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#059669',
+  },
+  modalInfoBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalInfoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modalInfoBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
 });
