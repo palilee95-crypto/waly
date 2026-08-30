@@ -391,8 +391,12 @@ export default function MerchantLayout() {
         const mRec = await pb.collection('merchants').getOne(user.merchant_id, { requestKey: null });
         setMerchant(mRec);
         
-        // If profile hasn't been onboarded yet, prompt onboarding UI
-        if (mRec.metadata && mRec.metadata.onboarded) {
+        // Only the Store Owner can perform initial store onboarding.
+        // Staff members or established stores must NEVER be blocked by onboarding.
+        const isStoreOwner = user?.is_owner || (mRec.owner && mRec.owner === user.id);
+        const isStoreAlreadySetUp = !!(mRec.metadata?.onboarded || (mRec.name && mRec.name.trim() !== ''));
+
+        if (!isStoreOwner || isStoreAlreadySetUp) {
           setIsOnboardingRequired(false);
         } else {
           setIsOnboardingRequired(true);

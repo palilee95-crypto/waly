@@ -472,6 +472,10 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
     meta = {};
   }
 
+  if (meta.onboarded === undefined && merchant.getString("name") !== "") {
+    meta.onboarded = true;
+  }
+
   meta.staff_permissions = {
     can_view_analytics: !!newPermissions.can_view_analytics,
     can_view_marketing: !!newPermissions.can_view_marketing,
