@@ -36,7 +36,7 @@ interface StaffMember {
 
 export default function StaffManagementScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, fetchStaffPermissions } = useAuth();
   const { t, locale } = useLanguage();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -65,15 +65,18 @@ export default function StaffManagementScreen() {
   const [warningMessage, setWarningMessage] = useState('');
 
   const fetchStaff = async () => {
+    if (!user || !user.merchant_id) return;
     try {
       setLoading(true);
-      const data = await pb.send('/api/risev/merchant/staff', {
+      const res = await pb.send<{ staff: StaffMember[] }>('/api/risev/merchant/staff', {
         method: 'GET',
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
-      setStaff(data as StaffMember[]);
+      if (res && res.staff) {
+        setStaff(res.staff);
+      }
 
       // Fetch branches
       if (user?.merchant_id) {
