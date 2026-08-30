@@ -30,10 +30,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
     return null;
   }
 
-  const allowedTabs = ['index', 'customers', 'give', 'profile'];
-  if (isOwner || staffPermissions?.can_view_marketing) {
-    allowedTabs.push('marketing');
-  }
+  const allowedTabs = ['index', 'customers', 'give', 'marketing', 'profile'];
 
   if (isDesktop) {
     return (
@@ -93,6 +90,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
               label = t('profile');
             }
 
+            const isLockedMarketing = route.name === 'marketing' && !isOwner && !staffPermissions?.can_view_marketing;
+
             return (
               <TouchableOpacity
                 key={route.key}
@@ -110,9 +109,14 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
                   color={isFocused ? '#FFFFFF' : '#64748B'}
                 />
                 {isSidebarExpanded && (
-                  <Text style={[styles.sidebarBtnText, isFocused && styles.sidebarBtnTextActive]}>
-                    {label}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.sidebarBtnText, isFocused && styles.sidebarBtnTextActive]}>
+                      {label}
+                    </Text>
+                    {isLockedMarketing && (
+                      <Ionicons name="lock-closed" size={12} color="#94A3B8" />
+                    )}
+                  </View>
                 )}
               </TouchableOpacity>
             );
@@ -208,6 +212,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
             label = t('profile');
           }
 
+          const isLockedMarketing = route.name === 'marketing' && !isOwner && !staffPermissions?.can_view_marketing;
+
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabButton} activeOpacity={0.8}>
               <View style={[styles.iconContainer, isFocused && styles.iconContainerActive]}>
@@ -216,6 +222,11 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
                   size={18}
                   color={isFocused ? '#050505' : '#94A3B8'}
                 />
+                {isLockedMarketing && (
+                  <View style={{ position: 'absolute', top: -2, right: -4, backgroundColor: '#050505', borderRadius: 6, padding: 1 }}>
+                    <Ionicons name="lock-closed" size={9} color="#FFC700" />
+                  </View>
+                )}
               </View>
               <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
                 {label}
