@@ -100,16 +100,21 @@ export default function StaffManagementScreen() {
   };
 
   const fetchPermissions = async () => {
+    if (!user?.merchant_id) return;
     try {
       setLoadingPermissions(true);
-      const res = await pb.send<{ isOwner: boolean; permissions: StaffPermissions }>('/api/risev/merchant/staff/permissions', {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer ' + pb.authStore.token
-        }
-      });
-      if (res?.permissions) {
-        setPermissionsState(res.permissions);
+      // Fetch directly from merchant record in PocketBase SDK
+      const mRec = await pb.collection('merchants').getOne(user.merchant_id, { requestKey: null });
+      const rawPerms = mRec?.metadata?.staff_permissions;
+      if (rawPerms) {
+        setPermissionsState({
+          can_view_analytics: !!rawPerms.can_view_analytics,
+          can_view_marketing: !!rawPerms.can_view_marketing,
+          can_manage_rewards: !!rawPerms.can_manage_rewards,
+          can_manage_customers: !!rawPerms.can_manage_customers,
+          can_edit_store_profile: !!rawPerms.can_edit_store_profile,
+          can_manage_branches: !!rawPerms.can_manage_branches,
+        });
       }
     } catch (err) {
       console.warn("Failed to fetch staff permissions:", err);
@@ -123,25 +128,36 @@ export default function StaffManagementScreen() {
     fetchPermissions();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      fetchPermissions();
+    }
+  }, [activeTab]);
+
   const handleTogglePermission = async (key: keyof StaffPermissions, val: boolean) => {
     const updated = { ...permissionsState, [key]: val };
     setPermissionsState(updated);
     try {
       setSavingPermissions(true);
-      await pb.send('/api/risev/merchant/staff/permissions', {
+      const res = await pb.send<{ message: string; permissions?: StaffPermissions }>('/api/risev/merchant/staff/permissions', {
         method: 'POST',
         body: { permissions: updated },
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
+      if (res?.permissions) {
+        setPermissionsState(res.permissions);
+      }
+      if (fetchStaffPermissions) {
+        fetchStaffPermissions();
+      }
     } catch (err: any) {
       console.warn("Failed to save staff permissions:", err);
       Alert.alert(
         locale === 'en' ? "Error" : "Ralat",
         err?.data?.message || err?.message || (locale === 'en' ? "Failed to save permissions." : "Gagal menyimpan kebenaran.")
       );
-      // Revert on error
       fetchPermissions();
     } finally {
       setSavingPermissions(false);

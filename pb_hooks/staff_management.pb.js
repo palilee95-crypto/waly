@@ -385,17 +385,17 @@ routerAdd("GET", "/api/risev/merchant/staff/permissions", (e) => {
 
   let meta = {};
   try {
-    const rawMeta = merchant.get("metadata");
-    if (typeof rawMeta === "string" && rawMeta.trim()) {
-      const parsed = JSON.parse(rawMeta);
+    let rawStr = "";
+    try { rawStr = merchant.getString("metadata"); } catch (e) {}
+    if (rawStr && rawStr.trim()) {
+      const parsed = JSON.parse(rawStr);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         meta = Object.assign({}, parsed);
       }
-    } else if (rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)) {
-      try {
-        meta = JSON.parse(JSON.stringify(rawMeta));
-      } catch (e) {
-        meta = Object.assign({}, rawMeta);
+    } else {
+      const rawObj = merchant.get("metadata");
+      if (rawObj && typeof rawObj === "object" && !Array.isArray(rawObj)) {
+        meta = Object.assign({}, rawObj);
       }
     }
   } catch (mErr) {
@@ -451,17 +451,17 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
 
   let meta = {};
   try {
-    const rawMeta = merchant.get("metadata");
-    if (typeof rawMeta === "string" && rawMeta.trim()) {
-      const parsed = JSON.parse(rawMeta);
+    let rawStr = "";
+    try { rawStr = merchant.getString("metadata"); } catch (e) {}
+    if (rawStr && rawStr.trim()) {
+      const parsed = JSON.parse(rawStr);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         meta = Object.assign({}, parsed);
       }
-    } else if (rawMeta && typeof rawMeta === "object" && !Array.isArray(rawMeta)) {
-      try {
-        meta = JSON.parse(JSON.stringify(rawMeta));
-      } catch (e) {
-        meta = Object.assign({}, rawMeta);
+    } else {
+      const rawObj = merchant.get("metadata");
+      if (rawObj && typeof rawObj === "object" && !Array.isArray(rawObj)) {
+        meta = Object.assign({}, rawObj);
       }
     }
   } catch (mErr) {
