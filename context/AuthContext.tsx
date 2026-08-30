@@ -119,7 +119,7 @@ interface AuthContextType {
   requestOTP: (phone: string) => Promise<string>;
   resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
-  checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string; verified?: boolean }>;
+  checkPhone: (phone: string) => Promise<{ exists: boolean; email?: string; verified?: boolean; name?: string }>;
   register: (phone: string, email: string, name: string, password: string, role: UserRole, birthday?: string) => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<void>;
   quickRegister: (name: string, phone: string) => Promise<void>;
@@ -338,10 +338,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return res.otpId;
   };
 
-  const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string; verified?: boolean }> => {
+  const checkPhone = async (phone: string): Promise<{ exists: boolean; email?: string; verified?: boolean; name?: string }> => {
     try {
       const cleanPhone = encodeURIComponent(phone.trim());
-      const res = await pb.send<{ exists: boolean; email?: string; verified?: boolean }>(`/api/risev/check-phone?phone=${cleanPhone}`, {
+      const res = await pb.send<{ exists: boolean; email?: string; verified?: boolean; name?: string }>(`/api/risev/check-phone?phone=${cleanPhone}`, {
         method: 'GET',
         requestKey: null,
       });

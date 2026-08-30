@@ -89,6 +89,9 @@ export default function LoginScreen() {
             setEmail(res.email || '');
             setStep('password');
           } else {
+            if (res.name && !res.name.startsWith('User ') && !res.name.startsWith('Staff (') && !res.name.startsWith('Customer ')) {
+              setName(res.name);
+            }
             setStep('register');
           }
         } else {
@@ -201,7 +204,10 @@ export default function LoginScreen() {
           setEmail(res.email || '');
           setStep('password');
         } else {
-          // Quick-registered QR user returning to complete account setup!
+          // Quick-registered / Shadow Staff returning to complete account setup!
+          if (res.name && !res.name.startsWith('User ') && !res.name.startsWith('Staff (') && !res.name.startsWith('Customer ')) {
+            setName(res.name);
+          }
           setStep('register');
         }
       } else {
