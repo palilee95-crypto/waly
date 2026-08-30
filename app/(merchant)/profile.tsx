@@ -39,6 +39,7 @@ type SettingItemProps = {
   badgeText?: string;
   badgeColor?: string;
   isPro?: boolean;
+  isLocked?: boolean;
 };
 
 const SettingItem = ({
@@ -48,25 +49,37 @@ const SettingItem = ({
   onPress,
   iconBgColor = '#F3F4F6',
   iconColor = '#565e74',
-  isPro
+  isPro,
+  isLocked
 }: SettingItemProps) => (
-  <TouchableOpacity style={styles.settingCard} onPress={onPress} activeOpacity={0.8}>
-    <View style={[styles.settingIconBg, { backgroundColor: iconBgColor }]}>
-      <Ionicons name={iconName} size={20} color={iconColor} />
+  <TouchableOpacity 
+    style={[styles.settingCard, isLocked && { backgroundColor: '#FAFAFA' }]} 
+    onPress={onPress} 
+    activeOpacity={0.8}
+  >
+    <View style={[styles.settingIconBg, { backgroundColor: isLocked ? '#F1F5F9' : iconBgColor }]}>
+      <Ionicons name={iconName} size={20} color={isLocked ? '#94A3B8' : iconColor} />
     </View>
     <View style={[styles.settingInfo, { paddingRight: 8 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {isPro && (
+        <Text style={[styles.settingTitle, isLocked && { color: '#64748B' }]}>{title}</Text>
+        {isLocked ? (
+          <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <Ionicons name="lock-closed" size={9} color="#64748B" />
+            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>LOCKED</Text>
+          </View>
+        ) : isPro ? (
           <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <Ionicons name="star" size={9} color="#000000" />
             <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>PRO</Text>
           </View>
-        )}
+        ) : null}
       </View>
-      <Text style={styles.settingSubtitle}>{subtitle}</Text>
+      <Text style={[styles.settingSubtitle, isLocked && { color: '#94A3B8' }]}>{subtitle}</Text>
     </View>
-    {isPro ? (
+    {isLocked ? (
+      <Ionicons name="lock-closed" size={16} color="#94A3B8" />
+    ) : isPro ? (
       <Ionicons name="lock-closed" size={16} color="#FFC700" />
     ) : (
       <Ionicons name="chevron-forward" size={18} color="#BEC6E0" />
@@ -82,21 +95,31 @@ const BentoSquareItem = ({
   iconBgColor = '#F3F4F6',
   iconColor = '#565e74',
   badgeText,
-  badgeColor = '#22C55E'
+  badgeColor = '#22C55E',
+  isLocked
 }: SettingItemProps) => (
-  <TouchableOpacity style={styles.bentoSquareCard} onPress={onPress} activeOpacity={0.8}>
+  <TouchableOpacity 
+    style={[styles.bentoSquareCard, isLocked && { backgroundColor: '#FAFAFA' }]} 
+    onPress={onPress} 
+    activeOpacity={0.8}
+  >
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-      <View style={[styles.settingIconBg, { backgroundColor: iconBgColor }]}>
-        <Ionicons name={iconName} size={22} color={iconColor} />
+      <View style={[styles.settingIconBg, { backgroundColor: isLocked ? '#F1F5F9' : iconBgColor }]}>
+        <Ionicons name={iconName} size={22} color={isLocked ? '#94A3B8' : iconColor} />
       </View>
-      {badgeText && (
+      {isLocked ? (
+        <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E2E8F0' }}>
+          <Ionicons name="lock-closed" size={9} color="#64748B" />
+          <Text style={{ color: '#64748B', fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5 }}>LOCKED</Text>
+        </View>
+      ) : badgeText ? (
         <View style={{ backgroundColor: badgeColor, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100, shadowColor: badgeColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 }}>
           <Text style={{ color: '#FFF', fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5 }}>{badgeText}</Text>
         </View>
-      )}
+      ) : null}
     </View>
-    <Text style={styles.settingTitle} numberOfLines={1}>{title}</Text>
-    <Text style={[styles.settingSubtitle, { marginTop: 4, color: '#737686', fontSize: 11 }]} numberOfLines={2}>{subtitle}</Text>
+    <Text style={[styles.settingTitle, isLocked && { color: '#64748B' }]} numberOfLines={1}>{title}</Text>
+    <Text style={[styles.settingSubtitle, { marginTop: 4, color: isLocked ? '#94A3B8' : '#737686', fontSize: 11 }]} numberOfLines={2}>{subtitle}</Text>
   </TouchableOpacity>
 );
 
@@ -109,6 +132,8 @@ export default function ProfileScreen() {
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [permissionDeniedModalVisible, setPermissionDeniedModalVisible] = useState(false);
+  const [deniedFeatureTitle, setDeniedFeatureTitle] = useState('');
 
   // Language & Password modals
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -122,6 +147,11 @@ export default function ProfileScreen() {
   const [metaPhoneId, setMetaPhoneId] = useState('');
   const [metaToken, setMetaToken] = useState('');
   const [metaPhone, setMetaPhone] = useState('');
+
+  const handleLockedItemPress = (featureName: string) => {
+    setDeniedFeatureTitle(featureName);
+    setPermissionDeniedModalVisible(true);
+  };
 
   const handleProFeaturePress = (route: string) => {
     if (user?.merchant_status !== 'active') {
@@ -1073,68 +1103,73 @@ export default function ProfileScreen() {
 
         {/* Settings Options Grid */}
         <View style={styles.settingsGrid}>
-          {(isOwner || staffPermissions?.can_manage_branches) && (
-            <SettingItem
-              iconName="business-outline"
-              title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
-              subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
-              iconBgColor="#FEF3C7"
-              iconColor="#B45309"
-              isPro={true}
-              onPress={() => handleProFeaturePress('/(merchant)/branches')}
-            />
-          )}
+          <SettingItem
+            iconName="business-outline"
+            title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
+            subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
+            iconBgColor="#FEF3C7"
+            iconColor="#B45309"
+            isPro={isOwner}
+            isLocked={!isOwner && !staffPermissions?.can_manage_branches}
+            onPress={(!isOwner && !staffPermissions?.can_manage_branches)
+              ? () => handleLockedItemPress(locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan')
+              : () => handleProFeaturePress('/(merchant)/branches')}
+          />
 
-          {isOwner && (
-            <SettingItem
-              iconName="people-outline"
-              title={t('manage_staff')}
-              subtitle={t('manage_staff_desc')}
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={() => router.push('/(merchant)/staff' as any)}
-            />
-          )}
+          <SettingItem
+            iconName="people-outline"
+            title={t('manage_staff')}
+            subtitle={t('manage_staff_desc')}
+            iconBgColor="#F1F5F9"
+            iconColor="#050505"
+            isLocked={!isOwner}
+            onPress={!isOwner
+              ? () => handleLockedItemPress(t('manage_staff'))
+              : () => router.push('/(merchant)/staff' as any)}
+          />
 
-          {(isOwner || staffPermissions?.can_manage_rewards) && (
-            <SettingItem
-              iconName="gift-outline"
-              title={t('manage_rewards')}
-              subtitle={t('manage_rewards_desc')}
-              iconBgColor="#FFF3E0"
-              iconColor="#FF9800"
-              onPress={() => router.push('/(merchant)/rewards' as any)}
-            />
-          )}
+          <SettingItem
+            iconName="gift-outline"
+            title={t('manage_rewards')}
+            subtitle={t('manage_rewards_desc')}
+            iconBgColor="#FFF3E0"
+            iconColor="#FF9800"
+            isLocked={!isOwner && !staffPermissions?.can_manage_rewards}
+            onPress={(!isOwner && !staffPermissions?.can_manage_rewards)
+              ? () => handleLockedItemPress(t('manage_rewards'))
+              : () => router.push('/(merchant)/rewards' as any)}
+          />
 
-          {(isOwner || staffPermissions?.can_view_marketing) && (
-            <SettingItem
-              iconName="logo-whatsapp"
-              title="WhatsApp Cloud API"
-              subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
-              iconBgColor="#E8F5E9"
-              iconColor="#4CAF50"
-              isPro={true}
-              onPress={() => {
+          <SettingItem
+            iconName="logo-whatsapp"
+            title="WhatsApp Cloud API"
+            subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
+            iconBgColor="#E8F5E9"
+            iconColor="#4CAF50"
+            isPro={isOwner}
+            isLocked={!isOwner && !staffPermissions?.can_view_marketing}
+            onPress={(!isOwner && !staffPermissions?.can_view_marketing)
+              ? () => handleLockedItemPress('WhatsApp Cloud API')
+              : () => {
                 if (user?.merchant_status !== 'active') {
                   router.push('/(merchant)/subscription' as any);
                 } else {
                   handleOpenMetaSetup();
                 }
               }}
-            />
-          )}
+          />
 
-          {(isOwner || staffPermissions?.can_edit_store_profile) && (
-            <SettingItem
-              iconName="color-palette-outline"
-              title="Onboarding Setup"
-              subtitle="Customize your customer-facing onboarding page"
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={() => router.push('/(merchant)/onboarding-setup' as any)}
-            />
-          )}
+          <SettingItem
+            iconName="color-palette-outline"
+            title="Onboarding Setup"
+            subtitle="Customize your customer-facing onboarding page"
+            iconBgColor="#F1F5F9"
+            iconColor="#050505"
+            isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
+            onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
+              ? () => handleLockedItemPress('Onboarding Setup')
+              : () => router.push('/(merchant)/onboarding-setup' as any)}
+          />
           
           <View style={styles.bentoRow}>
             <BentoSquareItem
@@ -1164,39 +1199,29 @@ export default function ProfileScreen() {
               iconColor="#050505"
               onPress={() => setLanguageModalVisible(true)}
             />
-            {isOwner ? (
-              <BentoSquareItem
-                iconName="card-outline"
-                title="My Subscription"
-                subtitle="Manage your plan & billing"
-                iconBgColor="#EEF2FF"
-                iconColor="#4F46E5"
-                badgeText="PRO"
-                badgeColor="#4F46E5"
-                onPress={() => router.push('/(merchant)/subscription' as any)}
-              />
-            ) : (
-              <BentoSquareItem
-                iconName="document-text-outline"
-                title={t('privacy_policy')}
-                subtitle={t('privacy_policy_desc')}
-                iconBgColor="#F1F5F9"
-                iconColor="#050505"
-                onPress={handlePrivacyPress}
-              />
-            )}
+            <BentoSquareItem
+              iconName="card-outline"
+              title="My Subscription"
+              subtitle="Manage your plan & billing"
+              iconBgColor="#EEF2FF"
+              iconColor="#4F46E5"
+              badgeText={isOwner ? "PRO" : undefined}
+              badgeColor="#4F46E5"
+              isLocked={!isOwner}
+              onPress={!isOwner
+                ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
+                : () => router.push('/(merchant)/subscription' as any)}
+            />
           </View>
           
-          {isOwner && (
-            <SettingItem
-              iconName="document-text-outline"
-              title={t('privacy_policy')}
-              subtitle={t('privacy_policy_desc')}
-              iconBgColor="#F1F5F9"
-              iconColor="#050505"
-              onPress={handlePrivacyPress}
-            />
-          )}
+          <SettingItem
+            iconName="document-text-outline"
+            title={t('privacy_policy')}
+            subtitle={t('privacy_policy_desc')}
+            iconBgColor="#F1F5F9"
+            iconColor="#050505"
+            onPress={handlePrivacyPress}
+          />
         </View>
 
         {/* Logout Button Card */}
@@ -1671,6 +1696,38 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Locked Feature Alert Modal */}
+      <Modal
+        visible={permissionDeniedModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPermissionDeniedModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 380, padding: 24, alignItems: 'center' }]}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Ionicons name="lock-closed" size={28} color="#D97706" />
+            </View>
+            <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 6, textAlign: 'center' }}>
+              {deniedFeatureTitle}
+            </Text>
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>
+              {locale === 'en'
+                ? 'This feature is currently locked for staff accounts. Contact your store owner to unlock this permission in Manage Staff.'
+                : 'Ciri ini dikunci untuk akaun staf. Hubungi pemilik kedai anda untuk membuka kebenaran ini dalam Pengurusan Staf.'}
+            </Text>
+            <TouchableOpacity
+              style={{ width: '100%', height: 48, borderRadius: 12, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center' }}
+              onPress={() => setPermissionDeniedModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
+                {locale === 'en' ? 'Understood' : 'Faham'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

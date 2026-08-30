@@ -85,7 +85,7 @@ const fontColorOptions = [
 ];
 
 export default function MarketingScreen() {
-  const { user } = useAuth();
+  const { user, isOwner, staffPermissions } = useAuth();
   const router = useRouter();
   const { t, locale } = useLanguage();
   const pathname = usePathname();
@@ -1089,7 +1089,7 @@ export default function MarketingScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
-        visible={isFocused && merchant !== null && merchant.owner !== user?.id}
+        visible={isFocused && !isOwner && !staffPermissions?.can_view_marketing}
         transparent={true}
         animationType="fade"
       >
