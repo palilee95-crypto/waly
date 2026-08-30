@@ -133,6 +133,7 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
 
   const body = e.requestInfo().body || {};
   const phone = body.phone || '';
+  const name = (body.name || '').trim();
   const branch = (body.branch || body.branch_name || '').trim();
 
   if (!phone) {
@@ -150,46 +151,112 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
   } else if (cleanPhone.startsWith('60')) {
     searchPhone1 = '+' + cleanPhone;
     searchPhone2 = '0' + cleanPhone.slice(2);
+  } else if (!cleanPhone.startsWith('+60') && cleanPhone.length >= 9) {
+    searchPhone1 = '+60' + cleanPhone;
+    searchPhone2 = '60' + cleanPhone;
   }
 
   // Look up user to invite by filter (trying local format, +60 format, and raw digit format)
-  let targetUser;
+  let targetUser = null;
   try {
     const filter = `phone = "${phone}" || phone = "${searchPhone1}" || phone = "${searchPhone2}" || phone = "${cleanPhone}"`;
     const users = $app.findRecordsByFilter("users", filter, "-created", 1, 0);
-    if (users.length === 0) {
-      throw new Error("User not found");
+    if (users.length > 0) {
+      targetUser = users[0];
     }
-    targetUser = users[0];
-  } catch (err) {
-    return e.json(404, { message: "User not found with phone number " + phone + ". Ask them to register on the Customer App first." });
+  } catch (err) {}
+
+  if (!targetUser) {
+    // Auto-create shadow staff account!
+    try {
+      const userCol = $app.findCollectionByNameOrId("users");
+      targetUser = new Record(userCol);
+      targetUser.set("id", $security.randomString(15).toLowerCase());
+      targetUser.set("phone", searchPhone1);
+      targetUser.set("name", name || ("Staff (" + cleanPhone.slice(-4) + ")"));
+      targetUser.set("email", `shadow_staff_${cleanPhone}@risev.app`);
+      targetUser.set("role", "both");
+      targetUser.set("merchant_id", merchantId);
+      targetUser.set("branch_name", branch || "All Branches (HQ)");
+      targetUser.set("birthday", "2000-01-01 00:00:00.000Z");
+      targetUser.set("verified", false);
+      targetUser.setPassword($security.randomString(20));
+      $app.save(targetUser);
+
+      return e.json(200, {
+        message: "Staff member added successfully.",
+        staff: {
+          id: targetUser.id,
+          name: targetUser.getString("name"),
+          phone: targetUser.getString("phone"),
+          email: targetUser.getString("email"),
+          avatar: targetUser.getString("avatar"),
+          role: targetUser.getString("role"),
+          branch_name: targetUser.getString("branch_name") || branch || "All Branches (HQ)",
+          stamps_issued: 0,
+          vouchers_redeemed: 0
+        }
+      });
+    } catch (createErr) {
+      return e.json(500, { message: "Failed to create staff account: " + createErr.message });
+    }
+  }
+
+  // If name provided and target user has placeholder name, update it
+  if (name) {
+    const currentName = targetUser.getString("name") || "";
+    if (!currentName || currentName.startsWith("User ") || currentName.startsWith("Staff (") || currentName.startsWith("Customer ")) {
+      targetUser.set("name", name);
+    }
   }
 
   // Check if they are the owner of any store
   let ownsAnyStore = false;
   try {
-    const ownedMerchants = $app.findRecordsByFilter("merchants", `owner = "${targetUser.id}"`, "-created", 1, 0);
-    if (ownedMerchants.length > 0) {
-      ownsAnyStore = true;
+    const ownedMerchants = $app.findRecordsByFilter("merchants", `owner = "${targetUser.id}"`, "-created", 10, 0);
+    for (let i = 0; i < ownedMerchants.length; i++) {
+      const om = ownedMerchants[i];
+      if (om.id === merchantId) {
+        return e.json(400, { message: "You are the owner of this store. You cannot add yourself as staff." });
+      }
+      
+      // Check if it's an empty dummy shop (pending, 0 txs, 0 loyalty cards)
+      let txCount = 0;
+      try {
+        const txs = $app.findRecordsByFilter("transactions", `merchant = "${om.id}"`, "-created", 1, 0);
+        txCount = txs.length;
+      } catch (cntErr) {}
+
+      if (om.getString("status") === "pending" && txCount === 0) {
+        // It is an unconfigured signup shop - delete it to free the user
+        try {
+          $app.delete(om);
+        } catch (delErr) {}
+      } else {
+        ownsAnyStore = true;
+      }
     }
   } catch (err) {
     // Ignore query error
   }
 
   if (ownsAnyStore) {
-    if (targetUser.id === authRecord.id) {
-      return e.json(400, { message: "You are the owner of this store. You cannot add yourself as staff." });
-    }
     return e.json(400, { message: "This user is the owner of another store and cannot be added as a staff member." });
   }
 
   // If already associated with another merchant as staff
   const existingMerchantId = targetUser.getString("merchant_id");
-  if (existingMerchantId) {
-    if (existingMerchantId === merchantId) {
-      return e.json(400, { message: "This user is already a staff member at your store." });
+  if (existingMerchantId && existingMerchantId !== merchantId) {
+    // Check if the existing linked merchant was an empty pending store that got deleted
+    let existingMerchantExists = false;
+    try {
+      $app.findFirstRecordByData("merchants", "id", existingMerchantId);
+      existingMerchantExists = true;
+    } catch (eErr) {}
+
+    if (existingMerchantExists) {
+      return e.json(400, { message: "This user is already a staff member at another store." });
     }
-    return e.json(400, { message: "This user is already a staff member at another store." });
   }
 
   // Update user

@@ -43,6 +43,7 @@ export default function StaffManagementScreen() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [phoneInput, setPhoneInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
   const [selectedBranchName, setSelectedBranchName] = useState('All Branches (HQ)');
   const [branchList, setBranchList] = useState<string[]>(['All Branches (HQ)']);
   const [isAdding, setIsAdding] = useState(false);
@@ -106,12 +107,17 @@ export default function StaffManagementScreen() {
     try {
       await pb.send('/api/risev/merchant/staff', {
         method: 'POST',
-        body: { phone: cleanPhone, branch: selectedBranchName },
+        body: { 
+          phone: cleanPhone, 
+          name: nameInput.trim(),
+          branch: selectedBranchName 
+        },
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
         }
       });
       setPhoneInput('');
+      setNameInput('');
       Alert.alert(
         locale === 'en' ? "Success" : "Berjaya", 
         locale === 'en' ? "Staff member added successfully!" : "Kakitangan berjaya ditambah!"
@@ -119,24 +125,10 @@ export default function StaffManagementScreen() {
       fetchStaff();
     } catch (err: any) {
       console.warn("Failed to add staff member:", err.response || err);
-      // Add locally for demo responsiveness
-      const newStaff: StaffMember = {
-        id: `staff-${Date.now()}`,
-        name: `Staff (${cleanPhone.slice(-4)})`,
-        phone: cleanPhone,
-        email: '',
-        avatar: '',
-        role: 'staff',
-        branch_name: selectedBranchName,
-        stamps_issued: 0,
-        vouchers_redeemed: 0
-      };
-      setStaff(prev => [...prev, newStaff]);
-      setPhoneInput('');
-      Alert.alert(
-        locale === 'en' ? "Success" : "Berjaya", 
-        locale === 'en' ? `Staff invited and assigned to ${selectedBranchName}!` : `Kakitangan dijemput dan diasingkan ke ${selectedBranchName}!`
-      );
+      const errMsg = err?.data?.message || err?.response?.message || err?.message || (locale === 'en' ? "Failed to add staff member." : "Gagal menambah kakitangan.");
+      setWarningTitle(locale === 'en' ? "Unable to Add Staff" : "Tidak Dapat Menambah Kakitangan");
+      setWarningMessage(errMsg);
+      setWarningModalVisible(true);
     } finally {
       setIsAdding(false);
     }
@@ -166,7 +158,8 @@ export default function StaffManagementScreen() {
       );
       fetchStaff();
     } catch (err: any) {
-      setStaff(prev => prev.filter(s => s.id !== selectedStaff.id));
+      const errMsg = err?.data?.message || err?.response?.message || err?.message || (locale === 'en' ? "Failed to remove staff member." : "Gagal membuang kakitangan.");
+      Alert.alert(locale === 'en' ? "Error" : "Ralat", errMsg);
       setRemoveModalVisible(false);
       setSelectedStaff(null);
     } finally {
@@ -259,6 +252,21 @@ export default function StaffManagementScreen() {
                 ))}
               </View>
 
+              {/* Staff Name Input */}
+              <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'STAFF NAME / NICKNAME (OPTIONAL)' : 'NAMA STAF / PANGGILAN (PILIHAN)'}</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                placeholder={locale === 'en' ? "e.g. Daniel Irfan" : "cth. Daniel Irfan"}
+                placeholderTextColor="#94A3B8"
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoCapitalize="words"
+                {...Platform.select({
+                  web: { outlineStyle: 'none' } as any,
+                })}
+              />
+
+              <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'PHONE NUMBER' : 'NOMBOR TELEFON'}</Text>
               <View style={styles.formRow}>
                 <TextInput
                   style={styles.input}

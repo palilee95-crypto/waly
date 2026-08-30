@@ -29,7 +29,6 @@ export default function LoginScreen() {
   const router = useRouter();
   const { checkPhone, register, resendVerificationEmail, loginWithIdentifier, requestPasswordReset, isAuthenticated, isLoading: isAuthLoading, activeRole } = useAuth();
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'customer' | 'merchant'>('customer');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -48,9 +47,6 @@ export default function LoginScreen() {
 
   useEffect(() => {
     const redirectUrl = getRedirectUrl();
-    if (redirectUrl && (redirectUrl.includes('nfc') || redirectUrl.includes('activate'))) {
-      setRole('merchant');
-    }
     if (!isAuthLoading && isAuthenticated) {
       setTimeout(() => {
         if (redirectUrl) {
@@ -67,7 +63,6 @@ export default function LoginScreen() {
       storage.setItem('risev_referral_code', params.ref)
         .then(() => {
           console.log('[Login] Stored referral code:', params.ref);
-          setRole('merchant'); // Pre-select Merchant role!
           pb.send(`/api/risev/agent/click?ref=${encodeURIComponent(params.ref || '')}`, { method: 'GET' })
             .catch(err => console.warn('[Login] Failed to record click:', err));
         });
@@ -161,7 +156,7 @@ export default function LoginScreen() {
             try {
               await loginWithIdentifier(email.trim().toLowerCase(), password);
               const record = pb.authStore.record;
-              const userRole = record?.role || role || 'customer';
+              const userRole = record?.role || 'customer';
               const redirectUrl = getRedirectUrl();
               if (redirectUrl) {
                 router.replace(redirectUrl as any);
@@ -181,7 +176,7 @@ export default function LoginScreen() {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [step, email, password, role, isAutoLoggingIn, isVerifiedSuccess]);
+  }, [step, email, password, isAutoLoggingIn, isVerifiedSuccess]);
   
   const [emailFocused, setEmailFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
@@ -264,7 +259,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const birthDateToUse = birthday && birthday.trim() ? birthday.trim() : '2000-01-01';
-      await register(getFullPhone(), email.trim().toLowerCase(), name.trim(), password, role, birthDateToUse);
+      await register(getFullPhone(), email.trim().toLowerCase(), name.trim(), password, 'customer', birthDateToUse);
       // Strict Mode: transition to Verify Email screen
       setStep('verify-email');
     } catch (e: any) {
@@ -364,29 +359,6 @@ export default function LoginScreen() {
                     : 'Every visit, rewarded.'}
                 </Text>
               </View>
-
-              {/* Role Switcher Pill (Phone Step Only) */}
-              {step === 'phone' && (
-                <View style={styles.roleSwitcher}>
-                  <TouchableOpacity
-                    style={[styles.roleTab, role === 'customer' && styles.roleTabActive]}
-                    onPress={() => setRole('customer')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="person" size={13} color={role === 'customer' ? '#FFFFFF' : '#64748B'} />
-                    <Text style={[styles.roleTabText, role === 'customer' && styles.roleTabTextActive]}>Customer</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.roleTab, role === 'merchant' && styles.roleTabActive]}
-                    onPress={() => setRole('merchant')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="storefront" size={13} color={role === 'merchant' ? '#FFFFFF' : '#64748B'} />
-                    <Text style={[styles.roleTabText, role === 'merchant' && styles.roleTabTextActive]}>Merchant</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
 
               {/* Input Form */}
               <View style={styles.form}>
@@ -745,11 +717,11 @@ export default function LoginScreen() {
                 {step === 'register' && (
                   <>
                     {/* Simplified registration form */}
-                    <Text style={styles.inputLabel}>{role === 'merchant' ? 'STORE NAME' : 'FULL NAME'}</Text>
+                    <Text style={styles.inputLabel}>FULL NAME</Text>
                     <View style={[styles.inputGroup, nameFocused && styles.inputGroupFocused]}>
                       <TextInput
                         style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                        placeholder={role === 'merchant' ? "e.g. Boutique Royal" : "John Doe"}
+                        placeholder="John Doe"
                         placeholderTextColor="#94A3B8"
                         value={name}
                         onChangeText={(t) => {
@@ -787,9 +759,7 @@ export default function LoginScreen() {
                       <Text style={styles.fieldHelperError}>⚠️ Please enter a valid email format</Text>
                     )}
 
-                    <Text style={styles.inputLabel}>
-                      {role === 'merchant' ? 'FOUNDED / BIRTH DATE (OPTIONAL)' : 'BIRTHDAY (FOR REWARDS)'}
-                    </Text>
+                    <Text style={styles.inputLabel}>BIRTHDAY (FOR REWARDS)</Text>
                     <View style={[
                       styles.inputGroup,
                       birthdayFocused && styles.inputGroupFocused,

@@ -191,35 +191,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .catch(() => null);
       }
       
-      // Self-healing: if role is merchant but merchant_id is missing, find or create one
+      // Self-healing: if role is merchant/both but merchant_id is missing, find orphaned merchant owned by user
       if (!merchantRecord) {
         try {
-          // Check if there is an orphaned merchant owned by this user
+          // Check if there is an existing merchant owned by this user
           const existing = await pb.collection('merchants').getFullList({
-            filter: `owner = "${record.id}"`
+            filter: `owner = "${record.id}"`,
+            requestKey: null
           });
           if (existing.length > 0) {
             merchantRecord = existing[0];
-          } else {
-            // Retrieve referral code from local storage
-            const refCode = await storage.getItem('risev_referral_code').catch(() => null);
-
-            // Create a new pending merchant record
-            merchantRecord = await pb.collection('merchants').create({
-              name: `${record.name || 'New'}'s Shop`,
-              owner: record.id,
-              category: 'food',
-              status: 'pending',
-              referral_code: refCode || '',
-              metadata: {},
-            });
-
-            if (refCode) {
-              await storage.deleteItem('risev_referral_code').catch(() => null);
-            }
-          }
-          
-          if (merchantRecord) {
             merchantId = merchantRecord.id;
             status = (merchantRecord.status as any) || 'pending';
             created = merchantRecord.created;
@@ -229,7 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
           }
         } catch (err) {
-          console.error("Self-healing merchant profile creation failed:", err);
+          console.error("Linking existing merchant profile failed:", err);
         }
       }
       if (merchantRecord) {

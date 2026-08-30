@@ -105,7 +105,12 @@ routerAdd("POST", "/api/risev/register", (e) => {
     }
     user.set("email", email);
     user.set("name", name || `User ${cleanPhone.slice(-4)}`);
-    user.set("role", role);
+    const existingRole = user.getString("role");
+    if (existingRole === "both" || existingRole === "merchant") {
+      user.set("role", existingRole);
+    } else {
+      user.set("role", role || "customer");
+    }
     if (formattedBirthday) {
       user.set("birthday", formattedBirthday);
     }
@@ -117,40 +122,6 @@ routerAdd("POST", "/api/risev/register", (e) => {
       $mails.sendRecordVerification($app, user);
     } catch (mailErr) {
       console.log("[Register Mail Error] Failed to send verification email:", mailErr.message || mailErr);
-    }
-
-    // Auto-provision merchant if role is merchant or both
-    if (role === 'merchant' || role === 'both') {
-      try {
-        const merchantId = user.getString("merchant_id");
-        if (!merchantId) {
-          const mc = $app.findCollectionByNameOrId("merchants");
-          const merchant = new Record(mc);
-          merchant.set("name", `${user.getString("name")}'s Shop`);
-          merchant.set("owner", user.id);
-          merchant.set("category", "food");
-          merchant.set("status", "pending");
-          $app.save(merchant);
-          user.set("merchant_id", merchant.id);
-          $app.save(user);
-
-          // Auto-provision initial pending subscription record in subscriptions collection
-          try {
-            const sc = $app.findCollectionByNameOrId("subscriptions");
-            const sub = new Record(sc);
-            sub.set("merchant", merchant.id);
-            sub.set("plan", "pro");
-            sub.set("status", "pending");
-            sub.set("chipin_payment_id", `signup_${Date.now()}`);
-            sub.set("chipin_customer_email", email || "");
-            $app.save(sub);
-          } catch (subErr) {
-            console.log("Subscription record initialization: " + (subErr.message || subErr));
-          }
-        }
-      } catch (mErr) {
-        console.log("Merchant provisioning failed: " + (mErr.message || mErr));
-      }
     }
 
     return e.json(200, { success: true, message: "Registration successful" });
