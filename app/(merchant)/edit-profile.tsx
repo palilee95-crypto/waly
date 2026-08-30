@@ -23,7 +23,7 @@ import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 
 export default function EditProfileScreen() {
-  const { user } = useAuth();
+  const { user, isOwner, staffPermissions } = useAuth();
   const { t, locale } = useLanguage();
   const router = useRouter();
 
@@ -558,6 +558,47 @@ export default function EditProfileScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FFC700" />
       </View>
+    );
+  }
+
+  if (!isOwner && !staffPermissions?.can_edit_store_profile) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{t('edit_store_profile')}</Text>
+          </View>
+          <Image
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 80, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#F8FAFC' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="lock-closed" size={30} color="#D97706" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
+            {locale === 'en' ? 'Store Profile Editing Locked' : 'Sunting Profil Kedai Dikunci'}
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 20, maxWidth: 360, marginBottom: 24 }}>
+            {locale === 'en'
+              ? 'This section is locked by your store owner. You do not have permission to modify store information, logos, or operating hours.'
+              : 'Bahagian ini dikunci oleh pemilik kedai. Anda tidak mempunyai kebenaran untuk mengubah maklumat kedai, logo, atau waktu operasi.'}
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#0F172A', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+            onPress={() => router.replace('/(merchant)/profile' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>
+              {locale === 'en' ? 'Go Back to Profile' : 'Kembali ke Profil'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 

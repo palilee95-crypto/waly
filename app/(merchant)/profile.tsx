@@ -1046,10 +1046,26 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={[styles.updateBtn, { width: '100%', alignItems: 'center', marginTop: 4 }]} onPress={handleOpenEdit} activeOpacity={0.8}>
-              <Text style={styles.updateBtnText}>
-                {locale === 'en' ? 'Edit Profile' : 'Edit Profil'}
-              </Text>
+            <TouchableOpacity 
+              style={[
+                styles.updateBtn, 
+                { width: '100%', alignItems: 'center', marginTop: 4 },
+                (!isOwner && !staffPermissions?.can_edit_store_profile) && { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' }
+              ]} 
+              onPress={(!isOwner && !staffPermissions?.can_edit_store_profile) 
+                ? () => handleLockedItemPress(locale === 'en' ? 'Edit Store Profile' : 'Sunting Profil Kedai') 
+                : handleOpenEdit
+              } 
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {(!isOwner && !staffPermissions?.can_edit_store_profile) && (
+                  <Ionicons name="lock-closed" size={14} color="#64748B" />
+                )}
+                <Text style={[styles.updateBtnText, (!isOwner && !staffPermissions?.can_edit_store_profile) && { color: '#64748B' }]}>
+                  {locale === 'en' ? 'Edit Profile' : 'Edit Profil'}
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
 
