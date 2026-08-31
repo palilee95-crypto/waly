@@ -58,7 +58,7 @@ const getInitials = (name: string) => {
 };
 
 export default function CustomersScreen() {
-  const { user } = useAuth();
+  const { user, isOwner, staffPermissions } = useAuth();
   const { t, locale } = useLanguage();
   const params = useLocalSearchParams<{ customerId?: string }>();
   const router = useRouter();
@@ -1030,34 +1030,36 @@ export default function CustomersScreen() {
           </View>
         </View>
 
-        {/* Sales Gaps Analytics Navigation Button */}
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#FFC700',
-            borderRadius: 16,
-            paddingVertical: 18,
-            paddingHorizontal: 24,
-            marginBottom: 20,
-            marginTop: 8,
-            shadowColor: '#FFC700',
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 4,
-            zIndex: 20,
-            gap: 10
-          }}
-          onPress={() => router.push('/(merchant)/analytics' as any)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="bar-chart" size={22} color="#050505" />
-          <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.2 }}>
-            View Sales Opportunity Analytics
-          </Text>
-        </TouchableOpacity>
+        {/* Sales Gaps Analytics Navigation Button (Only if can_view_analytics) */}
+        {(isOwner || staffPermissions?.can_view_analytics) && (
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#FFC700',
+              borderRadius: 16,
+              paddingVertical: 18,
+              paddingHorizontal: 24,
+              marginBottom: 20,
+              marginTop: 8,
+              shadowColor: '#FFC700',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.3,
+              shadowRadius: 12,
+              elevation: 4,
+              zIndex: 20,
+              gap: 10
+            }}
+            onPress={() => router.push('/(merchant)/analytics' as any)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="bar-chart" size={22} color="#050505" />
+            <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: 0.2 }}>
+              View Sales Opportunity Analytics
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* 📈 Weekly Activity Line Chart */}
         <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#050505', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4, marginBottom: 8 }}>

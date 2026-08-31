@@ -25,8 +25,8 @@ import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 
 export default function AnalyticsScreen() {
-  const { user } = useAuth();
-  const { t } = useLanguage();
+  const { user, isOwner, staffPermissions } = useAuth();
+  const { t, locale } = useLanguage();
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -586,6 +586,51 @@ export default function AnalyticsScreen() {
         <ActivityIndicator size="large" color="#050505" />
         <Text style={styles.loaderText}>Analysing merchant data...</Text>
       </View>
+    );
+  }
+
+  if (!isOwner && !staffPermissions?.can_view_analytics) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16, backgroundColor: '#050505' }}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+            Analytics
+          </Text>
+          <Image 
+            source={require('../../assets/risev logo.png')}
+            style={{ width: 70, height: 22, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+          />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#F8FAFC' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="lock-closed" size={30} color="#D97706" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
+            {locale === 'en' ? 'Financial Analytics Locked' : 'Analitik Kewangan Dikunci'}
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 20, maxWidth: 360, marginBottom: 24 }}>
+            {locale === 'en'
+              ? 'This section is restricted by your store owner. You do not have permission to view revenue charts, sales gap analysis, or store financial metrics.'
+              : 'Bahagian ini dihadkan oleh pemilik kedai. Anda tidak mempunyai kebenaran untuk melihat carta hasil, analisis jurang jualan, atau metrik kewangan kedai.'}
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#050505', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+            onPress={() => router.replace('/(merchant)/give' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>
+              {locale === 'en' ? 'Go to Cashier Mode' : 'Ke Mod Juruwang'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 

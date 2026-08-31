@@ -38,7 +38,7 @@ type ActivityItem = {
 };
 
 export default function MerchantDashboard() {
-  const { user, refreshSession } = useAuth();
+  const { user, refreshSession, isOwner, staffPermissions } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -432,24 +432,26 @@ export default function MerchantDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* Sales Progress */}
-          <View style={{ backgroundColor: '#050505', borderRadius: 16, padding: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="trending-up" size={14} color="#FFC700" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>{t('this_months_sales')}</Text>
+          {/* Sales Progress (Only for Owner or Staff with can_view_analytics) */}
+          {(isOwner || staffPermissions?.can_view_analytics) && (
+            <View style={{ backgroundColor: '#050505', borderRadius: 16, padding: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="trending-up" size={14} color="#FFC700" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>{t('this_months_sales')}</Text>
+                </View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(255,255,255,0.7)' }}>
+                  Goal: RM{monthlySalesGoal.toLocaleString()}
+                </Text>
               </View>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(255,255,255,0.7)' }}>
-                Goal: RM{monthlySalesGoal.toLocaleString()}
+              <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 12 }}>
+                {loading ? '...' : `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
               </Text>
+              <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: '100%', width: `${salesProgressPercentage}%`, backgroundColor: '#FFC700', borderRadius: 3 }} />
+              </View>
             </View>
-            <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 12 }}>
-              {loading ? '...' : `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-            </Text>
-            <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-              <View style={{ height: '100%', width: `${salesProgressPercentage}%`, backgroundColor: '#FFC700', borderRadius: 3 }} />
-            </View>
-          </View>
+          )}
         </View>
 
         {/* 🎯 Real-time Customer Quota Tracker Card */}
