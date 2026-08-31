@@ -100,7 +100,7 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     };
   });
 
-  return e.json(200, result);
+  return e.json(200, { staff: result });
 }, $apis.requireAuth("users"));
 
 routerAdd("POST", "/api/risev/merchant/staff", (e) => {
