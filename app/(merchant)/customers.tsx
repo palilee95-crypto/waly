@@ -376,6 +376,56 @@ export default function CustomersScreen() {
     }
   };
 
+  const executeDeleteTransaction = async (tx: any, stampsVal: number) => {
+    const merchantId = user?.merchant_id;
+    if (!merchantId || !tx?.id) return;
+
+    try {
+      await pb.collection('transactions').delete(tx.id);
+
+      // 1. Reverse stamps if stamps were earned
+      if (stampsVal > 0) {
+        const customerId = tx.customerId || tx.customer;
+        if (customerId) {
+          try {
+            const card = await pb.collection('loyalty_cards').getFirstListItem(
+              `customer = "${customerId}" && merchant = "${merchantId}"`
+            );
+            if (card) {
+              const updatedStamps = Math.max(0, (card.stamps_collected || 0) - stampsVal);
+              const updatedCard = await pb.collection('loyalty_cards').update(card.id, {
+                stamps_collected: updatedStamps,
+              }, {
+                expand: 'program,merchant'
+              });
+              if (customerCard && customerCard.id === card.id) {
+                setCustomerCard(updatedCard);
+              }
+            }
+          } catch (cardErr) {
+            console.warn('Failed to reverse stamps on card:', cardErr);
+          }
+        }
+      }
+
+      // 2. Remove from local state lists
+      setTransactions(prev => prev.filter(t => t.id !== tx.id));
+      setCustomerTransactions(prev => prev.filter(t => t.id !== tx.id));
+
+      if (Platform.OS === 'web') {
+        window.alert('Transaction successfully deleted and balances reversed.');
+      } else {
+        Alert.alert('Success', 'Transaction successfully deleted and balances reversed.');
+      }
+    } catch (err: any) {
+      if (Platform.OS === 'web') {
+        window.alert(err?.message || 'Failed to delete transaction.');
+      } else {
+        Alert.alert('Error', err?.message || 'Failed to delete transaction.');
+      }
+    }
+  };
+
   const handleDeleteTransaction = (tx: any) => {
     if (!tx?.id || !user?.merchant_id) return;
 
@@ -392,55 +442,25 @@ export default function CustomersScreen() {
       impactMsg += `\n\nThis will deduct RM ${billVal.toFixed(2)} from total spend.`;
     }
 
-    Alert.alert(
-      'Delete Transaction?',
-      impactMsg,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await pb.collection('transactions').delete(tx.id);
-
-              // 1. Reverse stamps if stamps were earned
-              if (stampsVal > 0) {
-                const customerId = tx.customerId || tx.customer;
-                if (customerId) {
-                  try {
-                    const card = await pb.collection('loyalty_cards').getFirstListItem(
-                      `customer = "${customerId}" && merchant = "${user.merchant_id}"`
-                    );
-                    if (card) {
-                      const updatedStamps = Math.max(0, (card.stamps_collected || 0) - stampsVal);
-                      const updatedCard = await pb.collection('loyalty_cards').update(card.id, {
-                        stamps_collected: updatedStamps,
-                      }, {
-                        expand: 'program,merchant'
-                      });
-                      if (customerCard && customerCard.id === card.id) {
-                        setCustomerCard(updatedCard);
-                      }
-                    }
-                  } catch (cardErr) {
-                    console.warn('Failed to reverse stamps on card:', cardErr);
-                  }
-                }
-              }
-
-              // 2. Remove from local state lists
-              setTransactions(prev => prev.filter(t => t.id !== tx.id));
-              setCustomerTransactions(prev => prev.filter(t => t.id !== tx.id));
-
-              Alert.alert('Success', 'Transaction successfully deleted and balances reversed.');
-            } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to delete transaction.');
-            }
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Delete Transaction?\n\n${impactMsg}`);
+      if (confirmed) {
+        executeDeleteTransaction(tx, stampsVal);
+      }
+    } else {
+      Alert.alert(
+        'Delete Transaction?',
+        impactMsg,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => executeDeleteTransaction(tx, stampsVal)
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   useEffect(() => {
