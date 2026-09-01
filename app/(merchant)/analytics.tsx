@@ -78,6 +78,12 @@ export default function AnalyticsScreen() {
   const [adjustReason, setAdjustReason] = useState('');
   const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
 
+  // Adjust Spend State
+  const [adjustSpendModalVisible, setAdjustSpendModalVisible] = useState(false);
+  const [adjustSpendAmount, setAdjustSpendAmount] = useState<number>(0);
+  const [adjustSpendReason, setAdjustSpendReason] = useState('');
+  const [isSavingSpendAdjustment, setIsSavingSpendAdjustment] = useState(false);
+
   const openCustomerProfile = async (c: any) => {
     setSelectedCustomerProfile(c);
     setEditName(c.name && c.name !== 'Anonymous' ? c.name : '');
@@ -226,34 +232,114 @@ export default function AnalyticsScreen() {
     }
   };
 
-  const handleConfirmDeleteCustomer = () => {
+  const openAdjustSpendModal = () => {
+    const currentSpend = customerTransactions
+      .filter(tx => tx.type === 'PURCHASE' || tx.type === 'earn' || tx.type === 'ADJUSTMENT' || tx.type === 'adjust' || tx.type === 'adjustment')
+      .reduce((sum, tx) => sum + (Number(tx.bill_amount) || 0), 0);
+    setAdjustSpendAmount(Math.round(currentSpend || selectedCustomerProfile?.totalSpend || 0));
+    setAdjustSpendReason('');
+    setAdjustSpendModalVisible(true);
+  };
+
+  const handleSaveSpendAdjustment = async () => {
     if (!selectedCustomerProfile?.id || !user?.merchant_id) return;
-    const custName = selectedCustomerProfile.name || 'Customer';
+    setIsSavingSpendAdjustment(true);
+    try {
+      const currentSpend = customerTransactions
+        .filter(tx => tx.type === 'PURCHASE' || tx.type === 'earn' || tx.type === 'ADJUSTMENT' || tx.type === 'adjust' || tx.type === 'adjustment')
+        .reduce((sum, tx) => sum + (Number(tx.bill_amount) || 0), 0) || (selectedCustomerProfile?.totalSpend || 0);
+      
+      const newSpend = Math.max(0, parseFloat(String(adjustSpendAmount)) || 0);
+      const delta = Number((newSpend - currentSpend).toFixed(2));
+
+      if (delta !== 0) {
+        const newTx = await pb.collection('transactions').create({
+          customer: selectedCustomerProfile.id,
+          merchant: user.merchant_id,
+          type: 'adjust',
+          stamps: 0,
+          points: 0,
+          bill_amount: delta,
+          notes: adjustSpendReason.trim() || 'Manual spend adjustment by merchant',
+          metadata: {
+            type: 'spend_adjustment',
+            previous_spend: currentSpend,
+            new_spend: newSpend,
+            delta_spend: delta,
+            reason: adjustSpendReason.trim() || undefined
+          }
+        });
+
+        setCustomerTransactions(prev => [newTx, ...prev]);
+        setSelectedCustomerProfile((prev: any) => prev ? { ...prev, totalSpend: newSpend } : null);
+      }
+
+      setAdjustSpendModalVisible(false);
+      Alert.alert('Success', `Total spend updated to RM ${newSpend.toFixed(0)}.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to adjust spend.');
+    } finally {
+      setIsSavingSpendAdjustment(false);
+    }
+  };
+
+  const handleDeleteTransaction = (tx: any) => {
+    if (!tx?.id || !user?.merchant_id) return;
+
+    const stampsVal = Number(tx.stamps_earned || tx.stamps || 0);
+    const billVal = Number(tx.bill_amount || tx.metadata?.bill_amount || 0);
+    const custName = selectedCustomerProfile?.name || 'Customer';
+
+    let impactMsg = `Are you sure you want to delete this transaction for ${custName}?`;
+    if (stampsVal > 0 && billVal > 0) {
+      impactMsg += `\n\nThis will reverse ${stampsVal} stamps and deduct RM ${billVal.toFixed(2)} from total spend.`;
+    } else if (stampsVal > 0) {
+      impactMsg += `\n\nThis will reverse ${stampsVal} stamps from the customer's card.`;
+    } else if (billVal > 0) {
+      impactMsg += `\n\nThis will deduct RM ${billVal.toFixed(2)} from total spend.`;
+    }
 
     Alert.alert(
-      'Remove Customer?',
-      `Are you sure you want to remove ${custName} from your store? This will delete their active loyalty card and unused vouchers for your store.`,
+      'Delete Transaction?',
+      impactMsg,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove Customer',
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
-              if (customerCard?.id) {
-                await pb.collection('loyalty_cards').delete(customerCard.id);
-              }
-              if (customerVouchers.length > 0) {
-                for (const v of customerVouchers) {
-                  try { await pb.collection('vouchers').delete(v.id); } catch (_) {}
+              await pb.collection('transactions').delete(tx.id);
+
+              // 1. Reverse stamps if stamps were earned
+              if (stampsVal > 0 && selectedCustomerProfile?.id) {
+                try {
+                  const card = await pb.collection('loyalty_cards').getFirstListItem(
+                    `customer = "${selectedCustomerProfile.id}" && merchant = "${user.merchant_id}"`
+                  );
+                  if (card) {
+                    const updatedStamps = Math.max(0, (card.stamps_collected || 0) - stampsVal);
+                    const updatedCard = await pb.collection('loyalty_cards').update(card.id, {
+                      stamps_collected: updatedStamps,
+                    }, {
+                      expand: 'program,merchant'
+                    });
+                    if (customerCard && customerCard.id === card.id) {
+                      setCustomerCard(updatedCard);
+                    }
+                  }
+                } catch (cardErr) {
+                  console.warn('Failed to reverse stamps on card:', cardErr);
                 }
               }
 
-              setCustomerProfileModalVisible(false);
-              setSelectedCustomerProfile(null);
-              Alert.alert('Removed', `${custName} has been removed from your store.`);
+              // 2. Remove from local state lists
+              setCustomerTransactions(prev => prev.filter(t => t.id !== tx.id));
+              setTransactions(prev => prev.filter(t => t.id !== tx.id));
+
+              Alert.alert('Success', 'Transaction successfully deleted and balances reversed.');
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to remove customer.');
+              Alert.alert('Error', err?.message || 'Failed to delete transaction.');
             }
           }
         }
@@ -1875,14 +1961,9 @@ export default function AnalyticsScreen() {
               <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 Customer Profile
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                <TouchableOpacity onPress={handleConfirmDeleteCustomer}>
-                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setCustomerProfileModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#050505" />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity onPress={() => setCustomerProfileModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#050505" />
+              </TouchableOpacity>
             </View>
 
             {selectedCustomerProfile && (
@@ -1903,10 +1984,14 @@ export default function AnalyticsScreen() {
                 </Text>
 
                 {/* Action Buttons */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
                   <TouchableOpacity 
-                    onPress={() => setEditInfoModalVisible(true)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}
+                    onPress={() => {
+                      setEditName(selectedCustomerProfile.name && selectedCustomerProfile.name !== 'Anonymous' ? selectedCustomerProfile.name : '');
+                      setEditPhone(selectedCustomerProfile.phone || '');
+                      setEditInfoModalVisible(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}
                   >
                     <Ionicons name="create-outline" size={14} color="#050505" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Edit Info</Text>
@@ -1917,21 +2002,41 @@ export default function AnalyticsScreen() {
                       setAdjustReason('');
                       setAdjustStampsModalVisible(true);
                     }}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#050505', borderRadius: 20 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#050505', borderRadius: 20 }}
                   >
                     <Ionicons name="flash" size={14} color="#FFC700" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Adjust Stamps</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={openAdjustSpendModal}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FEF3C7', borderRadius: 20, borderWidth: 1, borderColor: '#FDE68A' }}
+                  >
+                    <Ionicons name="cash" size={14} color="#B45309" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Spend</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* 1. Yellow Details Card */}
                 <View style={{ width: '100%', backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FEF3C7', marginBottom: 24 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="wallet-outline" size={16} color="#B45309" />
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Total Spend</Text>
                     </View>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>RM {selectedCustomerProfile.totalSpend.toFixed(2)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                        RM {(customerTransactions.length > 0 
+                          ? customerTransactions.filter(tx => tx.type === 'PURCHASE' || tx.type === 'earn' || tx.type === 'ADJUSTMENT' || tx.type === 'adjust' || tx.type === 'adjustment').reduce((sum, tx) => sum + (Number(tx.bill_amount) || 0), 0)
+                          : (selectedCustomerProfile.totalSpend || 0)).toFixed(0)}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={openAdjustSpendModal}
+                        style={{ paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#FDE68A', borderRadius: 6 }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}>Adjust</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7' }}>
@@ -2140,21 +2245,45 @@ export default function AnalyticsScreen() {
                 <View style={{ width: '100%', marginBottom: 16 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>VISIT HISTORY</Text>
                   {customerTransactions.length > 0 ? (
-                    customerTransactions.map((tx, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', width: '100%' }}>
-                        <View>
-                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 4 }}>
-                            {tx.type === 'earn' || tx.type === 'PURCHASE' ? 'Earned Stamp' : tx.type === 'redeem' || tx.type === 'REDEMPTION' ? 'Redeemed Reward' : 'Stamp Adjustment'}
-                          </Text>
-                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                            {new Date(tx.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(tx.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
+                    customerTransactions.map((tx, idx) => {
+                      const isSpendAdj = tx.metadata?.type === 'spend_adjustment' || (tx.type === 'ADJUSTMENT' && tx.bill_amount && !tx.stamps && !tx.stamps_earned);
+                      const isEarn = tx.type === 'earn' || tx.type === 'PURCHASE';
+                      const isRedeem = tx.type === 'redeem' || tx.type === 'REDEMPTION';
+                      
+                      let title = isEarn ? 'Earned Stamp' : isRedeem ? 'Redeemed Reward' : (isSpendAdj ? 'Spend Adjustment' : 'Stamp Adjustment');
+                      
+                      return (
+                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', width: '100%' }}>
+                          <View style={{ flex: 1, paddingRight: 10 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 4 }}>
+                              {title}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                              {new Date(tx.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(tx.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                              {tx.notes ? ` • ${tx.notes}` : ''}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            {isSpendAdj ? (
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (Number(tx.bill_amount) >= 0) ? '#10B981' : '#EF4444' }}>
+                                {Number(tx.bill_amount) >= 0 ? `+RM ${Number(tx.bill_amount).toFixed(0)}` : `-RM ${Math.abs(Number(tx.bill_amount)).toFixed(0)}`}
+                              </Text>
+                            ) : (
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (isEarn || (tx.stamps_earned || tx.stamps || 0) > 0) ? '#10B981' : '#EF4444' }}>
+                                {(isEarn || (tx.stamps_earned || tx.stamps || 0) > 0) ? `+${tx.stamps_earned || tx.stamps || 0} stamps` : `${tx.stamps_earned || tx.stamps || 0} stamps`}
+                              </Text>
+                            )}
+                            <TouchableOpacity
+                              onPress={() => handleDeleteTransaction(tx)}
+                              style={{ padding: 4 }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (tx.type === 'earn' || tx.type === 'PURCHASE' || tx.stamps_earned > 0) ? '#10B981' : '#EF4444' }}>
-                          {(tx.type === 'earn' || tx.type === 'PURCHASE' || tx.stamps_earned > 0) ? `+${tx.stamps_earned || tx.stamps || 0} stamps` : `${tx.stamps_earned || tx.stamps || 0} stamps`}
-                        </Text>
-                      </View>
-                    ))
+                      );
+                    })
                   ) : (
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 12 }}>No visits recorded yet.</Text>
                   )}
@@ -2305,6 +2434,131 @@ export default function AnalyticsScreen() {
                   <ActivityIndicator size="small" color="#050505" />
                 ) : (
                   <Text style={styles.saveActionBtnText}>Update Stamp Balance</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Adjust Spend Modal */}
+      <Modal
+        visible={adjustSpendModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAdjustSpendModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="cash" size={18} color="#B45309" />
+                </View>
+                <Text style={styles.modalTitle}>Adjust Total Spend</Text>
+              </View>
+              <TouchableOpacity onPress={() => setAdjustSpendModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'center', gap: 16 }}>
+              {/* Spend Counter Stepper */}
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustSpendAmount(prev => Math.max(0, prev - 10))}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="remove" size={22} color="#0F172A" />
+                </TouchableOpacity>
+
+                <View style={[styles.stepperValueBox, { minWidth: 130 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', marginRight: 4 }}>RM</Text>
+                    <TextInput
+                      style={[styles.stepperValueText, { minWidth: 50, textAlign: 'center', padding: 0 }]}
+                      value={String(adjustSpendAmount)}
+                      onChangeText={(val) => {
+                        const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+                        setAdjustSpendAmount(isNaN(num) ? 0 : num);
+                      }}
+                      keyboardType="numeric"
+                      selectTextOnFocus
+                    />
+                  </View>
+                  <Text style={styles.stepperValueSub}>target total spend</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setAdjustSpendAmount(prev => prev + 10)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={22} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Increment Chips */}
+              <View style={styles.quickChipsRow}>
+                {['+RM10', '+RM50', '+RM100', '+RM500', '-RM10', 'Reset RM0'].map((chip) => (
+                  <TouchableOpacity
+                    key={chip}
+                    style={styles.quickChipBtn}
+                    onPress={() => {
+                      if (chip === '+RM10') setAdjustSpendAmount(c => c + 10);
+                      if (chip === '+RM50') setAdjustSpendAmount(c => c + 50);
+                      if (chip === '+RM100') setAdjustSpendAmount(c => c + 100);
+                      if (chip === '+RM500') setAdjustSpendAmount(c => c + 500);
+                      if (chip === '-RM10') setAdjustSpendAmount(c => Math.max(0, c - 10));
+                      if (chip === 'Reset RM0') setAdjustSpendAmount(0);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.quickChipText}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Delta preview info box */}
+              {(() => {
+                const currentSpend = customerTransactions
+                  .filter(tx => tx.type === 'PURCHASE' || tx.type === 'earn' || tx.type === 'ADJUSTMENT' || tx.type === 'adjust' || tx.type === 'adjustment')
+                  .reduce((sum, tx) => sum + (Number(tx.bill_amount) || 0), 0) || (selectedCustomerProfile?.totalSpend || 0);
+                const delta = adjustSpendAmount - currentSpend;
+                return (
+                  <View style={{ width: '100%', backgroundColor: delta === 0 ? '#F8FAFC' : (delta > 0 ? '#ECFDF5' : '#FEF2F2'), padding: 12, borderRadius: 12, borderWidth: 1, borderColor: delta === 0 ? '#E2E8F0' : (delta > 0 ? '#A7F3D0' : '#FECACA'), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
+                      Current: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>RM {currentSpend.toFixed(0)}</Text>
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: delta === 0 ? '#64748B' : (delta > 0 ? '#059669' : '#DC2626') }}>
+                      {delta === 0 ? 'No change' : (delta > 0 ? `+RM ${delta.toFixed(0)} adjustment` : `-RM ${Math.abs(delta).toFixed(0)} adjustment`)}
+                    </Text>
+                  </View>
+                );
+              })()}
+
+              {/* Reason Input (Optional) */}
+              <View style={{ width: '100%' }}>
+                <Text style={styles.inputFieldLabel}>REASON / NOTE (OPTIONAL)</Text>
+                <TextInput
+                  style={styles.customTextInput}
+                  value={adjustSpendReason}
+                  onChangeText={setAdjustSpendReason}
+                  placeholder="e.g. Backfilled past orders, discount correction"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveActionBtn, { width: '100%' }, isSavingSpendAdjustment && { opacity: 0.7 }]}
+                onPress={handleSaveSpendAdjustment}
+                disabled={isSavingSpendAdjustment}
+                activeOpacity={0.85}
+              >
+                {isSavingSpendAdjustment ? (
+                  <ActivityIndicator size="small" color="#050505" />
+                ) : (
+                  <Text style={styles.saveActionBtnText}>Update Spend Balance</Text>
                 )}
               </TouchableOpacity>
             </View>

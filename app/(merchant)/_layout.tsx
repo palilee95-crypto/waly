@@ -145,7 +145,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   }
 
   // Mobile Bottom Tab Bar view
-  const tabBarWidth = width - 32;
+  const tabBarWidth = Math.max(0, width - 32);
 
   return (
     <View style={[styles.mobileTabBarWrap, { bottom: insets.bottom > 0 ? insets.bottom : 16 }]}>

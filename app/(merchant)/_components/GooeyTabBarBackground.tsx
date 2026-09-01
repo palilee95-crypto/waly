@@ -2,6 +2,8 @@ import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
 export default function GooeyTabBarBackground({ width, color = '#121214' }: { width: number; color?: string }) {
+  if (!width || width <= 80) return null;
+
   const H = 56; // Reduced height of the tab bar body for a sleeker look
   const pillR = 28; // Reduced radius of the pill
   const cx = width / 2;
