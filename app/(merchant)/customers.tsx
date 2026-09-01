@@ -176,6 +176,11 @@ export default function CustomersScreen() {
   const [adjustSpendReason, setAdjustSpendReason] = useState('');
   const [isSavingSpendAdjustment, setIsSavingSpendAdjustment] = useState(false);
 
+  // Delete Transaction Modal State
+  const [deleteTxModalVisible, setDeleteTxModalVisible] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<any>(null);
+  const [isDeletingTx, setIsDeletingTx] = useState(false);
+
   const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'Yesterday' | '7Days' | '30Days'>('All');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -376,10 +381,20 @@ export default function CustomersScreen() {
     }
   };
 
-  const executeDeleteTransaction = async (tx: any, stampsVal: number) => {
-    const merchantId = user?.merchant_id;
-    if (!merchantId || !tx?.id) return;
+  const handleDeleteTransaction = (tx: any) => {
+    if (!tx?.id || !user?.merchant_id) return;
+    setTxToDelete(tx);
+    setDeleteTxModalVisible(true);
+  };
 
+  const confirmExecuteDelete = async () => {
+    if (!txToDelete?.id || !user?.merchant_id) return;
+
+    const tx = txToDelete;
+    const stampsVal = Number(tx.stamps_earned || tx.stamps || 0);
+    const merchantId = user.merchant_id;
+
+    setIsDeletingTx(true);
     try {
       await pb.collection('transactions').delete(tx.id);
 
@@ -412,54 +427,12 @@ export default function CustomersScreen() {
       setTransactions(prev => prev.filter(t => t.id !== tx.id));
       setCustomerTransactions(prev => prev.filter(t => t.id !== tx.id));
 
-      if (Platform.OS === 'web') {
-        window.alert('Transaction successfully deleted and balances reversed.');
-      } else {
-        Alert.alert('Success', 'Transaction successfully deleted and balances reversed.');
-      }
+      setDeleteTxModalVisible(false);
+      setTxToDelete(null);
     } catch (err: any) {
-      if (Platform.OS === 'web') {
-        window.alert(err?.message || 'Failed to delete transaction.');
-      } else {
-        Alert.alert('Error', err?.message || 'Failed to delete transaction.');
-      }
-    }
-  };
-
-  const handleDeleteTransaction = (tx: any) => {
-    if (!tx?.id || !user?.merchant_id) return;
-
-    const stampsVal = Number(tx.stamps_earned || tx.stamps || 0);
-    const billVal = Number(tx.bill_amount || tx.metadata?.bill_amount || 0);
-    const custName = tx.name || selectedCustomer?.name || 'Customer';
-
-    let impactMsg = `Are you sure you want to delete this transaction for ${custName}?`;
-    if (stampsVal > 0 && billVal > 0) {
-      impactMsg += `\n\nThis will reverse ${stampsVal} stamps and deduct RM ${billVal.toFixed(2)} from total spend.`;
-    } else if (stampsVal > 0) {
-      impactMsg += `\n\nThis will reverse ${stampsVal} stamps from the customer's card.`;
-    } else if (billVal > 0) {
-      impactMsg += `\n\nThis will deduct RM ${billVal.toFixed(2)} from total spend.`;
-    }
-
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`Delete Transaction?\n\n${impactMsg}`);
-      if (confirmed) {
-        executeDeleteTransaction(tx, stampsVal);
-      }
-    } else {
-      Alert.alert(
-        'Delete Transaction?',
-        impactMsg,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => executeDeleteTransaction(tx, stampsVal)
-          }
-        ]
-      );
+      Alert.alert('Error', err?.message || 'Failed to delete transaction.');
+    } finally {
+      setIsDeletingTx(false);
     }
   };
 
@@ -2998,6 +2971,89 @@ export default function CustomersScreen() {
       </Modal>
         </View>
       </ScrollView>
+      {/* Delete Transaction Confirmation Modal */}
+      <Modal
+        visible={deleteTxModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => { if (!isDeletingTx) setDeleteTxModalVisible(false); }}
+      >
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <View style={[styles.modalContent, { borderRadius: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: 'auto', padding: 24, maxWidth: 420, width: '100%' }]}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <Ionicons name="trash" size={26} color="#DC2626" />
+              </View>
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', textAlign: 'center' }}>
+                Delete Transaction?
+              </Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 4 }}>
+                This action will void this record and reverse associated balances.
+              </Text>
+            </View>
+
+            {txToDelete && (
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 8, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Customer</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                    {txToDelete.name || selectedCustomer?.name || 'Customer'}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Date</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    {new Date(txToDelete.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(txToDelete.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+                
+                {/* Reversal summary */}
+                {Number(txToDelete.stamps_earned || txToDelete.stamps || 0) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>Stamp Reversal</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>
+                      -{Number(txToDelete.stamps_earned || txToDelete.stamps || 0)} stamps
+                    </Text>
+                  </View>
+                )}
+                {Number(txToDelete.bill_amount || txToDelete.metadata?.bill_amount || 0) !== 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>Spend Reversal</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>
+                      -RM {Math.abs(Number(txToDelete.bill_amount || txToDelete.metadata?.bill_amount || 0)).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => setDeleteTxModalVisible(false)}
+                disabled={isDeletingTx}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' }}
+                onPress={confirmExecuteDelete}
+                disabled={isDeletingTx}
+                activeOpacity={0.85}
+              >
+                {isDeletingTx ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Delete Record</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
