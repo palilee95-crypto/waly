@@ -13,6 +13,7 @@ import {
   Linking,
   Animated,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -2447,8 +2448,8 @@ export default function AnalyticsScreen() {
         animationType="fade"
         onRequestClose={() => setAdjustSpendModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <View style={[styles.modalContent, { borderRadius: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: 'auto', padding: 24, maxWidth: 420, width: '100%' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
@@ -2461,9 +2462,9 @@ export default function AnalyticsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'center', gap: 16 }}>
+            <View style={{ width: '100%', alignItems: 'center', gap: 16, paddingTop: 8 }}>
               {/* Spend Counter Stepper */}
-              <View style={styles.stepperContainer}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%' }}>
                 <TouchableOpacity
                   style={styles.stepperBtn}
                   onPress={() => setAdjustSpendAmount(prev => Math.max(0, prev - 10))}
@@ -2472,11 +2473,25 @@ export default function AnalyticsScreen() {
                   <Ionicons name="remove" size={22} color="#0F172A" />
                 </TouchableOpacity>
 
-                <View style={[styles.stepperValueBox, { minWidth: 130 }]}>
+                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', marginRight: 4 }}>RM</Text>
+                    <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', marginRight: 4 }}>
+                      RM
+                    </Text>
                     <TextInput
-                      style={[styles.stepperValueText, { minWidth: 50, textAlign: 'center', padding: 0 }]}
+                      style={{
+                        fontSize: 32,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: '#0F172A',
+                        textAlign: 'left',
+                        paddingVertical: 0,
+                        paddingHorizontal: 4,
+                        minWidth: 50,
+                        maxWidth: 160,
+                        borderWidth: 0,
+                        backgroundColor: 'transparent',
+                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+                      }}
                       value={String(adjustSpendAmount)}
                       onChangeText={(val) => {
                         const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
