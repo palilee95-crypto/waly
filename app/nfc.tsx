@@ -334,14 +334,18 @@ export default function NfcLandingScreen() {
 
       // 4. Save feedback in database
       if (merchant?.id) {
+        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
         pb.collection('store_feedbacks').create({
+          id: genId,
           merchant: merchant.id,
           customer_phone: phone,
           customer_name: name,
           rating: 5,
           feedback: '',
           redirected_to_google: true,
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn('[STORE FEEDBACK 5-STAR ERROR]', err?.message || err);
+        });
       }
 
       setShowReviewModal(false);
@@ -357,7 +361,9 @@ export default function NfcLandingScreen() {
 
     try {
       if (merchant?.id) {
+        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
         await pb.collection('store_feedbacks').create({
+          id: genId,
           merchant: merchant.id,
           customer_phone: phone,
           customer_name: name,
@@ -376,7 +382,8 @@ export default function NfcLandingScreen() {
         setShowReviewModal(false);
         setReviewSubmitted(false);
       }, 1600);
-    } catch (err) {
+    } catch (err: any) {
+      console.warn('[STORE FEEDBACK SUBMIT ERROR]', err?.message || err);
       setShowReviewModal(false);
     } finally {
       setIsSubmittingReview(false);
