@@ -1449,22 +1449,24 @@ export default function CustomersScreen() {
           </View>
         </View>
 
-        {/* ⚠️ Idle Customers (>30 Days) Section */}
-        {idleCustomers.length > 0 && (
-          <View style={{ marginVertical: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                  {`Inactive customers (>${inactiveFilterDays} days)`}
-                </Text>
-                <TouchableOpacity onPress={() => setInactiveFilterModalVisible(true)} style={{ backgroundColor: '#F1F5F9', padding: 4, borderRadius: 6 }}>
-                  <Ionicons name="filter" size={14} color="#64748B" />
-                </TouchableOpacity>
-              </View>
+        {/* ⚠️ Idle Customers Section */}
+        <View style={{ marginVertical: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                {`Inactive customers (>${inactiveFilterDays} days)`}
+              </Text>
+              <TouchableOpacity onPress={() => setInactiveFilterModalVisible(true)} style={{ backgroundColor: '#F1F5F9', padding: 4, borderRadius: 6 }}>
+                <Ionicons name="filter" size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            {idleCustomers.length > 0 && (
               <TouchableOpacity onPress={() => setShowAllInactive(true)}>
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>View All</Text>
               </TouchableOpacity>
-            </View>
+            )}
+          </View>
+          {idleCustomers.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 20 }}>
               {idleCustomers.map((cust) => (
                 <TouchableOpacity
@@ -1489,8 +1491,14 @@ export default function CustomersScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        )}
+          ) : (
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                {`No customers idle for >${inactiveFilterDays} days`}
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* 📄 Replicated "Transfer List" Bottom Sheet Container */}
         <View style={styles.filterSection}>
@@ -2386,6 +2394,14 @@ export default function CustomersScreen() {
                     <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                   </TouchableOpacity>
                 ))}
+                {idleCustomers.length === 0 && (
+                  <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+                    <Ionicons name="people-outline" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      {`No inactive customers found (>${inactiveFilterDays} days)`}
+                    </Text>
+                  </View>
+                )}
               </View>
             </ScrollView>
           </View>
