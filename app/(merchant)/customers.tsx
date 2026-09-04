@@ -15,6 +15,8 @@ import {
   Alert,
   Linking,
   Animated,
+  TouchableWithoutFeedback,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
@@ -129,7 +131,7 @@ export default function CustomersScreen() {
           stamps: rec.stamps || 0,
           points: rec.points || 0,
           customerId: cust?.id || '',
-          customerPhone: cust?.phone || 'No Phone',
+          customerPhone: cust?.phone || '',
           avatar: cust?.avatar 
             ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
             : null,
@@ -159,7 +161,15 @@ export default function CustomersScreen() {
   const [mainPage, setMainPage] = useState(0);
   const [detailsOrigin, setDetailsOrigin] = useState<'main' | 'spenders' | 'inactive'>('main');
   const [leaderboardRankBy, setLeaderboardRankBy] = useState<'spend' | 'visits'>('spend');
+  const [inactiveFilterDays, setInactiveFilterDays] = useState<number>(30);
+  const [inactiveFilterModalVisible, setInactiveFilterModalVisible] = useState(false);
+  const [customDaysInput, setCustomDaysInput] = useState('');
 
+  useEffect(() => {
+    if (merchant?.inactive_threshold_days) {
+      setInactiveFilterDays(merchant.inactive_threshold_days);
+    }
+  }, [merchant?.inactive_threshold_days]);
   // Edit Info & Stamp Adjustment & Delete states
   const [editInfoModalVisible, setEditInfoModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -458,7 +468,7 @@ export default function CustomersScreen() {
               stamps: 0,
               points: 0,
               customerId: cust.id,
-              customerPhone: cust.phone || 'No Phone',
+              customerPhone: cust.phone || '',
               avatar: cust.avatar 
                 ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
                 : null,
@@ -725,7 +735,7 @@ export default function CustomersScreen() {
         const cust = card.expand?.customer;
         return [
           cust?.name || 'Walk-in Customer',
-          cust?.phone || 'No Phone',
+          cust?.phone || '',
           cust?.email || 'No Email',
           (card.tier || 'bronze').toUpperCase(),
           card.stamps_collected || 0,
@@ -767,7 +777,7 @@ export default function CustomersScreen() {
             stamps: rec.stamps || 0,
             points: rec.points || 0,
             customerId: cust?.id || '',
-            customerPhone: cust?.phone || 'No Phone',
+            customerPhone: cust?.phone || '',
             created: rec.created,
             metadata,
             bill_amount: rec.bill_amount
@@ -999,7 +1009,7 @@ export default function CustomersScreen() {
   }, [transactions]);
 
   const idleCustomers = React.useMemo(() => {
-    const lastVisitedMap: Record<string, { lastVisited: Date; name: string; phone: string; initials: string; bgCircleColor: string; avatar: string | null }> = {};
+    const lastVisitedMap: Record<string, { lastVisited: Date; name: string; customerPhone: string; initials: string; bgCircleColor: string; avatar: string | null }> = {};
 
     transactions.forEach(tx => {
       if (!tx.customerId) return;
@@ -1009,7 +1019,7 @@ export default function CustomersScreen() {
         lastVisitedMap[tx.customerId] = {
           lastVisited: txDate,
           name: tx.name,
-          phone: tx.customerPhone,
+          customerPhone: tx.customerPhone || '',
           initials: tx.initials,
           bgCircleColor: tx.bgCircleColor,
           avatar: tx.avatar
@@ -1029,11 +1039,11 @@ export default function CustomersScreen() {
           ...item
         };
       })
-      .filter(item => item.daysIdle >= 30)
+      .filter(item => item.daysIdle >= inactiveFilterDays)
       .sort((a, b) => b.daysIdle - a.daysIdle);
 
     return idleList;
-  }, [transactions]);
+  }, [transactions, inactiveFilterDays]);
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
@@ -1443,9 +1453,14 @@ export default function CustomersScreen() {
         {idleCustomers.length > 0 && (
           <View style={{ marginVertical: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                {"Inactive customers (>30 days)"}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                  {`Inactive customers (>${inactiveFilterDays} days)`}
+                </Text>
+                <TouchableOpacity onPress={() => setInactiveFilterModalVisible(true)} style={{ backgroundColor: '#F1F5F9', padding: 4, borderRadius: 6 }}>
+                  <Ionicons name="filter" size={14} color="#64748B" />
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity onPress={() => setShowAllInactive(true)}>
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>View All</Text>
               </TouchableOpacity>
@@ -1648,7 +1663,8 @@ export default function CustomersScreen() {
           activeOpacity={1} 
           onPress={closeCustomerModal}
         >
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, width: '100%', maxWidth: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40, maxHeight: '90%' }} onStartShouldSetResponder={() => true}>
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, width: '100%', maxWidth: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40, maxHeight: '90%' }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
               <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
@@ -1978,6 +1994,7 @@ export default function CustomersScreen() {
               </ScrollView>
             )}
           </View>
+        </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
 
@@ -2191,6 +2208,133 @@ export default function CustomersScreen() {
         </View>
       </Modal>
 
+      {/* Inactive Filter Modal */}
+      <Modal
+        visible={inactiveFilterModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setInactiveFilterModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]} 
+          activeOpacity={1} 
+          onPress={() => setInactiveFilterModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, padding: 20 }]} onStartShouldSetResponder={() => true}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                Filter Inactive Customers
+              </Text>
+              <TouchableOpacity onPress={() => setInactiveFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 4 }}>Select preset</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[14, 30, 60, 90].map((days) => {
+                  const isSelected = inactiveFilterDays === days && !customDaysInput;
+                  return (
+                    <TouchableOpacity 
+                      key={days}
+                      onPress={() => {
+                        setInactiveFilterDays(days);
+                        setCustomDaysInput('');
+                        setInactiveFilterModalVisible(false);
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: '45%',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        backgroundColor: isSelected ? '#10B981' : '#F1F5F9',
+                        borderRadius: 16,
+                      }}
+                    >
+                      <Ionicons name={isSelected ? "checkmark-circle" : "time-outline"} size={18} color={isSelected ? "#FFFFFF" : "#64748B"} />
+                      <Text style={{ fontSize: 14, fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold', color: isSelected ? '#FFFFFF' : '#334155' }}>
+                        {days} Days
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 12, marginBottom: 4 }}>Or enter custom days</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  value={customDaysInput}
+                  onChangeText={setCustomDaysInput}
+                  placeholder="e.g. 45"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="number-pad"
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 16,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    fontSize: 14,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#050505'
+                  }}
+                />
+                <TouchableOpacity
+                  disabled={!customDaysInput || isNaN(Number(customDaysInput)) || Number(customDaysInput) <= 0}
+                  onPress={() => {
+                    const days = Number(customDaysInput);
+                    if (days > 0) {
+                      setInactiveFilterDays(days);
+                      setInactiveFilterModalVisible(false);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: (!customDaysInput || isNaN(Number(customDaysInput)) || Number(customDaysInput) <= 0) ? '#E2E8F0' : '#10B981',
+                    paddingHorizontal: 20,
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: (!customDaysInput || isNaN(Number(customDaysInput)) || Number(customDaysInput) <= 0) ? '#94A3B8' : '#FFFFFF' }}>
+                    Apply
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                onPress={() => {
+                  setInactiveFilterDays(merchant?.inactive_threshold_days || 30);
+                  setCustomDaysInput('');
+                  setInactiveFilterModalVisible(false);
+                }}
+                style={{
+                  marginTop: 16,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  backgroundColor: '#FFFBEB',
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: '#FDE68A'
+                }}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                  Reset to Store Default ({merchant?.inactive_threshold_days || 30} Days)
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Inactive Customers View All Modal */}
       <Modal
         visible={showAllInactive}
@@ -2201,7 +2345,7 @@ export default function CustomersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: '75%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Inactive Customers</Text>
+              <Text style={styles.modalTitle}>Inactive Customers ({'>'}{inactiveFilterDays} days)</Text>
               <TouchableOpacity onPress={() => setShowAllInactive(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>

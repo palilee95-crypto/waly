@@ -38,6 +38,7 @@ export default function EditProfileScreen() {
   const [businessEmail, setBusinessEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [monthlySalesGoal, setMonthlySalesGoal] = useState('10000');
+  const [inactiveThresholdDays, setInactiveThresholdDays] = useState('30');
   const [address, setAddress] = useState('');
   const [category, setCategory] = useState<'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other'>('food');
   const [lat, setLat] = useState('6.2443');
@@ -297,6 +298,7 @@ export default function EditProfileScreen() {
       setBusinessEmail(mRec.metadata?.email || mRec.website || user.email || '');
       setPhoneNumber(mRec.metadata?.phone || user.phone || '');
       setMonthlySalesGoal(String(mRec.metadata?.monthly_sales_goal || '10000'));
+      setInactiveThresholdDays(String(mRec.inactive_threshold_days || '30'));
       setAddress(mRec.description || '');
       setCategory(mRec.category || 'food');
 
@@ -498,6 +500,7 @@ export default function EditProfileScreen() {
         monthly_sales_goal: parseFloat(monthlySalesGoal) || 10000,
       };
       formData.append('metadata', JSON.stringify(updatedMetadata));
+      formData.append('inactive_threshold_days', String(parseInt(inactiveThresholdDays) || 30));
 
       if (logoFile) {
         formData.append('logo', logoFile);
@@ -728,6 +731,25 @@ export default function EditProfileScreen() {
               placeholder={t('phone_number')}
               placeholderTextColor="#94A3B8"
               keyboardType="phone-pad"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
+        </View>
+
+        {/* Inactive Customer Threshold Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Inactive Customer Threshold (Days)</Text>
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="time-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={inactiveThresholdDays}
+              onChangeText={setInactiveThresholdDays}
+              placeholder="e.g. 30"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
               {...Platform.select({
                 web: { outlineStyle: 'none' } as any,
               })}
