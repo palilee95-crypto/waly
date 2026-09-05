@@ -1,49 +1,37 @@
 // pb_hooks/cascade_delete_user.pb.js
 // Cascade-delete all user-dependent and merchant-dependent data when a user is deleted.
 
-function cascadeDeleteUserInternal(userId) {
-  if (!userId) return;
+// 1. Hook on direct PocketBase user record deletion
+onRecordDelete((e) => {
+  const userId = e.record.id;
+  if (!userId) return e.next();
 
-  // Helper: fetch + delete all records in `collection` matching `filter` safely without infinite loops
   const safeDelete = (collection, filter) => {
     try {
       const records = $app.findRecordsByFilter(collection, filter, "-created", 1000, 0);
       if (records && records.length > 0) {
         for (let i = 0; i < records.length; i++) {
-          try {
-            $app.delete(records[i]);
-          } catch (delErr) {
-            console.log(`[CASCADE] Failed to delete ${collection} record ${records[i].id}: ${delErr.message || delErr}`);
-          }
+          try { $app.delete(records[i]); } catch (delErr) {}
         }
       }
-    } catch (err) {
-      // Ignore if collection does not exist or filter is invalid
-    }
+    } catch (err) {}
   };
 
-  // ---- Step 1: Find merchant(s) owned by this user ----
   let merchantIds = [];
   try {
     const merchants = $app.findRecordsByFilter("merchants", `owner = '${userId}'`, "-created", 50, 0);
     for (let i = 0; i < merchants.length; i++) {
       merchantIds.push(merchants[i].id);
     }
-  } catch (err) {
-    console.log(`[CASCADE] Error finding merchants for user ${userId}: ${err.message || err}`);
-  }
+  } catch (err) {}
 
-  // ---- Step 2: Delete records referencing the merchant(s) ----
   for (let m = 0; m < merchantIds.length; m++) {
     const mid = merchantIds[m];
-
-    // Follow up sequences & messages
     try {
       const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
       for (let g = 0; g < groups.length; g++) {
         const gid = groups[g].id;
         safeDelete("follow_up_members", `group = '${gid}'`);
-        
         try {
           const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${gid}'`, "-created", 200, 0);
           for (let s = 0; s < sequences.length; s++) {
@@ -51,12 +39,10 @@ function cascadeDeleteUserInternal(userId) {
             try { $app.delete(sequences[s]); } catch (e) {}
           }
         } catch (e2) {}
-
         try { $app.delete(groups[g]); } catch (e3) {}
       }
     } catch (e4) {}
 
-    // Merchant dependent collections
     safeDelete("branches", `merchant = '${mid}'`);
     safeDelete("campaigns", `merchant = '${mid}'`);
     safeDelete("loyalty_programs", `merchant = '${mid}'`);
@@ -75,7 +61,6 @@ function cascadeDeleteUserInternal(userId) {
     safeDelete("commissions", `referred_merchant = '${mid}'`);
     safeDelete("activation_codes", `redeemed_by = '${mid}'`);
 
-    // Unlink any staff linked to this merchant
     try {
       const staff = $app.findRecordsByFilter("users", `merchant_id = '${mid}'`, "-created", 500, 0);
       for (let st = 0; st < staff.length; st++) {
@@ -90,16 +75,12 @@ function cascadeDeleteUserInternal(userId) {
       }
     } catch (stFindErr) {}
 
-    // Delete the merchant record
     try {
       const mRec = $app.findRecordById("merchants", mid);
       if (mRec) $app.delete(mRec);
-    } catch (delMerchErr) {
-      console.log(`[CASCADE] Failed to delete merchant ${mid}: ${delMerchErr.message || delMerchErr}`);
-    }
+    } catch (delMerchErr) {}
   }
 
-  // ---- Step 3: Delete user-dependent records (customer relations) ----
   safeDelete("loyalty_cards", `customer = '${userId}'`);
   safeDelete("transactions", `customer = '${userId}'`);
   safeDelete("vouchers", `customer = '${userId}'`);
@@ -113,15 +94,11 @@ function cascadeDeleteUserInternal(userId) {
   safeDelete("redemptions", `customer = '${userId}'`);
   safeDelete("prospects", `customer = '${userId}' || agent = '${userId}'`);
   safeDelete("notifications", `user = '${userId}'`);
-}
 
-// 1. Hook on direct PocketBase user record deletion
-onRecordDelete((e) => {
-  cascadeDeleteUserInternal(e.record.id);
   return e.next();
 }, "users");
 
-// 2. Custom REST Route for Admin Portal (allows sales agents / superusers to delete users cleanly)
+// 2. Custom REST Route for Admin Portal (inlined handler to avoid Goja context issues)
 routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
   let authRecord = c.auth || null;
   if (!authRecord && typeof c.get === "function") {
@@ -181,10 +158,99 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
 
     const userName = userRec.getString("name") || "User";
 
-    // Run cascade delete
-    cascadeDeleteUserInternal(targetUserId);
+    // Inlined cascade deletion helper
+    const safeDelete = (collection, filter) => {
+      try {
+        const records = $app.findRecordsByFilter(collection, filter, "-created", 1000, 0);
+        if (records && records.length > 0) {
+          for (let i = 0; i < records.length; i++) {
+            try { $app.delete(records[i]); } catch (delErr) {}
+          }
+        }
+      } catch (err) {}
+    };
 
-    // Delete user record
+    // 1. Find and delete merchants owned by user + their dependents
+    let merchantIds = [];
+    try {
+      const merchants = $app.findRecordsByFilter("merchants", `owner = '${targetUserId}'`, "-created", 50, 0);
+      for (let i = 0; i < merchants.length; i++) {
+        merchantIds.push(merchants[i].id);
+      }
+    } catch (err) {}
+
+    for (let m = 0; m < merchantIds.length; m++) {
+      const mid = merchantIds[m];
+      try {
+        const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
+        for (let g = 0; g < groups.length; g++) {
+          const gid = groups[g].id;
+          safeDelete("follow_up_members", `group = '${gid}'`);
+          try {
+            const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${gid}'`, "-created", 200, 0);
+            for (let s = 0; s < sequences.length; s++) {
+              safeDelete("follow_up_messages", `sequence = '${sequences[s].id}'`);
+              try { $app.delete(sequences[s]); } catch (e) {}
+            }
+          } catch (e2) {}
+          try { $app.delete(groups[g]); } catch (e3) {}
+        }
+      } catch (e4) {}
+
+      safeDelete("branches", `merchant = '${mid}'`);
+      safeDelete("campaigns", `merchant = '${mid}'`);
+      safeDelete("loyalty_programs", `merchant = '${mid}'`);
+      safeDelete("loyalty_cards", `merchant = '${mid}'`);
+      safeDelete("rewards", `merchant = '${mid}'`);
+      safeDelete("transactions", `merchant = '${mid}'`);
+      safeDelete("broadcasts", `merchant = '${mid}'`);
+      safeDelete("subscriptions", `merchant = '${mid}'`);
+      safeDelete("whatsapp_configurations", `merchant = '${mid}'`);
+      safeDelete("nfc_claims", `merchant = '${mid}'`);
+      safeDelete("hardware_orders", `merchant = '${mid}'`);
+      safeDelete("store_feedbacks", `merchant = '${mid}'`);
+      safeDelete("automation_rules", `merchant = '${mid}'`);
+      safeDelete("birthday_logs", `merchant = '${mid}'`);
+      safeDelete("birthday_rewards", `merchant = '${mid}'`);
+      safeDelete("commissions", `referred_merchant = '${mid}'`);
+      safeDelete("activation_codes", `redeemed_by = '${mid}'`);
+
+      try {
+        const staff = $app.findRecordsByFilter("users", `merchant_id = '${mid}'`, "-created", 500, 0);
+        for (let st = 0; st < staff.length; st++) {
+          if (staff[st].id !== targetUserId) {
+            try {
+              staff[st].set("merchant_id", "");
+              staff[st].set("branch_name", "");
+              staff[st].set("branch", "");
+              $app.save(staff[st]);
+            } catch (stErr) {}
+          }
+        }
+      } catch (stFindErr) {}
+
+      try {
+        const mRec = $app.findRecordById("merchants", mid);
+        if (mRec) $app.delete(mRec);
+      } catch (delMerchErr) {}
+    }
+
+    // 2. Delete user-level customer records
+    safeDelete("loyalty_cards", `customer = '${targetUserId}'`);
+    safeDelete("transactions", `customer = '${targetUserId}'`);
+    safeDelete("vouchers", `customer = '${targetUserId}'`);
+    safeDelete("nfc_claims", `customer = '${targetUserId}'`);
+    safeDelete("fraud_flags", `user = '${targetUserId}'`);
+    safeDelete("follow_up_members", `customer = '${targetUserId}'`);
+    safeDelete("follow_up_logs", `customer = '${targetUserId}'`);
+    safeDelete("birthday_logs", `customer = '${targetUserId}'`);
+    safeDelete("store_feedbacks", `customer = '${targetUserId}'`);
+    safeDelete("qr_transactions", `customer = '${targetUserId}'`);
+    safeDelete("redemptions", `customer = '${targetUserId}'`);
+    safeDelete("prospects", `customer = '${targetUserId}' || agent = '${targetUserId}'`);
+    safeDelete("notifications", `user = '${targetUserId}'`);
+
+    // 3. Finally delete the user record
     $app.delete(userRec);
 
     console.log(`[ADMIN DELETE USER] Successfully deleted user ${userName} (${targetUserId}) and all cascade data.`);
