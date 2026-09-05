@@ -7,6 +7,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     const merchantId = (body.merchant_id || body.merchant || "").trim();
     let rawPhone = (body.phone || body.customer_phone || "").trim();
     let name = (body.name || body.customer_name || "").trim();
+    let branchId = (body.branch_id || body.branch || "").trim();
+    let branchName = (body.branch_name || "").trim();
 
     if (!merchantId) {
       return e.json(400, { message: "merchant_id is required" });
@@ -21,6 +23,25 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       merchant = $app.findRecordById("merchants", merchantId);
     } catch (err) {
       return e.json(404, { message: "Merchant not found" });
+    }
+
+    // Resolve branch name if branchId is provided
+    if (branchId && !branchName) {
+      try {
+        const bRec = $app.findRecordById("branches", branchId);
+        if (bRec) branchName = bRec.getString("name") || "";
+      } catch (bErr) {}
+    }
+
+    // If no branch specified, fallback to merchant's HQ branch
+    if (!branchId) {
+      try {
+        const hqs = $app.findRecordsByFilter("branches", `merchant = '${merchantId}' && is_hq = true`, "-created", 1, 0);
+        if (hqs.length > 0) {
+          branchId = hqs[0].id;
+          branchName = hqs[0].getString("name") || "HQ / Main Outlet";
+        }
+      } catch (hqErr) {}
     }
 
     // Format phone number
@@ -63,9 +84,11 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         claim.set("customer_name", name);
         claim.set("session_code", sessionCode);
         claim.set("status", "pending");
+        if (branchId) claim.set("branch", branchId);
+        if (branchName) claim.set("branch_name", branchName);
         if (customerUser) claim.set("customer", customerUser.id);
         $app.save(claim);
-        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to pending for merchant ${merchantId}, phone ${cleanPhone}`);
+        console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to pending for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
       }
     } catch (err) { /* create new below */ }
 
@@ -78,9 +101,11 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       claim.set("customer_name", name);
       claim.set("session_code", sessionCode);
       claim.set("status", "pending");
+      if (branchId) claim.set("branch", branchId);
+      if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
       $app.save(claim);
-      console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, phone ${cleanPhone}`);
+      console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
     }
 
     // Find current stamps for this customer & merchant if already registered

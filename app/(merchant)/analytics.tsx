@@ -425,7 +425,26 @@ export default function AnalyticsScreen() {
 
   const filteredTransactions = useMemo(() => {
     const now = new Date();
+    const hqBranch = branchList.find(b => b.is_hq);
+    const selectedBranchObj = selectedBranch === 'All Branches' ? null : branchList.find(b => b.name === selectedBranch || b.id === selectedBranch);
+
     return transactions.filter(tx => {
+      // Dynamic Branch Filter
+      if (selectedBranchObj) {
+        let meta: any = {};
+        try {
+          if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
+          else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
+        } catch (e) {}
+
+        const txBranchId = meta.branch_id || '';
+        const txBranchName = (meta.branch_name || '').toLowerCase();
+        const isHqMatch = selectedBranchObj.is_hq && (!txBranchId || txBranchId === selectedBranchObj.id || txBranchName.includes('hq') || txBranchName.includes('all branches'));
+        const isSpecificMatch = txBranchId === selectedBranchObj.id || (Boolean(txBranchName) && txBranchName === selectedBranchObj.name.toLowerCase());
+
+        if (!isSpecificMatch && !isHqMatch) return false;
+      }
+
       const txDate = new Date(tx.created);
       if (timeframe === 'daily') {
         return txDate.toDateString() === now.toDateString();
@@ -445,7 +464,7 @@ export default function AnalyticsScreen() {
       }
       return true;
     });
-  }, [transactions, timeframe, startDate, endDate]);
+  }, [transactions, timeframe, startDate, endDate, selectedBranch, branchList]);
 
   // Calculate Metrics based on filtered data
   const merchantMetrics = useMemo(() => {
@@ -463,6 +482,54 @@ export default function AnalyticsScreen() {
       avgSpending: Math.round(avgSpending),
     };
   }, [filteredTransactions]);
+
+  // Dynamic Outlet Comparison Metrics
+  const branchComparisonMetrics = useMemo(() => {
+    if (branchList.length === 0) return [];
+    const hqBranch = branchList.find(b => b.is_hq) || branchList[0];
+    const hqId = hqBranch?.id;
+
+    const stats = branchList.map(branch => {
+      let sales = 0;
+      let stamps = 0;
+      const customers = new Set<string>();
+
+      transactions.forEach(tx => {
+        let meta: any = {};
+        try {
+          if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
+          else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
+        } catch (e) {}
+
+        const txBranchId = meta.branch_id || '';
+        const txBranchName = (meta.branch_name || '').toLowerCase();
+        const isHqMatch = branch.is_hq && (!txBranchId || txBranchId === hqId || txBranchName.includes('hq') || txBranchName.includes('all branches'));
+        const isSpecificMatch = txBranchId === branch.id || (Boolean(txBranchName) && txBranchName === branch.name.toLowerCase());
+
+        if (isSpecificMatch || isHqMatch) {
+          sales += Number(tx.bill_amount) || 0;
+          stamps += Number(tx.stamps) || (tx.type === 'earn' ? 1 : 0);
+          if (tx.customer) customers.add(tx.customer);
+        }
+      });
+
+      return {
+        id: branch.id,
+        name: branch.name,
+        is_hq: branch.is_hq,
+        city: branch.city || 'Malaysia',
+        sales: Math.round(sales),
+        stamps,
+        footfall: customers.size
+      };
+    });
+
+    const totalSales = stats.reduce((sum, b) => sum + b.sales, 0);
+    return stats.map(b => ({
+      ...b,
+      salesPct: totalSales > 0 ? Math.round((b.sales / totalSales) * 100) : Math.round(100 / stats.length)
+    })).sort((a, b) => b.sales - a.sales);
+  }, [branchList, transactions]);
 
   const monthlySalesData = useMemo(() => {
     const months = [];
@@ -1238,7 +1305,7 @@ export default function AnalyticsScreen() {
               <Text style={styles.sectionSubtitle}>Compare sales contribution per outlet</Text>
 
               <View style={{ gap: 10, marginTop: 16 }}>
-                {branchList.length === 0 ? (
+                {branchComparisonMetrics.length === 0 ? (
                   <View style={styles.emptyBranchBox}>
                     <Ionicons name="business-outline" size={24} color="#94A3B8" />
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
@@ -1257,35 +1324,53 @@ export default function AnalyticsScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  branchList.map((br, idx) => (
-                    <View key={br.id || idx} style={styles.branchItemCard}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: idx === 0 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>#{idx + 1}</Text>
-                          </View>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{br.name}</Text>
-                          {br.is_hq && (
-                            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>HQ</Text>
+                  branchComparisonMetrics.map((br, idx) => {
+                    const rankMedal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                    return (
+                      <View key={br.id || idx} style={styles.branchItemCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: idx === 0 ? '#FEF3C7' : '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{rankMedal}</Text>
                             </View>
-                          )}
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }} numberOfLines={1}>{br.name}</Text>
+                                {br.is_hq && (
+                                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                    <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>HQ</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>{br.city}</Text>
+                            </View>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                              RM {br.sales.toLocaleString()}
+                            </Text>
+                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                              {br.salesPct}% of sales
+                            </Text>
+                          </View>
                         </View>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                          RM {(br.total_sales || 0).toLocaleString()}
-                        </Text>
-                      </View>
 
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                          {br.total_stamps || 0} stamps issued
-                        </Text>
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                          {br.manager_name ? `Mgr: ${br.manager_name}` : (br.city || 'Active')}
-                        </Text>
+                        {/* Revenue Share Progress Bar */}
+                        <View style={{ height: 5, borderRadius: 2.5, backgroundColor: '#F1F5F9', overflow: 'hidden', marginVertical: 6 }}>
+                          <View style={{ width: `${Math.max(4, Math.min(100, br.salesPct))}%`, height: '100%', backgroundColor: idx === 0 ? '#FFC700' : '#38BDF8', borderRadius: 2.5 }} />
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                            {br.stamps.toLocaleString()} stamps issued
+                          </Text>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                            {br.footfall.toLocaleString()} unique customers
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             </View>

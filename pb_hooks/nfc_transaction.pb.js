@@ -110,8 +110,8 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       // 4. Record transaction
       const staffId = authRecord.id;
       const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
-      const branchName = (body.branch_name || authRecord.getString("branch_name") || "All Branches (HQ)").trim();
-      const branchId = (body.branch_id || authRecord.getString("branch") || "").trim();
+      const branchName = (body.branch_name || authRecord.getString("branch_name") || claim.getString("branch_name") || "All Branches (HQ)").trim();
+      const branchId = (body.branch_id || authRecord.getString("branch") || claim.getString("branch") || "").trim();
 
       try {
         const txnCol = $app.findCollectionByNameOrId("transactions");

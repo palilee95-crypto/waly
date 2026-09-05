@@ -156,20 +156,25 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
       console.log("[REDEEM STAND CODE] Merchant update notice:", mErr.message || mErr);
     }
 
-    // 5. Mark code as redeemed
+    // 5. Mark code as redeemed & bind branch
+    const branchId = (body.branch_id || body.branch || "").trim();
     codeRecord.set("is_redeemed", true);
     codeRecord.set("redeemed_by", merchantId);
+    if (branchId) {
+      codeRecord.set("branch", branchId);
+    }
     const nowStr = new Date().toISOString().replace("T", " ").substring(0, 19);
     codeRecord.set("redeemed_at", nowStr);
     $app.save(codeRecord);
 
-    console.log(`[REDEEM STAND CODE] Merchant ${merchantId} activated ${targetPlan} using code ${rawCode}`);
+    console.log(`[REDEEM STAND CODE] Merchant ${merchantId} activated ${targetPlan} using code ${rawCode} (Branch: ${branchId || 'HQ'})`);
 
     return c.json(200, {
       success: true,
       message: "Physical Stand successfully activated! You have 500 customer capacity with no expiration date.",
       plan: targetPlan,
       quota: quota,
+      branch_id: branchId,
       period_end: "2099-12-31 23:59:59"
     });
   } catch (err) {
@@ -178,5 +183,68 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
       success: false,
       message: "Failed to redeem activation code: " + (err.message || err)
     });
+  }
+});
+
+// Route to re-bind or assign an existing stand code to a specific branch
+routerAdd("POST", "/api/risev/merchant/bind-stand-branch", (c) => {
+  let authRecord = c.auth || null;
+  if (!authRecord && typeof c.get === "function") {
+    try {
+      authRecord = c.get("authRecord");
+    } catch (e) {}
+  }
+  if (!authRecord) {
+    return c.json(401, { success: false, message: "Authentication required." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return c.json(400, { success: false, message: "Merchant profile required." });
+  }
+
+  let body = {};
+  try {
+    body = c.requestInfo().body || {};
+  } catch (e) {
+    try {
+      body = $apis.requestInfo(c).data || {};
+    } catch (e2) {
+      body = {};
+    }
+  }
+
+  const rawCode = (body.code || body.stand_code || "").trim().toUpperCase();
+  const targetBranchId = (body.branch_id || body.branch || "").trim();
+
+  if (!rawCode) {
+    return c.json(400, { success: false, message: "Stand code is required." });
+  }
+
+  try {
+    const codes = $app.findRecordsByFilter(
+      "activation_codes",
+      `code = '${rawCode}' && redeemed_by = '${merchantId}'`,
+      "-created",
+      1,
+      0
+    );
+
+    if (codes.length === 0) {
+      return c.json(404, { success: false, message: "Stand code not found under your merchant account." });
+    }
+
+    const codeRec = codes[0];
+    codeRec.set("branch", targetBranchId || "");
+    $app.save(codeRec);
+
+    return c.json(200, {
+      success: true,
+      message: `Stand ${rawCode} successfully assigned to branch.`,
+      code: rawCode,
+      branch_id: targetBranchId
+    });
+  } catch (err) {
+    return c.json(500, { success: false, message: "Failed to bind stand to branch: " + (err.message || err) });
   }
 });

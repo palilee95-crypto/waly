@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Platform,
-  Image
+  Image,
+  Linking
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
@@ -30,9 +31,12 @@ interface Branch {
   manager_name: string;
   is_hq: boolean;
   status: 'active' | 'inactive';
+  google_review_url?: string;
   staff_count?: number;
   total_sales?: number;
   total_stamps?: number;
+  customer_count?: number;
+  assigned_stands?: string[];
 }
 
 export default function BranchesScreen() {
@@ -76,6 +80,8 @@ export default function BranchesScreen() {
   const [phone, setPhone] = useState('');
   const [managerName, setManagerName] = useState('');
   const [isHq, setIsHq] = useState(false);
+  const [googleReviewUrl, setGoogleReviewUrl] = useState('');
+  const [resolvingGoogleUrl, setResolvingGoogleUrl] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -89,22 +95,35 @@ export default function BranchesScreen() {
 
     setLoading(true);
     try {
-      // Fetch branches and subscription concurrently
-      const [records, subRec] = await Promise.all([
+      // Fetch branches, subscription, transactions, staff, and stand codes concurrently
+      const [records, subRec, txRecords, staffRecords, codeRecords] = await Promise.all([
         pb.collection('branches').getFullList<Branch>({
           filter: `merchant = "${user.merchant_id}"`,
           sort: '-is_hq,-created',
           requestKey: null
         }),
-        pb.collection('subscriptions').getFirstListItem(`merchant = "${user.merchant_id}"`).catch(() => null)
+        pb.collection('subscriptions').getFirstListItem(`merchant = "${user.merchant_id}"`).catch(() => null),
+        pb.collection('transactions').getFullList({
+          filter: `merchant = "${user.merchant_id}"`,
+          sort: '-created',
+          requestKey: null
+        }).catch(() => []),
+        pb.collection('users').getFullList({
+          filter: `merchant_id = "${user.merchant_id}" && role = "merchant"`,
+          requestKey: null
+        }).catch(() => []),
+        pb.collection('activation_codes').getFullList({
+          filter: `redeemed_by = "${user.merchant_id}"`,
+          requestKey: null
+        }).catch(() => [])
       ]);
 
       setSubscription(subRec);
 
-      if (records && records.length > 0) {
-        setBranches(records);
-      } else {
-        // Auto-provision default HQ branch from merchant profile for single-store merchants
+      let branchList = records || [];
+
+      // Auto-provision default HQ branch if merchant has no branches yet
+      if (branchList.length === 0) {
         try {
           const merch = await pb.collection('merchants').getOne(user.merchant_id);
           if (merch) {
@@ -116,19 +135,68 @@ export default function BranchesScreen() {
               phone: merch.phone || user.phone || '',
               manager_name: user.name || 'Store Owner',
               is_hq: true,
-              status: 'active'
+              status: 'active',
+              google_review_url: merch.google_review_url || ''
             });
             if (autoHq?.id) {
-              setBranches([autoHq as any]);
-              setLoading(false);
-              return;
+              branchList = [autoHq as any];
             }
           }
         } catch (autoErr) {
-          console.log('Auto-provision HQ branch bypassed:', autoErr);
+          console.log('Auto-provision HQ branch notice:', autoErr);
         }
-        setBranches([]);
       }
+
+      // Compute live performance metrics per branch
+      const hqBranch = branchList.find(b => b.is_hq) || branchList[0];
+      const hqId = hqBranch?.id;
+
+      const enriched = branchList.map((branch) => {
+        let totalSales = 0;
+        let totalStamps = 0;
+        const customerSet = new Set<string>();
+
+        txRecords.forEach((tx: any) => {
+          let meta: any = {};
+          try {
+            if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
+            else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
+          } catch (e) {}
+
+          const txBranchId = meta.branch_id || '';
+          const txBranchName = (meta.branch_name || '').toLowerCase();
+          const isHqMatch = branch.is_hq && (!txBranchId || txBranchId === hqId || txBranchName.includes('hq') || txBranchName.includes('all branches'));
+          const isSpecificMatch = txBranchId === branch.id || (Boolean(txBranchName) && txBranchName === branch.name.toLowerCase());
+
+          if (isSpecificMatch || isHqMatch) {
+            totalSales += Number(tx.bill_amount) || 0;
+            totalStamps += Number(tx.stamps) || (tx.type === 'earn' ? 1 : 0);
+            if (tx.customer) customerSet.add(tx.customer);
+          }
+        });
+
+        // Match staff for this branch
+        const assignedStaff = staffRecords.filter((s: any) => {
+          if (branch.is_hq && (!s.branch || s.branch === branch.id)) return true;
+          return s.branch === branch.id || (s.branch_name && s.branch_name.toLowerCase() === branch.name.toLowerCase());
+        });
+
+        // Match assigned physical stand codes
+        const assignedStands = codeRecords
+          .filter((c: any) => c.branch === branch.id || (branch.is_hq && !c.branch))
+          .map((c: any) => c.code);
+
+        return {
+          ...branch,
+          total_sales: Math.round(totalSales),
+          total_stamps: totalStamps,
+          customer_count: customerSet.size,
+          staff_count: Math.max(1, assignedStaff.length),
+          assigned_stands: assignedStands
+        };
+      });
+
+      setBranches(enriched);
     } catch (err: any) {
       console.log('Branches fetch info:', err.message);
       setBranches([]);
@@ -138,7 +206,6 @@ export default function BranchesScreen() {
   };
 
   const handleOpenAddModal = () => {
-    // If merchant has reached branch quota, show upgrade modal (PRO allows 2, Starter allows 1)
     if (branches.length >= maxAllowedBranches) {
       setShowUpgradeModal(true);
       return;
@@ -150,6 +217,7 @@ export default function BranchesScreen() {
     setCity('');
     setPhone('');
     setManagerName('');
+    setGoogleReviewUrl('');
     setIsHq(branches.length === 0);
     setModalVisible(true);
   };
@@ -161,8 +229,31 @@ export default function BranchesScreen() {
     setCity(branch.city);
     setPhone(branch.phone);
     setManagerName(branch.manager_name);
+    setGoogleReviewUrl(branch.google_review_url || '');
     setIsHq(Boolean(branch.is_hq));
     setModalVisible(true);
+  };
+
+  const handleTestGoogleReviewUrl = async () => {
+    if (!googleReviewUrl.trim()) return;
+    setResolvingGoogleUrl(true);
+    try {
+      const res = await pb.send<any>('/api/risev/google-review/resolve', {
+        method: 'POST',
+        body: { url: googleReviewUrl.trim() }
+      });
+      if (res?.direct_url) {
+        setGoogleReviewUrl(res.direct_url);
+        Alert.alert(
+          locale === 'en' ? 'Google Review Link Verified' : 'Pautan Review Google Disahkan',
+          locale === 'en' ? 'Optimized 1-click Direct Review URL generated!' : 'Pautan 1-klik Google Review berjaya dijana!'
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Notice', 'Using link as entered.');
+    } finally {
+      setResolvingGoogleUrl(false);
+    }
   };
 
   const handleSaveBranch = async () => {
@@ -182,7 +273,7 @@ export default function BranchesScreen() {
     setSubmitting(true);
     try {
       if (editingBranch) {
-        // Try updating in PB
+        // Update in PB
         try {
           if (editingBranch.id && editingBranch.id !== 'hq-default' && !editingBranch.id.startsWith('branch-')) {
             await pb.collection('branches').update(editingBranch.id, {
@@ -192,6 +283,7 @@ export default function BranchesScreen() {
               phone: phone.trim(),
               manager_name: managerName.trim(),
               is_hq: finalIsHq,
+              google_review_url: googleReviewUrl.trim()
             });
           }
 
@@ -205,7 +297,7 @@ export default function BranchesScreen() {
             }
           }
         } catch (e) {
-          console.log('PB update branch bypassed:', e);
+          console.log('PB update branch notice:', e);
         }
 
         setBranches(prev => prev.map(b => b.id === editingBranch.id ? {
@@ -215,13 +307,13 @@ export default function BranchesScreen() {
           city: city.trim(),
           phone: phone.trim(),
           manager_name: managerName.trim(),
-          is_hq: finalIsHq
+          is_hq: finalIsHq,
+          google_review_url: googleReviewUrl.trim()
         } : (finalIsHq ? { ...b, is_hq: false } : b)));
 
         Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'Branch updated successfully.' : 'Cawangan berjaya dikemaskini.');
       } else {
         // Create new branch in PB
-        const newBranchId = `branch-${Date.now()}`;
         try {
           if (user?.merchant_id) {
             // If new branch is HQ, unset others first
@@ -242,12 +334,21 @@ export default function BranchesScreen() {
               phone: phone.trim(),
               manager_name: managerName.trim(),
               is_hq: finalIsHq,
+              google_review_url: googleReviewUrl.trim(),
               status: 'active'
             });
             if (created?.id) {
+              const newEnriched: Branch = {
+                ...(created as any),
+                total_sales: 0,
+                total_stamps: 0,
+                customer_count: 0,
+                staff_count: 1,
+                assigned_stands: []
+              };
               setBranches(prev => finalIsHq 
-                ? [created as any, ...prev.map(b => ({ ...b, is_hq: false }))]
-                : [...prev, created as any]
+                ? [newEnriched, ...prev.map(b => ({ ...b, is_hq: false }))]
+                : [...prev, newEnriched]
               );
               setModalVisible(false);
               setSubmitting(false);
@@ -258,23 +359,6 @@ export default function BranchesScreen() {
         } catch (e) {
           console.log('PB create branch error:', e);
         }
-
-        const newBranchObj: Branch = {
-          id: newBranchId,
-          name: name.trim(),
-          address: address.trim() || 'Outlet Address',
-          city: city.trim() || 'Selangor',
-          phone: phone.trim() || '0123456789',
-          manager_name: managerName.trim() || 'Branch Manager',
-          is_hq: finalIsHq,
-          status: 'active',
-          staff_count: 1,
-          total_sales: 0,
-          total_stamps: 0
-        };
-
-        setBranches(prev => finalIsHq ? [newBranchObj, ...prev.map(b => ({ ...b, is_hq: false }))] : [...prev, newBranchObj]);
-        Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'New branch added successfully.' : 'Cawangan baru berjaya ditambah.');
       }
       setModalVisible(false);
     } catch (err: any) {
@@ -367,6 +451,104 @@ export default function BranchesScreen() {
               </View>
             </View>
           </View>
+
+          {/* Multi-Branch Performance Spotlight / Comparison */}
+          {branches.length > 0 && (
+            <View style={{
+              backgroundColor: '#050505',
+              borderRadius: 22,
+              padding: 18,
+              marginBottom: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 4
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="bar-chart" size={16} color="#FFC700" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      {locale === 'en' ? 'Brand-Wide Outlets Summary' : 'Ringkasan Seluruh Cawangan'}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                      {branches.length} {locale === 'en' ? 'active outlets registered' : 'cawangan aktif'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#38BDF8' }}>
+                    LIVE DATA
+                  </Text>
+                </View>
+              </View>
+
+              {/* Total Brand Stats Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', borderRadius: 14, padding: 12, marginBottom: 14 }}>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL SALES</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
+                    RM {branches.reduce((sum, b) => sum + (b.total_sales || 0), 0).toLocaleString()}
+                  </Text>
+                </View>
+                <View style={{ width: 1, height: 26, backgroundColor: '#262626' }} />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL STAMPS</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', marginTop: 2 }}>
+                    {branches.reduce((sum, b) => sum + (b.total_stamps || 0), 0).toLocaleString()}
+                  </Text>
+                </View>
+                <View style={{ width: 1, height: 26, backgroundColor: '#262626' }} />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL STAFF</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
+                    {branches.reduce((sum, b) => sum + (b.staff_count || 1), 0)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Multi-Branch Revenue Distribution Bar */}
+              {(() => {
+                const totalRev = branches.reduce((sum, b) => sum + (b.total_sales || 0), 0);
+                const colors = ['#FFC700', '#38BDF8', '#10B981', '#F43F5E', '#A855F7'];
+                return (
+                  <View>
+                    <View style={{ height: 6, borderRadius: 3, backgroundColor: '#262626', flexDirection: 'row', overflow: 'hidden', marginBottom: 8 }}>
+                      {branches.map((b, idx) => {
+                        const pct = totalRev > 0 ? ((b.total_sales || 0) / totalRev) * 100 : (100 / branches.length);
+                        return (
+                          <View
+                            key={b.id}
+                            style={{
+                              flex: pct,
+                              backgroundColor: colors[idx % colors.length]
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                      {branches.map((b, idx) => {
+                        const pct = totalRev > 0 ? Math.round(((b.total_sales || 0) / totalRev) * 100) : Math.round(100 / branches.length);
+                        return (
+                          <View key={b.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors[idx % colors.length] }} />
+                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
+                              {b.name.replace(' (HQ)', '')}: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{pct}%</Text>
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
 
           {/* Section Header */}
           <View style={styles.sectionHeaderRow}>
@@ -491,6 +673,77 @@ export default function BranchesScreen() {
                     ) : null}
                   </View>
 
+                  {/* Google Review & Hardware Badges Row */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    {branch.google_review_url ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (branch.google_review_url) {
+                            Linking.openURL(branch.google_review_url).catch(() => {});
+                          }
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          backgroundColor: '#FEF3C7',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: '#FDE68A'
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="star" size={12} color="#D97706" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                          Google Review Active
+                        </Text>
+                        <Ionicons name="open-outline" size={10} color="#B45309" />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => handleOpenEditModal(branch)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          backgroundColor: '#F1F5F9',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0'
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="add-circle-outline" size={12} color="#64748B" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                          {locale === 'en' ? '+ Add Google Review URL' : '+ Tambah URL Review'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {branch.assigned_stands && branch.assigned_stands.length > 0 && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: '#EFF6FF',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#DBEAFE'
+                      }}>
+                        <Ionicons name="hardware-chip-outline" size={12} color="#2563EB" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#1D4ED8' }}>
+                          {branch.assigned_stands.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
                   {/* Onboarding NFC Link */}
                   <View style={{
                     marginTop: 10,
@@ -554,21 +807,26 @@ export default function BranchesScreen() {
                     </View>
                   </View>
 
-                  {/* Quick Performance Strip */}
+                  {/* 4-Column Live Performance Strip */}
                   <View style={styles.performanceStrip}>
                     <View style={styles.perfItem}>
-                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Staff Members' : 'Bil. Staf'}</Text>
+                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Staff' : 'Staf'}</Text>
                       <Text style={styles.perfValue}>{branch.staff_count || 1}</Text>
                     </View>
                     <View style={styles.perfDivider} />
                     <View style={styles.perfItem}>
-                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Est. Sales' : 'Anggaran Jualan'}</Text>
+                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Footfall' : 'Pelawat'}</Text>
+                      <Text style={styles.perfValue}>{(branch.customer_count || 0).toLocaleString()}</Text>
+                    </View>
+                    <View style={styles.perfDivider} />
+                    <View style={styles.perfItem}>
+                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Sales' : 'Jualan'}</Text>
                       <Text style={styles.perfValue}>RM {(branch.total_sales || 0).toLocaleString()}</Text>
                     </View>
                     <View style={styles.perfDivider} />
                     <View style={styles.perfItem}>
-                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Stamps Issued' : 'Stamp Diedar'}</Text>
-                      <Text style={[styles.perfValue, { color: '#FFC700' }]}>{branch.total_stamps || 0}</Text>
+                      <Text style={styles.perfLabel}>{locale === 'en' ? 'Stamps' : 'Stamp'}</Text>
+                      <Text style={[styles.perfValue, { color: '#FFC700' }]}>{(branch.total_stamps || 0).toLocaleString()}</Text>
                     </View>
                   </View>
                 </View>
@@ -606,7 +864,7 @@ export default function BranchesScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
                 {/* Branch Name */}
                 <Text style={styles.inputLabel}>{locale === 'en' ? 'BRANCH NAME *' : 'NAMA CAWANGAN *'}</Text>
                 <TextInput
@@ -637,6 +895,42 @@ export default function BranchesScreen() {
                   onChangeText={setAddress}
                   multiline
                 />
+
+                {/* Branch-Specific Google Review Link */}
+                <Text style={styles.inputLabel}>
+                  {locale === 'en' ? 'OUTLET GOOGLE REVIEW URL (OPTIONAL)' : 'URL GOOGLE REVIEW CAWANGAN (PILIHAN)'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                    placeholder="https://maps.app.goo.gl/... or g.page"
+                    placeholderTextColor="#94A3B8"
+                    value={googleReviewUrl}
+                    onChangeText={setGoogleReviewUrl}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    onPress={handleTestGoogleReviewUrl}
+                    disabled={resolvingGoogleUrl || !googleReviewUrl.trim()}
+                    style={{
+                      backgroundColor: '#050505',
+                      paddingHorizontal: 14,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: googleReviewUrl.trim() ? 1 : 0.5
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {resolvingGoogleUrl ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                        {locale === 'en' ? 'Verify' : 'Sahkan'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
 
                 {/* Manager Name */}
                 <Text style={styles.inputLabel}>{locale === 'en' ? 'BRANCH MANAGER' : 'NAMA PENGURUS'}</Text>

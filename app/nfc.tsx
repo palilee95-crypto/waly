@@ -156,7 +156,7 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
 
 export default function NfcLandingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ m?: string; merchant?: string; c?: string; s?: string; code?: string; tag?: string }>();
+  const params = useLocalSearchParams<{ m?: string; merchant?: string; c?: string; s?: string; code?: string; tag?: string; b?: string; branch?: string }>();
   const { user, logout, refreshSession } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
@@ -183,6 +183,7 @@ export default function NfcLandingScreen() {
   };
 
   const [merchant, setMerchant] = useState<any>(null);
+  const [branch, setBranch] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
   const [reward, setReward] = useState<any>(null);
   const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
@@ -304,10 +305,11 @@ export default function NfcLandingScreen() {
     const storageKey = `risev_reviewed_${merchant?.id}_${phone}`;
 
     if (star === 5) {
-      // 1. Prepare target Google URL
-      let targetUrl = (merchant?.google_review_url || '').trim();
+      // 1. Prepare target Google URL (Prioritize outlet-specific Google Review link over general merchant link)
+      let targetUrl = (branch?.branch_google_review_url || branch?.google_review_url || merchant?.google_review_url || '').trim();
       if (!targetUrl) {
-        const storeName = merchant?.name ? `${merchant.name} review` : 'google review';
+        const outletName = branch?.branch_name ? `${merchant?.name || ''} ${branch.branch_name}` : merchant?.name;
+        const storeName = outletName ? `${outletName} review` : 'google review';
         targetUrl = `https://www.google.com/search?q=${encodeURIComponent(storeName)}`;
       } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
         targetUrl = `https://${targetUrl}`;
@@ -526,11 +528,15 @@ export default function NfcLandingScreen() {
           code?: string;
           quota?: number;
           plan?: string;
+          branch?: any;
         }>(`/api/risev/nfc/resolve?c=${encodeURIComponent(rawCode)}&m=${encodeURIComponent(rawMerchantId)}`, {
           method: 'GET',
         });
 
         if (resolveRes.success) {
+          if (resolveRes.branch) {
+            setBranch(resolveRes.branch);
+          }
           if (resolveRes.is_paired && resolveRes.merchant_id) {
             // Paired Stand: load merchant details
             await loadMerchantAndPrograms(resolveRes.merchant_id, isMounted);
@@ -929,6 +935,8 @@ export default function NfcLandingScreen() {
             merchant_id: merchant.id,
             phone: cleanPhone,
             name: displayName,
+            branch_id: branch?.branch_id || params.b || params.branch || undefined,
+            branch_name: branch?.branch_name || undefined,
           },
         });
         if (reqRes?.claim_id) {

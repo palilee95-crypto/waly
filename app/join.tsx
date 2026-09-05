@@ -24,7 +24,7 @@ type Step = 'loading' | 'invalid' | 'phone_entry' | 'login' | 'register' | 'send
 export default function JoinScreen() {
   const router = useRouter();
   const { user, isAuthenticated, loginWithIdentifier, register, checkPhone, quickRegister } = useAuth();
-  const params = useLocalSearchParams<{ m: string; bill: string; stamps: string; t: string }>();
+  const params = useLocalSearchParams<{ m?: string; bill?: string; stamps?: string; t?: string; b?: string; branch?: string }>();
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
@@ -49,6 +49,14 @@ export default function JoinScreen() {
   // ── Validate QR on mount ─────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      if (!params.t && params.m) {
+        router.replace({
+          pathname: '/nfc' as any,
+          params: { m: params.m, b: params.b || params.branch || '' }
+        });
+        return;
+      }
+
       if (!params.t || !params.m) {
         setInvalidReason('Invalid QR code');
         setStep('invalid');
