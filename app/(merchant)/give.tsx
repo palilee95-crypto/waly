@@ -11,10 +11,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
@@ -33,6 +36,28 @@ export default function GiveStampsScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraActive, setIsCameraActive] = useState(false);
   const isProcessingScan = React.useRef(false);
+
+  // Lifecycle Scoping: Automatically unmount camera when screen loses focus
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setIsCameraActive(false);
+      };
+    }, [])
+  );
+
+  // Lifecycle Scoping: Automatically unmount camera when app is backgrounded/inactive
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState !== 'active') {
+        setIsCameraActive(false);
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Voucher Scanner States
   const [voucherCode, setVoucherCode] = useState('');
@@ -355,7 +380,7 @@ export default function GiveStampsScreen() {
 
             {/* Viewfinder & Camera Scanner Card */}
             <View style={styles.viewfinderCard}>
-              {isCameraActive ? (
+              {isCameraActive && activeTab === 'voucher' ? (
                 permission?.granted ? (
                   <View style={{ width: '100%', height: 260, position: 'relative' }}>
                     <CameraView
