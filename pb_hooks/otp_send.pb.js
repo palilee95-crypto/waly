@@ -141,12 +141,16 @@ routerAdd("POST", "/api/risev/login", (e) => {
     return e.json(400, { message: "Identifier and password are required" });
   }
 
-  // Try email first, then phone
+  // Try email first if @ is present, then phone
   let user = null;
-  try {
-    user = $app.findAuthRecordByEmail("users", identifier);
-  } catch (err) {
-    // Try phone lookup with normalization
+  if (identifier.includes('@')) {
+    try {
+      user = $app.findAuthRecordByEmail("users", identifier);
+    } catch (err) {}
+  }
+
+  // If not found by email or identifier is a phone number, look up by phone
+  if (!user) {
     let digits = String(identifier).replace(/[^\d]/g, '');
     if (digits) {
       if (digits.startsWith('0')) digits = '6' + digits;
@@ -163,8 +167,11 @@ routerAdd("POST", "/api/risev/login", (e) => {
   }
 
   if (!user || !user.validatePassword(password)) {
+    console.log("[LOGIN FAILED]", identifier, user ? "invalid password" : "user not found");
     return e.json(401, { message: "Invalid credentials" });
   }
+
+  console.log("[LOGIN SUCCESS]", identifier, "user:", user.id);
 
   const userEmail = user.getString("email") || "";
   const isShadowOrQuick = userEmail.startsWith("quick_") || userEmail.startsWith("shadow_");
@@ -219,9 +226,13 @@ routerAdd("POST", "/api/risev/request-password-reset", (e) => {
   }
 
   let user = null;
-  try {
-    user = $app.findAuthRecordByEmail("users", identifier);
-  } catch (err) {
+  if (identifier.includes('@')) {
+    try {
+      user = $app.findAuthRecordByEmail("users", identifier);
+    } catch (err) {}
+  }
+
+  if (!user) {
     let digits = String(identifier).replace(/[^\d]/g, '');
     if (digits) {
       if (digits.startsWith('0')) digits = '6' + digits;
