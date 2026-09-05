@@ -126,7 +126,11 @@ export default function NfcClaimModal() {
     setStampAmount('1');
   };
 
-  const handleDismiss = async () => {
+  const handleMinimize = () => {
+    setIsVisible(false);
+  };
+
+  const handleDecline = async () => {
     if (claim && !isSuccess) {
       try {
         await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
@@ -135,15 +139,45 @@ export default function NfcClaimModal() {
     handleClose();
   };
 
-  if (!isVisible || !claim) return null;
+  if (!claim) return null;
 
   return (
-    <Modal
-      visible={isVisible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleDismiss}
-    >
+    <>
+      {/* Floating Minimized Pending Capsule (visible when minimized so cashier can re-open anytime) */}
+      {!isVisible && !isSuccess && (
+        <View style={styles.floatingContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.floatingCapsule}
+            onPress={() => setIsVisible(true)}
+            activeOpacity={0.88}
+          >
+            <View style={styles.floatingPulseRing}>
+              <Ionicons name="wifi" size={15} color="#B45309" />
+            </View>
+            <View style={{ flex: 1, paddingRight: 6 }}>
+              <Text style={styles.floatingTitle} numberOfLines={1}>
+                Pending Tap: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{claim.customer_name || 'Customer'}</Text>
+              </Text>
+              <Text style={styles.floatingSubtitle}>
+                {claim.customer_phone} · RM {billAmount || '10'} ({stampAmount || '1'} stamp)
+              </Text>
+            </View>
+            <View style={[styles.floatingActionBadge, { backgroundColor: merchantColor }]}>
+              <Text style={styles.floatingActionText}>Open</Text>
+              <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Main Claim Modal */}
+      {isVisible && (
+        <Modal
+          visible={isVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={handleMinimize}
+        >
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
           {isSuccess ? (
@@ -230,7 +264,7 @@ export default function NfcClaimModal() {
                       <Text style={styles.title}>NFC Stamp Claim!</Text>
                       <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
                     </View>
-                    <TouchableOpacity onPress={handleDismiss} style={styles.closeBtn}>
+                    <TouchableOpacity onPress={handleMinimize} style={styles.closeBtn} accessibilityLabel="Minimize">
                       <Ionicons name="close" size={20} color="#64748B" />
                     </TouchableOpacity>
                   </View>
@@ -311,8 +345,13 @@ export default function NfcClaimModal() {
 
                   {/* Action Buttons */}
                   <View style={styles.actionRow}>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={handleDismiss} disabled={isLoading}>
-                      <Text style={styles.cancelBtnText}>Dismiss</Text>
+                    <TouchableOpacity style={styles.declineBtn} onPress={handleDecline} disabled={isLoading} activeOpacity={0.8}>
+                      <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
+                      <Text style={styles.declineBtnText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.laterBtn} onPress={handleMinimize} disabled={isLoading} activeOpacity={0.8}>
+                      <Ionicons name="time-outline" size={14} color="#64748B" />
+                      <Text style={styles.laterBtnText}>Later</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.confirmBtn, { backgroundColor: merchantColor, borderColor: merchantColor }]} 
@@ -323,7 +362,7 @@ export default function NfcClaimModal() {
                       {isLoading ? (
                         <ActivityIndicator size="small" color={contrastTextColor} />
                       ) : (
-                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps & Confirm</Text>
+                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -334,6 +373,8 @@ export default function NfcClaimModal() {
         </View>
       </View>
     </Modal>
+    )}
+  </>
   );
 }
 
@@ -481,25 +522,44 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
-  cancelBtn: {
-    flex: 1,
+  declineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     height: 48,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  declineBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#EF4444',
+  },
+  laterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    height: 48,
+    paddingHorizontal: 12,
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  cancelBtnText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
+  laterBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
   },
   confirmBtn: {
-    flex: 2,
+    flex: 1,
     height: 48,
     borderRadius: 14,
     backgroundColor: '#1A1400',
@@ -650,5 +710,64 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#475569',
+  },
+  floatingContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 16 : 48,
+    left: 16,
+    right: 16,
+    zIndex: 9999,
+    alignItems: 'center',
+  },
+  floatingCapsule: {
+    width: '100%',
+    maxWidth: 440,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+  },
+  floatingPulseRing: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  floatingSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  floatingActionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#050505',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  floatingActionText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
 });
