@@ -91,7 +91,7 @@ export default function LoginScreen() {
         if (res.exists) {
           const isFullyRegistered = res.verified === true || res.is_shadow === false;
           if (isFullyRegistered) {
-            setEmail(res.email || '');
+            setEmail(res.email || fullPhone);
             setStep('password');
           } else {
             if (res.name && !res.name.startsWith('User ') && !res.name.startsWith('Staff (') && !res.name.startsWith('Customer ')) {
@@ -206,7 +206,7 @@ export default function LoginScreen() {
       if (res.exists) {
         const isFullyRegistered = res.verified === true || res.is_shadow === false;
         if (isFullyRegistered) {
-          setEmail(res.email || '');
+          setEmail(res.email || fullPhone);
           setStep('password');
         } else {
           // Quick-registered / Shadow Staff returning to complete account setup!
@@ -638,7 +638,7 @@ export default function LoginScreen() {
                           styles.input,
                           Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                         ]}
-                        placeholder="user@example.com"
+                        placeholder="+60123456789 or user@example.com"
                         placeholderTextColor="#94A3B8"
                         value={email}
                         onChangeText={(t) => {
