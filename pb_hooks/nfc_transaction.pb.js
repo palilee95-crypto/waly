@@ -147,6 +147,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         txn.set("customer", customer.id);
         txn.set("merchant", merchantId);
         txn.set("loyalty_card", card.id);
+        txn.set("staff", staffId);
         const txnMeta = {
           source: "nfc_claim",
           claim_id: claimId,

@@ -118,6 +118,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("customer", customer.id);
     txn.set("merchant", merchantId);
     txn.set("loyalty_card", card.id);
+    txn.set("staff", authRecord.id);
     
     const txnMeta = {
       source: "manual_give",

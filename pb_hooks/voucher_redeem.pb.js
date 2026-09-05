@@ -37,6 +37,7 @@ onRecordUpdate((e) => {
       tx.set('type', 'redeem');
       tx.set('stamps', 0);
       tx.set('points', 0);
+      tx.set('staff', e.auth ? e.auth.id : '');
       
       const meta = {
         voucher_id: e.record.id,

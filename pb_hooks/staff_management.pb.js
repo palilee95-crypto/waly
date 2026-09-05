@@ -80,8 +80,11 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   // Build lookup maps for fast O(1) matching
   const staffMapById = {};
   const staffMapByName = {};
+  const staffMapByPhone = {};
 
   staffMembers.forEach(u => {
+    const sPhone = (u.getString("phone") || "").replace(/[^\d]/g, '');
+    const sName = (u.getString("name") || "").toLowerCase().trim();
     const sObj = {
       id: u.id,
       name: u.getString("name"),
@@ -96,32 +99,66 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       sales_volume: 0
     };
     staffMapById[u.id] = sObj;
-    if (sObj.name) {
-      staffMapByName[sObj.name] = sObj;
+    if (sName) {
+      staffMapByName[sName] = sObj;
+    }
+    if (sPhone) {
+      staffMapByPhone[sPhone] = sObj;
+      if (sPhone.startsWith('60')) {
+        staffMapByPhone['0' + sPhone.slice(2)] = sObj;
+      } else if (sPhone.startsWith('0')) {
+        staffMapByPhone['60' + sPhone.slice(1)] = sObj;
+      }
     }
   });
 
   // Single-pass aggregation over all transactions
   merchantTxns.forEach(tx => {
+    const txType = tx.getString("type");
+    const bill = parseFloat(tx.get("bill_amount")) || 0;
+    const stamps = parseInt(tx.get("stamps")) || 0;
+
+    // Track total store overview metrics
+    totalStoreSales += bill;
+    totalStoreTxns += 1;
+    if (txType === "earn") {
+      totalStoreStamps += (stamps || 1);
+    }
+
+    // 1. Check direct staff relation column
+    let targetStaffId = "";
+    try {
+      targetStaffId = tx.getString("staff") || "";
+    } catch (e) {}
+
     let meta = {};
     try {
       const rawMeta = tx.get("metadata");
-      if (typeof rawMeta === "string" && rawMeta.trim()) {
-        meta = JSON.parse(rawMeta);
-      } else if (typeof rawMeta === "object" && rawMeta !== null) {
-        meta = rawMeta;
+      if (rawMeta) {
+        if (typeof rawMeta === "string" && rawMeta.trim()) {
+          meta = JSON.parse(rawMeta);
+        } else if (typeof rawMeta === "object" && rawMeta !== null) {
+          try {
+            meta = JSON.parse(JSON.stringify(rawMeta));
+          } catch (e2) {
+            meta = rawMeta;
+          }
+        }
       }
     } catch (parseErr) {}
 
-    const targetStaffId = meta.staff_id || "";
-    const targetStaffName = meta.staff_name || "";
-    const matchedStaff = (targetStaffId && staffMapById[targetStaffId]) || (targetStaffName && staffMapByName[targetStaffName]) || null;
+    if (!targetStaffId) {
+      targetStaffId = meta.staff_id || meta.handled_by || "";
+    }
+
+    const rawStaffName = (meta.staff_name || "").toLowerCase().trim();
+    const rawStaffPhone = (meta.staff_phone || "").replace(/[^\d]/g, '');
+
+    const matchedStaff = (targetStaffId && staffMapById[targetStaffId]) ||
+                         (rawStaffName && staffMapByName[rawStaffName]) ||
+                         (rawStaffPhone && staffMapByPhone[rawStaffPhone]) || null;
 
     if (matchedStaff) {
-      const txType = tx.getString("type");
-      const bill = parseFloat(tx.get("bill_amount")) || 0;
-      const stamps = parseInt(tx.get("stamps")) || 0;
-
       matchedStaff.customers_served += 1;
       matchedStaff.sales_volume += bill;
 
@@ -130,15 +167,20 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       } else if (txType === "redeem" || txType === "reward") {
         matchedStaff.vouchers_redeemed += 1;
       }
+
+      // Self-heal: If direct staff relation is missing, backfill it
+      if (!tx.getString("staff")) {
+        try {
+          tx.set("staff", matchedStaff.id);
+          $app.save(tx);
+        } catch (healErr) {}
+      }
     }
   });
 
   let staffStats = staffMembers.map(u => {
     const sObj = staffMapById[u.id];
     sObj.sales_volume = Math.round(sObj.sales_volume * 100) / 100;
-    totalStoreStamps += sObj.stamps_issued;
-    totalStoreSales += sObj.sales_volume;
-    totalStoreTxns += sObj.customers_served;
     return sObj;
   });
 
