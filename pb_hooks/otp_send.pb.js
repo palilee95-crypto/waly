@@ -172,14 +172,40 @@ routerAdd("POST", "/api/risev/login", (e) => {
     return e.json(400, { message: "Please verify your email address before logging in." });
   }
 
+  let token = "";
+  try {
+    const duration = user.collection().authToken.duration || 604800;
+    const secret = user.tokenKey() + user.collection().authToken.secret;
+    token = $security.createJWT(
+      {
+        id: user.id,
+        type: "auth",
+        collectionId: user.collection().id,
+      },
+      secret,
+      duration
+    );
+  } catch (tokErr) {
+    console.log("[LOGIN JWT ERROR]:", tokErr.message || tokErr);
+  }
+
   return e.json(200, {
     success: true,
+    token: token,
     record: {
       id: user.id,
       email: user.getString("email"),
       name: user.getString("name"),
       role: user.getString("role"),
       phone: user.getString("phone"),
+      avatar: user.getString("avatar"),
+      birthday: user.getString("birthday"),
+      verified: user.getBool("verified"),
+      merchant_id: user.getString("merchant_id"),
+      tier: user.getString("tier"),
+      total_points: user.getInt("total_points"),
+      branch: user.getString("branch"),
+      branch_name: user.getString("branch_name")
     }
   });
 });

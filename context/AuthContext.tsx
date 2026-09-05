@@ -445,27 +445,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginWithIdentifier = async (identifier: string, password: string) => {
-    // Try email login first via PocketBase SDK
-    try {
-      await loginWithPassword(identifier, password);
-      return;
-    } catch (e: any) {
-      if (e?.message === 'EMAIL_NOT_VERIFIED') {
-        throw e;
+    // Try email login first via PocketBase SDK if identifier is an email
+    if (identifier.includes('@')) {
+      try {
+        await loginWithPassword(identifier.trim().toLowerCase(), password);
+        return;
+      } catch (e: any) {
+        if (e?.message === 'EMAIL_NOT_VERIFIED') {
+          throw e;
+        }
       }
-      // If email fails with invalid credentials, try phone login via custom endpoint
     }
 
-    // Phone-based login: get email from phone, then auth
-    const cleanIdentifier = encodeURIComponent(identifier.trim());
-    const res = await pb.send<{ exists: boolean; email?: string }>(`/api/risev/check-phone?phone=${cleanIdentifier}`, {
-      method: 'GET',
+    // Call unified login endpoint (supports phone and email)
+    const res = await pb.send<{ success: boolean; token?: string; record?: any; message?: string }>('/api/risev/login', {
+      method: 'POST',
+      body: { identifier: identifier.trim(), password },
       requestKey: null,
     });
-    if (!res.exists || !res.email) {
-      throw new Error('Invalid credentials');
+
+    if (!res || !res.success || !res.token || !res.record) {
+      if (res?.message && (res.message.includes('verify') || res.message.includes('verified'))) {
+        throw new Error('EMAIL_NOT_VERIFIED');
+      }
+      throw new Error(res?.message || 'Invalid credentials');
     }
-    await loginWithPassword(res.email, password);
+
+    pb.authStore.save(res.token, res.record);
+    const authRecord = res.record;
+    const rawRole = authRecord.role || 'customer';
+    const role: UserRole = rawRole === 'both' ? 'customer' : (rawRole as UserRole);
+    await storage.setItem('risev_token', res.token);
+    await storage.setItem('risev_record', JSON.stringify(authRecord));
+    await storage.setItem('risev_active_role', role || 'customer');
+
+    const merchantData = await ensureMerchantProfile(authRecord);
+    setUser({
+      id: authRecord.id,
+      phone: authRecord.phone || '',
+      name: authRecord.name || '',
+      email: authRecord.email || '',
+      avatar: authRecord.avatar || undefined,
+      role,
+      activeRole: role,
+      merchant_id: merchantData.id,
+      merchant_status: merchantData.status,
+      merchant_created: merchantData.created,
+      is_owner: merchantData.is_owner,
+      is_staff: merchantData.is_staff,
+      staff_permissions: merchantData.staff_permissions,
+      tier: authRecord.tier || undefined,
+      total_points: authRecord.total_points || 0,
+      branch: authRecord.branch || undefined,
+      branch_name: authRecord.branch_name || undefined,
+    });
+    setActiveRole(role);
   };
 
   const resetPassword = async (phone: string, otpId: string, otpCode: string, newPassword: string) => {
@@ -476,8 +510,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const requestPasswordReset = async (email: string) => {
-    await pb.collection('users').requestPasswordReset(email);
+  const requestPasswordReset = async (identifier: string) => {
+    await pb.send<{ success: boolean; message?: string }>('/api/risev/request-password-reset', {
+      method: 'POST',
+      body: { identifier: identifier.trim() },
+      requestKey: null,
+    });
   };
 
   const loginWithPassword = async (email: string, password: string) => {

@@ -291,15 +291,15 @@ export default function LoginScreen() {
   };
 
   const handlePasswordLogin = async () => {
-    if (!email || !password) {
-      setErrorMsg('Please fill in all fields.');
+    const targetIdentifier = email.trim() || getFullPhone() || phone;
+    if (!targetIdentifier || !password) {
+      setErrorMsg('Please enter your password.');
       return;
     }
     setIsLoading(true);
     setErrorMsg('');
     try {
-      // Try email first, then phone
-      await loginWithIdentifier(email.trim(), password);
+      await loginWithIdentifier(targetIdentifier, password);
       const record = pb.authStore.record;
       const userRole = record?.role || 'customer';
       const redirectUrl = getRedirectUrl();
@@ -689,26 +689,20 @@ export default function LoginScreen() {
                     {/* Forgot Password Link */}
                     <TouchableOpacity
                       onPress={async () => {
-                        if (!phone) {
-                          Alert.alert('Info', 'Please enter your phone number first.');
+                        const targetIdentifier = email.trim() || getFullPhone() || phone;
+                        if (!targetIdentifier) {
+                          Alert.alert('Info', 'Please enter your phone number or email address first.');
                           setStep('phone');
-                          return;
-                        }
-                        if (!email || email.trim() === '') {
-                          Alert.alert('Error', 'No email address found for this account. Please contact support.');
-                          return;
-                        }
-                        if (email.endsWith('@risev.app') || email.includes('shadow_') || email.includes('quick_')) {
-                          Alert.alert('Info', 'This account was created without a personal email. Please contact support or register a new account.');
                           return;
                         }
                         try {
                           setIsLoading(true);
-                          await requestPasswordReset(email.trim());
+                          await requestPasswordReset(targetIdentifier);
+                          const successMsg = 'If an account exists with this phone or email, a password reset link has been sent to your registered email address.';
                           if (Platform.OS === 'web') {
-                            alert(`A password reset link has been sent to ${email}. Please check your inbox.`);
+                            alert(successMsg);
                           } else {
-                            Alert.alert('Reset Sent', `A password reset link has been sent to ${email}. Please check your inbox.`);
+                            Alert.alert('Password Reset', successMsg);
                           }
                         } catch (e: any) {
                           Alert.alert('Error', e?.message || 'Failed to send password reset email.');
@@ -716,7 +710,7 @@ export default function LoginScreen() {
                           setIsLoading(false);
                         }
                       }}
-                      style={{ alignSelf: 'flex-end', marginTop: 4 }}
+                      style={{ alignSelf: 'flex-end', marginTop: 4, paddingVertical: 4 }}
                     >
                       <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
                         Forgot Password?
