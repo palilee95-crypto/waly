@@ -212,14 +212,21 @@ routerAdd("GET", "/api/risev/merchant/whatsapp/callback", (e) => {
     let merchantId = "";
     let redirectHost = "https://risev.app"; // default fallback
     let callbackUrl = "";
+    const allowedHosts = ["https://risev.app", "https://api.risev.app", "http://localhost:8081", "http://localhost:19006"];
     try {
       const decodedState = JSON.parse(decodeURIComponent(stateStr));
       merchantId = decodedState.merchantId;
       if (decodedState.redirectHost) {
-        redirectHost = decodedState.redirectHost;
+        const isAllowed = allowedHosts.some(h => decodedState.redirectHost === h || decodedState.redirectHost.startsWith(h));
+        if (isAllowed) {
+          redirectHost = decodedState.redirectHost;
+        }
       }
       if (decodedState.callbackUrl) {
-        callbackUrl = decodedState.callbackUrl;
+        const isAllowedCb = allowedHosts.some(h => decodedState.callbackUrl.startsWith(h));
+        if (isAllowedCb) {
+          callbackUrl = decodedState.callbackUrl;
+        }
       }
     } catch (err) {
       // Fallback if state is raw merchantId string
@@ -878,8 +885,40 @@ routerAdd("POST", "/api/risev/whatsapp-webhook", (e) => {
   return e.json(200, { success: true, message: "Webhook decommissioned" });
 });
 
-// 5. GET Test WhatsApp Send (Temporary Route)
+// 5. GET Test WhatsApp Send (Superuser Only)
 routerAdd("GET", "/api/risev/test/send-whatsapp", (e) => {
+  let authRecord = e.auth || null;
+  if (!authRecord && typeof e.get === "function") {
+    try { authRecord = e.get("authRecord"); } catch (err) {}
+  }
+  if (!authRecord) {
+    let authHeader = "";
+    try {
+      if (e.requestInfo && e.requestInfo().headers) {
+        authHeader = e.requestInfo().headers["authorization"] || "";
+      }
+    } catch (err) {}
+    if (authHeader) {
+      const parts = authHeader.split(" ");
+      const token = parts.length === 2 ? parts[1] : parts[0];
+      if (token) {
+        try {
+          authRecord = $app.findAuthRecordByToken(token, $app.settings().recordAuthToken.secret);
+        } catch (tokErr) {
+          try { authRecord = $app.findAuthRecordByToken(token); } catch (tokErr2) {}
+        }
+      }
+    }
+  }
+
+  const isSuperuser = authRecord && ((authRecord.isSuperuser === true) || 
+                      (authRecord.collection && authRecord.collection().name === "_superusers") ||
+                      (authRecord.getString && authRecord.getString("role") === "admin"));
+
+  if (!isSuperuser) {
+    return e.json(403, { error: "Forbidden. Admin/Superuser access required." });
+  }
+
   const { sendTemplateMessage } = require(`${__hooks}/whatsapp_helper.js`);
   try {
     const phone = e.requestInfo().query.phone;

@@ -52,28 +52,30 @@ routerAdd("POST", "/api/risev/qr/quick-register", (e) => {
       $app.save(user);
     }
 
-    // Generate user token for immediate authentication session
     let token = "";
-    try {
-      const duration = user.collection().authToken.duration || 604800;
-      const secret = user.tokenKey() + user.collection().authToken.secret;
-      token = $security.createJWT(
-        {
-          id: user.id,
-          type: "auth",
-          collectionId: user.collection().id,
-        },
-        secret,
-        duration
-      );
-    } catch (tokenErr) {
-      console.log("[QUICK REGISTER] Token creation fallback:", tokenErr.message || tokenErr);
+    if (isNewUser) {
+      try {
+        const duration = user.collection().authToken.duration || 604800;
+        const secret = user.tokenKey() + user.collection().authToken.secret;
+        token = $security.createJWT(
+          {
+            id: user.id,
+            type: "auth",
+            collectionId: user.collection().id,
+          },
+          secret,
+          duration
+        );
+      } catch (tokenErr) {
+        console.log("[QUICK REGISTER] Token creation fallback:", tokenErr.message || tokenErr);
+      }
     }
 
     return e.json(200, {
       success: true,
       isNewUser: isNewUser,
       token: token,
+      message: isNewUser ? "Quick account created successfully" : "User exists. Please log in with your credentials.",
       user: {
         id: user.id,
         phone: user.getString("phone"),

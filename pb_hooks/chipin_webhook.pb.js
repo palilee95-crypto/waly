@@ -8,6 +8,16 @@ routerAdd("POST", "/api/risev/chipin-webhook", (c) => {
 
     console.log("[CHIPIN WEBHOOK RECEIVED]", JSON.stringify(body));
 
+    const expectedSecret = $os.getenv("CHIPIN_WEBHOOK_SECRET") || $os.getenv("CHIPIN_API_KEY") || "";
+    const signature = headers["x-signature"] || headers["x-chip-signature"] || headers["authorization"] || "";
+
+    if (expectedSecret && signature) {
+      if (signature !== expectedSecret && !signature.includes(expectedSecret)) {
+        console.log("[CHIPIN WEBHOOK] Invalid webhook signature/secret.");
+        return c.json(403, { success: false, message: "Invalid webhook signature" });
+      }
+    }
+
     const eventType = body.event_type || "";
     const paymentStatus = (body.status || "").toLowerCase();
     const purchaseId = body.id || "";

@@ -179,6 +179,14 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
     return c.json(401, { success: false, message: "Authentication required." });
   }
 
+  const isSuperuser = (authRecord.isSuperuser === true) || 
+                      (authRecord.collection && authRecord.collection().name === "_superusers") ||
+                      (authRecord.getString && authRecord.getString("role") === "admin");
+
+  if (!isSuperuser) {
+    return c.json(403, { success: false, message: "Forbidden. Admin/Superuser access required." });
+  }
+
   let body = {};
   try {
     body = c.requestInfo().body || {};

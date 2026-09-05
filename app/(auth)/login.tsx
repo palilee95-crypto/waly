@@ -35,12 +35,17 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string; redirect_to?: string }>();
 
   const getRedirectUrl = () => {
-    if (params?.redirect_to) return params.redirect_to;
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    let raw = params?.redirect_to;
+    if (!raw && Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
         const sp = new URLSearchParams(window.location.search);
-        return sp.get('redirect_to') || '';
+        raw = sp.get('redirect_to') || '';
       } catch (e) {}
+    }
+    if (!raw) return '';
+    // Must be a relative path starting with a single '/' and not containing '//', '\', or ':'
+    if (raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('\\') && !raw.includes(':')) {
+      return raw;
     }
     return '';
   };
@@ -84,7 +89,7 @@ export default function LoginScreen() {
     checkPhone(fullPhone)
       .then((res) => {
         if (res.exists) {
-          const isFullyRegistered = res.verified === true || (res.email && res.email.trim() && !res.email.includes('@risev.app'));
+          const isFullyRegistered = res.verified === true || res.is_shadow === false;
           if (isFullyRegistered) {
             setEmail(res.email || '');
             setStep('password');
@@ -199,7 +204,7 @@ export default function LoginScreen() {
       const fullPhone = getFullPhone();
       const res = await checkPhone(fullPhone);
       if (res.exists) {
-        const isFullyRegistered = res.verified === true || (res.email && res.email.trim() && !res.email.includes('@risev.app'));
+        const isFullyRegistered = res.verified === true || res.is_shadow === false;
         if (isFullyRegistered) {
           setEmail(res.email || '');
           setStep('password');

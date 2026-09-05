@@ -28,11 +28,12 @@ const checkPhoneHandler = (e) => {
   } catch (err) { /* not found */ }
 
   if (user) {
+    const userEmail = user.getString("email") || "";
+    const isShadow = userEmail.includes("@risev.app") || userEmail.startsWith("shadow_") || userEmail.startsWith("quick_");
     return e.json(200, { 
       exists: true, 
-      name: user.getString("name"), 
-      email: user.getString("email"),
-      verified: user.getBool("verified")
+      verified: user.getBool("verified"),
+      is_shadow: isShadow
     });
   } else {
     return e.json(200, { exists: false });

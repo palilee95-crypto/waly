@@ -126,6 +126,24 @@ routerAdd("POST", "/api/risev/google-review/resolve", (e) => {
     fetchUrl = `https://${fetchUrl}`;
   }
 
+  // SSRF Protection: Validate allowed Google domains and reject internal/private destinations
+  const allowedGoogleHostRegex = /^(?:[a-zA-Z0-9-]+\.)*(?:google\.com|google\.com\.[a-z]{2}|goo\.gl|g\.page)$/i;
+  let parsedHost = "";
+  try {
+    const hostMatch = fetchUrl.match(/^https?:\/\/([^/?#:]+)/i);
+    if (hostMatch) {
+      parsedHost = hostMatch[1].toLowerCase();
+    }
+  } catch (hErr) {}
+
+  if (!parsedHost || !allowedGoogleHostRegex.test(parsedHost)) {
+    return e.json(400, { success: false, message: "Invalid URL. Only Google Maps and Google Business URLs are supported." });
+  }
+
+  if (parsedHost === "localhost" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|::1)/.test(parsedHost)) {
+    return e.json(400, { success: false, message: "Invalid domain target." });
+  }
+
   try {
     const res = $http.send({
       method: "GET",

@@ -248,6 +248,41 @@ routerAdd("POST", "/api/risev/shipping/rate-check", handleJntRateCheck);
 // Route: POST /api/risev/jnt/book (& aliases)
 // Creates order via J&T Open API and updates hardware_orders record
 function handleJntBook(c) {
+  let authRecord = c.auth || null;
+  if (!authRecord && typeof c.get === "function") {
+    try { authRecord = c.get("authRecord"); } catch (e) {}
+  }
+  if (!authRecord && c.httpContext) {
+    try { authRecord = c.httpContext.get("authRecord"); } catch (e) {}
+  }
+
+  if (!authRecord) {
+    let authHeader = "";
+    try {
+      if (c.requestInfo && c.requestInfo().headers) {
+        authHeader = c.requestInfo().headers["authorization"] || "";
+      }
+    } catch (e) {}
+    if (!authHeader) {
+      try { authHeader = c.request().header.get("Authorization") || ""; } catch (e) {}
+    }
+    if (authHeader) {
+      const parts = authHeader.split(" ");
+      const token = parts.length === 2 ? parts[1] : parts[0];
+      if (token) {
+        try {
+          authRecord = $app.findAuthRecordByToken(token, $app.settings().recordAuthToken.secret);
+        } catch (tokErr) {
+          try { authRecord = $app.findAuthRecordByToken(token); } catch (tokErr2) {}
+        }
+      }
+    }
+  }
+
+  if (!authRecord) {
+    return c.json(401, { success: false, message: "Authentication required to book shipping." });
+  }
+
   let body = {};
   try {
     body = c.requestInfo().body || {};
@@ -278,6 +313,21 @@ function handleJntBook(c) {
 
   if (!orderRecord) {
     return c.json(404, { success: false, message: "Order record not found" });
+  }
+
+  const isSuperuser = (authRecord.isSuperuser === true) || 
+                      (authRecord.collection && authRecord.collection().name === "_superusers") ||
+                      (authRecord.getString && authRecord.getString("role") === "admin");
+
+  const orderUserId = orderRecord.getString("user");
+  const orderMerchantId = orderRecord.getString("merchant");
+  const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
+
+  const isOrderOwner = (orderUserId && orderUserId === authRecord.id) || 
+                       (orderMerchantId && orderMerchantId === authMerchantId);
+
+  if (!isSuperuser && !isOrderOwner) {
+    return c.json(403, { success: false, message: "Forbidden. You do not have permission to book shipping for this order." });
   }
 
   const courierName = "J&T Express";

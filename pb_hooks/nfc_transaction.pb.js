@@ -27,6 +27,30 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
     }
 
     const merchantId = claim.getString("merchant");
+    const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
+    let isOwner = false;
+    try {
+      const merchRec = $app.findRecordById("merchants", merchantId);
+      if (merchRec && merchRec.getString("owner") === authRecord.id) {
+        isOwner = true;
+      }
+    } catch (mErr) {}
+
+    const isSuperuser = (authRecord.isSuperuser === true) || 
+                        (authRecord.collection && authRecord.collection().name === "_superusers");
+
+    if (!isOwner && authMerchantId !== merchantId && !isSuperuser) {
+      return e.json(403, { message: "Forbidden. You are not authorized to confirm claims for this store." });
+    }
+
+    if (stampAmount < 1 || stampAmount > 100) {
+      return e.json(400, { message: "Invalid stamp amount. Must be between 1 and 100." });
+    }
+
+    if (billAmount < 0) {
+      return e.json(400, { message: "Bill amount cannot be negative." });
+    }
+
     const cleanPhone = claim.getString("customer_phone");
     const customerName = claim.getString("customer_name") || "there";
 

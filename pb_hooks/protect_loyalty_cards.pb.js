@@ -7,11 +7,21 @@ onRecordUpdate((e) => {
     return e.next();
   }
 
-  // Check if user is a merchant or admin
-  const isMerchant = authRecord.get("role") === "merchant" || authRecord.get("role") === "both";
+  // Check if user is a superuser
+  const isSuperuser = (authRecord.isSuperuser === true) || 
+                      (authRecord.collection && authRecord.collection().name === "_superusers") ||
+                      (authRecord.getString && authRecord.getString("role") === "admin");
 
-  if (!isMerchant) {
-    // Customers can only update opt_in_marketing. Let's compare all other fields with original values.
+  if (isSuperuser) {
+    return e.next();
+  }
+
+  const cardMerchantId = e.record.get("merchant");
+  const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
+  const isCardOwnerMerchant = authMerchantId && cardMerchantId === authMerchantId;
+
+  if (!isCardOwnerMerchant) {
+    // Customers and non-owner merchants can only update opt_in_marketing
     const original = e.record.original();
     const criticalFields = ["stamps_collected", "completions", "program", "customer", "merchant", "status"];
     
