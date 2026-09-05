@@ -150,13 +150,13 @@ export default function VouchersScreen() {
     }
   };
 
+  // 1. Global collection subscription for user's vouchers
   useEffect(() => {
     fetchVouchers();
     if (user) {
       pb.collection('vouchers').subscribe('*', (e) => {
         fetchVouchers();
         if (e.record) {
-          // If the voucher currently shown in the modal is updated (e.g. redeemed)
           setSelectedVoucher((prev) => {
             if (prev && prev.id === e.record.id) {
               const isUsed = e.record.status === 'used';
@@ -170,16 +170,63 @@ export default function VouchersScreen() {
             return prev;
           });
         }
-      }, {
-        filter: `customer = '${user.id}'`
       }).catch((err) => {
-        console.warn('Voucher realtime subscription error:', err);
+        console.warn('Vouchers collection realtime subscription error:', err);
       });
     }
     return () => {
       pb.collection('vouchers').unsubscribe('*');
     };
   }, [user]);
+
+  // 2. Active Modal Realtime Watchdog (Direct Record SSE + 1.5s Polling Fallback)
+  useEffect(() => {
+    if (!useModalVisible || !selectedVoucher || selectedVoucher.status === 'used') return;
+
+    const voucherId = selectedVoucher.id;
+    let isMounted = true;
+
+    // Direct single-record SSE subscription (instant push notification from server)
+    pb.collection('vouchers').subscribe(voucherId, (e) => {
+      if (!isMounted) return;
+      if (e.action === 'update' && e.record && e.record.status === 'used') {
+        setSelectedVoucher((prev) => prev && prev.id === voucherId ? {
+          ...prev,
+          status: 'used',
+          rawStatus: 'used',
+          expiry: `Used on ${new Date().toLocaleDateString()}`,
+        } : prev);
+        fetchVouchers();
+      }
+    }).catch((err) => {
+      console.warn('Direct voucher SSE subscription error:', err);
+    });
+
+    // 1.5s Active Modal Polling Watchdog (guarantees update even across network hiccups)
+    const interval = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const latest = await pb.collection('vouchers').getOne(voucherId, { requestKey: null });
+        if (latest && latest.status === 'used') {
+          if (isMounted) {
+            setSelectedVoucher((prev) => prev && prev.id === voucherId ? {
+              ...prev,
+              status: 'used',
+              rawStatus: 'used',
+              expiry: `Used on ${new Date().toLocaleDateString()}`,
+            } : prev);
+            fetchVouchers();
+          }
+        }
+      } catch (err) {}
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      pb.collection('vouchers').unsubscribe(voucherId).catch(() => {});
+    };
+  }, [useModalVisible, selectedVoucher?.id, selectedVoucher?.status]);
 
   const filteredVouchers = vouchers.filter((v) => v.status === activeTab);
 
