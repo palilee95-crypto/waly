@@ -156,12 +156,22 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
       console.log("[REDEEM STAND CODE] Merchant update notice:", mErr.message || mErr);
     }
 
-    // 5. Mark code as redeemed & bind branch
+    // 5. Mark code as redeemed & bind branch (validating branch belongs to merchant)
+    let validatedBranchId = "";
     const branchId = (body.branch_id || body.branch || "").trim();
+    if (branchId) {
+      try {
+        const bRec = $app.findRecordById("branches", branchId);
+        if (bRec && bRec.getString("merchant") === merchantId) {
+          validatedBranchId = bRec.id;
+        }
+      } catch (bErr) {}
+    }
+
     codeRecord.set("is_redeemed", true);
     codeRecord.set("redeemed_by", merchantId);
-    if (branchId) {
-      codeRecord.set("branch", branchId);
+    if (validatedBranchId) {
+      codeRecord.set("branch", validatedBranchId);
     }
     const nowStr = new Date().toISOString().replace("T", " ").substring(0, 19);
     codeRecord.set("redeemed_at", nowStr);
@@ -234,8 +244,21 @@ routerAdd("POST", "/api/risev/merchant/bind-stand-branch", (c) => {
       return c.json(404, { success: false, message: "Stand code not found under your merchant account." });
     }
 
+    let validatedBranchId = "";
+    if (targetBranchId) {
+      try {
+        const bRec = $app.findRecordById("branches", targetBranchId);
+        if (!bRec || bRec.getString("merchant") !== merchantId) {
+          return c.json(400, { success: false, message: "Branch does not belong to your merchant account." });
+        }
+        validatedBranchId = bRec.id;
+      } catch (bErr) {
+        return c.json(400, { success: false, message: "Invalid branch ID." });
+      }
+    }
+
     const codeRec = codes[0];
-    codeRec.set("branch", targetBranchId || "");
+    codeRec.set("branch", validatedBranchId || "");
     $app.save(codeRec);
 
     return c.json(200, {

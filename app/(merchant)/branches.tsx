@@ -109,7 +109,7 @@ export default function BranchesScreen() {
           requestKey: null
         }).catch(() => []),
         pb.collection('users').getFullList({
-          filter: `merchant_id = "${user.merchant_id}" && role = "merchant"`,
+          filter: `merchant_id = "${user.merchant_id}" && (role = "merchant" || role = "both")`,
           requestKey: null
         }).catch(() => []),
         pb.collection('activation_codes').getFullList({

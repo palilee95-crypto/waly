@@ -48,6 +48,11 @@ export default function NfcClaimModal() {
     })();
   }, [merchantId]);
 
+  const activeClaimRef = React.useRef<any>(null);
+  activeClaimRef.current = claim;
+  const isSuccessRef = React.useRef(false);
+  isSuccessRef.current = isSuccess;
+
   useEffect(() => {
     if (!merchantId) return;
 
@@ -73,11 +78,24 @@ export default function NfcClaimModal() {
     let unsubscribe: any = null;
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
       const record = e.record;
-      if (record && record.merchant === merchantId && record.status === 'pending') {
+      const action = e.action;
+      if (!record || record.merchant !== merchantId) return;
+
+      if (record.status === 'pending') {
         setClaim(record);
         setIsSuccess(false);
         setErrorMsg(null);
         setIsVisible(true);
+      } else if (
+        activeClaimRef.current &&
+        record.id === activeClaimRef.current.id &&
+        (record.status === 'completed' || record.status === 'cancelled' || action === 'delete')
+      ) {
+        if (!isSuccessRef.current) {
+          setIsVisible(false);
+          setClaim(null);
+          setErrorMsg(null);
+        }
       }
     }).then((unsub) => {
       unsubscribe = unsub;

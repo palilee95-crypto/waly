@@ -77,61 +77,69 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   let totalStoreSales = 0;
   let totalStoreTxns = 0;
 
-  let staffStats = staffMembers.map(u => {
-    const staffId = u.id;
-    const staffName = u.getString("name");
-    const branchName = u.getString("branch_name") || "All Branches (HQ)";
+  // Build lookup maps for fast O(1) matching
+  const staffMapById = {};
+  const staffMapByName = {};
 
-    let stampsIssued = 0;
-    let vouchersRedeemed = 0;
-    let customersServed = 0;
-    let salesVolume = 0;
-
-    merchantTxns.forEach(tx => {
-      let meta = {};
-      try {
-        const rawMeta = tx.get("metadata");
-        if (typeof rawMeta === "string" && rawMeta.trim()) {
-          meta = JSON.parse(rawMeta);
-        } else if (typeof rawMeta === "object" && rawMeta !== null) {
-          meta = rawMeta;
-        }
-      } catch (parseErr) {}
-
-      const matchesStaff = meta.staff_id === staffId || (meta.staff_name && meta.staff_name === staffName);
-      if (matchesStaff) {
-        const txType = tx.getString("type");
-        const bill = parseFloat(tx.get("bill_amount")) || 0;
-        const stamps = parseInt(tx.get("stamps")) || 0;
-
-        customersServed += 1;
-        salesVolume += bill;
-
-        if (txType === "earn") {
-          stampsIssued += (stamps || 1);
-        } else if (txType === "redeem" || txType === "reward") {
-          vouchersRedeemed += 1;
-        }
-      }
-    });
-
-    totalStoreStamps += stampsIssued;
-    totalStoreSales += salesVolume;
-    totalStoreTxns += customersServed;
-
-    return {
+  staffMembers.forEach(u => {
+    const sObj = {
       id: u.id,
-      name: staffName,
+      name: u.getString("name"),
       phone: u.getString("phone"),
       email: u.getString("email"),
       avatar: u.getString("avatar"),
       role: u.getString("role"),
-      branch_name: branchName,
-      stamps_issued: stampsIssued,
-      vouchers_redeemed: vouchersRedeemed,
-      customers_served: customersServed,
-      sales_volume: Math.round(salesVolume * 100) / 100
+      branch_name: u.getString("branch_name") || "All Branches (HQ)",
+      stamps_issued: 0,
+      vouchers_redeemed: 0,
+      customers_served: 0,
+      sales_volume: 0
     };
+    staffMapById[u.id] = sObj;
+    if (sObj.name) {
+      staffMapByName[sObj.name] = sObj;
+    }
+  });
+
+  // Single-pass aggregation over all transactions
+  merchantTxns.forEach(tx => {
+    let meta = {};
+    try {
+      const rawMeta = tx.get("metadata");
+      if (typeof rawMeta === "string" && rawMeta.trim()) {
+        meta = JSON.parse(rawMeta);
+      } else if (typeof rawMeta === "object" && rawMeta !== null) {
+        meta = rawMeta;
+      }
+    } catch (parseErr) {}
+
+    const targetStaffId = meta.staff_id || "";
+    const targetStaffName = meta.staff_name || "";
+    const matchedStaff = (targetStaffId && staffMapById[targetStaffId]) || (targetStaffName && staffMapByName[targetStaffName]) || null;
+
+    if (matchedStaff) {
+      const txType = tx.getString("type");
+      const bill = parseFloat(tx.get("bill_amount")) || 0;
+      const stamps = parseInt(tx.get("stamps")) || 0;
+
+      matchedStaff.customers_served += 1;
+      matchedStaff.sales_volume += bill;
+
+      if (txType === "earn") {
+        matchedStaff.stamps_issued += (stamps || 1);
+      } else if (txType === "redeem" || txType === "reward") {
+        matchedStaff.vouchers_redeemed += 1;
+      }
+    }
+  });
+
+  let staffStats = staffMembers.map(u => {
+    const sObj = staffMapById[u.id];
+    sObj.sales_volume = Math.round(sObj.sales_volume * 100) / 100;
+    totalStoreStamps += sObj.stamps_issued;
+    totalStoreSales += sObj.sales_volume;
+    totalStoreTxns += sObj.customers_served;
+    return sObj;
   });
 
   // Sort staff according to metric
