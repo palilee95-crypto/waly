@@ -194,6 +194,8 @@ export default function NfcLandingScreen() {
   // Unclaimed stand pairing state
   const [unclaimedStand, setUnclaimedStand] = useState<{ code: string; plan?: string; quota?: number } | null>(null);
   const [isPairing, setIsPairing] = useState(false);
+  const [pairingBranches, setPairingBranches] = useState<any[]>([]);
+  const [selectedPairingBranchId, setSelectedPairingBranchId] = useState<string>('');
 
   const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
   const [nameInput, setNameInput] = useState(user?.name || '');
@@ -214,8 +216,22 @@ export default function NfcLandingScreen() {
           Animated.timing(pulseAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
         ])
       ).start();
+
+      if (user?.merchant_id) {
+        pb.collection('branches').getFullList({
+          filter: `merchant = "${user.merchant_id}"`,
+          sort: '-is_hq,-created',
+          requestKey: null,
+        }).then(list => {
+          setPairingBranches(list);
+          if (list.length > 0) {
+            const hq = list.find(b => b.is_hq) || list[0];
+            setSelectedPairingBranchId(hq.id);
+          }
+        }).catch(() => {});
+      }
     }
-  }, [step]);
+  }, [step, user?.merchant_id]);
 
   useEffect(() => {
     if (step === 'sent') {
@@ -591,7 +607,10 @@ export default function NfcLandingScreen() {
       const token = pb.authStore.token;
       const res = await pb.send<{ success: boolean; message: string }>('/api/risev/merchant/redeem-stand-code', {
         method: 'POST',
-        body: { code: unclaimedStand.code },
+        body: { 
+          code: unclaimedStand.code,
+          branch_id: selectedPairingBranchId || undefined
+        },
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
@@ -1104,6 +1123,50 @@ export default function NfcLandingScreen() {
                     <Text style={styles.pairingSwitchBtnText}>Switch</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Outlet Selection Pills (Only displayed if merchant has 2+ branches) */}
+                {pairingBranches.length > 1 && (
+                  <View style={{
+                    backgroundColor: '#1E293B',
+                    padding: 12,
+                    borderRadius: 14,
+                    marginBottom: 14,
+                    borderWidth: 1,
+                    borderColor: '#334155'
+                  }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.5, marginBottom: 8 }}>
+                      SELECT OUTLET FOR THIS STAND:
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                      {pairingBranches.map(b => {
+                        const isSelected = selectedPairingBranchId === b.id;
+                        return (
+                          <TouchableOpacity
+                            key={b.id}
+                            onPress={() => setSelectedPairingBranchId(b.id)}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 7,
+                              borderRadius: 10,
+                              backgroundColor: isSelected ? '#FFC700' : '#0F172A',
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#FFC700' : '#334155',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name={b.is_hq ? "business" : "storefront"} size={12} color={isSelected ? '#050505' : '#CBD5E1'} />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isSelected ? '#050505' : '#FFFFFF' }}>
+                              {b.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
 
                 {/* Primary Bind CTA */}
                 <TouchableOpacity
