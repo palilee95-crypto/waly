@@ -22,10 +22,21 @@ onRecordCreate((e) => {
     let messageTitle = "";
     let messageBody = "";
 
+    let staffName = "";
+    try {
+      const rawMeta = e.record.get("metadata");
+      let parsed = typeof rawMeta === "string" ? JSON.parse(rawMeta) : rawMeta;
+      if (parsed && parsed.staff_name && parsed.staff_name !== "Merchant" && parsed.staff_name !== "Owner") {
+        staffName = parsed.staff_name;
+      }
+    } catch (mErr) {}
+
+    const staffText = staffName ? ` (Dilayan oleh ${staffName})` : "";
+
     if (diffMs < 15000) {
       // BRAND NEW USER: Send welcome notification
       messageTitle = `Selamat Datang ke ${merchantName}! 🎁`;
-      messageBody = `Akaun kad ganjaran digital anda telah diaktifkan! Tahniah! Anda baru mendapat ${stampsEarned} Cop (Stamp) di ${merchantName}! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n${appUrl}`;
+      messageBody = `Akaun kad ganjaran digital anda telah diaktifkan! Tahniah! Anda baru mendapat ${stampsEarned} Cop (Stamp) di ${merchantName}${staffText}! 🎉\n\nUntuk melihat baki cop & menuntut hadiah percuma, sila log masuk di sini:\n${appUrl}`;
     } else if (stampsEarned > 0) {
       // EXISTING USER: Send stamp update notification
       let currentStamps = 0;
@@ -59,10 +70,10 @@ onRecordCreate((e) => {
 
       if (isCompleted) {
         messageTitle = `Tahniah! Anda Telah Melengkapkan Kad Cop! 🎉`;
-        messageBody = `Terima kasih kerana mengunjungi ${merchantName}! Anda baru sahaja menerima ${stampsEarned} Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\nGanjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n${appUrl}`;
+        messageBody = `Terima kasih kerana mengunjungi ${merchantName}${staffText}! Anda baru sahaja menerima ${stampsEarned} Cop (Stamp) terakhir untuk melengkapkan kad anda.\n\nGanjaran anda telah dimasukkan ke dalam akaun. Sila semak aplikasi untuk menebus hadiah anda!\n\nUntuk melihat ganjaran anda, layari:\n${appUrl}`;
       } else {
         messageTitle = `Cop Baharu Diterima! ✨`;
-        messageBody = `Terima kasih kerana mengunjungi ${merchantName}! Anda baru sahaja mendapat ${stampsEarned} Cop (Stamp).\n\n📊 Status Kad Cop Anda:\n${currentStamps} / ${goal} Cop dipenuhi.\n\nKumpulkan ${Math.max(0, goal - currentStamps)} cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat baki cop anda, layari:\n${appUrl}`;
+        messageBody = `Terima kasih kerana mengunjungi ${merchantName}${staffText}! Anda baru sahaja mendapat ${stampsEarned} Cop (Stamp).\n\n📊 Status Kad Cop Anda:\n${currentStamps} / ${goal} Cop dipenuhi.\n\nKumpulkan ${Math.max(0, goal - currentStamps)} cop lagi untuk menebus ganjaran! 🎁\n\nUntuk melihat baki cop anda, layari:\n${appUrl}`;
       }
     }
 

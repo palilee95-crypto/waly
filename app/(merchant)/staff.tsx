@@ -32,6 +32,9 @@ interface StaffMember {
   branch_name?: string;
   stamps_issued?: number;
   vouchers_redeemed?: number;
+  customers_served?: number;
+  sales_volume?: number;
+  rank?: number;
 }
 
 export default function StaffManagementScreen() {
@@ -54,6 +57,12 @@ export default function StaffManagementScreen() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [activeTab, setActiveTab] = useState<'members' | 'performance' | 'settings'>('members');
 
+  // Performance State
+  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
+  const [sortBy, setSortBy] = useState<'stamps' | 'sales' | 'customers'>('stamps');
+  const [topPerformer, setTopPerformer] = useState<StaffMember | null>(null);
+  const [summary, setSummary] = useState<any>(null);
+
   // Permissions State
   const [permissionsState, setPermissionsState] = useState<StaffPermissions>(defaultStaffPermissions);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -64,11 +73,15 @@ export default function StaffManagementScreen() {
   const [warningTitle, setWarningTitle] = useState('');
   const [warningMessage, setWarningMessage] = useState('');
 
-  const fetchStaff = async () => {
+  const fetchStaff = async (tFrame = timeframe, sBy = sortBy) => {
     if (!user || !user.merchant_id) return;
     try {
       setLoading(true);
-      const res = await pb.send<{ staff: StaffMember[] }>('/api/risev/merchant/staff', {
+      const res = await pb.send<{
+        staff: StaffMember[];
+        top_performer?: StaffMember | null;
+        summary?: any;
+      }>(`/api/risev/merchant/staff?timeframe=${tFrame}&sort_by=${sBy}`, {
         method: 'GET',
         headers: {
           'Authorization': 'Bearer ' + pb.authStore.token
@@ -76,6 +89,8 @@ export default function StaffManagementScreen() {
       });
       if (res && res.staff) {
         setStaff(res.staff);
+        setTopPerformer(res.top_performer || null);
+        setSummary(res.summary || null);
       }
 
       // Fetch branches
@@ -127,6 +142,12 @@ export default function StaffManagementScreen() {
     fetchStaff();
     fetchPermissions();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'performance') {
+      fetchStaff(timeframe, sortBy);
+    }
+  }, [activeTab, timeframe, sortBy]);
 
   useEffect(() => {
     if (activeTab === 'settings') {
@@ -422,35 +443,214 @@ export default function StaffManagementScreen() {
           </>
         ) : activeTab === 'performance' ? (
           /* Staff Performance & Leaderboard View */
-          <View style={{ gap: 14 }}>
+          <View style={{ gap: 16 }}>
+            {/* Header Banner Card with Total Overview */}
             <View style={styles.leaderboardHeaderCard}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={styles.trophyBadge}>
-                  <Ionicons name="ribbon" size={22} color="#050505" />
+                  <Ionicons name="trophy" size={22} color="#050505" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.leaderboardTitle}>{locale === 'en' ? 'Staff Activity Ranking' : 'Kedudukan Aktiviti Staf'}</Text>
-                  <Text style={styles.leaderboardSubtitle}>{locale === 'en' ? 'Track stamp issuance and voucher checkouts by staff.' : 'Pantau edaran stamp & penebusan baucar staf.'}</Text>
+                  <Text style={styles.leaderboardTitle}>
+                    {locale === 'en' ? 'Staff Performance Leaderboard' : 'Papan Pendahulu Prestasi Staf'}
+                  </Text>
+                  <Text style={styles.leaderboardSubtitle}>
+                    {locale === 'en'
+                      ? 'Recognize top contributors and motivate team loyalty delivery.'
+                      : 'Iktiraf penyumbang terbaik dan dorong kejayaan program kesetiaan.'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Summary Stats Row */}
+              {summary && (
+                <View style={styles.summaryStatsRow}>
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Stamps Issued' : 'Cop Dikeluarkan'}</Text>
+                    <Text style={styles.summaryStatValue}>{summary.total_stamps || 0}</Text>
+                  </View>
+                  <View style={styles.summaryStatDivider} />
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Sales Volume' : 'Jumlah Jualan'}</Text>
+                    <Text style={styles.summaryStatValue}>RM {(summary.total_sales || 0).toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.summaryStatDivider} />
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Served' : 'Dilayan'}</Text>
+                    <Text style={styles.summaryStatValue}>{summary.total_customers_served || 0}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Timeframe Filter Bar */}
+            <View style={styles.filterSection}>
+              <View style={styles.timeframePillRow}>
+                {[
+                  { id: 'today', labelEn: 'Today', labelMs: 'Hari Ini' },
+                  { id: 'week', labelEn: 'This Week', labelMs: 'Minggu Ini' },
+                  { id: 'month', labelEn: 'This Month', labelMs: 'Bulan Ini' },
+                  { id: 'all', labelEn: 'All Time', labelMs: 'Sepanjang Masa' },
+                ].map((tf) => (
+                  <TouchableOpacity
+                    key={tf.id}
+                    style={[styles.timeframePill, timeframe === tf.id && styles.timeframePillActive]}
+                    onPress={() => setTimeframe(tf.id as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeframePillText, timeframe === tf.id && styles.timeframePillTextActive]}>
+                      {locale === 'en' ? tf.labelEn : tf.labelMs}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Metric Sort Tabs */}
+              <View style={styles.sortRow}>
+                <Text style={styles.sortLabel}>{locale === 'en' ? 'Sort by:' : 'Susun ikut:'}</Text>
+                <View style={styles.sortPills}>
+                  <TouchableOpacity
+                    style={[styles.sortPill, sortBy === 'stamps' && styles.sortPillActive]}
+                    onPress={() => setSortBy('stamps')}
+                  >
+                    <Ionicons name="ribbon-outline" size={13} color={sortBy === 'stamps' ? '#B45309' : '#64748B'} />
+                    <Text style={[styles.sortPillText, sortBy === 'stamps' && styles.sortPillTextActive]}>
+                      {locale === 'en' ? 'Stamps' : 'Cop'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sortPill, sortBy === 'sales' && styles.sortPillActive]}
+                    onPress={() => setSortBy('sales')}
+                  >
+                    <Ionicons name="cash-outline" size={13} color={sortBy === 'sales' ? '#B45309' : '#64748B'} />
+                    <Text style={[styles.sortPillText, sortBy === 'sales' && styles.sortPillTextActive]}>
+                      {locale === 'en' ? 'Sales (RM)' : 'Jualan (RM)'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sortPill, sortBy === 'customers' && styles.sortPillActive]}
+                    onPress={() => setSortBy('customers')}
+                  >
+                    <Ionicons name="people-outline" size={13} color={sortBy === 'customers' ? '#B45309' : '#64748B'} />
+                    <Text style={[styles.sortPillText, sortBy === 'customers' && styles.sortPillTextActive]}>
+                      {locale === 'en' ? 'Customers' : 'Pelanggan'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
 
-            {staff.map((member, index) => (
-              <View key={member.id} style={styles.perfStaffCard}>
-                <View style={styles.rankPill}>
-                  <Text style={styles.rankPillText}>#{index + 1}</Text>
+            {/* Hero Top Performer Spotlight Card */}
+            {topPerformer && (
+              <View style={styles.spotlightCard}>
+                <View style={styles.spotlightHeader}>
+                  <View style={styles.spotlightBadge}>
+                    <Ionicons name="sparkles" size={14} color="#B45309" />
+                    <Text style={styles.spotlightBadgeText}>
+                      {locale === 'en' ? 'TOP PERFORMING STAFF' : 'STAF TERBAIK'}
+                    </Text>
+                  </View>
+                  <View style={styles.spotlightPeriod}>
+                    <Text style={styles.spotlightPeriodText}>
+                      {timeframe === 'today' ? (locale === 'en' ? 'Today' : 'Hari Ini') :
+                       timeframe === 'week' ? (locale === 'en' ? 'This Week' : 'Minggu Ini') :
+                       timeframe === 'month' ? (locale === 'en' ? 'This Month' : 'Bulan Ini') : (locale === 'en' ? 'All-Time' : 'Sepanjang Masa')}
+                    </Text>
+                  </View>
                 </View>
-                <Image source={{ uri: getAvatarUrl(member) }} style={styles.avatarSmall} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.staffName}>{member.name}</Text>
-                  <Text style={styles.perfBranchText}>{member.branch_name || 'Main HQ'}</Text>
+
+                <View style={styles.spotlightProfileRow}>
+                  <View style={styles.spotlightAvatarWrap}>
+                    <Image source={{ uri: getAvatarUrl(topPerformer) }} style={styles.spotlightAvatar} />
+                    <View style={styles.spotlightCrown}>
+                      <Text style={{ fontSize: 13 }}>👑</Text>
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.spotlightName}>{topPerformer.name}</Text>
+                    <View style={styles.spotlightBranch}>
+                      <Ionicons name="location" size={11} color="#B45309" />
+                      <Text style={styles.spotlightBranchText}>{topPerformer.branch_name || 'All Branches (HQ)'}</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={styles.perfStampCount}>{member.stamps_issued || 0} <Text style={{ fontSize: 10, color: '#64748B' }}>stamps</Text></Text>
-                  <Text style={styles.perfVoucherCount}>{member.vouchers_redeemed || 0} vouchers</Text>
+
+                <View style={styles.spotlightMetricsGrid}>
+                  <View style={styles.spotlightMetricItem}>
+                    <Text style={styles.spotlightMetricVal}>{topPerformer.stamps_issued || 0}</Text>
+                    <Text style={styles.spotlightMetricLbl}>{locale === 'en' ? 'Stamps Issued' : 'Cop Dikeluarkan'}</Text>
+                  </View>
+                  <View style={styles.spotlightMetricItem}>
+                    <Text style={styles.spotlightMetricVal}>RM {(topPerformer.sales_volume || 0).toFixed(2)}</Text>
+                    <Text style={styles.spotlightMetricLbl}>{locale === 'en' ? 'Sales Handled' : 'Jualan Dikendalikan'}</Text>
+                  </View>
+                  <View style={styles.spotlightMetricItem}>
+                    <Text style={styles.spotlightMetricVal}>{topPerformer.customers_served || 0}</Text>
+                    <Text style={styles.spotlightMetricLbl}>{locale === 'en' ? 'Customers' : 'Pelanggan'}</Text>
+                  </View>
                 </View>
               </View>
-            ))}
+            )}
+
+            {/* Staff Ranking List */}
+            {loading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator color="#050505" size="large" />
+              </View>
+            ) : staff.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconBg}>
+                  <Ionicons name="ribbon-outline" size={32} color="#64748B" />
+                </View>
+                <Text style={styles.emptyTitle}>{locale === 'en' ? 'No Staff Data' : 'Tiada Data Staf'}</Text>
+                <Text style={styles.emptySubtitle}>
+                  {locale === 'en'
+                    ? 'Add staff members to start tracking stamp issuing activity.'
+                    : 'Tambah ahli staf untuk mula memantau aktiviti pengeluaran stamp.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                <Text style={styles.leaderboardSectionTitle}>
+                  {locale === 'en' ? 'All Staff Rankings' : 'Semua Kedudukan Staf'} ({staff.length})
+                </Text>
+
+                {staff.map((member, index) => {
+                  const rank = member.rank || index + 1;
+                  const isTop3 = rank <= 3;
+                  const rankBadge = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+
+                  return (
+                    <View key={member.id} style={[styles.perfStaffCard, rank === 1 && styles.perfStaffCardGold]}>
+                      <View style={[styles.rankPill, isTop3 && styles.rankPillTop]}>
+                        <Text style={[styles.rankPillText, isTop3 && styles.rankPillTopText]}>
+                          {rankBadge}
+                        </Text>
+                      </View>
+
+                      <Image source={{ uri: getAvatarUrl(member) }} style={styles.avatarSmall} />
+
+                      <View style={{ flex: 1, paddingRight: 4 }}>
+                        <Text style={styles.staffName}>{member.name}</Text>
+                        <Text style={styles.perfBranchText}>{member.branch_name || 'All Branches (HQ)'}</Text>
+                      </View>
+
+                      <View style={styles.perfMetricsColumn}>
+                        <View style={styles.perfBadgeStamps}>
+                          <Ionicons name="ribbon" size={11} color="#B45309" />
+                          <Text style={styles.perfBadgeStampsText}>
+                            {member.stamps_issued || 0} {locale === 'en' ? 'stamps' : 'cop'}
+                          </Text>
+                        </View>
+                        <Text style={styles.perfSalesText}>
+                          RM {(member.sales_volume || 0).toFixed(2)} · {member.customers_served || 0} cust
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         ) : (
           /* Staff Permissions & Settings View */
@@ -1192,6 +1392,217 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  summaryStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  summaryStatBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryStatLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  summaryStatValue: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  summaryStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  filterSection: {
+    gap: 10,
+  },
+  timeframePillRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  timeframePill: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timeframePillActive: {
+    backgroundColor: '#FFC700',
+    borderColor: '#FFC700',
+  },
+  timeframePillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  timeframePillTextActive: {
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  sortLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  sortPills: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  sortPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sortPillActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FFC700',
+  },
+  sortPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  sortPillTextActive: {
+    color: '#B45309',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  spotlightCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  spotlightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  spotlightBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  spotlightBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  spotlightPeriod: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  spotlightPeriodText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#E2E8F0',
+  },
+  spotlightProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  spotlightAvatarWrap: {
+    position: 'relative',
+  },
+  spotlightAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: '#FFC700',
+  },
+  spotlightCrown: {
+    position: 'absolute',
+    top: -8,
+    right: -4,
+  },
+  spotlightName: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  spotlightBranch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  spotlightBranchText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  spotlightMetricsGrid: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+  },
+  spotlightMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  spotlightMetricVal: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+  },
+  spotlightMetricLbl: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  leaderboardSectionTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 6,
+    marginBottom: 2,
+  },
   perfStaffCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1202,18 +1613,51 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  perfStaffCardGold: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
   rankPill: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  rankPillTop: {
+    backgroundColor: '#FEF3C7',
+  },
   rankPillText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#64748B',
+  },
+  rankPillTopText: {
+    fontSize: 14,
+  },
+  perfMetricsColumn: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  perfBadgeStamps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  perfBadgeStampsText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
+  perfSalesText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
   avatarSmall: {
     width: 36,
@@ -1225,16 +1669,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-  },
-  perfStampCount: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  perfVoucherCount: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#059669',
   },
   modalInfoBadgeRow: {
     flexDirection: 'row',

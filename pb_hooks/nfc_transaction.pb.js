@@ -108,6 +108,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       $app.save(card);
 
       // 4. Record transaction
+      const staffId = authRecord.id;
+      const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
+      const branchName = (body.branch_name || authRecord.getString("branch_name") || "All Branches (HQ)").trim();
+      const branchId = (body.branch_id || authRecord.getString("branch") || "").trim();
+
       try {
         const txnCol = $app.findCollectionByNameOrId("transactions");
         const txn = new Record(txnCol);
@@ -118,7 +123,15 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         txn.set("customer", customer.id);
         txn.set("merchant", merchantId);
         txn.set("loyalty_card", card.id);
-        txn.set("metadata", JSON.stringify({ source: "nfc_claim", claim_id: claimId }));
+        const txnMeta = {
+          source: "nfc_claim",
+          claim_id: claimId,
+          staff_id: staffId,
+          staff_name: staffName,
+          branch_name: branchName,
+          branch_id: branchId
+        };
+        txn.set("metadata", JSON.stringify(txnMeta));
         $app.save(txn);
       } catch (txnErr) {
         console.log("[NFC COMPLETE] Transaction error:", txnErr.message || txnErr);
@@ -128,6 +141,8 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       claim.set("status", "completed");
       claim.set("bill_amount", billAmount);
       claim.set("stamp_amount", stampAmount);
+      claim.set("handled_by", staffId);
+      claim.set("staff_name", staffName);
       if (customer) claim.set("customer", customer.id);
       claim.set("completed_at", new Date().toISOString().replace('T', ' ').substring(0, 19));
       $app.save(claim);

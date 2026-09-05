@@ -103,6 +103,8 @@ export default function NfcClaimModal() {
           claim_id: claim.id,
           bill_amount: bill,
           stamp_amount: stamps,
+          branch_name: user?.branch_name || '',
+          branch_id: user?.branch || '',
         },
       });
 
@@ -169,6 +171,13 @@ export default function NfcClaimModal() {
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Bill Amount</Text>
                   <Text style={styles.summaryValue}>RM {parseFloat(billAmount || '0').toFixed(2)}</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Handled by</Text>
+                  <Text style={[styles.summaryValue, { color: '#0F172A', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                    {user?.name || 'Staff'}
+                  </Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
@@ -282,6 +291,22 @@ export default function NfcClaimModal() {
                         />
                       </View>
                     </View>
+                  </View>
+
+                  {/* Staff Acting Badge */}
+                  <View style={styles.staffPillRow}>
+                    <View style={styles.staffPill}>
+                      <Ionicons name="person-circle" size={14} color="#64748B" />
+                      <Text style={styles.staffPillText}>
+                        Issuing as <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{user?.name || 'Staff'}</Text>
+                      </Text>
+                    </View>
+                    {user?.branch_name ? (
+                      <View style={styles.branchPill}>
+                        <Ionicons name="location-outline" size={12} color="#64748B" />
+                        <Text style={styles.branchPillText}>{user.branch_name}</Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   {/* Action Buttons */}
@@ -589,5 +614,41 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFC700',
+  },
+  staffPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  staffPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  staffPillText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  branchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EDF2F7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  branchPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
   },
 });

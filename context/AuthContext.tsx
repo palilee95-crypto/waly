@@ -128,6 +128,8 @@ interface AuthUser {
   staff_permissions?: StaffPermissions;
   tier?: string;
   total_points?: number;
+  branch?: string;
+  branch_name?: string;
 }
 
 interface AuthContextType {
@@ -360,6 +362,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             staff_permissions: merchantData.staff_permissions,
             tier: freshRecord.tier || undefined,
             total_points: freshRecord.total_points || 0,
+            branch: freshRecord.branch || undefined,
+            branch_name: freshRecord.branch_name || undefined,
           });
         } catch (bgErr) {
           console.warn('[AuthContext] Background session refresh failed:', bgErr);
@@ -511,6 +515,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       staff_permissions: merchantData.staff_permissions,
       tier: authRecord.tier || undefined,
       total_points: authRecord.total_points || 0,
+      branch: authRecord.branch || undefined,
+      branch_name: authRecord.branch_name || undefined,
     });
     setActiveRole(role);
   };

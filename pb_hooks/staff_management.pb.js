@@ -16,7 +16,7 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     return e.json(400, { message: "Account is not associated with any merchant." });
   }
 
-  // Verify requester is the owner of the merchant
+  // Verify requester is linked to merchant
   let merchant;
   try {
     merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
@@ -24,22 +24,39 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     return e.json(404, { message: "Associated merchant not found." });
   }
 
-  if (merchant.getString("owner") !== authRecord.id) {
-    return e.json(403, { message: "Forbidden. Only the store owner can view the staff list." });
-  }
+  const isOwner = merchant.getString("owner") === authRecord.id;
+
+  // Query params
+  const query = e.requestInfo().query || {};
+  const timeframe = (query.timeframe || "all").toLowerCase();
+  const sortBy = (query.sort_by || "stamps").toLowerCase();
 
   // Find all users linked to this merchant (excluding the owner)
   let staffMembers = [];
   try {
     staffMembers = $app.findRecordsByFilter(
       "users",
-      `merchant_id = "${merchantId}" && id != "${authRecord.id}"`,
+      `merchant_id = "${merchantId}" && id != "${merchant.getString("owner")}"`,
       "-created",
-      100,
+      200,
       0
     );
   } catch (err) {
     console.log("Error querying staff members:", err.message || err);
+  }
+
+  // Determine date filter for transactions
+  let dateFilterStr = "";
+  const now = new Date();
+  if (timeframe === "today") {
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    dateFilterStr = ` && created >= "${startOfToday.toISOString().replace('T', ' ').substring(0, 19)}"`;
+  } else if (timeframe === "week") {
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    dateFilterStr = ` && created >= "${sevenDaysAgo.toISOString().replace('T', ' ').substring(0, 19)}"`;
+  } else if (timeframe === "month") {
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+    dateFilterStr = ` && created >= "${startOfMonth.toISOString().replace('T', ' ').substring(0, 19)}"`;
   }
 
   // Pre-fetch transactions for this merchant to aggregate staff performance
@@ -47,23 +64,28 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   try {
     merchantTxns = $app.findRecordsByFilter(
       "transactions",
-      `merchant = "${merchantId}"`,
+      `merchant = "${merchantId}"${dateFilterStr}`,
       "-created",
-      1000,
+      2000,
       0
     );
   } catch (err) {
     console.log("Error querying transactions for staff performance:", err.message || err);
   }
 
-  const result = staffMembers.map(u => {
+  let totalStoreStamps = 0;
+  let totalStoreSales = 0;
+  let totalStoreTxns = 0;
+
+  let staffStats = staffMembers.map(u => {
     const staffId = u.id;
     const staffName = u.getString("name");
     const branchName = u.getString("branch_name") || "All Branches (HQ)";
 
-    // Calculate stamps issued and vouchers redeemed by this staff member
     let stampsIssued = 0;
     let vouchersRedeemed = 0;
+    let customersServed = 0;
+    let salesVolume = 0;
 
     merchantTxns.forEach(tx => {
       let meta = {};
@@ -79,13 +101,23 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       const matchesStaff = meta.staff_id === staffId || (meta.staff_name && meta.staff_name === staffName);
       if (matchesStaff) {
         const txType = tx.getString("type");
+        const bill = parseFloat(tx.get("bill_amount")) || 0;
+        const stamps = parseInt(tx.get("stamps")) || 0;
+
+        customersServed += 1;
+        salesVolume += bill;
+
         if (txType === "earn") {
-          stampsIssued += (parseInt(tx.get("stamps")) || 1);
+          stampsIssued += (stamps || 1);
         } else if (txType === "redeem" || txType === "reward") {
           vouchersRedeemed += 1;
         }
       }
     });
+
+    totalStoreStamps += stampsIssued;
+    totalStoreSales += salesVolume;
+    totalStoreTxns += customersServed;
 
     return {
       id: u.id,
@@ -96,11 +128,41 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       role: u.getString("role"),
       branch_name: branchName,
       stamps_issued: stampsIssued,
-      vouchers_redeemed: vouchersRedeemed
+      vouchers_redeemed: vouchersRedeemed,
+      customers_served: customersServed,
+      sales_volume: Math.round(salesVolume * 100) / 100
     };
   });
 
-  return e.json(200, { staff: result });
+  // Sort staff according to metric
+  if (sortBy === "sales") {
+    staffStats.sort((a, b) => b.sales_volume - a.sales_volume || b.stamps_issued - a.stamps_issued);
+  } else if (sortBy === "customers") {
+    staffStats.sort((a, b) => b.customers_served - a.customers_served || b.stamps_issued - a.stamps_issued);
+  } else {
+    // Default: stamps
+    staffStats.sort((a, b) => b.stamps_issued - a.stamps_issued || b.sales_volume - a.sales_volume);
+  }
+
+  // Assign ranking badges & positions
+  staffStats = staffStats.map((s, idx) => ({
+    ...s,
+    rank: idx + 1
+  }));
+
+  const topPerformer = staffStats.length > 0 && staffStats[0].stamps_issued > 0 ? staffStats[0] : null;
+
+  return e.json(200, {
+    staff: staffStats,
+    timeframe: timeframe,
+    top_performer: topPerformer,
+    summary: {
+      total_staff: staffStats.length,
+      total_stamps: totalStoreStamps,
+      total_sales: Math.round(totalStoreSales * 100) / 100,
+      total_customers_served: totalStoreTxns
+    }
+  });
 }, $apis.requireAuth("users"));
 
 routerAdd("POST", "/api/risev/merchant/staff", (e) => {

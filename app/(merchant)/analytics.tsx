@@ -518,6 +518,39 @@ export default function AnalyticsScreen() {
     return { rate, oneTimeUsers, totalUsers };
   }, [filteredTransactions]);
 
+  const staffMetrics = useMemo(() => {
+    const staffMap: Record<string, { id: string; name: string; stamps: number; sales: number; customers: number }> = {};
+    filteredTransactions.forEach(tx => {
+      let meta: any = {};
+      try {
+        if (typeof tx.metadata === 'string' && tx.metadata.trim()) {
+          meta = JSON.parse(tx.metadata);
+        } else if (typeof tx.metadata === 'object' && tx.metadata !== null) {
+          meta = tx.metadata;
+        }
+      } catch (e) {}
+
+      const staffName = meta.staff_name || (meta.staff_id ? 'Staff' : null);
+      if (staffName && staffName !== 'Merchant' && staffName !== 'Owner') {
+        const key = meta.staff_id || staffName;
+        if (!staffMap[key]) {
+          staffMap[key] = { id: key, name: staffName, stamps: 0, sales: 0, customers: 0 };
+        }
+        const stamps = parseInt(tx.stamps) || (tx.type === 'earn' ? 1 : 0);
+        const bill = parseFloat(tx.bill_amount) || 0;
+        staffMap[key].stamps += stamps;
+        staffMap[key].sales += bill;
+        staffMap[key].customers += 1;
+      }
+    });
+
+    const list = Object.values(staffMap).sort((a, b) => b.stamps - a.stamps);
+    const topStaff = list.length > 0 && list[0].stamps > 0 ? list[0] : null;
+    const totalStaffStamps = list.reduce((acc, s) => acc + s.stamps, 0);
+
+    return { list, topStaff, totalStaffStamps, staffCount: list.length };
+  }, [filteredTransactions]);
+
   const funnelMetrics = useMemo(() => {
     let tier1 = 0; 
     let tier2 = 0; 
@@ -1026,6 +1059,45 @@ export default function AnalyticsScreen() {
                   >
                     <Ionicons name="link" size={14} color="#050505" />
                     <Text style={styles.recomActionBtnText}>Setup Google Review Link</Text>
+                    <Ionicons name="arrow-forward" size={12} color="#050505" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Recommendation 5: Staff Performance & Leaderboard */}
+            <View style={styles.recommendationCard}>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                <View style={[styles.recomIconBg, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="trophy" size={18} color="#B45309" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                      {staffMetrics.topStaff
+                        ? `Top Staff: ${staffMetrics.topStaff.name} (${staffMetrics.topStaff.stamps} stamps)`
+                        : 'Staff Performance Leaderboard'}
+                    </Text>
+                    {staffMetrics.topStaff ? (
+                      <View style={[styles.statusBadge, { backgroundColor: '#FEF3C7' }]}>
+                        <Text style={[styles.statusBadgeText, { color: '#B45309' }]}>#1 Performer</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, lineHeight: 16 }}>
+                    {staffMetrics.topStaff
+                      ? `${staffMetrics.topStaff.name} has served ${staffMetrics.topStaff.customers} customers and generated RM ${staffMetrics.topStaff.sales.toFixed(2)} in sales during this period.`
+                      : 'Track employee stamp issuance and front-line customer engagement.'}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => router.push('/(merchant)/staff' as any)}
+                    activeOpacity={0.8}
+                    style={styles.recomActionBtn}
+                  >
+                    <Ionicons name="people" size={14} color="#050505" />
+                    <Text style={styles.recomActionBtnText}>View Full Staff Leaderboard</Text>
                     <Ionicons name="arrow-forward" size={12} color="#050505" />
                   </TouchableOpacity>
                 </View>
