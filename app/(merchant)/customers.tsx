@@ -59,6 +59,43 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+function parseSafeDate(rawDate: any): Date {
+  if (!rawDate) return new Date();
+  if (rawDate instanceof Date) return isNaN(rawDate.getTime()) ? new Date() : rawDate;
+  if (typeof rawDate === 'string') {
+    const cleaned = rawDate.replace(' ', 'T');
+    const d = new Date(cleaned);
+    if (!isNaN(d.getTime())) return d;
+    const d2 = new Date(rawDate);
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  return new Date();
+}
+
+function formatDateTime(rawDate: any): string {
+  const d = parseSafeDate(rawDate);
+  try {
+    const dateStr = d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} at ${timeStr}`;
+  } catch (e) {
+    return 'Recently';
+  }
+}
+
+function parseSafeMetadata(rawMeta: any): any {
+  if (!rawMeta) return {};
+  if (typeof rawMeta === 'object') return rawMeta;
+  if (typeof rawMeta === 'string') {
+    try {
+      return JSON.parse(rawMeta);
+    } catch (e) {
+      return {};
+    }
+  }
+  return {};
+}
+
 export default function CustomersScreen() {
   const { user, isOwner, staffPermissions } = useAuth();
   const { t, locale } = useLanguage();
@@ -119,10 +156,13 @@ export default function CustomersScreen() {
         const name = cust?.name || 'Walk-in Customer';
         const type = (rec.type === 'earn' ? 'PURCHASE' : rec.type === 'redeem' ? 'REDEMPTION' : 'ADJUSTMENT') as 'PURCHASE' | 'REDEMPTION' | 'ADJUSTMENT';
         const bgCircleColor = rec.type === 'earn' ? '#DBEAFE' : rec.type === 'redeem' ? '#FEE2E2' : '#F3F4F6';
+        const safeD = parseSafeDate(rec.created);
+        const dateStr = safeD.toLocaleDateString();
+        const timeStr = safeD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         return {
           id: rec.id,
-          dateTime: new Date(rec.created).toLocaleDateString() + '\n' + new Date(rec.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateTime: dateStr + '\n' + timeStr,
           name,
           memberId: `ID: ${cust?.id ? cust.id.substring(cust.id.length - 4).toUpperCase() : '----'}`,
           initials: getInitials(name),
@@ -136,7 +176,7 @@ export default function CustomersScreen() {
             ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
             : null,
           created: rec.created,
-          metadata: typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : (rec.metadata || {}),
+          metadata: parseSafeMetadata(rec.metadata),
           bill_amount: rec.bill_amount,
         };
       });
@@ -304,10 +344,20 @@ export default function CustomersScreen() {
           const newTx = await pb.collection('transactions').create({
             customer: selectedCustomer.customerId,
             merchant: user.merchant_id,
-            type: 'adjustment',
-            stamps_earned: delta,
+            type: 'adjust',
+            stamps: delta,
             bill_amount: 0,
-            notes: adjustReason.trim() || 'Manual stamp adjustment by merchant'
+            staff: user.id,
+            notes: adjustReason.trim() || 'Manual stamp adjustment by merchant',
+            metadata: {
+              type: 'stamp_adjustment',
+              reason: adjustReason.trim() || 'Manual stamp adjustment by merchant',
+              previous_stamps: oldStamps,
+              new_stamps: newStamps,
+              delta_stamps: delta,
+              staff_id: user.id,
+              staff_name: user.name || 'Merchant'
+            }
           });
           setCustomerTransactions(prev => [newTx, ...prev]);
         } catch (txErr) {}
@@ -1770,7 +1820,7 @@ export default function CustomersScreen() {
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Last Visit</Text>
                     </View>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                      {customerTransactions.length > 0 ? new Date(customerTransactions[0].created).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                      {customerTransactions.length > 0 ? parseSafeDate(customerTransactions[0].created).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                     </Text>
                   </View>
 
@@ -1933,7 +1983,7 @@ export default function CustomersScreen() {
                               {voucher.expand?.reward?.title || 'Reward Voucher'}
                             </Text>
                             <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                              Issued: {new Date(voucher.created).toLocaleDateString()}
+                              Issued: {parseSafeDate(voucher.created).toLocaleDateString()}
                             </Text>
                           </View>
                           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: voucher.status === 'valid' ? '#16A34A' : '#E2E8F0' }}>
@@ -1956,21 +2006,27 @@ export default function CustomersScreen() {
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>VISIT HISTORY</Text>
                   {customerTransactions.length > 0 ? (
                     customerTransactions.map((tx, idx) => {
-                      const isSpendAdj = tx.metadata?.type === 'spend_adjustment' || (tx.type === 'ADJUSTMENT' && tx.bill_amount && !tx.stamps && !tx.stamps_earned);
+                      const meta = parseSafeMetadata(tx.metadata);
+                      const metaType = meta?.type || '';
+                      const isSpendAdj = metaType === 'spend_adjustment' || (tx.type === 'ADJUSTMENT' && tx.bill_amount && !tx.stamps && !tx.stamps_earned);
                       const isEarn = tx.type === 'earn' || tx.type === 'PURCHASE';
                       const isRedeem = tx.type === 'redeem' || tx.type === 'REDEMPTION';
                       
                       let title = isEarn ? 'Earned Stamp' : isRedeem ? 'Redeemed Reward' : (isSpendAdj ? 'Spend Adjustment' : 'Stamp Adjustment');
                       
+                      const stampsCount = Number(tx.stamps ?? tx.stamps_earned ?? 0);
+                      const formattedDate = formatDateTime(tx.created || tx.updated);
+                      const notes = tx.notes || meta?.reason || '';
+                      
                       return (
-                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', width: '100%' }}>
+                        <View key={tx.id || idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', width: '100%' }}>
                           <View style={{ flex: 1, paddingRight: 10 }}>
                             <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 4 }}>
                               {title}
                             </Text>
                             <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                              {new Date(tx.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(tx.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                              {tx.notes ? ` • ${tx.notes}` : ''}
+                              {formattedDate}
+                              {notes ? ` • ${notes}` : ''}
                             </Text>
                           </View>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -1979,8 +2035,8 @@ export default function CustomersScreen() {
                                 {Number(tx.bill_amount) >= 0 ? `+RM ${Number(tx.bill_amount).toFixed(0)}` : `-RM ${Math.abs(Number(tx.bill_amount)).toFixed(0)}`}
                               </Text>
                             ) : (
-                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (isEarn || (tx.stamps_earned || tx.stamps || 0) > 0) ? '#10B981' : '#EF4444' }}>
-                                {(isEarn || (tx.stamps_earned || tx.stamps || 0) > 0) ? `+${tx.stamps_earned || tx.stamps || 0} stamps` : `${tx.stamps_earned || tx.stamps || 0} stamps`}
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: (isEarn || stampsCount > 0) ? '#10B981' : (stampsCount < 0 ? '#EF4444' : '#64748B') }}>
+                                {stampsCount > 0 ? `+${stampsCount} stamp${stampsCount !== 1 ? 's' : ''}` : `${stampsCount} stamps`}
                               </Text>
                             )}
                             <TouchableOpacity
