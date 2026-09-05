@@ -94,8 +94,10 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
     setScanMode('qr');
   };
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = (event: any) => {
     if (isScanning) return;
+    const data = event?.data || event?.nativeEvent?.data || (typeof event === 'string' ? event : '');
+    if (!data) return;
     
     // Parse link to find merchant ID 'm'
     // Format: https://risev.app/nfc?m=MERCHANT_ID or similar
@@ -278,6 +280,9 @@ export default function CustomerStampModal({ visible, onClose }: CustomerStampMo
                   <CameraView
                     style={StyleSheet.absoluteFill}
                     facing="back"
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr'],
+                    }}
                     onBarcodeScanned={handleBarCodeScanned}
                   >
                     <View style={styles.scannerOverlay}>

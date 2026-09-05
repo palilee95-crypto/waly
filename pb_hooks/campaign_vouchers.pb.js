@@ -92,12 +92,16 @@ routerAdd("POST", "/api/risev/merchant/campaigns/auto-drop", (e) => {
       if (rewardId) {
         voucher.set("reward", rewardId);
       }
+      if (campaignId) {
+        voucher.set("campaign", campaignId);
+      }
       voucher.set("code", code);
       voucher.set("status", "active");
       voucher.set("expires_at", expiresAt);
       
       const meta = {
         campaign_id: campaignId,
+        merchant_id: merchantId,
         discount_type: discountType,
         discount_value: discountValue,
         min_spend: minSpend,

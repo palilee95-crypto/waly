@@ -32,11 +32,23 @@ export default function GiveStampsScreen() {
   // Camera Scanner States
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const isProcessingScan = React.useRef(false);
 
   // Voucher Scanner States
   const [voucherCode, setVoucherCode] = useState('');
   const [isRedeemingVoucher, setIsRedeemingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
+  const [redeemedDetails, setRedeemedDetails] = useState<{
+    id?: string;
+    code: string;
+    customer_id?: string;
+    customer_name: string;
+    customer_phone?: string;
+    reward_title: string;
+    discount_type?: string;
+    discount_value?: string;
+    used_at?: string;
+  } | null>(null);
 
   // Manual Issuance States
   const [phoneInput, setPhoneInput] = useState('');
@@ -73,9 +85,10 @@ export default function GiveStampsScreen() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // 2. Submit Voucher Code Redemption
-  const handleRedeemVoucher = async () => {
-    if (!voucherCode.trim()) {
+  // 2. Submit Voucher Code Redemption via Backend Endpoint
+  const executeRedemption = async (targetCode: string) => {
+    const cleanCode = (targetCode || '').trim().toUpperCase();
+    if (!cleanCode) {
       setVoucherError('Please enter or scan a voucher code.');
       return;
     }
@@ -83,53 +96,68 @@ export default function GiveStampsScreen() {
     setIsRedeemingVoucher(true);
     setVoucherError('');
     setSuccessMsg(null);
+    setRedeemedDetails(null);
 
     try {
-      const code = voucherCode.trim().toUpperCase();
-      const vouchers = await pb.collection('vouchers').getFullList({
-        filter: `code = "${code}" && status = "active"`,
-        expand: 'reward,customer,merchant',
+      const res = await pb.send<{
+        success: boolean;
+        message: string;
+        voucher: {
+          id: string;
+          code: string;
+          customer_id: string;
+          customer_name: string;
+          customer_phone: string;
+          reward_title: string;
+          discount_type: string;
+          discount_value: string;
+          used_at: string;
+        };
+      }>('/api/risev/merchant/vouchers/redeem', {
+        method: 'POST',
+        body: { code: cleanCode },
       });
 
-      if (vouchers.length === 0) {
-        setVoucherError('Invalid, expired, or already used voucher code.');
-        setIsRedeemingVoucher(false);
-        return;
+      if (res.success && res.voucher) {
+        setRedeemedDetails(res.voucher);
+        setSuccessMsg(res.message || `Voucher ${res.voucher.code} redeemed successfully!`);
+        setVoucherCode('');
+        fetchTransactions();
+      } else {
+        setVoucherError(res.message || 'Failed to redeem voucher.');
       }
-
-      const v = vouchers[0];
-      const voucherMerchantId = v.merchant || v.expand?.reward?.merchant;
-      if (merchantId && voucherMerchantId && voucherMerchantId !== merchantId) {
-        setVoucherError('This voucher belongs to another store and cannot be redeemed here.');
-        setIsRedeemingVoucher(false);
-        return;
-      }
-
-      await pb.collection('vouchers').update(v.id, {
-        status: 'used',
-      });
-
-      const customerName = v.expand?.customer?.name || v.expand?.customer?.phone || 'Customer';
-      const rewardName = v.expand?.reward?.title || 'Reward';
-
-      setSuccessMsg(`Voucher ${code} redeemed for ${customerName} (${rewardName})!`);
-      setVoucherCode('');
-      setIsCameraActive(false);
-      fetchTransactions();
     } catch (err: any) {
-      setVoucherError(err?.message || 'Failed to redeem voucher.');
+      const msg = err?.data?.message || err?.message || 'Invalid, expired, or already used voucher code.';
+      setVoucherError(msg);
     } finally {
       setIsRedeemingVoucher(false);
+      setTimeout(() => {
+        isProcessingScan.current = false;
+      }, 800);
     }
   };
 
-  // 3. Camera Scan Handler
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (data) {
-      setVoucherCode(data.trim());
-      setIsCameraActive(false);
-      setVoucherError('');
+  const handleRedeemVoucher = () => {
+    executeRedemption(voucherCode);
+  };
+
+  // 3. Camera Scan Handler (Auto-executes redemption upon QR detection)
+  const handleBarCodeScanned = (event: any) => {
+    const raw = event?.data || event?.nativeEvent?.data || (typeof event === 'string' ? event : '');
+    if (!raw || isRedeemingVoucher || isProcessingScan.current) return;
+
+    isProcessingScan.current = true;
+    setIsCameraActive(false);
+
+    let code = raw.trim();
+    if (code.includes('?code=')) {
+      code = code.split('?code=')[1].split('&')[0];
+    } else if (code.includes('/')) {
+      code = code.substring(code.lastIndexOf('/') + 1);
     }
+    code = code.trim().toUpperCase();
+    setVoucherCode(code);
+    executeRedemption(code);
   };
 
   // 4. Submit Manual Stamp Issuance
@@ -252,8 +280,63 @@ export default function GiveStampsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Success Alert */}
-        {successMsg ? (
+        {/* Rich Redemption Success Card */}
+        {redeemedDetails ? (
+          <View style={styles.redeemedCard}>
+            <View style={styles.redeemedHeader}>
+              <View style={styles.redeemedBadge}>
+                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                <Text style={styles.redeemedBadgeText}>VOUCHER REDEEMED</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setRedeemedDetails(null);
+                  setSuccessMsg(null);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.redeemedRewardTitle}>{redeemedDetails.reward_title}</Text>
+            
+            <View style={styles.redeemedCodeBox}>
+              <Text style={styles.redeemedCodeLabel}>CODE</Text>
+              <Text style={styles.redeemedCodeValue}>{redeemedDetails.code}</Text>
+            </View>
+
+            <View style={styles.redeemedInfoRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.redeemedMetaLabel}>CUSTOMER</Text>
+                <Text style={styles.redeemedMetaValue}>{redeemedDetails.customer_name}</Text>
+                {redeemedDetails.customer_phone ? (
+                  <Text style={styles.redeemedMetaSub}>{redeemedDetails.customer_phone}</Text>
+                ) : null}
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.redeemedMetaLabel}>STATUS</Text>
+                <View style={styles.redeemedStatusPill}>
+                  <Text style={styles.redeemedStatusText}>USED / APPLIED</Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.scanNextBtn}
+              onPress={() => {
+                setRedeemedDetails(null);
+                setSuccessMsg(null);
+                setVoucherCode('');
+                setIsCameraActive(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="qr-code-outline" size={18} color="#050505" />
+              <Text style={styles.scanNextBtnText}>Scan Next Voucher</Text>
+            </TouchableOpacity>
+          </View>
+        ) : successMsg ? (
           <View style={styles.successBanner}>
             <Ionicons name="checkmark-circle" size={20} color="#10B981" />
             <Text style={styles.successText}>{successMsg}</Text>
@@ -274,20 +357,38 @@ export default function GiveStampsScreen() {
             <View style={styles.viewfinderCard}>
               {isCameraActive ? (
                 permission?.granted ? (
-                  <CameraView
-                    style={styles.cameraView}
-                    facing="back"
-                    onBarcodeScanned={handleBarCodeScanned}
-                  >
-                    <View style={styles.scannerOverlay}>
-                      <View style={styles.scanTargetBox}>
-                        <View style={[styles.cornerBracket, styles.topLeft]} />
-                        <View style={[styles.cornerBracket, styles.topRight]} />
-                        <View style={[styles.cornerBracket, styles.bottomLeft]} />
-                        <View style={[styles.cornerBracket, styles.bottomRight]} />
+                  <View style={{ width: '100%', height: 260, position: 'relative' }}>
+                    <CameraView
+                      style={styles.cameraView}
+                      facing="back"
+                      barcodeScannerSettings={{
+                        barcodeTypes: ['qr'],
+                      }}
+                      onBarcodeScanned={handleBarCodeScanned}
+                    >
+                      <View style={styles.scannerOverlay}>
+                        <View style={styles.scanTargetBox}>
+                          <View style={[styles.cornerBracket, styles.topLeft]} />
+                          <View style={[styles.cornerBracket, styles.topRight]} />
+                          <View style={[styles.cornerBracket, styles.bottomLeft]} />
+                          <View style={[styles.cornerBracket, styles.bottomRight]} />
+                        </View>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 12 }}>
+                          Align customer QR code within frame
+                        </Text>
                       </View>
-                    </View>
-                  </CameraView>
+                    </CameraView>
+
+                    {/* Camera Close Control */}
+                    <TouchableOpacity
+                      style={styles.closeCameraOverlayBtn}
+                      onPress={() => setIsCameraActive(false)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="close-circle" size={24} color="#FFFFFF" />
+                      <Text style={styles.closeCameraOverlayText}>Cancel Scan</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <View style={styles.cameraFallbackWrap}>
                     <Text style={styles.cameraFallbackText}>Camera permission needed to scan QR codes</Text>
@@ -935,5 +1036,140 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
     marginTop: 2,
+  },
+
+  // Redeemed Confirmation Card
+  redeemedCard: {
+    backgroundColor: '#050505',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  redeemedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  redeemedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  redeemedBadgeText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#10B981',
+    letterSpacing: 0.5,
+  },
+  redeemedRewardTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    marginBottom: 14,
+  },
+  redeemedCodeBox: {
+    backgroundColor: '#171717',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
+  },
+  redeemedCodeLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  redeemedCodeValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 1,
+  },
+  redeemedInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#262626',
+    marginBottom: 18,
+  },
+  redeemedMetaLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  redeemedMetaValue: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  redeemedMetaSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  redeemedStatusPill: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  redeemedStatusText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#10B981',
+  },
+  scanNextBtn: {
+    backgroundColor: '#FFC700',
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  scanNextBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+
+  // Close Camera Overlay Button
+  closeCameraOverlayBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  closeCameraOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
