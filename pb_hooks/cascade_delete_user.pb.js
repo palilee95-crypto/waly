@@ -8,7 +8,7 @@ onRecordDelete((e) => {
 
   const safeDelete = (collection, filter) => {
     try {
-      const records = $app.findRecordsByFilter(collection, filter, "-created", 1000, 0);
+      const records = $app.findRecordsByFilter(collection, filter, "-created", 2000, 0);
       if (records && records.length > 0) {
         for (let i = 0; i < records.length; i++) {
           try { $app.delete(records[i]); } catch (delErr) {}
@@ -27,6 +27,30 @@ onRecordDelete((e) => {
 
   for (let m = 0; m < merchantIds.length; m++) {
     const mid = merchantIds[m];
+
+    // Step A: Find rewards and delete all vouchers referencing those rewards (even from other customers)
+    try {
+      const rewards = $app.findRecordsByFilter("rewards", `merchant = '${mid}'`, "-created", 500, 0);
+      for (let r = 0; r < rewards.length; r++) {
+        safeDelete("vouchers", `reward = '${rewards[r].id}'`);
+      }
+    } catch (rErr) {}
+
+    // Step B: Find loyalty programs and delete all loyalty cards & transactions referencing them
+    try {
+      const progs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${mid}'`, "-created", 500, 0);
+      for (let p = 0; p < progs.length; p++) {
+        safeDelete("loyalty_cards", `program = '${progs[p].id}'`);
+      }
+    } catch (pErr) {}
+
+    // Step C: Delete transactions and loyalty cards belonging to merchant
+    safeDelete("transactions", `merchant = '${mid}'`);
+    safeDelete("loyalty_cards", `merchant = '${mid}'`);
+    safeDelete("loyalty_programs", `merchant = '${mid}'`);
+    safeDelete("rewards", `merchant = '${mid}'`);
+
+    // Step D: Follow-up groups, sequences, messages, members
     try {
       const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
       for (let g = 0; g < groups.length; g++) {
@@ -43,12 +67,17 @@ onRecordDelete((e) => {
       }
     } catch (e4) {}
 
+    // Step E: Branches and activation codes
+    try {
+      const branches = $app.findRecordsByFilter("branches", `merchant = '${mid}'`, "-created", 200, 0);
+      for (let b = 0; b < branches.length; b++) {
+        safeDelete("activation_codes", `branch = '${branches[b].id}'`);
+      }
+    } catch (bErr) {}
+
+    safeDelete("activation_codes", `redeemed_by = '${mid}'`);
     safeDelete("branches", `merchant = '${mid}'`);
     safeDelete("campaigns", `merchant = '${mid}'`);
-    safeDelete("loyalty_programs", `merchant = '${mid}'`);
-    safeDelete("loyalty_cards", `merchant = '${mid}'`);
-    safeDelete("rewards", `merchant = '${mid}'`);
-    safeDelete("transactions", `merchant = '${mid}'`);
     safeDelete("broadcasts", `merchant = '${mid}'`);
     safeDelete("subscriptions", `merchant = '${mid}'`);
     safeDelete("whatsapp_configurations", `merchant = '${mid}'`);
@@ -59,8 +88,8 @@ onRecordDelete((e) => {
     safeDelete("birthday_logs", `merchant = '${mid}'`);
     safeDelete("birthday_rewards", `merchant = '${mid}'`);
     safeDelete("commissions", `referred_merchant = '${mid}'`);
-    safeDelete("activation_codes", `redeemed_by = '${mid}'`);
 
+    // Step F: Unlink staff members
     try {
       const staff = $app.findRecordsByFilter("users", `merchant_id = '${mid}'`, "-created", 500, 0);
       for (let st = 0; st < staff.length; st++) {
@@ -75,15 +104,19 @@ onRecordDelete((e) => {
       }
     } catch (stFindErr) {}
 
+    // Step G: Delete merchant record
     try {
       const mRec = $app.findRecordById("merchants", mid);
       if (mRec) $app.delete(mRec);
-    } catch (delMerchErr) {}
+    } catch (delMerchErr) {
+      console.log(`[CASCADE] Failed to delete merchant ${mid}: ${delMerchErr.message || delMerchErr}`);
+    }
   }
 
+  // Step H: Delete customer-level data
+  safeDelete("vouchers", `customer = '${userId}'`);
   safeDelete("loyalty_cards", `customer = '${userId}'`);
   safeDelete("transactions", `customer = '${userId}'`);
-  safeDelete("vouchers", `customer = '${userId}'`);
   safeDelete("nfc_claims", `customer = '${userId}'`);
   safeDelete("fraud_flags", `user = '${userId}'`);
   safeDelete("follow_up_members", `customer = '${userId}'`);
@@ -98,7 +131,7 @@ onRecordDelete((e) => {
   return e.next();
 }, "users");
 
-// 2. Custom REST Route for Admin Portal (inlined handler to avoid Goja context issues)
+// 2. Custom REST Route for Admin Portal
 routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
   let authRecord = c.auth || null;
   if (!authRecord && typeof c.get === "function") {
@@ -108,7 +141,7 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
     try { authRecord = c.httpContext.get("authRecord"); } catch (e) {}
   }
 
-  // Fallback: If token was passed in Authorization header, resolve user directly
+  // Fallback: Token lookup
   if (!authRecord) {
     let authHeader = "";
     try {
@@ -158,10 +191,10 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
 
     const userName = userRec.getString("name") || "User";
 
-    // Inlined cascade deletion helper
+    // Inlined safeDelete helper
     const safeDelete = (collection, filter) => {
       try {
-        const records = $app.findRecordsByFilter(collection, filter, "-created", 1000, 0);
+        const records = $app.findRecordsByFilter(collection, filter, "-created", 2000, 0);
         if (records && records.length > 0) {
           for (let i = 0; i < records.length; i++) {
             try { $app.delete(records[i]); } catch (delErr) {}
@@ -181,6 +214,30 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
 
     for (let m = 0; m < merchantIds.length; m++) {
       const mid = merchantIds[m];
+
+      // Step A: Delete vouchers referencing rewards of this merchant
+      try {
+        const rewards = $app.findRecordsByFilter("rewards", `merchant = '${mid}'`, "-created", 500, 0);
+        for (let r = 0; r < rewards.length; r++) {
+          safeDelete("vouchers", `reward = '${rewards[r].id}'`);
+        }
+      } catch (rErr) {}
+
+      // Step B: Delete loyalty cards referencing programs of this merchant
+      try {
+        const progs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${mid}'`, "-created", 500, 0);
+        for (let p = 0; p < progs.length; p++) {
+          safeDelete("loyalty_cards", `program = '${progs[p].id}'`);
+        }
+      } catch (pErr) {}
+
+      // Step C: Delete transactions and loyalty cards
+      safeDelete("transactions", `merchant = '${mid}'`);
+      safeDelete("loyalty_cards", `merchant = '${mid}'`);
+      safeDelete("loyalty_programs", `merchant = '${mid}'`);
+      safeDelete("rewards", `merchant = '${mid}'`);
+
+      // Step D: Follow-up groups, sequences, messages, members
       try {
         const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
         for (let g = 0; g < groups.length; g++) {
@@ -197,12 +254,17 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
         }
       } catch (e4) {}
 
+      // Step E: Branches and activation codes
+      try {
+        const branches = $app.findRecordsByFilter("branches", `merchant = '${mid}'`, "-created", 200, 0);
+        for (let b = 0; b < branches.length; b++) {
+          safeDelete("activation_codes", `branch = '${branches[b].id}'`);
+        }
+      } catch (bErr) {}
+
+      safeDelete("activation_codes", `redeemed_by = '${mid}'`);
       safeDelete("branches", `merchant = '${mid}'`);
       safeDelete("campaigns", `merchant = '${mid}'`);
-      safeDelete("loyalty_programs", `merchant = '${mid}'`);
-      safeDelete("loyalty_cards", `merchant = '${mid}'`);
-      safeDelete("rewards", `merchant = '${mid}'`);
-      safeDelete("transactions", `merchant = '${mid}'`);
       safeDelete("broadcasts", `merchant = '${mid}'`);
       safeDelete("subscriptions", `merchant = '${mid}'`);
       safeDelete("whatsapp_configurations", `merchant = '${mid}'`);
@@ -213,8 +275,8 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
       safeDelete("birthday_logs", `merchant = '${mid}'`);
       safeDelete("birthday_rewards", `merchant = '${mid}'`);
       safeDelete("commissions", `referred_merchant = '${mid}'`);
-      safeDelete("activation_codes", `redeemed_by = '${mid}'`);
 
+      // Step F: Unlink staff members
       try {
         const staff = $app.findRecordsByFilter("users", `merchant_id = '${mid}'`, "-created", 500, 0);
         for (let st = 0; st < staff.length; st++) {
@@ -229,16 +291,19 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
         }
       } catch (stFindErr) {}
 
+      // Step G: Delete merchant record
       try {
         const mRec = $app.findRecordById("merchants", mid);
         if (mRec) $app.delete(mRec);
-      } catch (delMerchErr) {}
+      } catch (delMerchErr) {
+        console.log(`[CASCADE] Failed to delete merchant ${mid}: ${delMerchErr.message || delMerchErr}`);
+      }
     }
 
     // 2. Delete user-level customer records
+    safeDelete("vouchers", `customer = '${targetUserId}'`);
     safeDelete("loyalty_cards", `customer = '${targetUserId}'`);
     safeDelete("transactions", `customer = '${targetUserId}'`);
-    safeDelete("vouchers", `customer = '${targetUserId}'`);
     safeDelete("nfc_claims", `customer = '${targetUserId}'`);
     safeDelete("fraud_flags", `user = '${targetUserId}'`);
     safeDelete("follow_up_members", `customer = '${targetUserId}'`);
