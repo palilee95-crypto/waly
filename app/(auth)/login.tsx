@@ -14,6 +14,7 @@ import {
   Image,
   useWindowDimensions,
   Animated,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +32,8 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetModalIdentifier, setResetModalIdentifier] = useState('');
 
   const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string; redirect_to?: string }>();
 
@@ -698,12 +701,8 @@ export default function LoginScreen() {
                         try {
                           setIsLoading(true);
                           await requestPasswordReset(targetIdentifier);
-                          const successMsg = 'If an account exists with this phone or email, a password reset link has been sent to your registered email address.';
-                          if (Platform.OS === 'web') {
-                            alert(successMsg);
-                          } else {
-                            Alert.alert('Password Reset', successMsg);
-                          }
+                          setResetModalIdentifier(targetIdentifier);
+                          setResetModalVisible(true);
                         } catch (e: any) {
                           Alert.alert('Error', e?.message || 'Failed to send password reset email.');
                         } finally {
@@ -982,6 +981,64 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Password Reset Confirmation Modal */}
+      <Modal
+        visible={resetModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <TouchableOpacity 
+              style={styles.modalCloseBtn}
+              onPress={() => setResetModalVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="mail-unread-outline" size={32} color="#FFC700" />
+            </View>
+
+            <Text style={styles.modalTitle}>Check Your Email</Text>
+            
+            <Text style={styles.modalDescription}>
+              If an account is associated with:
+            </Text>
+
+            {resetModalIdentifier ? (
+              <View style={styles.modalIdentifierBadge}>
+                <Ionicons name="person-circle-outline" size={15} color="#FFC700" />
+                <Text style={styles.modalIdentifierText} numberOfLines={1}>
+                  {resetModalIdentifier}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.modalSubDescription}>
+              A secure password reset link has been dispatched to your registered email address.
+            </Text>
+
+            <View style={styles.modalHintBox}>
+              <Ionicons name="information-circle-outline" size={16} color="#94A3B8" style={{ marginTop: 1 }} />
+              <Text style={styles.modalHintText}>
+                Don't see it? Please check your spam or junk folder.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalPrimaryBtn}
+              onPress={() => setResetModalVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalPrimaryBtnText}>GOT IT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1304,5 +1361,120 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
     borderWidth: 1.5,
     backgroundColor: '#FEF2F2',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#18181B',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.25)',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  modalIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 199, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalDescription: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalIdentifierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 199, 0, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 10,
+    maxWidth: '90%',
+  },
+  modalIdentifierText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFC700',
+  },
+  modalSubDescription: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  modalHintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    width: '100%',
+  },
+  modalHintText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    lineHeight: 17,
+  },
+  modalPrimaryBtn: {
+    width: '100%',
+    backgroundColor: '#FFC700',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
 });
