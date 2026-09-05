@@ -64,7 +64,7 @@ export default function VouchersScreen() {
       const [records, birthdayLogs] = await Promise.all([
         pb.collection('vouchers').getFullList({
           filter: `customer = '${user.id}'`,
-          expand: 'reward,reward.merchant',
+          expand: 'reward,reward.merchant,campaign,campaign.merchant',
           sort: '-created'
         }),
         pb.collection('birthday_logs').getFullList({
@@ -77,16 +77,30 @@ export default function VouchersScreen() {
 
       const mapped = records.map((rec: any) => {
         const reward = rec.expand?.reward;
-        const merchant = reward?.expand?.merchant;
+        const campaign = rec.expand?.campaign;
+        const merchant = reward?.expand?.merchant || campaign?.expand?.merchant;
+
+        let parsedMeta: any = {};
+        try {
+          parsedMeta = typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : (rec.metadata || {});
+        } catch (e) {}
+
+        const discountVal = parsedMeta.discount_value || campaign?.discount_value;
+        const discountType = parsedMeta.discount_type || campaign?.discount_type;
+        const displayTitle = reward?.name || reward?.title || campaign?.name || campaign?.title || (discountVal ? `${discountType === 'percent' ? discountVal + '%' : 'RM ' + discountVal} OFF` : 'Voucher');
+        const displaySubtitle = reward?.description || campaign?.description || parsedMeta.description || 'Redeem at store';
+        const merchantName = merchant?.name || parsedMeta.merchant_name || 'Risev Merchant';
+        const logo = merchant?.logo 
+          ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
+          : 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?auto=format&fit=crop&q=80&w=120';
+
         return {
           id: rec.id,
-          merchantName: merchant?.name || 'Unknown Merchant',
+          merchantName,
           category: merchant?.category || 'General',
-          logo: merchant?.logo 
-            ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
-            : 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?auto=format&fit=crop&q=80&w=120',
-          title: reward?.name || 'Voucher',
-          subtitle: reward?.description || 'Loyalty Voucher',
+          logo,
+          title: displayTitle,
+          subtitle: displaySubtitle,
           code: rec.code || 'CODE-PENDING',
           expiry: rec.status === 'used' && rec.used_at
             ? `Used on ${new Date(rec.used_at).toLocaleDateString()}`
@@ -139,10 +153,27 @@ export default function VouchersScreen() {
   useEffect(() => {
     fetchVouchers();
     if (user) {
-      pb.collection('vouchers').subscribe('*', () => {
+      pb.collection('vouchers').subscribe('*', (e) => {
         fetchVouchers();
+        if (e.record) {
+          // If the voucher currently shown in the modal is updated (e.g. redeemed)
+          setSelectedVoucher((prev) => {
+            if (prev && prev.id === e.record.id) {
+              const isUsed = e.record.status === 'used';
+              return {
+                ...prev,
+                status: (isUsed ? 'used' : e.record.status) as any,
+                rawStatus: e.record.status as any,
+                expiry: isUsed ? `Used on ${new Date().toLocaleDateString()}` : prev.expiry,
+              };
+            }
+            return prev;
+          });
+        }
       }, {
         filter: `customer = '${user.id}'`
+      }).catch((err) => {
+        console.warn('Voucher realtime subscription error:', err);
       });
     }
     return () => {
@@ -377,22 +408,78 @@ export default function VouchersScreen() {
                 <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', position: 'absolute', right: -12 }} />
               </View>
 
-              {/* Bottom Block: White QR Area */}
+              {/* Bottom Block: White QR or Redeemed Receipt Area */}
               <View style={{ backgroundColor: '#FFFFFF', padding: 24, width: '100%', alignItems: 'center' }}>
-                <View style={[styles.qrWrapper, { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 24, shadowColor: '#1A1400', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5, marginBottom: 24 }]}>
-                  <Image
-                    source={{
-                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${selectedVoucher.code}`,
-                    }}
-                    style={[styles.qrCodeImage, { width: 180, height: 180 }]}
-                  />
-                </View>
+                {selectedVoucher.status === 'used' || selectedVoucher.rawStatus === 'used' ? (
+                  <View style={{ width: '100%', alignItems: 'center' }}>
+                    {/* Glowing Checkmark */}
+                    <View style={styles.redeemedSuccessIconWrap}>
+                      <Ionicons name="checkmark-circle" size={56} color="#10B981" />
+                    </View>
 
-                <Text style={[styles.codeLabel, { color: '#64748B', marginBottom: 4 }]}>VOUCHER CODE</Text>
-                <Text style={[styles.codeValue, { color: '#1A1400', fontSize: 22, letterSpacing: 2, fontFamily: 'PlusJakartaSans_800ExtraBold', marginBottom: 12 }]}>{selectedVoucher.code}</Text>
-                <Text style={[styles.scanNotice, { color: '#94A3B8', textAlign: 'center' }]}>
-                  Present this voucher code to the store staff to apply your discount reward.
-                </Text>
+                    <Text style={styles.redeemedSuccessTitle}>Voucher Redeemed!</Text>
+                    <Text style={styles.redeemedSuccessSubtitle}>
+                      Your discount reward has been verified and applied to your bill.
+                    </Text>
+
+                    {/* Receipt Summary Box */}
+                    <View style={styles.redeemedReceiptBox}>
+                      <View style={styles.redeemedReceiptRow}>
+                        <Text style={styles.redeemedReceiptLabel}>VOUCHER CODE</Text>
+                        <View style={styles.redeemedReceiptCodePill}>
+                          <Text style={styles.redeemedReceiptCodeText}>{selectedVoucher.code}</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.redeemedReceiptRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}>
+                        <Text style={styles.redeemedReceiptLabel}>STATUS</Text>
+                        <Text style={[styles.redeemedReceiptValue, { color: '#10B981' }]}>REDEEMED & APPLIED</Text>
+                      </View>
+                      <View style={[styles.redeemedReceiptRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}>
+                        <Text style={styles.redeemedReceiptLabel}>STORE</Text>
+                        <Text style={styles.redeemedReceiptValue}>{selectedVoucher.merchantName}</Text>
+                      </View>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <TouchableOpacity
+                      style={styles.redeemedDoneModalBtn}
+                      onPress={() => setUseModalVisible(false)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.redeemedDoneModalBtnText}>Done</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ marginTop: 12, paddingVertical: 6 }}
+                      onPress={() => {
+                        setUseModalVisible(false);
+                        setActiveTab('used');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                        View in Used Wallet →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                    <View style={[styles.qrWrapper, { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 24, shadowColor: '#1A1400', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5, marginBottom: 24 }]}>
+                      <Image
+                        source={{
+                          uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${selectedVoucher.code}`,
+                        }}
+                        style={[styles.qrCodeImage, { width: 180, height: 180 }]}
+                      />
+                    </View>
+
+                    <Text style={[styles.codeLabel, { color: '#64748B', marginBottom: 4 }]}>VOUCHER CODE</Text>
+                    <Text style={[styles.codeValue, { color: '#1A1400', fontSize: 22, letterSpacing: 2, fontFamily: 'PlusJakartaSans_800ExtraBold', marginBottom: 12 }]}>{selectedVoucher.code}</Text>
+                    <Text style={[styles.scanNotice, { color: '#94A3B8', textAlign: 'center' }]}>
+                      Present this voucher code to the store staff to apply your discount reward.
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
             );
@@ -901,5 +988,94 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 20,
+  },
+
+  // Redeemed Receipt Modal Styles
+  redeemedSuccessIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#A7F3D0',
+    marginBottom: 16,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  redeemedSuccessTitle: {
+    fontSize: 22,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  redeemedSuccessSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+  },
+  redeemedReceiptBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  redeemedReceiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  redeemedReceiptLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  redeemedReceiptCodePill: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  redeemedReceiptCodeText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 1,
+  },
+  redeemedReceiptValue: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  redeemedDoneModalBtn: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  redeemedDoneModalBtnText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
 });
