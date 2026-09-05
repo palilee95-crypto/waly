@@ -50,16 +50,18 @@ onRecordDelete((e) => {
     safeDelete("loyalty_programs", `merchant = '${mid}'`);
     safeDelete("rewards", `merchant = '${mid}'`);
 
-    // Step D: Follow-up groups, sequences, messages, members
+    // Step D: Follow-up groups, sequences, messages, members, logs
     try {
       const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
       for (let g = 0; g < groups.length; g++) {
         const gid = groups[g].id;
+        safeDelete("follow_up_logs", `group = '${gid}'`);
         safeDelete("follow_up_members", `group = '${gid}'`);
         try {
           const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${gid}'`, "-created", 200, 0);
           for (let s = 0; s < sequences.length; s++) {
             safeDelete("follow_up_messages", `sequence = '${sequences[s].id}'`);
+            safeDelete("follow_up_logs", `sequence = '${sequences[s].id}'`);
             try { $app.delete(sequences[s]); } catch (e) {}
           }
         } catch (e2) {}
@@ -67,7 +69,7 @@ onRecordDelete((e) => {
       }
     } catch (e4) {}
 
-    // Step E: Branches and activation codes
+    // Step E: Branches, store locations and activation codes
     try {
       const branches = $app.findRecordsByFilter("branches", `merchant = '${mid}'`, "-created", 200, 0);
       for (let b = 0; b < branches.length; b++) {
@@ -76,6 +78,7 @@ onRecordDelete((e) => {
     } catch (bErr) {}
 
     safeDelete("activation_codes", `redeemed_by = '${mid}'`);
+    safeDelete("store_locations", `merchant = '${mid}'`);
     safeDelete("branches", `merchant = '${mid}'`);
     safeDelete("campaigns", `merchant = '${mid}'`);
     safeDelete("broadcasts", `merchant = '${mid}'`);
@@ -88,6 +91,8 @@ onRecordDelete((e) => {
     safeDelete("birthday_logs", `merchant = '${mid}'`);
     safeDelete("birthday_rewards", `merchant = '${mid}'`);
     safeDelete("commissions", `referred_merchant = '${mid}'`);
+    safeDelete("sales_agent_referrals", `merchant = '${mid}'`);
+    safeDelete("prospects", `merchant = '${mid}'`);
 
     // Step F: Unlink staff members
     try {
@@ -126,6 +131,9 @@ onRecordDelete((e) => {
   safeDelete("qr_transactions", `customer = '${userId}'`);
   safeDelete("redemptions", `customer = '${userId}'`);
   safeDelete("prospects", `customer = '${userId}' || agent = '${userId}'`);
+  safeDelete("commissions", `agent = '${userId}'`);
+  safeDelete("sales_agent_referrals", `agent = '${userId}'`);
+  safeDelete("hardware_orders", `user = '${userId}'`);
   safeDelete("notifications", `user = '${userId}'`);
 
   return e.next();
@@ -237,16 +245,18 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
       safeDelete("loyalty_programs", `merchant = '${mid}'`);
       safeDelete("rewards", `merchant = '${mid}'`);
 
-      // Step D: Follow-up groups, sequences, messages, members
+      // Step D: Follow-up groups, sequences, messages, members, logs
       try {
         const groups = $app.findRecordsByFilter("follow_up_groups", `merchant = '${mid}'`, "-created", 200, 0);
         for (let g = 0; g < groups.length; g++) {
           const gid = groups[g].id;
+          safeDelete("follow_up_logs", `group = '${gid}'`);
           safeDelete("follow_up_members", `group = '${gid}'`);
           try {
             const sequences = $app.findRecordsByFilter("follow_up_sequences", `group = '${gid}'`, "-created", 200, 0);
             for (let s = 0; s < sequences.length; s++) {
               safeDelete("follow_up_messages", `sequence = '${sequences[s].id}'`);
+              safeDelete("follow_up_logs", `sequence = '${sequences[s].id}'`);
               try { $app.delete(sequences[s]); } catch (e) {}
             }
           } catch (e2) {}
@@ -254,7 +264,7 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
         }
       } catch (e4) {}
 
-      // Step E: Branches and activation codes
+      // Step E: Branches, store locations and activation codes
       try {
         const branches = $app.findRecordsByFilter("branches", `merchant = '${mid}'`, "-created", 200, 0);
         for (let b = 0; b < branches.length; b++) {
@@ -263,6 +273,7 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
       } catch (bErr) {}
 
       safeDelete("activation_codes", `redeemed_by = '${mid}'`);
+      safeDelete("store_locations", `merchant = '${mid}'`);
       safeDelete("branches", `merchant = '${mid}'`);
       safeDelete("campaigns", `merchant = '${mid}'`);
       safeDelete("broadcasts", `merchant = '${mid}'`);
@@ -275,6 +286,8 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
       safeDelete("birthday_logs", `merchant = '${mid}'`);
       safeDelete("birthday_rewards", `merchant = '${mid}'`);
       safeDelete("commissions", `referred_merchant = '${mid}'`);
+      safeDelete("sales_agent_referrals", `merchant = '${mid}'`);
+      safeDelete("prospects", `merchant = '${mid}'`);
 
       // Step F: Unlink staff members
       try {
@@ -313,6 +326,9 @@ routerAdd("POST", "/api/risev/admin/users/delete", (c) => {
     safeDelete("qr_transactions", `customer = '${targetUserId}'`);
     safeDelete("redemptions", `customer = '${targetUserId}'`);
     safeDelete("prospects", `customer = '${targetUserId}' || agent = '${targetUserId}'`);
+    safeDelete("commissions", `agent = '${targetUserId}'`);
+    safeDelete("sales_agent_referrals", `agent = '${targetUserId}'`);
+    safeDelete("hardware_orders", `user = '${targetUserId}'`);
     safeDelete("notifications", `user = '${targetUserId}'`);
 
     // 3. Finally delete the user record
