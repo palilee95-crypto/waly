@@ -37,14 +37,15 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
   }
 
   const body = e.requestInfo().body || {};
-  const plan = (body.plan || "pro").toLowerCase(); // 'starter' | 'pro' | 'business'
+  const rawPlan = (body.plan || "pro").toLowerCase(); // 'starter' | 'pro' | 'business' | 'enterprise'
+  const plan = (rawPlan === "enterprise" || rawPlan === "business") ? "business" : (rawPlan === "starter" ? "starter" : "pro");
   const billingCycle = (body.billing_cycle || "annually").toLowerCase(); // 'monthly' | 'annually'
   const paymentMethod = body.payment_method || "fpx"; // 'fpx' | 'card' | 'duitnow'
 
   // Pricing Matrix (in RM)
   const PRICING = {
     starter: { monthly: 47, annually: 456, quota: 500, title: "Starter Plan" },
-    pro: { monthly: 78, annually: 748, quota: "unlimited", title: "PRO Plan" },
+    pro: { monthly: 97, annually: 936, quota: "unlimited", title: "PRO Plan" },
     business: { monthly: 329, annually: 3156, quota: "unlimited", title: "Business Plan" }
   };
 

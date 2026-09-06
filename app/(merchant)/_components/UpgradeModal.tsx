@@ -68,7 +68,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
               >
                 <View style={styles.cardTop}>
                   <Text style={styles.planDuration}>1 month</Text>
-                  <Text style={styles.planPrice}>RM 78</Text>
+                  <Text style={styles.planPrice}>RM 97</Text>
                 </View>
                 <View style={[
                   styles.cardBottom,
@@ -77,7 +77,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
                   <Text style={[
                     styles.cardBottomText,
                     selectedPlan === 'monthly' ? styles.cardBottomTextSelected : styles.cardBottomTextUnselected
-                  ]}>RM 78 /mo</Text>
+                  ]}>RM 97 /mo</Text>
                 </View>
               </TouchableOpacity>
 
@@ -102,7 +102,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
                 
                 <View style={[styles.cardTop, { paddingTop: 24 }]}>
                   <Text style={styles.planDuration}>1 year</Text>
-                  <Text style={styles.planPrice}>RM 748</Text>
+                  <Text style={styles.planPrice}>RM 936</Text>
                 </View>
                 <View style={[
                   styles.cardBottom,
@@ -111,7 +111,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
                   <Text style={[
                     styles.cardBottomText,
                     selectedPlan === 'yearly' ? styles.cardBottomTextSelected : styles.cardBottomTextUnselected
-                  ]}>RM 62.33 /mo</Text>
+                  ]}>RM 78 /mo</Text>
                 </View>
               </TouchableOpacity>
 

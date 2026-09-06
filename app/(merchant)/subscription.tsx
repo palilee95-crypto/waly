@@ -273,7 +273,7 @@ export default function SubscriptionScreen() {
       }>('/api/risev/merchant/subscription/checkout', {
         method: 'POST',
         body: {
-          plan: selectedPlan,
+          plan: selectedPlan === 'enterprise' ? 'business' : selectedPlan,
           billing_cycle: billingCycle,
           payment_method: selectedPaymentMethod,
         }
