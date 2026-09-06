@@ -49,6 +49,8 @@ export default function OnboardingSetupScreen() {
   const [brandingLogoPreview, setBrandingLogoPreview] = useState<string | null>(null);
   const [googleReviewUrl, setGoogleReviewUrl] = useState('');
   const [isResolvingUrl, setIsResolvingUrl] = useState(false);
+  const [isDownloadingQr, setIsDownloadingQr] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const getOnboardingUrl = () => {
@@ -63,29 +65,78 @@ export default function OnboardingSetupScreen() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const handleShareWhatsapp = () => {
+  const handleShareWhatsapp = async () => {
     const storeName = merchant?.name || user?.name || 'our store';
     const url = getOnboardingUrl();
     const message = `Collect stamps & unlock rewards at ${storeName}! Tap or scan here: ${url}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(url)}`;
+    const fileName = `${merchant?.name ? merchant.name.replace(/[^a-zA-Z0-9]/g, '_') : 'store'}-onboarding-qr.png`;
+
+    // 1. Try Native Web Share API (attaches actual image file + text on supported mobile & desktop browsers)
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof navigator !== 'undefined' && (navigator as any).share) {
+      try {
+        setIsSharing(true);
+        const response = await fetch(qrUrl);
+        const blob = await response.blob();
+        const file = new File([blob], fileName, { type: 'image/png' });
+
+        if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+          await (navigator as any).share({
+            title: `${storeName} Loyalty Onboarding`,
+            text: message,
+            url: url,
+            files: [file],
+          });
+          return;
+        } else {
+          await (navigator as any).share({
+            title: `${storeName} Loyalty Onboarding`,
+            text: message,
+            url: url,
+          });
+          return;
+        }
+      } catch (shareErr: any) {
+        if (shareErr.name === 'AbortError') return; // User closed native share sheet
+        console.log('Native share failed or dismissed, falling back to direct WhatsApp link:', shareErr);
+      } finally {
+        setIsSharing(false);
+      }
+    }
+
+    // 2. Fallback: Direct WhatsApp Click-to-Chat URL
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(waUrl, '_blank');
     } else {
       Linking.openURL(waUrl);
     }
   };
 
-  const handleDownloadQr = () => {
+  const handleDownloadQr = async () => {
     const url = getOnboardingUrl();
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(url)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(url)}`;
+    const fileName = `${merchant?.name ? merchant.name.replace(/[^a-zA-Z0-9]/g, '_') : 'store'}-onboarding-qr.png`;
+
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const link = document.createElement('a');
-      link.href = qrUrl;
-      link.download = `${merchant?.name ? merchant.name.replace(/[^a-zA-Z0-9]/g, '_') : 'store'}-onboarding-qr.png`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        setIsDownloadingQr(true);
+        const response = await fetch(qrUrl);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+      } catch (err) {
+        console.warn('Direct blob download failed, opening image in new tab:', err);
+        window.open(qrUrl, '_blank');
+      } finally {
+        setIsDownloadingQr(false);
+      }
     } else {
       Linking.openURL(qrUrl);
     }
@@ -498,21 +549,35 @@ export default function OnboardingSetupScreen() {
           {/* Quick Action Buttons (WhatsApp & Download QR) */}
           <View style={styles.qrActionGrid}>
             <TouchableOpacity
-              style={styles.whatsappActionBtn}
+              style={[styles.whatsappActionBtn, isSharing && { opacity: 0.75 }]}
               onPress={handleShareWhatsapp}
+              disabled={isSharing}
               activeOpacity={0.85}
             >
-              <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-              <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
+              {isSharing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                  <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.downloadQrActionBtn}
+              style={[styles.downloadQrActionBtn, isDownloadingQr && { opacity: 0.75 }]}
               onPress={handleDownloadQr}
+              disabled={isDownloadingQr}
               activeOpacity={0.85}
             >
-              <Ionicons name="download-outline" size={16} color="#050505" />
-              <Text style={styles.downloadQrActionBtnText}>Download QR</Text>
+              {isDownloadingQr ? (
+                <ActivityIndicator size="small" color="#050505" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={16} color="#050505" />
+                  <Text style={styles.downloadQrActionBtnText}>Download QR</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
