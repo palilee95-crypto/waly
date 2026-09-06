@@ -102,7 +102,7 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
           reference: orderId,
           success_redirect: `https://risev.app/subscription?status=success&order_id=${orderId}`,
           failure_redirect: `https://risev.app/subscription?status=failed&order_id=${orderId}`,
-          cancel_redirect: `https://risev.app/subscription?status=cancelled`
+          cancel_redirect: `https://risev.app/subscription?status=cancelled&order_id=${orderId}`
         }),
         timeout: 15
       });

@@ -39,6 +39,8 @@ export default function SubscriptionScreen() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showFailureModal, setShowFailureModal] = useState(false);
+  const [failureType, setFailureType] = useState<'cancelled' | 'failed'>('cancelled');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'fpx' | 'card' | 'duitnow'>('fpx');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeSub, setActiveSub] = useState<any>(null);
@@ -65,11 +67,17 @@ export default function SubscriptionScreen() {
     }
   }, [params.plan, params.cycle, params.checkout]);
 
-  // Auto-refresh auth on payment success callback
+  // Handle gateway callback status
   useEffect(() => {
     if (params.status === 'success') {
       refreshSession();
       setShowSuccessModal(true);
+    } else if (params.status === 'cancelled') {
+      setFailureType('cancelled');
+      setShowFailureModal(true);
+    } else if (params.status === 'failed') {
+      setFailureType('failed');
+      setShowFailureModal(true);
     }
   }, [params.status]);
 
@@ -953,10 +961,10 @@ export default function SubscriptionScreen() {
         }}>
           <View style={{
             backgroundColor: '#FFFFFF',
-            borderRadius: 24,
+            borderRadius: 28,
             padding: 28,
             width: '100%',
-            maxWidth: 400,
+            maxWidth: 420,
             alignItems: 'center',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 10 },
@@ -965,15 +973,17 @@ export default function SubscriptionScreen() {
             elevation: 10,
           }}>
             <View style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
+              width: 68,
+              height: 68,
+              borderRadius: 34,
               backgroundColor: '#DCFCE7',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
+              borderWidth: 4,
+              borderColor: '#BBF7D0',
             }}>
-              <Ionicons name="checkmark-circle" size={40} color="#16A34A" />
+              <Ionicons name="checkmark-circle" size={42} color="#16A34A" />
             </View>
 
             <Text style={{
@@ -982,8 +992,9 @@ export default function SubscriptionScreen() {
               color: '#0F172A',
               textAlign: 'center',
               marginBottom: 8,
+              letterSpacing: -0.3,
             }}>
-              Payment Successful! 🎉
+              {locale === 'en' ? 'Payment Successful! 🎉' : 'Pembayaran Berjaya! 🎉'}
             </Text>
 
             <Text style={{
@@ -994,30 +1005,210 @@ export default function SubscriptionScreen() {
               lineHeight: 20,
               marginBottom: 24,
             }}>
-              Your store subscription is now active. You can now issue stamps, create WhatsApp marketing broadcasts, and manage your staff!
+              {locale === 'en'
+                ? 'Your store subscription is now active! Enjoy official WhatsApp automation, customer analytics, and unlimited CRM growth.'
+                : 'Langganan kedai anda kini aktif! Nikmati automasi WhatsApp rasmi, analitik pelanggan, dan pertumbuhan CRM tanpa had.'}
             </Text>
+
+            {params.order_id ? (
+              <View style={{
+                backgroundColor: '#F8FAFC',
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                marginBottom: 20,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                  {locale === 'en' ? 'Reference:' : 'Rujukan:'}
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                  {params.order_id}
+                </Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity
               style={{
                 width: '100%',
-                backgroundColor: '#050505',
+                backgroundColor: '#FFC700',
                 borderRadius: 16,
                 paddingVertical: 14,
                 alignItems: 'center',
                 justifyContent: 'center',
+                marginBottom: 10,
+                shadowColor: '#FFC700',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 4,
               }}
               onPress={() => {
                 setShowSuccessModal(false);
                 router.replace('/(merchant)');
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               <Text style={{
                 fontSize: 14,
-                fontFamily: 'PlusJakartaSans_700Bold',
-                color: '#FFFFFF',
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: '#050505',
               }}>
-                Enter Merchant Dashboard →
+                {locale === 'en' ? 'Enter Merchant Dashboard →' : 'Masuk Papan Pemuka →'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                alignItems: 'center',
+              }}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontFamily: 'PlusJakartaSans_600SemiBold',
+                color: '#64748B',
+              }}>
+                {locale === 'en' ? 'Stay on Subscriptions' : 'Kekal di Halaman Langganan'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Unsuccessful / Cancelled Modal */}
+      <Modal
+        visible={showFailureModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFailureModal(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+        }}>
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 28,
+            padding: 28,
+            width: '100%',
+            maxWidth: 420,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.15,
+            shadowRadius: 20,
+            elevation: 10,
+          }}>
+            {/* Status Icon */}
+            <View style={{
+              width: 68,
+              height: 68,
+              borderRadius: 34,
+              backgroundColor: failureType === 'cancelled' ? '#FEF3C7' : '#FEE2E2',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+              borderWidth: 4,
+              borderColor: failureType === 'cancelled' ? '#FDE68A' : '#FECACA',
+            }}>
+              <Ionicons 
+                name={failureType === 'cancelled' ? 'close-circle' : 'alert-circle'} 
+                size={40} 
+                color={failureType === 'cancelled' ? '#D97706' : '#DC2626'} 
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={{
+              fontSize: 20,
+              fontFamily: 'PlusJakartaSans_800ExtraBold',
+              color: '#0F172A',
+              textAlign: 'center',
+              marginBottom: 8,
+              letterSpacing: -0.3,
+            }}>
+              {failureType === 'cancelled'
+                ? (locale === 'en' ? 'Payment Incomplete' : 'Pembayaran Dibatalkan')
+                : (locale === 'en' ? 'Payment Unsuccessful' : 'Pembayaran Tidak Berjaya')}
+            </Text>
+
+            {/* Explanatory Description */}
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_500Medium',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 20,
+              marginBottom: 20,
+            }}>
+              {failureType === 'cancelled'
+                ? (locale === 'en'
+                    ? 'You left the payment gateway before completing checkout. No charges were made to your bank account, and your current store plan was unchanged.'
+                    : 'Anda telah meninggalkan gerbang pembayaran sebelum selesai. Tiada sebarang bayaran ditolak daripada akaun bank anda, dan pelan kedai anda tidak berubah.')
+                : (locale === 'en'
+                    ? 'Your bank or payment method could not complete this transaction. No funds were captured. Please try again or choose another payment method.'
+                    : 'Bank atau kaedah pembayaran anda tidak dapat melengkapkan transaksi ini. Tiada wang ditolak. Sila cuba lagi atau pilih kaedah pembayaran lain.')}
+            </Text>
+
+            {/* Action CTA: Resume / Try Again */}
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                backgroundColor: '#FFC700',
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 10,
+                shadowColor: '#FFC700',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              onPress={() => {
+                setShowFailureModal(false);
+                setShowCheckoutModal(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: '#050505',
+              }}>
+                {failureType === 'cancelled'
+                  ? (locale === 'en' ? 'Resume Checkout ⚡' : 'Sambung Pembayaran ⚡')
+                  : (locale === 'en' ? 'Try Again ⚡' : 'Cuba Lagi ⚡')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Secondary Action: Dismiss */}
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                setShowFailureModal(false);
+                router.replace('/(merchant)');
+              }}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontFamily: 'PlusJakartaSans_600SemiBold',
+                color: '#64748B',
+              }}>
+                {locale === 'en' ? 'Back to Dashboard' : 'Kembali ke Papan Pemuka'}
               </Text>
             </TouchableOpacity>
           </View>
