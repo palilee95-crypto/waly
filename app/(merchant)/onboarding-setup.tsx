@@ -49,6 +49,60 @@ export default function OnboardingSetupScreen() {
   const [brandingLogoPreview, setBrandingLogoPreview] = useState<string | null>(null);
   const [googleReviewUrl, setGoogleReviewUrl] = useState('');
   const [isResolvingUrl, setIsResolvingUrl] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const getOnboardingUrl = () => {
+    const merchantId = user?.merchant_id || '';
+    return `https://risev.app/nfc?m=${merchantId}`;
+  };
+
+  const handleCopyOnboardingLink = async () => {
+    const url = getOnboardingUrl();
+    await Clipboard.setStringAsync(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleShareWhatsapp = () => {
+    const storeName = merchant?.name || user?.name || 'our store';
+    const url = getOnboardingUrl();
+    const message = `Collect stamps & unlock rewards at ${storeName}! Tap or scan here: ${url}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    if (Platform.OS === 'web') {
+      window.open(waUrl, '_blank');
+    } else {
+      Linking.openURL(waUrl);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    const url = getOnboardingUrl();
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(url)}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const link = document.createElement('a');
+      link.href = qrUrl;
+      link.download = `${merchant?.name ? merchant.name.replace(/[^a-zA-Z0-9]/g, '_') : 'store'}-onboarding-qr.png`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      Linking.openURL(qrUrl);
+    }
+  };
+
+  const handleOpenLivePreview = async () => {
+    const merchantId = user?.merchant_id || '';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const liveUrl = `${window.location.origin}/nfc?m=${merchantId}`;
+      window.open(liveUrl, '_blank');
+    } else {
+      router.push({
+        pathname: '/nfc' as any,
+        params: { m: merchantId }
+      });
+    }
+  };
 
   const handleAutoConvertGoogleUrl = async (rawUrl: string) => {
     setGoogleReviewUrl(rawUrl);
@@ -396,32 +450,82 @@ export default function OnboardingSetupScreen() {
           </View>
         </View>
 
-        {/* 3. NFC Stand Preview Button Only */}
-        <TouchableOpacity
-          style={[styles.copyBtnGold, { marginBottom: 24 }]}
-          onPress={async () => {
-            const merchantId = user?.merchant_id || '';
-            const publicUrl = `https://risev.app/nfc?m=${merchantId}`;
-            await Clipboard.setStringAsync(publicUrl);
+        {/* Customer Onboarding QR & Share Hub Card */}
+        <View style={styles.qrShareCard}>
+          <View style={styles.qrShareHeader}>
+            <View style={styles.qrShareIconWrap}>
+              <Ionicons name="qr-code" size={20} color="#050505" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.qrShareTitle}>Customer Onboarding QR & Link</Text>
+              <Text style={styles.qrShareSubtitle}>
+                Place this QR on counter stands or share online for instant customer onboarding.
+              </Text>
+            </View>
+          </View>
 
-            if (Platform.OS === 'web') {
-              const liveUrl = `${window.location.origin}/nfc?m=${merchantId}`;
-              window.open(liveUrl, '_blank');
-            } else {
-              // Open seamlessly inside the mobile app
-              router.push({
-                pathname: '/nfc' as any,
-                params: { m: merchantId }
-              });
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="open-outline" size={16} color="#050505" style={{ marginRight: 6 }} />
-          <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }}>
-            Open Live Preview
-          </Text>
-        </TouchableOpacity>
+          {/* High Definition QR Code Frame */}
+          <View style={styles.qrCodeFrame}>
+            <Image
+              source={{
+                uri: `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(getOnboardingUrl())}`,
+              }}
+              style={styles.qrCodeImage}
+              resizeMode="contain"
+            />
+            <View style={styles.qrScanHintRow}>
+              <Ionicons name="scan-outline" size={13} color="#64748B" />
+              <Text style={styles.qrScanHintText}>Scan with any camera or NFC phone</Text>
+            </View>
+          </View>
+
+          {/* Link Display with Tap-To-Copy */}
+          <TouchableOpacity
+            style={styles.onboardingUrlPill}
+            onPress={handleCopyOnboardingLink}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="link-outline" size={15} color="#94A3B8" />
+            <Text style={styles.onboardingUrlText} numberOfLines={1}>
+              {getOnboardingUrl()}
+            </Text>
+            <View style={[styles.copyPillBadge, copiedLink && { backgroundColor: '#10B981' }]}>
+              <Ionicons name={copiedLink ? "checkmark" : "copy-outline"} size={12} color="#FFFFFF" />
+              <Text style={styles.copyPillBadgeText}>{copiedLink ? 'Copied!' : 'Copy'}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Quick Action Buttons (WhatsApp & Download QR) */}
+          <View style={styles.qrActionGrid}>
+            <TouchableOpacity
+              style={styles.whatsappActionBtn}
+              onPress={handleShareWhatsapp}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+              <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.downloadQrActionBtn}
+              onPress={handleDownloadQr}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="download-outline" size={16} color="#050505" />
+              <Text style={styles.downloadQrActionBtnText}>Download QR</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Open Live Web Preview */}
+          <TouchableOpacity
+            style={styles.livePreviewActionBtn}
+            onPress={handleOpenLivePreview}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="open-outline" size={15} color="#050505" />
+            <Text style={styles.livePreviewActionBtnText}>Open Live Web Preview</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* 1. Brand Identity Card */}
         <View style={styles.settingsCard}>
@@ -1419,5 +1523,164 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 3,
+  },
+
+  // QR Share Hub Card Styles
+  qrShareCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  qrShareHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  qrShareIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrShareTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  qrShareSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  qrCodeFrame: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  qrCodeImage: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+  },
+  qrScanHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+  },
+  qrScanHintText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  onboardingUrlPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    gap: 8,
+  },
+  onboardingUrlText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  copyPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#050505',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  copyPillBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  qrActionGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  whatsappActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#25D366',
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 6,
+    shadowColor: '#25D366',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  whatsappActionBtnText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  downloadQrActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    gap: 6,
+  },
+  downloadQrActionBtnText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+  },
+  livePreviewActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FFC700',
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 6,
+  },
+  livePreviewActionBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
   },
 });
