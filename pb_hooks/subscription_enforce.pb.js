@@ -55,21 +55,24 @@ onRecordCreate((e) => {
           }
         }
 
-        // 2. Starter Plan: 500 new customers per month (Resets monthly)
+        // 2. Starter Plan: 500 customer quota per renewal cycle
         if (plan === 'starter') {
-          const now = new Date();
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().replace('T', ' ').substring(0, 19);
+          const subStart = activeSub.getString('created') || activeSub.getString('updated');
+          let cycleStart = subStart ? new Date(subStart.replace(' ', 'T')).toISOString().replace('T', ' ').substring(0, 19) : '';
           
           try {
-            const monthlyCards = $app.findRecordsByFilter(
+            const filter = cycleStart 
+              ? `merchant = '${merchantId}' && created >= '${cycleStart}'` 
+              : `merchant = '${merchantId}'`;
+            const cycleCards = $app.findRecordsByFilter(
               'loyalty_cards',
-              `merchant = '${merchantId}' && created >= '${startOfMonth}'`,
+              filter,
               '-created',
               505,
               0
             );
-            if (monthlyCards.length >= 500) {
-              throw new ForbiddenError('Monthly customer quota reached (500/500). Quota resets next billing month, or upgrade to PRO for unlimited customers.');
+            if (cycleCards.length >= 500) {
+              throw new ForbiddenError('You have reached your 500 customer quota for this renewal cycle. Renew your subscription or upgrade to PRO for unlimited customers.');
             }
           } catch (qErr) {
             if (qErr.name === 'ForbiddenError') throw qErr;

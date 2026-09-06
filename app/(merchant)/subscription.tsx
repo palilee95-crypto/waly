@@ -186,11 +186,11 @@ export default function SubscriptionScreen() {
         total,
         periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual)' : '12 Bulan (Tahunan)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
         highlights: locale === 'en' ? [
-          '500 monthly customer quota',
+          '500 customer quota per renewal',
           'Basic analytics dashboard',
           '1 staff account'
         ] : [
-          'Kuota 500 pelanggan bulanan',
+          'Kuota 500 pelanggan setiap pembaharuan',
           'Papan pemuka analitik asas',
           '1 akaun staf'
         ]
@@ -312,7 +312,7 @@ export default function SubscriptionScreen() {
   const getFeaturesList = () => {
     if (selectedPlan === 'starter') {
       return [
-        '500 new unique customers / mo (Quota resets monthly)',
+        '500 customer quota per renewal',
         'Single Store Outlet (HQ)',
         'Basic Analytics Dashboard',
         'Up to 10 active vouchers',
@@ -431,7 +431,7 @@ export default function SubscriptionScreen() {
               <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
-                    {activeSub?.plan === 'starter' ? 'Monthly Customer Quota' : 'Customer Database Quota'}
+                    Customer Database Quota
                   </Text>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
                     {activeSub?.plan === 'starter'
