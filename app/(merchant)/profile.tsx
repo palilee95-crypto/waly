@@ -674,6 +674,62 @@ export default function ProfileScreen() {
     }
   };
 
+  const getSubscriptionBadgeInfo = () => {
+    if (!subscription || merchant?.status !== 'active') {
+      if (isInTrial) {
+        return {
+          title: 'TRIAL',
+          bg: '#E0F2FE',
+          color: '#0284C7',
+          subtitle: `${trialDaysRemaining}d left`,
+        };
+      }
+      return {
+        title: 'SUSPENDED',
+        bg: '#FEE2E2',
+        color: '#DC2626',
+        subtitle: locale === 'en' ? 'Action Required' : 'Tindakan Diperlukan',
+      };
+    }
+
+    const plan = (subscription.plan || 'pro').toLowerCase();
+
+    if (plan === 'stand_bundle') {
+      return {
+        title: 'NFC BUNDLE',
+        bg: '#FEF3C7',
+        color: '#B45309',
+        subtitle: locale === 'en' ? 'No Expiry • 500 Cap' : 'Tiada Luput • 500 Had',
+      };
+    }
+
+    if (plan === 'starter') {
+      return {
+        title: 'STARTER',
+        bg: '#F1F5F9',
+        color: '#334155',
+        subtitle: getExpiryLabel(),
+      };
+    }
+
+    if (plan === 'business' || plan === 'enterprise') {
+      return {
+        title: 'BUSINESS',
+        bg: '#FEF3C7',
+        color: '#D97706',
+        subtitle: getExpiryLabel(),
+      };
+    }
+
+    // Default to PRO
+    return {
+      title: 'PRO',
+      bg: '#4F46E5',
+      color: '#FFFFFF',
+      subtitle: getExpiryLabel(),
+    };
+  };
+
   useEffect(() => {
     const fetchMerchant = async () => {
       if (!user || !user.merchant_id) return;
@@ -689,10 +745,23 @@ export default function ProfileScreen() {
         //   fetchWhatsappStatus();
         // }
 
-        // Fetch subscription record
+        // Fetch subscription record (prioritize active record, then latest)
         try {
-          const subRec = await pb.collection('subscriptions').getFirstListItem(`merchant = "${user.merchant_id}"`);
-          setSubscription(subRec);
+          const subList = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${user.merchant_id}" && status = "active"`,
+            sort: '-created',
+          });
+          if (subList.items.length > 0) {
+            setSubscription(subList.items[0]);
+          } else {
+            const fallbackList = await pb.collection('subscriptions').getList(1, 1, {
+              filter: `merchant = "${user.merchant_id}"`,
+              sort: '-created',
+            });
+            if (fallbackList.items.length > 0) {
+              setSubscription(fallbackList.items[0]);
+            }
+          }
         } catch (e: any) {
           console.log("No active subscription row found for profile view:", e.message);
         }
@@ -1021,27 +1090,19 @@ export default function ProfileScreen() {
               <View style={styles.shopMainInfo}>
                 <Text style={styles.shopName} numberOfLines={1}>{merchant?.name || user?.name || 'The Coffee House'}</Text>
                 <View style={styles.partnerRow}>
-                  {merchant?.status === 'active' ? (
-                    <>
-                      <View style={styles.proBadge}>
-                        <Text style={styles.proBadgeText}>PRO</Text>
-                      </View>
-                      {subscription?.current_period_end && (
-                        <Text style={styles.locationText}>{getExpiryLabel()}</Text>
-                      )}
-                    </>
-                  ) : isInTrial ? (
-                    <>
-                      <View style={styles.trialBadge}>
-                        <Text style={styles.trialBadgeText}>TRIAL</Text>
-                      </View>
-                      <Text style={styles.locationText}>{trialDaysRemaining}d left</Text>
-                    </>
-                  ) : (
-                    <View style={styles.expiredBadge}>
-                      <Text style={styles.expiredBadgeText}>SUSPENDED</Text>
-                    </View>
-                  )}
+                  {(() => {
+                    const badge = getSubscriptionBadgeInfo();
+                    return (
+                      <>
+                        <View style={[styles.proBadge, { backgroundColor: badge.bg }]}>
+                          <Text style={[styles.proBadgeText, { color: badge.color }]}>{badge.title}</Text>
+                        </View>
+                        {badge.subtitle ? (
+                          <Text style={styles.locationText}>{badge.subtitle}</Text>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                 </View>
               </View>
             </View>
@@ -1202,8 +1263,8 @@ export default function ProfileScreen() {
             subtitle="Manage your plan & billing"
             iconBgColor="#EEF2FF"
             iconColor="#4F46E5"
-            badgeText={isOwner ? "PRO" : undefined}
-            badgeColor="#4F46E5"
+            badgeText={isOwner ? getSubscriptionBadgeInfo().title : undefined}
+            badgeColor={getSubscriptionBadgeInfo().color === '#FFFFFF' ? '#4F46E5' : getSubscriptionBadgeInfo().color}
             isLocked={!isOwner}
             onPress={!isOwner
               ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
