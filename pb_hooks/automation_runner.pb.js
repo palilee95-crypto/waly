@@ -118,3 +118,62 @@ routerAdd("GET", "/api/risev/test/check-expired-subscriptions", (e) => {
     });
   }
 });
+
+// 7. Voucher Expiration Cron — runs every hour to mark expired vouchers in DB
+cronAdd("check_expired_vouchers", "0 * * * *", () => {
+  try {
+    const now = new Date();
+    const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const expiredVouchers = $app.findRecordsByFilter(
+      "vouchers",
+      `status = 'active' && expires_at != '' && expires_at <= '${nowStr}'`,
+      "-created",
+      500,
+      0
+    );
+
+    for (const v of expiredVouchers) {
+      v.set("status", "expired");
+      $app.save(v);
+    }
+  } catch (err) {
+    console.log("[Voucher Expiration Cron] Error:", err.message || err);
+  }
+});
+
+// 8. HTTP endpoint to trigger voucher expiration check manually
+routerAdd("GET", "/api/risev/test/check-expired-vouchers", (e) => {
+  try {
+    const now = new Date();
+    const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const expiredVouchers = $app.findRecordsByFilter(
+      "vouchers",
+      `status = 'active' && expires_at != '' && expires_at <= '${nowStr}'`,
+      "-created",
+      500,
+      0
+    );
+
+    const expired = [];
+    for (const v of expiredVouchers) {
+      v.set("status", "expired");
+      $app.save(v);
+      expired.push({ id: v.id, code: v.get("code"), expires_at: v.get("expires_at") });
+    }
+
+    return e.json(200, {
+      success: true,
+      message: "Expired vouchers check completed",
+      processedCount: expired.length,
+      expired: expired
+    });
+  } catch (err) {
+    return e.json(500, {
+      success: false,
+      message: "Failed to run expired vouchers check: " + err.message
+    });
+  }
+});
+

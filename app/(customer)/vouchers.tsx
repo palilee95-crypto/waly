@@ -94,6 +94,29 @@ export default function VouchersScreen() {
           ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
           : 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?auto=format&fit=crop&q=80&w=120';
 
+        const isUsed = rec.status === 'used';
+        let isPastExpiry = false;
+        if (rec.expires_at) {
+          const expDate = new Date(String(rec.expires_at).replace(' ', 'T'));
+          if (!isNaN(expDate.getTime())) {
+            isPastExpiry = expDate.getTime() < Date.now();
+          }
+        }
+        const isExpired = rec.status === 'expired' || (!isUsed && isPastExpiry);
+
+        let expiryDisplay = 'No expiry';
+        if (isUsed) {
+          expiryDisplay = rec.used_at
+            ? `Used on ${new Date(String(rec.used_at).replace(' ', 'T')).toLocaleDateString()}`
+            : 'Used';
+        } else if (isExpired) {
+          expiryDisplay = rec.expires_at
+            ? `Expired on ${new Date(String(rec.expires_at).replace(' ', 'T')).toLocaleDateString()}`
+            : 'Expired';
+        } else if (rec.expires_at) {
+          expiryDisplay = `Valid until ${new Date(String(rec.expires_at).replace(' ', 'T')).toLocaleDateString()}`;
+        }
+
         return {
           id: rec.id,
           merchantName,
@@ -102,15 +125,9 @@ export default function VouchersScreen() {
           title: displayTitle,
           subtitle: displaySubtitle,
           code: rec.code || 'CODE-PENDING',
-          expiry: rec.status === 'used' && rec.used_at
-            ? `Used on ${new Date(rec.used_at).toLocaleDateString()}`
-            : rec.status === 'expired'
-            ? `Expired on ${rec.expires_at ? new Date(rec.expires_at).toLocaleDateString() : 'Unknown'}`
-            : rec.expires_at 
-            ? `Valid until ${new Date(rec.expires_at).toLocaleDateString()}` 
-            : 'No expiry',
-          status: (rec.status === 'used' || rec.status === 'expired' ? 'used' : 'active') as 'used' | 'active',
-          rawStatus: rec.status as 'active' | 'used' | 'expired',
+          expiry: expiryDisplay,
+          status: (isUsed || isExpired ? 'used' : 'active') as 'used' | 'active',
+          rawStatus: (isUsed ? 'used' : isExpired ? 'expired' : 'active') as 'active' | 'used' | 'expired',
           color: merchant?.onboarding_primary_color || (reward?.type === 'discount' ? '#7C3AED' : '#004ac6')
         };
       });
@@ -122,6 +139,28 @@ export default function VouchersScreen() {
           const voucher = log.expand.voucher;
           const merchant = log.expand?.merchant;
           const expiresAt = voucher.expires_at || voucher.valid_until;
+
+          const isBirthdayUsed = voucher.status === 'used';
+          let isBirthdayPastExpiry = false;
+          if (expiresAt) {
+            const expDate = new Date(String(expiresAt).replace(' ', 'T'));
+            if (!isNaN(expDate.getTime())) {
+              isBirthdayPastExpiry = expDate.getTime() < Date.now();
+            }
+          }
+          const isBirthdayExpired = voucher.status === 'expired' || (!isBirthdayUsed && isBirthdayPastExpiry);
+
+          let bdayExpiryDisplay = 'No expiry';
+          if (isBirthdayUsed) {
+            bdayExpiryDisplay = 'Used';
+          } else if (isBirthdayExpired) {
+            bdayExpiryDisplay = expiresAt
+              ? `Expired on ${new Date(String(expiresAt).replace(' ', 'T')).toLocaleDateString()}`
+              : 'Expired';
+          } else if (expiresAt) {
+            bdayExpiryDisplay = `Valid until ${new Date(String(expiresAt).replace(' ', 'T')).toLocaleDateString()}`;
+          }
+
           return {
             id: voucher.id,
             merchantName: merchant?.name || 'Unknown Merchant',
@@ -132,11 +171,9 @@ export default function VouchersScreen() {
             title: voucher.title || 'Birthday Reward',
             subtitle: voucher.description || 'Birthday treat',
             code: voucher.code || 'CODE-PENDING',
-            expiry: expiresAt
-              ? `Valid until ${new Date(expiresAt).toLocaleDateString()}`
-              : 'No expiry',
-            status: 'active' as const,
-            rawStatus: voucher.status as 'active' | 'used' | 'expired',
+            expiry: bdayExpiryDisplay,
+            status: (isBirthdayUsed || isBirthdayExpired ? 'used' : 'active') as 'used' | 'active',
+            rawStatus: (isBirthdayUsed ? 'used' : isBirthdayExpired ? 'expired' : 'active') as 'active' | 'used' | 'expired',
             color: merchant?.onboarding_primary_color || '#0F172A',
             isBirthday: true,
             merchantId: merchant?.id,
@@ -296,14 +333,14 @@ export default function VouchersScreen() {
           </View>
 
           {/* Birthday Rewards Section */}
-          {activeTab === 'active' && birthdayRewards.length > 0 && (
+          {activeTab === 'active' && birthdayRewards.filter((b) => b.status === 'active').length > 0 && (
             <View style={styles.birthdaySection}>
               <View style={styles.birthdaySectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="gift-outline" size={16} color="#0F172A" />
                   <Text style={styles.birthdaySectionTitle}>Birthday Rewards</Text>
                 </View>
-                <Text style={styles.birthdaySectionMeta}>{birthdayRewards[0]?.expiry || ''}</Text>
+                <Text style={styles.birthdaySectionMeta}>{birthdayRewards.filter((b) => b.status === 'active')[0]?.expiry || ''}</Text>
               </View>
 
               <ScrollView
@@ -311,7 +348,7 @@ export default function VouchersScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.birthdayScrollContent}
               >
-                {birthdayRewards.map((item) => (
+                {birthdayRewards.filter((b) => b.status === 'active').map((item) => (
                   <View key={item.id} style={styles.birthdayCard}>
                     <View style={styles.birthdayCardHeader}>
                       <Image source={{ uri: item.logo }} style={styles.birthdayMerchantLogo} />
