@@ -18,10 +18,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth, storage } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { AntDesign, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { validateEmailWithTypoCheck, parseAndNormalizeBirthday } from '@/lib/emailValidator';
 
 const { width } = Dimensions.get('window');
 const COUNTRY_CODE = '+60';
@@ -229,6 +230,30 @@ export default function LoginScreen() {
     }
   };
 
+  const handleBirthdayChange = (text: string) => {
+    // If backspacing/deleting, don't auto-format so user can freely delete hyphens and digits
+    if (text.length < birthday.length) {
+      setBirthday(text);
+      setErrorMsg('');
+      return;
+    }
+
+    const clean = text.replace(/[^0-9\-\/]/g, '');
+    // If entering pure digits without separators, auto-format as DD-MM-YYYY
+    if (!clean.includes('-') && !clean.includes('/')) {
+      let formatted = clean;
+      if (clean.length > 2 && clean.length <= 4) {
+        formatted = `${clean.slice(0, 2)}-${clean.slice(2)}`;
+      } else if (clean.length > 4) {
+        formatted = `${clean.slice(0, 2)}-${clean.slice(2, 4)}-${clean.slice(4, 8)}`;
+      }
+      setBirthday(formatted.slice(0, 10));
+    } else {
+      setBirthday(clean.slice(0, 10));
+    }
+    setErrorMsg('');
+  };
+
   const handleRegister = async () => {
     setErrorMsg('');
 
@@ -240,13 +265,9 @@ export default function LoginScreen() {
       setErrorMsg('Please enter your email address.');
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setErrorMsg('Please enter a valid email address (e.g. user@gmail.com).');
-      return;
-    }
-    if (email.trim().endsWith('@risev.app')) {
-      setErrorMsg('Please use your personal email address.');
+    const emailCheck = validateEmailWithTypoCheck(email);
+    if (!emailCheck.isValid) {
+      setErrorMsg(emailCheck.error || 'Please enter a valid email address (e.g. user@gmail.com).');
       return;
     }
     if (!password) {
@@ -262,17 +283,18 @@ export default function LoginScreen() {
       return;
     }
 
+    let birthDateToUse = '2000-01-01';
     if (birthday && birthday.trim()) {
-      const birthRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!birthRegex.test(birthday.trim())) {
-        setErrorMsg('Please enter a valid birthday format (YYYY-MM-DD).');
+      const bdayCheck = parseAndNormalizeBirthday(birthday);
+      if (!bdayCheck.isValid) {
+        setErrorMsg(bdayCheck.error || 'Please enter a valid birthday in DD-MM-YYYY format (e.g. 01-09-2000).');
         return;
       }
+      birthDateToUse = bdayCheck.isoDate || '2000-01-01';
     }
 
     setIsLoading(true);
     try {
-      const birthDateToUse = birthday && birthday.trim() ? birthday.trim() : '2000-01-01';
       await register(getFullPhone(), email.trim().toLowerCase(), name.trim(), password, 'customer', birthDateToUse);
       // Strict Mode: transition to Verify Email screen
       setStep('verify-email');
@@ -742,7 +764,7 @@ export default function LoginScreen() {
                     <View style={[
                       styles.inputGroup,
                       emailFocused && styles.inputGroupFocused,
-                      email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && styles.inputGroupWarning
+                      email.length > 0 && !validateEmailWithTypoCheck(email).isValid && styles.inputGroupWarning
                     ]}>
                       <TextInput
                         style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
@@ -759,9 +781,42 @@ export default function LoginScreen() {
                         onBlur={() => setEmailFocused(false)}
                       />
                     </View>
-                    {email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (
-                      <Text style={styles.fieldHelperError}>⚠️ Please enter a valid email format</Text>
-                    )}
+                    {email.length > 0 && (() => {
+                      const check = validateEmailWithTypoCheck(email);
+                      if (!check.isValid && check.suggestedEmail) {
+                        return (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setEmail(check.suggestedEmail!);
+                              setErrorMsg('');
+                            }}
+                            activeOpacity={0.8}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: '#FEF3C7',
+                              borderColor: '#FDE68A',
+                              borderWidth: 1,
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              marginTop: 6,
+                              marginBottom: 8,
+                              gap: 6,
+                            }}
+                          >
+                            <Ionicons name="sparkles" size={14} color="#D97706" />
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#92400E', flex: 1 }}>
+                              Did you mean <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', textDecorationLine: 'underline' }}>{check.suggestedEmail}</Text>? Tap to fix
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      }
+                      if (!check.isValid && check.error) {
+                        return <Text style={styles.fieldHelperError}>⚠️ {check.error}</Text>;
+                      }
+                      return null;
+                    })()}
 
                     <Text style={styles.inputLabel}>BIRTHDAY (FOR REWARDS)</Text>
                     <View style={[
@@ -770,23 +825,23 @@ export default function LoginScreen() {
                     ]}>
                       <TextInput
                         style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                        placeholder="YYYY-MM-DD (e.g. 1998-05-24)"
+                        placeholder="DD-MM-YYYY (e.g. 01-09-2000)"
                         placeholderTextColor="#94A3B8"
                         value={birthday}
-                        onChangeText={(t) => {
-                          let cleaned = t.replace(/[^0-9]/g, '');
-                          let formatted = cleaned;
-                          if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-                          if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
-                          setBirthday(formatted.slice(0, 10));
-                          setErrorMsg('');
-                        }}
-                        keyboardType="numeric"
+                        onChangeText={handleBirthdayChange}
+                        keyboardType="numbers-and-punctuation"
                         maxLength={10}
                         onFocus={() => setBirthdayFocused(true)}
                         onBlur={() => setBirthdayFocused(false)}
                       />
                     </View>
+                    {birthday.trim().length >= 6 && (() => {
+                      const check = parseAndNormalizeBirthday(birthday);
+                      if (!check.isValid && check.error) {
+                        return <Text style={styles.fieldHelperError}>⚠️ {check.error}</Text>;
+                      }
+                      return null;
+                    })()}
                     <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: -4, marginBottom: 12 }}>
                       🎁 Receive exclusive surprise vouchers on your birthday!
                     </Text>

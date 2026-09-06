@@ -60,6 +60,40 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Password must be at least 8 characters" });
   }
 
+  const trimmedEmail = String(email).trim().toLowerCase();
+  const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!basicEmailRegex.test(trimmedEmail)) {
+    return e.json(400, { message: "Please enter a valid email address." });
+  }
+  if (trimmedEmail.endsWith('@risev.app')) {
+    return e.json(400, { message: "Please use your personal email address, not a @risev.app domain." });
+  }
+
+  // Check for common typo domains (e.g. .con, gmai.com, icloud.con)
+  const emailDomain = trimmedEmail.split('@')[1] || '';
+  const typoDomains = {
+    'icloud.con': 'icloud.com',
+    'icloud.cmo': 'icloud.com',
+    'iclud.com': 'icloud.com',
+    'icoud.com': 'icloud.com',
+    'gmail.con': 'gmail.com',
+    'gmai.com': 'gmail.com',
+    'gamil.com': 'gmail.com',
+    'gmial.com': 'gmail.com',
+    'yahoo.con': 'yahoo.com',
+    'yaho.com': 'yahoo.com',
+    'hotmail.con': 'hotmail.com',
+    'hotmial.com': 'hotmail.com',
+    'outlook.con': 'outlook.com',
+    'outlok.com': 'outlook.com'
+  };
+  if (typoDomains[emailDomain]) {
+    return e.json(400, { message: "Invalid email domain. Did you mean @" + typoDomains[emailDomain] + "?" });
+  }
+  if (emailDomain.endsWith('.con') || emailDomain.endsWith('.cmo') || emailDomain.endsWith('.coom')) {
+    return e.json(400, { message: "Invalid email extension. Did you mean .com instead of ." + emailDomain.split('.').pop() + "?" });
+  }
+
   let digits = String(phone).replace(/[^\d]/g, '');
   if (digits.startsWith('0')) digits = '6' + digits;
   if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
@@ -93,7 +127,23 @@ routerAdd("POST", "/api/risev/register", (e) => {
     }
   } catch (err) { /* ok */ }
 
-  const formattedBirthday = (birthday && birthday.length === 10) ? `${birthday} 00:00:00.000Z` : birthday;
+  let normalizedBirthday = birthday;
+  if (birthday) {
+    const bStr = String(birthday).trim().replace(/\//g, '-');
+    const bParts = bStr.split('-');
+    if (bParts.length === 3) {
+      let y, m, d;
+      if (bParts[0].length === 4) {
+        y = bParts[0]; m = bParts[1]; d = bParts[2];
+      } else {
+        d = bParts[0]; m = bParts[1]; y = bParts[2];
+      }
+      if (d.length === 1) d = '0' + d;
+      if (m.length === 1) m = '0' + m;
+      normalizedBirthday = `${y}-${m}-${d}`;
+    }
+  }
+  const formattedBirthday = (normalizedBirthday && normalizedBirthday.length === 10) ? `${normalizedBirthday} 00:00:00.000Z` : normalizedBirthday;
 
   try {
     let user;

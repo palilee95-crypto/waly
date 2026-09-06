@@ -43,6 +43,31 @@ routerAdd("POST", "/api/risev/onboarding/complete", (e) => {
     return e.json(400, { message: "Please use your personal email address, not a temporary @risev.app domain." });
   }
 
+  // Check for common typo domains (e.g. .con, gmai.com, icloud.con)
+  const onboardingDomain = trimmedEmail.split('@')[1] || '';
+  const typoDomains = {
+    'icloud.con': 'icloud.com',
+    'icloud.cmo': 'icloud.com',
+    'iclud.com': 'icloud.com',
+    'icoud.com': 'icloud.com',
+    'gmail.con': 'gmail.com',
+    'gmai.com': 'gmail.com',
+    'gamil.com': 'gmail.com',
+    'gmial.com': 'gmail.com',
+    'yahoo.con': 'yahoo.com',
+    'yaho.com': 'yahoo.com',
+    'hotmail.con': 'hotmail.com',
+    'hotmial.com': 'hotmail.com',
+    'outlook.con': 'outlook.com',
+    'outlok.com': 'outlook.com'
+  };
+  if (typoDomains[onboardingDomain]) {
+    return e.json(400, { message: "Invalid email domain. Did you mean @" + typoDomains[onboardingDomain] + "?" });
+  }
+  if (onboardingDomain.endsWith('.con') || onboardingDomain.endsWith('.cmo') || onboardingDomain.endsWith('.coom')) {
+    return e.json(400, { message: "Invalid email extension. Did you mean .com instead of ." + onboardingDomain.split('.').pop() + "?" });
+  }
+
   // Check if the email is already registered by another user
   try {
     const existingUser = $app.findFirstRecordByData("users", "email", trimmedEmail);

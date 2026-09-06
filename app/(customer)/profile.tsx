@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { colors } from '@/theme';
+import { parseAndNormalizeBirthday } from '@/lib/emailValidator';
 
 export default function CustomerProfile() {
   const { user, logout, switchRole, updateProfile, refreshSession } = useAuth();
@@ -77,12 +78,43 @@ export default function CustomerProfile() {
 
   const handleOpenEdit = () => {
     setEditName(user?.name || '');
-    setEditBirthday(user?.birthday && user.birthday !== '2000-01-01' ? user.birthday : '');
+    let formattedBday = '';
+    if (user?.birthday && user.birthday !== '2000-01-01') {
+      const datePart = String(user.birthday).split(' ')[0];
+      const parts = datePart.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        // YYYY-MM-DD to DD-MM-YYYY
+        formattedBday = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else {
+        formattedBday = datePart;
+      }
+    }
+    setEditBirthday(formattedBday);
     setEditPassword('');
     setEditConfirmPassword('');
     setAvatarPreview(avatarUrl);
     setAvatarFile(null);
     setEditModalVisible(true);
+  };
+
+  const handleBirthdayChange = (text: string) => {
+    // If user is deleting/backspacing, allow free deletion
+    if (text.length < editBirthday.length) {
+      setEditBirthday(text);
+      return;
+    }
+    const clean = text.replace(/[^0-9\-\/]/g, '');
+    if (!clean.includes('-') && !clean.includes('/')) {
+      let formatted = clean;
+      if (clean.length > 2 && clean.length <= 4) {
+        formatted = `${clean.slice(0, 2)}-${clean.slice(2)}`;
+      } else if (clean.length > 4) {
+        formatted = `${clean.slice(0, 2)}-${clean.slice(2, 4)}-${clean.slice(4, 8)}`;
+      }
+      setEditBirthday(formatted.slice(0, 10));
+    } else {
+      setEditBirthday(clean.slice(0, 10));
+    }
   };
 
   const handlePickImage = () => {
@@ -162,12 +194,14 @@ export default function CustomerProfile() {
       }
     }
 
+    let birthDateToSave: string | undefined = undefined;
     if (editBirthday && editBirthday.trim()) {
-      const birthRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!birthRegex.test(editBirthday.trim())) {
-        Alert.alert('Validation Error', 'Please enter a valid birthday format (YYYY-MM-DD).');
+      const bdayCheck = parseAndNormalizeBirthday(editBirthday);
+      if (!bdayCheck.isValid) {
+        Alert.alert('Validation Error', bdayCheck.error || 'Please enter a valid birthday in DD-MM-YYYY format (e.g. 01-09-2000).');
         return;
       }
+      birthDateToSave = bdayCheck.isoDate;
     }
 
     setIsSaving(true);
@@ -177,7 +211,7 @@ export default function CustomerProfile() {
         avatarFile, 
         editPassword ? editPassword : undefined, 
         editPassword ? editConfirmPassword : undefined,
-        editBirthday.trim() || undefined
+        birthDateToSave
       );
       setEditModalVisible(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -448,20 +482,14 @@ export default function CustomerProfile() {
 
             {/* Birthday field */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Birthday (YYYY-MM-DD)</Text>
+              <Text style={styles.inputLabel}>Birthday (DD-MM-YYYY)</Text>
               <TextInput
                 style={styles.textInput}
                 value={editBirthday}
-                onChangeText={(t) => {
-                  let cleaned = t.replace(/[^0-9]/g, '');
-                  let formatted = cleaned;
-                  if (cleaned.length >= 4) formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-                  if (cleaned.length >= 6) formatted = formatted.slice(0, 7) + '-' + formatted.slice(7, 10);
-                  setEditBirthday(formatted.slice(0, 10));
-                }}
-                placeholder="YYYY-MM-DD (e.g. 1998-05-24)"
+                onChangeText={handleBirthdayChange}
+                placeholder="DD-MM-YYYY (e.g. 01-09-2000)"
                 placeholderTextColor="#94A3B8"
-                keyboardType="numeric"
+                keyboardType="numbers-and-punctuation"
                 maxLength={10}
                 {...Platform.select({
                   web: {
