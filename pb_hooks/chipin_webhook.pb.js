@@ -137,8 +137,21 @@ routerAdd("POST", "/api/risev/chipin-webhook", (c) => {
     $app.save(subRecord);
     console.log(`[CHIPIN WEBHOOK] Activated subscription ${subRecord.id} for merchant ${subRecord.getString("merchant")} (Plan: ${subRecord.getString("plan")}, Valid: ${periodDays} days)`);
 
-    // Sync merchant status
+    // Supercede any other active subscriptions for this merchant
     const merchantId = subRecord.getString("merchant");
+    if (merchantId) {
+      try {
+        const oldSubs = $app.findRecordsByFilter("subscriptions", `merchant = "${merchantId}" && id != "${subRecord.id}" && status = "active"`, "-created", 10, 0);
+        for (let i = 0; i < oldSubs.length; i++) {
+          oldSubs[i].set("status", "superseded");
+          $app.save(oldSubs[i]);
+        }
+      } catch (oldErr) {
+        console.log("[CHIPIN WEBHOOK] Failed to supersede old subscriptions:", oldErr.message || oldErr);
+      }
+    }
+
+    // Sync merchant status
     if (merchantId) {
       try {
         const merch = $app.findRecordById("merchants", merchantId);

@@ -57,27 +57,13 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
   const periodDays = billingCycle === "monthly" ? 30 : 365;
   const periodEndDate = new Date(Date.now() + periodDays * 86400000).toISOString();
 
-  // Find or create subscription record
-  let subRecord = null;
-  try {
-    const existing = $app.findRecordsByFilter("subscriptions", `merchant = "${merchantId}"`, "-created", 1, 0);
-    if (existing.length > 0) {
-      subRecord = existing[0];
-    }
-  } catch (findErr) {}
-
+  // Create a new pending subscription checkout record (DO NOT touch existing active subscriptions)
   const subCol = $app.findCollectionByNameOrId("subscriptions");
-  if (!subRecord) {
-    subRecord = new Record(subCol);
-    subRecord.set("id", $security.randomString(15).toLowerCase());
-    subRecord.set("merchant", merchantId);
-    subRecord.set("status", "pending");
-  } else if (!subRecord.getString("status")) {
-    subRecord.set("status", "pending");
-  }
-
-  // Update subscription record with pending checkout intent
-  subRecord.set("plan", plan === "business" ? "business" : (plan === "starter" ? "starter" : "pro"));
+  const subRecord = new Record(subCol);
+  subRecord.set("id", $security.randomString(15).toLowerCase());
+  subRecord.set("merchant", merchantId);
+  subRecord.set("status", "pending");
+  subRecord.set("plan", plan);
   subRecord.set("chipin_payment_id", orderId);
   subRecord.set("chipin_customer_email", authRecord.getString("email") || "");
 
