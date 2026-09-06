@@ -50,7 +50,6 @@ export default function OnboardingSetupScreen() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState('');
   const [isResolvingUrl, setIsResolvingUrl] = useState(false);
   const [isDownloadingQr, setIsDownloadingQr] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const getOnboardingUrl = () => {
@@ -65,47 +64,12 @@ export default function OnboardingSetupScreen() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const handleShareWhatsapp = async () => {
+  const handleShareWhatsapp = () => {
     const storeName = merchant?.name || user?.name || 'our store';
     const url = getOnboardingUrl();
     const message = `Collect stamps & unlock rewards at ${storeName}! Tap or scan here: ${url}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(url)}`;
-    const fileName = `${merchant?.name ? merchant.name.replace(/[^a-zA-Z0-9]/g, '_') : 'store'}-onboarding-qr.png`;
-
-    // 1. Try Native Web Share API (attaches actual image file + text on supported mobile & desktop browsers)
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof navigator !== 'undefined' && (navigator as any).share) {
-      try {
-        setIsSharing(true);
-        const response = await fetch(qrUrl);
-        const blob = await response.blob();
-        const file = new File([blob], fileName, { type: 'image/png' });
-
-        if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({
-            title: `${storeName} Loyalty Onboarding`,
-            text: message,
-            url: url,
-            files: [file],
-          });
-          return;
-        } else {
-          await (navigator as any).share({
-            title: `${storeName} Loyalty Onboarding`,
-            text: message,
-            url: url,
-          });
-          return;
-        }
-      } catch (shareErr: any) {
-        if (shareErr.name === 'AbortError') return; // User closed native share sheet
-        console.log('Native share failed or dismissed, falling back to direct WhatsApp link:', shareErr);
-      } finally {
-        setIsSharing(false);
-      }
-    }
-
-    // 2. Fallback: Direct WhatsApp Click-to-Chat URL
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(waUrl, '_blank');
     } else {
@@ -549,19 +513,12 @@ export default function OnboardingSetupScreen() {
           {/* Quick Action Buttons (WhatsApp & Download QR) */}
           <View style={styles.qrActionGrid}>
             <TouchableOpacity
-              style={[styles.whatsappActionBtn, isSharing && { opacity: 0.75 }]}
+              style={styles.whatsappActionBtn}
               onPress={handleShareWhatsapp}
-              disabled={isSharing}
               activeOpacity={0.85}
             >
-              {isSharing ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-                  <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
-                </>
-              )}
+              <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+              <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
