@@ -68,6 +68,7 @@ export default function MerchantDashboard() {
   const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 9 | 12>(1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
 
   useEffect(() => {
     const loadPricing = async () => {
@@ -260,6 +261,12 @@ export default function MerchantDashboard() {
         sort: '-created'
       });
       setTransactions(txs);
+
+      // 3. Fetch total registered customer cards
+      const cardsRes = await pb.collection('loyalty_cards').getList(1, 1, {
+        filter: `merchant = '${user.merchant_id}'`,
+      });
+      setTotalCustomersCount(cardsRes.totalItems);
     } catch (err) {
       console.warn('Failed to fetch merchant dashboard data:', err);
     } finally {
@@ -456,8 +463,10 @@ export default function MerchantDashboard() {
 
         {/* 🎯 Real-time Customer Quota Tracker Card */}
         {(() => {
-          const customerCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
+          const txCustomersCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
+          const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
           const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
+          const isStarter = activeSubscription?.plan === 'starter';
           const quotaLimit = isPro ? Infinity : 500;
           const percentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
           const isNearLimit = !isPro && customerCount >= 400;
@@ -488,7 +497,11 @@ export default function MerchantDashboard() {
                       Customer Quota
                     </Text>
                     <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                      {isPro ? `${(activeSubscription?.plan || 'PRO').toUpperCase()} Plan • Unlimited` : 'Stand Welcome Bundle • No Expiry'}
+                      {isPro 
+                        ? `${(activeSubscription?.plan || 'PRO').toUpperCase()} Plan • Unlimited` 
+                        : isStarter 
+                          ? 'Starter Plan • Active Subscription' 
+                          : 'Stand Welcome Bundle • No Expiry'}
                     </Text>
                   </View>
                 </View>

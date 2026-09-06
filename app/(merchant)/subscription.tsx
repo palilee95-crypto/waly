@@ -434,21 +434,17 @@ export default function SubscriptionScreen() {
                     Customer Database Quota
                   </Text>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
-                    {activeSub?.plan === 'starter'
-                      ? `${monthlyCustomerCount.toLocaleString()} / 500`
-                      : activeSub?.plan === 'stand_bundle'
-                        ? `${customerCount.toLocaleString()} / 500`
-                        : `${customerCount.toLocaleString()} (Unlimited ♾️)`}
+                    {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                      ? `${customerCount.toLocaleString()} (Unlimited ♾️)`
+                      : `${customerCount.toLocaleString()} / 500`}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
                   <View style={{ 
                     height: '100%', 
-                    width: activeSub?.plan === 'starter'
-                      ? `${Math.min(100, Math.round((monthlyCustomerCount / 500) * 100))}%`
-                      : activeSub?.plan === 'stand_bundle'
-                        ? `${Math.min(100, Math.round((customerCount / 500) * 100))}%`
-                        : '100%', 
+                    width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                      ? '100%'
+                      : `${Math.min(100, Math.round((customerCount / 500) * 100))}%`, 
                     backgroundColor: '#FFC700', 
                     borderRadius: 3 
                   }} />
