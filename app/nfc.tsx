@@ -22,6 +22,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
+import { formatMalaysianPhone } from '@/lib/emailValidator';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -1609,7 +1610,7 @@ export default function NfcLandingScreen() {
                         placeholderTextColor={brandSubtextColor}
                         value={phoneInput}
                         onChangeText={(text) => {
-                          setPhoneInput(text);
+                          setPhoneInput(formatMalaysianPhone(text));
                           setErrorMsg('');
                         }}
                         keyboardType="phone-pad"

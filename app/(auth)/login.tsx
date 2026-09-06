@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, storage } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { validateEmailWithTypoCheck, parseAndNormalizeBirthday } from '@/lib/emailValidator';
+import { validateEmailWithTypoCheck, parseAndNormalizeBirthday, formatMalaysianPhone, getFullMalaysianPhone } from '@/lib/emailValidator';
 
 const { width } = Dimensions.get('window');
 const COUNTRY_CODE = '+60';
@@ -63,7 +63,7 @@ export default function LoginScreen() {
         } else {
           router.replace(activeRole === 'merchant' ? '/(merchant)' : '/(customer)');
         }
-      }, 0);
+      }, 100);
     }
   }, [isAuthLoading, isAuthenticated, activeRole, params.redirect_to]);
 
@@ -80,15 +80,16 @@ export default function LoginScreen() {
 
   // Pre-fill phone from NFC claim redirect and auto-advance past phone step
   useEffect(() => {
-    if (!params.prefill_phone || params.prefill_phone.length < 9) return;
-    const formatted = params.prefill_phone.replace(/\D/g, '').slice(0, 10);
+    if (!params.prefill_phone) return;
+    const formatted = formatMalaysianPhone(params.prefill_phone);
+    if (formatted.length < 8) return;
     setPhone(formatted);
     // Pre-fill name if passed from NFC page
     if (params.prefill_name && params.prefill_name.trim()) {
       setName(params.prefill_name.trim());
     }
     // Directly check the pre-filled phone (don't rely on stale state)
-    const fullPhone = `${COUNTRY_CODE}${formatted}`;
+    const fullPhone = getFullMalaysianPhone(formatted);
     setIsLoading(true);
     checkPhone(fullPhone)
       .then((res) => {
@@ -140,8 +141,8 @@ export default function LoginScreen() {
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 1,
           duration: 900,
+          toValue: 1,
           useNativeDriver: true,
         }),
       ])
@@ -159,15 +160,14 @@ export default function LoginScreen() {
       try {
         const res = await checkPhone(fullPhone);
         if (res && res.exists && res.verified) {
-          clearInterval(interval);
           setIsVerifiedSuccess(true);
           setIsAutoLoggingIn(true);
+          clearInterval(interval);
 
-          // Automatically log the user in once verified!
           setTimeout(async () => {
             try {
-              await loginWithIdentifier(email.trim().toLowerCase(), password);
-              const record = pb.authStore.record;
+              const loginIdentifier = email || fullPhone;
+              const record: any = await loginWithIdentifier(loginIdentifier, password);
               const userRole = record?.role || 'customer';
               const redirectUrl = getRedirectUrl();
               if (redirectUrl) {
@@ -197,9 +197,9 @@ export default function LoginScreen() {
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const formatPhone = (text: string) => text.replace(/\D/g, '').slice(0, 10);
-  const getFullPhone = () => `${COUNTRY_CODE}${phone}`;
-  const isValid = phone.length >= 9;
+  const formatPhone = (text: string) => formatMalaysianPhone(text);
+  const getFullPhone = () => getFullMalaysianPhone(phone);
+  const isValid = phone.length >= 8 && phone.length <= 10;
 
   const handleGetStarted = async () => {
     if (!isValid) return;

@@ -170,3 +170,31 @@ export function parseAndNormalizeBirthday(raw: string): BirthdayValidationResult
   };
 }
 
+/**
+ * Normalizes Malaysian phone number inputs:
+ * - Strips non-digits
+ * - Removes country code '60' if typed/pasted with '+60' or '60'
+ * - Strips leading '0' (e.g. '0115330047' -> '115330047')
+ * - Clamps to 10 digits
+ */
+export function formatMalaysianPhone(text: string): string {
+  if (!text) return '';
+  let digits = text.replace(/\D/g, '');
+  if (digits.startsWith('60') && digits.length > 2) {
+    digits = digits.slice(2);
+  }
+  while (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return digits.slice(0, 10);
+}
+
+/**
+ * Formats phone with standard +60 prefix (e.g. '115330047' -> '+60115330047')
+ */
+export function getFullMalaysianPhone(text: string): string {
+  const clean = formatMalaysianPhone(text);
+  return clean ? `+60${clean}` : '';
+}
+
+

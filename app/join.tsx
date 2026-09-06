@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { formatMalaysianPhone, getFullMalaysianPhone } from '@/lib/emailValidator';
 
 type Step = 'loading' | 'invalid' | 'phone_entry' | 'login' | 'register' | 'send_whatsapp' | 'sent';
 
@@ -107,10 +108,11 @@ export default function JoinScreen() {
     setErrorMsg('');
     try {
       // Format phone with +60 prefix (e.g. +60123456789)
-      let digits = phoneInput.trim().replace(/\D/g, '');
-      if (digits.startsWith('0')) digits = '6' + digits;
-      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-      const phone = '+' + digits;
+      const phone = getFullMalaysianPhone(phoneInput);
+      if (!phone || phone.length < 11) {
+        setErrorMsg('Please enter a valid phone number.');
+        return;
+      }
 
       const res = await checkPhone(phone);
       if (res.exists) {
@@ -323,7 +325,7 @@ export default function JoinScreen() {
                   placeholder="11 234 5678"
                   placeholderTextColor="#BEC6E0"
                   value={phoneInput}
-                  onChangeText={setPhoneInput}
+                  onChangeText={(t) => setPhoneInput(formatMalaysianPhone(t))}
                   keyboardType="phone-pad"
                 />
               </View>

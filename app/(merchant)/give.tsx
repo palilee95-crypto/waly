@@ -21,6 +21,7 @@ import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { formatMalaysianPhone } from '@/lib/emailValidator';
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
@@ -520,7 +521,7 @@ export default function GiveStampsScreen() {
                   placeholder="11 234 5678"
                   placeholderTextColor="#94A3B8"
                   value={phoneInput}
-                  onChangeText={setPhoneInput}
+                  onChangeText={(t) => setPhoneInput(formatMalaysianPhone(t))}
                   keyboardType="phone-pad"
                 />
               </View>
