@@ -585,15 +585,39 @@ export default function LoginScreen() {
                           color: '#64748B',
                           textAlign: 'center',
                           lineHeight: 18,
-                          marginBottom: 18,
+                          marginBottom: 10,
                         }}>
                           Click the link in your email on any phone or computer. This page will <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>automatically log you in</Text> once clicked.
                         </Text>
 
+                        {/* Spam / Junk folder notice */}
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: 'rgba(15, 23, 42, 0.05)',
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          marginBottom: 16,
+                          gap: 6,
+                          width: '100%',
+                        }}>
+                          <Ionicons name="information-circle-outline" size={16} color="#475569" />
+                          <Text style={{
+                            fontSize: 11.5,
+                            fontFamily: 'PlusJakartaSans_500Medium',
+                            color: '#475569',
+                            flex: 1,
+                            lineHeight: 16,
+                          }}>
+                            Can't find it? Please check your <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Spam</Text> or <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Junk</Text> folder.
+                          </Text>
+                        </View>
+
                         {resendSuccess && (
                           <View style={[styles.errorContainer, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginBottom: 14 }]}>
                             <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                            <Text style={[styles.errorText, { color: '#065F46' }]}>Verification email resent! Please check your inbox.</Text>
+                            <Text style={[styles.errorText, { color: '#065F46' }]}>Verification email resent! Please check your inbox (or spam folder).</Text>
                           </View>
                         )}
 
