@@ -114,6 +114,7 @@ export default function UnifiedRewardsScreen() {
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
+  const [catalogueFilter, setCatalogueFilter] = useState<'all' | 'active' | 'draft' | 'discount' | 'free_item'>('all');
 
   // Tab 4: Birthday Rewards
   const [birthdayReward, setBirthdayReward] = useState<any>(null);
@@ -798,28 +799,107 @@ export default function UnifiedRewardsScreen() {
         </View>
 
         {/* TAB 1: Rewards Catalogue */}
-        {activeTab === 'catalogue' && (
-          <View style={{ flex: 1 }}>
-            {/* Catalogue header title & button is in parent screen header */}
-            {loadingRewards ? (
-              <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
-            ) : rewards.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <View style={styles.emptyIconBg}>
-                  <Ionicons name="gift-outline" size={48} color="#94A3B8" />
-                </View>
-                <Text style={styles.emptyTitle}>{t('catalogue_empty')}</Text>
-                <Text style={styles.emptySubtitle}>
-                  {t('catalogue_empty_desc')}
+        {activeTab === 'catalogue' && (() => {
+          const activeCount = rewards.filter((r) => r.is_active).length;
+          const draftCount = rewards.filter((r) => !r.is_active).length;
+          const discountCount = rewards.filter((r) => r.type === 'discount').length;
+          const freeItemCount = rewards.filter((r) => r.type === 'free_item').length;
+
+          const filteredRewards = rewards.filter((r) => {
+            if (catalogueFilter === 'active') return r.is_active;
+            if (catalogueFilter === 'draft') return !r.is_active;
+            if (catalogueFilter === 'discount') return r.type === 'discount';
+            if (catalogueFilter === 'free_item') return r.type === 'free_item';
+            return true;
+          });
+
+          const renderStockLabel = (stock: number) => {
+            if (stock >= 9999 || stock < 0) {
+              return (
+                <Text style={styles.stockText}>
+                  {locale === 'en' ? 'Stock' : 'Stok'}: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>{locale === 'en' ? 'Unlimited' : 'Tanpa Had'}</Text>
                 </Text>
-                <TouchableOpacity style={styles.createFirstBtn} onPress={handleOpenCreate} activeOpacity={0.8}>
-                  <Text style={styles.createFirstText}>{t('add_first_reward')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.rewardsList}>
-                {rewards
-                  .map((reward) => {
+              );
+            }
+            if (stock === 0) {
+              return (
+                <Text style={[styles.stockText, { color: '#EF4444', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  {locale === 'en' ? 'Out of Stock' : 'Habis Stok'}
+                </Text>
+              );
+            }
+            if (stock < 10) {
+              return (
+                <Text style={[styles.stockText, { color: '#F59E0B', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  {locale === 'en' ? 'Low Stock' : 'Stok Rendah'}: {stock}
+                </Text>
+              );
+            }
+            return (
+              <Text style={styles.stockText}>
+                {locale === 'en' ? 'Stock' : 'Stok'}: {stock}
+              </Text>
+            );
+          };
+
+          return (
+            <View style={{ flex: 1 }}>
+              {/* Filter Pills Bar */}
+              {rewards.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsContainer} style={{ marginBottom: 16 }}>
+                  {[
+                    { id: 'all', label: locale === 'en' ? 'All' : 'Semua', count: rewards.length },
+                    { id: 'active', label: locale === 'en' ? 'Active' : 'Aktif', count: activeCount },
+                    { id: 'draft', label: locale === 'en' ? 'Draft' : 'Deraf', count: draftCount },
+                    { id: 'discount', label: locale === 'en' ? 'Discounts' : 'Diskaun', count: discountCount },
+                    { id: 'free_item', label: locale === 'en' ? 'Free Items' : 'Item Percuma', count: freeItemCount },
+                  ].map((pill) => {
+                    const isSelected = catalogueFilter === pill.id;
+                    return (
+                      <TouchableOpacity
+                        key={pill.id}
+                        style={[styles.filterPill, isSelected && styles.filterPillActive]}
+                        onPress={() => setCatalogueFilter(pill.id as any)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
+                          {pill.label}
+                        </Text>
+                        <View style={[styles.filterPillCount, isSelected && styles.filterPillCountActive]}>
+                          <Text style={[styles.filterPillCountText, isSelected && styles.filterPillCountTextActive]}>
+                            {pill.count}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {loadingRewards ? (
+                <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
+              ) : rewards.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconBg}>
+                    <Ionicons name="gift-outline" size={48} color="#94A3B8" />
+                  </View>
+                  <Text style={styles.emptyTitle}>{t('catalogue_empty')}</Text>
+                  <Text style={styles.emptySubtitle}>
+                    {t('catalogue_empty_desc')}
+                  </Text>
+                  <TouchableOpacity style={styles.createFirstBtn} onPress={handleOpenCreate} activeOpacity={0.8}>
+                    <Text style={styles.createFirstText}>{t('add_first_reward')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : filteredRewards.length === 0 ? (
+                <View style={[styles.emptyContainer, { paddingVertical: 40 }]}>
+                  <Ionicons name="filter-outline" size={36} color="#94A3B8" style={{ marginBottom: 8 }} />
+                  <Text style={[styles.emptyTitle, { fontSize: 16 }]}>{locale === 'en' ? 'No matching rewards' : 'Tiada ganjaran sepadan'}</Text>
+                  <Text style={styles.emptySubtitle}>{locale === 'en' ? 'Try selecting a different filter above.' : 'Cuba pilih penapis lain di atas.'}</Text>
+                </View>
+              ) : (
+                <View style={styles.rewardsList}>
+                  {filteredRewards.map((reward) => {
                     const itemImgUrl = reward.image
                       ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
                       : 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=150';
@@ -859,7 +939,7 @@ export default function UnifiedRewardsScreen() {
                                   <Ionicons name="gift" size={14} color="#10B981" />
                                   <Text style={styles.pointsCostText}>{reward.points_cost} {locale === 'en' ? 'Pts' : 'Mata'}</Text>
                                 </View>
-                                <Text style={styles.stockText}>{locale === 'en' ? 'Stock' : 'Stok'}: {reward.stock || '0'}</Text>
+                                {renderStockLabel(reward.stock)}
                               </>
                             )}
                           </View>
@@ -887,10 +967,11 @@ export default function UnifiedRewardsScreen() {
                       </View>
                     );
                   })}
-              </View>
-            )}
-          </View>
-        )}
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* TAB 2: Card Customizer */}
         {activeTab === 'card_design' && (
@@ -1955,7 +2036,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 140,
   },
   introSection: {
     marginBottom: 20,
@@ -3089,6 +3170,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.5,
   },
+
   deleteIconBg: {
     width: 56,
     height: 56,
@@ -3137,5 +3219,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
+  },
+
+  // Filter Pills Styling
+  filterPillsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterPillActive: {
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFC700',
+  },
+  filterPillCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  filterPillCountActive: {
+    backgroundColor: '#1E293B',
+  },
+  filterPillCountText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+  },
+  filterPillCountTextActive: {
+    color: '#FFC700',
   },
 });
