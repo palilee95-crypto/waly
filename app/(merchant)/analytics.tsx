@@ -147,21 +147,31 @@ export default function AnalyticsScreen() {
 
     setIsSavingEdit(true);
     try {
-      await pb.collection('users').update(selectedCustomerProfile.id, {
-        name: editName.trim(),
-        phone: editPhone.trim(),
-      });
+      const res = await pb.send<{ success: boolean; message: string; customer: any }>(
+        '/api/risev/merchant/customer/update',
+        {
+          method: 'POST',
+          body: {
+            customer_id: selectedCustomerProfile.id,
+            name: editName.trim(),
+            phone: editPhone.trim(),
+          },
+        }
+      );
+
+      const updatedName = res.customer?.name || editName.trim();
+      const updatedPhone = res.customer?.phone || editPhone.trim();
 
       setSelectedCustomerProfile((prev: any) => prev ? {
         ...prev,
-        name: editName.trim(),
-        phone: editPhone.trim(),
+        name: updatedName,
+        phone: updatedPhone,
       } : null);
 
       setEditInfoModalVisible(false);
-      Alert.alert('Success', 'Customer information updated successfully.');
+      Alert.alert('Success', res.message || 'Customer information updated successfully.');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update customer info.');
+      Alert.alert('Error', err?.data?.message || err?.message || 'Failed to update customer info.');
     } finally {
       setIsSavingEdit(false);
     }

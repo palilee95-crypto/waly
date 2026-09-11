@@ -57,6 +57,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       customer.set("birthday", "2000-01-01 00:00:00.000Z");
       customer.setPassword($security.randomString(20));
       $app.save(customer);
+    } else if (customerNameInput) {
+      // If merchant supplied a name and existing name is missing or placeholder, update it
+      const currentName = customer.getString("name");
+      if (!currentName || currentName.startsWith("Customer ") || currentName.startsWith("Customer_")) {
+        customer.set("name", customerNameInput);
+        $app.save(customer);
+      }
     }
 
     // 2. Find or auto-create merchant's loyalty program
@@ -131,12 +138,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     $app.save(txn);
 
     // 6. Transaction completed - welcome_notification.pb.js handles sending the WhatsApp receipt
-    console.log(`[MANUAL GIVE] Issued ${stampAmount} stamp(s) to ${customer.getString("name") || "customer"} (${cleanPhone}), total stamps: ${totalStamps}/${goal}`);
+    const resolvedCustomerName = customer.getString("name") || customerNameInput || ("Customer " + digits.slice(-4));
+    console.log(`[MANUAL GIVE] Issued ${stampAmount} stamp(s) to ${resolvedCustomerName} (${cleanPhone}), total stamps: ${totalStamps}/${goal}`);
 
     return e.json(200, {
       success: true,
-      message: `${stampAmount} stamp(s) issued to ${customerNameInput}`,
-      customerName: customerNameInput,
+      message: `${stampAmount} stamp(s) issued to ${resolvedCustomerName}`,
+      customerName: resolvedCustomerName,
       phone: cleanPhone,
       totalStamps: totalStamps,
       goal: goal

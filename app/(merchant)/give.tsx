@@ -78,6 +78,9 @@ export default function GiveStampsScreen() {
 
   // Manual Issuance States
   const [phoneInput, setPhoneInput] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [existingCustomer, setExistingCustomer] = useState<{ id: string; name: string } | null>(null);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [billAmount, setBillAmount] = useState('');
   const [stampAmount, setStampAmount] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +113,54 @@ export default function GiveStampsScreen() {
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  // Real-time lookup for existing customer by phone number
+  useEffect(() => {
+    const rawDigits = phoneInput.replace(/\D/g, '');
+    if (rawDigits.length < 8) {
+      setExistingCustomer(null);
+      return;
+    }
+
+    let isMounted = true;
+    const timeout = setTimeout(async () => {
+      try {
+        setIsSearchingCustomer(true);
+        let digits = rawDigits;
+        if (digits.startsWith('0')) digits = '6' + digits;
+        if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+        const clean = '+' + digits;
+        const local = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+
+        const res = await pb.collection('users').getList(1, 1, {
+          filter: `phone = '${clean}' || phone = '${digits}' || phone = '${local}'`,
+          requestKey: null,
+        });
+
+        if (isMounted) {
+          if (res.items && res.items.length > 0) {
+            const foundUser = res.items[0];
+            const foundName = foundUser.name || '';
+            setExistingCustomer({ id: foundUser.id, name: foundName });
+            if (foundName && (!customerName || customerName.startsWith('Customer '))) {
+              setCustomerName(foundName);
+            }
+          } else {
+            setExistingCustomer(null);
+          }
+        }
+      } catch (err) {
+        // ignore lookup errors
+      } finally {
+        if (isMounted) setIsSearchingCustomer(false);
+      }
+    }, 400);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [phoneInput]);
 
   // 2. Submit Voucher Code Redemption via Backend Endpoint
   const executeRedemption = async (targetCode: string) => {
@@ -209,14 +260,18 @@ export default function GiveStampsScreen() {
           method: 'POST',
           body: {
             phone: phoneInput.trim(),
+            customer_name: customerName.trim(),
             bill_amount: bill,
             stamp_amount: stamps,
           },
         }
       );
 
-      setSuccessMsg(res.message || `${stamps} stamp(s) credited successfully!`);
+      const resolvedName = res.customerName || customerName.trim() || 'Customer';
+      setSuccessMsg(res.message || `${stamps} stamp(s) issued to ${resolvedName}`);
       setPhoneInput('');
+      setCustomerName('');
+      setExistingCustomer(null);
       setBillAmount('');
       setStampAmount('1');
       fetchTransactions();
@@ -523,6 +578,34 @@ export default function GiveStampsScreen() {
                   value={phoneInput}
                   onChangeText={(t) => setPhoneInput(formatMalaysianPhone(t))}
                   keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+
+            {/* Customer Name Input (Optional / Auto-filled if registered) */}
+            <View style={styles.inputContainer}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={styles.label}>{t('customer_name_optional') || 'CUSTOMER NAME (OPTIONAL)'}</Text>
+                {isSearchingCustomer ? (
+                  <ActivityIndicator size="small" color="#FFC700" />
+                ) : existingCustomer?.name ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>
+                      Registered Customer
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.inputWrap}>
+                <Ionicons name="person-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                  placeholder={t('customer_name_placeholder') || 'Enter name (e.g. Adam)'}
+                  placeholderTextColor="#94A3B8"
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                  autoCapitalize="words"
                 />
               </View>
             </View>
