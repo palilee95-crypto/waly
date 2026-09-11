@@ -488,7 +488,8 @@ export default function UnifiedRewardsScreen() {
       fetchRewards();
     } catch (err: any) {
       console.warn("Failed to delete reward:", err.message || err);
-      Alert.alert("Error", "Failed to delete reward.");
+      const msg = err?.data?.message || err?.message || "Failed to delete reward.";
+      Alert.alert("Error", msg);
     } finally {
       setIsDeletingReward(false);
     }

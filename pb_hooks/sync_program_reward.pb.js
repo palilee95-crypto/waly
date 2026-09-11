@@ -133,3 +133,41 @@ onRecordDelete((e) => {
   
   return e.next();
 }, 'loyalty_programs');
+
+onRecordDelete((e) => {
+  const rewardId = e.record.id;
+
+  // 1. Check if linked to an active loyalty program
+  try {
+    const activePrograms = $app.findRecordsByFilter('loyalty_programs', `linked_reward = "${rewardId}" && is_active = true`, '-created', 1, 0);
+    if (activePrograms.length > 0) {
+      throw new BadRequestError("Cannot delete this reward because it is linked to your active stamp card program.");
+    }
+  } catch (err) {
+    if (err instanceof BadRequestError) throw err;
+  }
+
+  // 2. Unlink from any inactive loyalty programs
+  try {
+    const programs = $app.findRecordsByFilter('loyalty_programs', `linked_reward = "${rewardId}"`, '-created', 50, 0);
+    for (const prog of programs) {
+      prog.set('linked_reward', null);
+      $app.save(prog);
+    }
+  } catch (err) {
+    console.log("[REWARD DELETE] Error unlinking loyalty programs:", err.message || err);
+  }
+
+  // 3. Delete associated vouchers to satisfy foreign key required relation constraint
+  try {
+    const vouchers = $app.findRecordsByFilter('vouchers', `reward = "${rewardId}"`, '-created', 5000, 0);
+    for (const v of vouchers) {
+      $app.delete(v);
+    }
+    console.log(`[REWARD DELETE] Deleted ${vouchers.length} voucher(s) associated with reward ${rewardId}`);
+  } catch (err) {
+    console.log("[REWARD DELETE] Error deleting associated vouchers:", err.message || err);
+  }
+
+  return e.next();
+}, 'rewards');
