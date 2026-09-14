@@ -158,15 +158,52 @@ onRecordDelete((e) => {
     console.log("[REWARD DELETE] Error unlinking loyalty programs:", err.message || err);
   }
 
-  // 3. Delete associated vouchers to satisfy foreign key required relation constraint
+  // 3. Unlink from any campaigns
+  try {
+    const campaigns = $app.findRecordsByFilter('campaigns', `linked_reward = "${rewardId}"`, '-created', 100, 0);
+    for (const camp of campaigns) {
+      camp.set('linked_reward', null);
+      $app.save(camp);
+    }
+  } catch (err) {
+    console.log("[REWARD DELETE] Error unlinking campaigns:", err.message || err);
+  }
+
+  // 4. Unlink from store_feedbacks
+  try {
+    const feedbacks = $app.findRecordsByFilter('store_feedbacks', `linked_reward = "${rewardId}"`, '-created', 100, 0);
+    for (const fb of feedbacks) {
+      fb.set('linked_reward', null);
+      $app.save(fb);
+    }
+  } catch (err) {
+    console.log("[REWARD DELETE] Error unlinking store_feedbacks:", err.message || err);
+  }
+
+  // 5. Delete associated vouchers to satisfy foreign key required relation constraint
   try {
     const vouchers = $app.findRecordsByFilter('vouchers', `reward = "${rewardId}"`, '-created', 5000, 0);
     for (const v of vouchers) {
       $app.delete(v);
     }
-    console.log(`[REWARD DELETE] Deleted ${vouchers.length} voucher(s) associated with reward ${rewardId}`);
+    if (vouchers.length > 0) {
+      console.log(`[REWARD DELETE] Deleted ${vouchers.length} voucher(s) associated with reward ${rewardId}`);
+    }
   } catch (err) {
     console.log("[REWARD DELETE] Error deleting associated vouchers:", err.message || err);
+  }
+
+  // 6. Delete associated redemptions to satisfy foreign key required relation constraint
+  try {
+    const redemptions = $app.findRecordsByFilter('redemptions', `reward = "${rewardId}"`, '-created', 5000, 0);
+    for (const r of redemptions) {
+      $app.delete(r);
+    }
+    if (redemptions.length > 0) {
+      console.log(`[REWARD DELETE] Deleted ${redemptions.length} redemption(s) associated with reward ${rewardId}`);
+    }
+  } catch (err) {
+    console.log("[REWARD DELETE] Error deleting associated redemptions:", err.message || err);
   }
 
   return e.next();

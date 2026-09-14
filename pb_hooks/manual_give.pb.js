@@ -141,13 +141,35 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     const resolvedCustomerName = customer.getString("name") || customerNameInput || ("Customer " + digits.slice(-4));
     console.log(`[MANUAL GIVE] Issued ${stampAmount} stamp(s) to ${resolvedCustomerName} (${cleanPhone}), total stamps: ${totalStamps}/${goal}`);
 
+    let nextRewardName = "";
+    try {
+      const rewardId = program.getString("linked_reward");
+      if (rewardId) {
+        const rew = $app.findRecordById("rewards", rewardId);
+        if (rew) nextRewardName = rew.getString("name");
+      }
+    } catch (rErr) {}
+
+    let merchantStoreName = "Risev Store";
+    try {
+      const merchRec = $app.findRecordById("merchants", merchantId);
+      if (merchRec) merchantStoreName = merchRec.getString("name");
+    } catch (mErr) {}
+
     return e.json(200, {
       success: true,
       message: `${stampAmount} stamp(s) issued to ${resolvedCustomerName}`,
       customerName: resolvedCustomerName,
       phone: cleanPhone,
       totalStamps: totalStamps,
-      goal: goal
+      goal: goal,
+      transactionId: txn.id,
+      billAmount: billAmount,
+      stampsEarned: stampAmount,
+      storeName: merchantStoreName,
+      branchName: branchName,
+      nextRewardName: nextRewardName,
+      created: txn.getString("created") || new Date().toISOString()
     });
   } catch (err) {
     return e.json(500, { message: "Failed to manually issue stamps: " + (err.message || err) });

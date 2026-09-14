@@ -22,6 +22,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
+import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
@@ -86,6 +87,8 @@ export default function GiveStampsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -269,6 +272,47 @@ export default function GiveStampsScreen() {
 
       const resolvedName = res.customerName || customerName.trim() || 'Customer';
       setSuccessMsg(res.message || `${stamps} stamp(s) issued to ${resolvedName}`);
+
+      // Fetch real transaction record and merchant details from PocketBase
+      let realTxnId = (res as any).transactionId || '';
+      let storeName = (res as any).storeName || '';
+      let branchName = (res as any).branchName || '';
+
+      if (merchantId) {
+        try {
+          const [mRec, latestTxns] = await Promise.all([
+            pb.collection('merchants').getOne(merchantId).catch(() => null),
+            pb.collection('transactions').getList(1, 1, {
+              filter: `merchant = "${merchantId}"`,
+              sort: '-created',
+            }).catch(() => ({ items: [] }))
+          ]);
+
+          if (mRec?.name) storeName = mRec.name;
+          if (latestTxns?.items?.length > 0) {
+            const latest = latestTxns.items[0];
+            if (!realTxnId) realTxnId = latest.id;
+          }
+        } catch (fetchErr) {}
+      }
+
+      const receiptInfo: ReceiptData = {
+        id: realTxnId || ('TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()),
+        storeName: storeName || (user as any)?.merchant_name || 'Risev Partner Store',
+        branchName: branchName || (user as any)?.branch_name || 'Main Counter',
+        date: new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        billAmount: bill,
+        stampsEarned: stamps,
+        currentStamps: (res as any).totalStamps || stamps,
+        stampGoal: (res as any).goal || 10,
+        nextRewardName: (res as any).nextRewardName || 'Next Reward',
+        customerPhone: phoneInput.trim(),
+        customerName: resolvedName,
+        cashierName: user?.name,
+      };
+      setActiveReceipt(receiptInfo);
+      setReceiptModalVisible(true);
+
       setPhoneInput('');
       setCustomerName('');
       setExistingCustomer(null);
@@ -691,6 +735,14 @@ export default function GiveStampsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Digital Stamp Receipt & Print Modal */}
+      <DigitalStampReceiptModal
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        receiptData={activeReceipt}
+        mode="merchant"
+      />
     </SafeAreaView>
   );
 }

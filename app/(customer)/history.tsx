@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
+import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
 
 type TransactionItem = {
   id: string;
@@ -12,11 +13,23 @@ type TransactionItem = {
   type: 'earn' | 'redeem' | 'adjust';
   points: number;
   stamps?: number;
+  bill_amount?: number;
+  metadata?: any;
   expand?: {
     merchant?: {
       id: string;
       name: string;
       logo?: string;
+    };
+    loyalty_card?: {
+      id: string;
+      stamps_collected?: number;
+      expand?: {
+        program?: {
+          name?: string;
+          stamp_goal?: number;
+        };
+      };
     };
   };
 };
@@ -26,6 +39,8 @@ export default function StampHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState<TransactionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
+  const [receiptVisible, setReceiptVisible] = useState(false);
 
   useEffect(() => {
     fetchLogs();
@@ -38,7 +53,7 @@ export default function StampHistoryScreen() {
       const res = await pb.collection('transactions').getList<TransactionItem>(1, 50, {
         filter: `customer = "${user.id}"`,
         sort: '-created',
-        expand: 'merchant',
+        expand: 'merchant,loyalty_card.program',
       });
       setLogs(res.items);
     } catch (err) {
@@ -46,6 +61,35 @@ export default function StampHistoryScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleOpenReceipt = (item: TransactionItem) => {
+    let branchName = 'Main Counter';
+    if (item.metadata) {
+      try {
+        const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+        if (meta.branch_name) branchName = meta.branch_name;
+      } catch (e) {}
+    }
+
+    const card = item.expand?.loyalty_card;
+    const program = card?.expand?.program;
+
+    const receipt: ReceiptData = {
+      id: item.id,
+      storeName: item.expand?.merchant?.name || 'Partner Store',
+      branchName: branchName,
+      date: formatDate(item.created),
+      billAmount: item.bill_amount || 0,
+      stampsEarned: item.stamps || 0,
+      currentStamps: card?.stamps_collected || item.stamps || 1,
+      stampGoal: program?.stamp_goal || 10,
+      nextRewardName: program?.name || 'Loyalty Reward',
+      customerPhone: user?.phone,
+      customerName: user?.name,
+    };
+    setSelectedReceipt(receipt);
+    setReceiptVisible(true);
   };
 
   const formatDate = (dateStr: string) => {
@@ -122,7 +166,12 @@ export default function StampHistoryScreen() {
                   const pointVal = item.points || 0;
                   
                   return (
-                    <View key={item.id} style={styles.logCard}>
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.logCard}
+                      onPress={() => handleOpenReceipt(item)}
+                      activeOpacity={0.7}
+                    >
                       <Image source={{ uri: getMerchantLogo(item) }} style={styles.merchantLogo} />
                       
                       <View style={styles.logMain}>
@@ -148,13 +197,26 @@ export default function StampHistoryScreen() {
                           </View>
                         )}
                       </View>
-                    </View>
+                      
+                      <View style={{ marginLeft: 8 }}>
+                        <Ionicons name="receipt-outline" size={18} color="#94A3B8" />
+                      </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
             )}
           </ScrollView>
         )}
+
+        {/* Digital Stamp Receipt & Print Modal */}
+        <DigitalStampReceiptModal
+          visible={receiptVisible}
+          onClose={() => setReceiptVisible(false)}
+          onViewCard={() => router.push('/(customer)/my-cards' as any)}
+          receiptData={selectedReceipt}
+          mode="customer"
+        />
       </SafeAreaView>
     </View>
   );
