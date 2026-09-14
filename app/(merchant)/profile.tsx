@@ -1237,6 +1237,25 @@ export default function ProfileScreen() {
           />
 
           <SettingItem
+            iconName="school-outline"
+            title={locale === 'en' ? 'Risev Academy & Video Guides' : 'Pusat Tutorial & Video Panduan'}
+            subtitle={locale === 'en' ? 'Step-by-step video tutorials on stand setup & counter SOP' : 'Video panduan langkah demi langkah setup stand & SOP kaunter'}
+            iconBgColor="#FEF3C7"
+            iconColor="#D97706"
+            badgeText="ACADEMY ✨"
+            badgeColor="#D97706"
+            onPress={() => {
+              const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+              const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.open(url, '_blank');
+              } else {
+                Linking.openURL(url);
+              }
+            }}
+          />
+
+          <SettingItem
             iconName="color-palette-outline"
             title="Onboarding Setup"
             subtitle="Customize your customer-facing onboarding page"

@@ -121,6 +121,37 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
               </TouchableOpacity>
             );
           })}
+
+          {/* Tutorial / Academy Link in Sidebar */}
+          <TouchableOpacity
+            onPress={() => {
+              const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+              const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.open(url, '_blank');
+              } else {
+                Linking.openURL(url);
+              }
+            }}
+            activeOpacity={0.8}
+            style={[
+              styles.sidebarBtn,
+              { backgroundColor: '#FEF3C7', marginTop: 12, borderWidth: 1, borderColor: '#FDE68A' },
+              !isSidebarExpanded && { justifyContent: 'center', paddingHorizontal: 0 }
+            ]}
+          >
+            <Ionicons name="school" size={20} color="#D97706" />
+            {isSidebarExpanded && (
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.sidebarBtnText, { color: '#92400E', fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                  Risev Academy
+                </Text>
+                <View style={{ backgroundColor: '#D97706', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>VIDEO</Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Footer with User and Logout */}

@@ -40,7 +40,7 @@ type ActivityItem = {
 export default function MerchantDashboard() {
   const { user, refreshSession, isOwner, staffPermissions } = useAuth();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState<'Today' | 'This Week' | 'This Month'>('Today');
   const [merchant, setMerchant] = useState<any>(null);
@@ -555,6 +555,55 @@ export default function MerchantDashboard() {
         })()}
 
 
+
+        {/* 🎓 RISEV ACADEMY QUICK TUTORIAL BANNER */}
+        <TouchableOpacity
+          onPress={() => {
+            const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+            const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.open(url, '_blank');
+            } else {
+              Linking.openURL(url);
+            }
+          }}
+          activeOpacity={0.85}
+          style={{
+            backgroundColor: '#0F172A',
+            borderRadius: 18,
+            padding: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: 1,
+            borderColor: '#1E293B',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            marginBottom: 4,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play-circle" size={26} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                  {locale === 'en' ? 'Risev Video Academy' : 'Pusat Tutorial & Video Panduan'}
+                </Text>
+                <View style={{ backgroundColor: '#D97706', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>TUTORIAL</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
+                {locale === 'en' ? 'Watch 2-min guides on stand setup & counter SOP' : 'Tonton video 2-minit cara setup stand & SOP juruwang'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>
