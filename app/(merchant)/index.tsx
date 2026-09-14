@@ -68,6 +68,7 @@ export default function MerchantDashboard() {
   const [selectedMonths, setSelectedMonths] = useState<1 | 3 | 6 | 9 | 12>(1);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [standTotalQuota, setStandTotalQuota] = useState<number>(500);
   const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -249,6 +250,18 @@ export default function MerchantDashboard() {
       } catch (subErr) {
         setActiveSubscription(null);
       }
+
+      // Stand Bundle Quota calculation from redeemed activation codes
+      try {
+        const codes = await pb.collection('activation_codes').getFullList({
+          filter: `redeemed_by = '${user.merchant_id}' && is_redeemed = true`,
+          requestKey: null,
+        });
+        if (codes.length > 0) {
+          const sumQuota = codes.reduce((acc: number, c: any) => acc + (Number(c.quota) > 0 ? Number(c.quota) : 500), 0);
+          if (sumQuota > 0) setStandTotalQuota(sumQuota);
+        }
+      } catch (codeErr) {}
 
       // 1. Fetch merchant details
       const mRec = await pb.collection('merchants').getOne(user.merchant_id);
@@ -467,10 +480,10 @@ export default function MerchantDashboard() {
           const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
           const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
           const isStarter = activeSubscription?.plan === 'starter';
-          const quotaLimit = isPro ? Infinity : 500;
+          const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 500);
           const percentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
-          const isNearLimit = !isPro && customerCount >= 400;
-          const isCritical = !isPro && customerCount >= 475;
+          const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
+          const isCritical = !isPro && customerCount >= Math.round(quotaLimit * 0.95);
           
           return (
             <View style={{

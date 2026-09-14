@@ -166,7 +166,7 @@ export default function ActivateStandPage() {
                 <ActivityIndicator color="#050505" />
               ) : (
                 <Text style={styles.submitBtnText}>
-                  {locale === 'en' ? 'Unlock 500 Customer Quota' : 'Buka Kuota 500 Pelanggan'}
+                  {locale === 'en' ? 'Unlock Customer Quota' : 'Buka Kuota Pelanggan'}
                 </Text>
               )}
             </TouchableOpacity>

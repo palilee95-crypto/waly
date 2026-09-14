@@ -35,19 +35,35 @@ onRecordCreate((e) => {
       if (e.collection && e.collection.name === 'loyalty_cards' && activeSub) {
         const plan = activeSub.getString('plan');
         
-        // 1. Stand Bundle: Fixed 500 total customer capacity (Lifetime pool)
+        // 1. Stand Bundle: Dynamic total customer capacity based on redeemed stand activation codes
         if (plan === 'stand_bundle') {
+          let standQuota = 0;
           try {
-            const allCards = $app.findRecordsByFilter(
-              'loyalty_cards',
-              `merchant = '${merchantId}'`,
-              '-created',
-              505,
-              0
-            );
-            if (allCards.length >= 500) {
+            const quotaResult = new DynamicModel({ total: 0 });
+            $app.db()
+              .newQuery("SELECT COALESCE(SUM(CASE WHEN quota > 0 THEN quota ELSE 500 END), 0) as total FROM activation_codes WHERE redeemed_by = {:mid} AND (is_redeemed = 1 OR is_redeemed = true)")
+              .bind({ mid: merchantId })
+              .one(quotaResult);
+            standQuota = Number(quotaResult.total) || 0;
+          } catch (qErr) {
+            console.log("[SUBSCRIPTION ENFORCE] Stand quota query warning:", qErr.message || qErr);
+          }
+
+          if (standQuota <= 0) {
+            standQuota = 500;
+          }
+
+          try {
+            const countResult = new DynamicModel({ cnt: 0 });
+            $app.db()
+              .newQuery("SELECT COUNT(*) as cnt FROM loyalty_cards WHERE merchant = {:mid}")
+              .bind({ mid: merchantId })
+              .one(countResult);
+            const currentCards = Number(countResult.cnt) || 0;
+
+            if (currentCards >= standQuota) {
               throw new ForbiddenError(
-                'You have reached the 500 customer limit included with your NFC Plate. Please subscribe to Starter (RM47/mo) or PRO (RM97/mo) to enroll new members.'
+                'You have reached the ' + standQuota.toLocaleString() + ' customer limit included with your NFC Plate package. Please subscribe to Starter (RM47/mo) or PRO (RM97/mo) to enroll new members.'
               );
             }
           } catch (qErr) {

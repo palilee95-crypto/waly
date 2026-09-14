@@ -44,6 +44,7 @@ export default function SubscriptionScreen() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'fpx' | 'card' | 'duitnow'>('fpx');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeSub, setActiveSub] = useState<any>(null);
+  const [standTotalQuota, setStandTotalQuota] = useState(500);
   const [customerCount, setCustomerCount] = useState(0);
   const [monthlyCustomerCount, setMonthlyCustomerCount] = useState(0);
 
@@ -94,6 +95,18 @@ export default function SubscriptionScreen() {
           setActiveSub(subs.items[0]);
         }
         
+        // Total stand quota from redeemed activation codes
+        try {
+          const codes = await pb.collection('activation_codes').getFullList({
+            filter: `redeemed_by = "${user.merchant_id}" && is_redeemed = true`,
+            requestKey: null,
+          });
+          if (codes.length > 0) {
+            const sumQuota = codes.reduce((acc: number, c: any) => acc + (Number(c.quota) > 0 ? Number(c.quota) : 500), 0);
+            if (sumQuota > 0) setStandTotalQuota(sumQuota);
+          }
+        } catch (codeErr) {}
+
         // Total customers ever registered
         const allCards = await pb.collection('loyalty_cards').getList(1, 1, {
           filter: `merchant = "${user.merchant_id}"`,
@@ -444,7 +457,7 @@ export default function SubscriptionScreen() {
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
                     {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                       ? `${customerCount.toLocaleString()} (Unlimited ♾️)`
-                      : `${customerCount.toLocaleString()} / 500`}
+                      : `${customerCount.toLocaleString()} / ${(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 500).toLocaleString()}`}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
@@ -452,7 +465,7 @@ export default function SubscriptionScreen() {
                     height: '100%', 
                     width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                       ? '100%'
-                      : `${Math.min(100, Math.round((customerCount / 500) * 100))}%`, 
+                      : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 500)) * 100))}%`, 
                     backgroundColor: '#FFC700', 
                     borderRadius: 3 
                   }} />

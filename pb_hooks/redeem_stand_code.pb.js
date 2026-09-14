@@ -181,7 +181,7 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
 
     return c.json(200, {
       success: true,
-      message: "Physical Stand successfully activated! You have 500 customer capacity with no expiration date.",
+      message: `Physical Stand successfully activated! You have ${quota.toLocaleString()} customer capacity with no expiration date.`,
       plan: targetPlan,
       quota: quota,
       branch_id: branchId,
