@@ -324,6 +324,10 @@ export default function LoginScreen() {
       setErrorMsg('Please enter your password.');
       return;
     }
+    if (Platform.OS === 'web' && !turnstileToken) {
+      setErrorMsg('Please wait for security verification to finish.');
+      return;
+    }
     setIsLoading(true);
     setErrorMsg('');
     try {
@@ -1048,17 +1052,19 @@ export default function LoginScreen() {
 
                     {/* Primary Action Button for Password Login */}
                     <TouchableOpacity
-                      style={[styles.primaryBtn, (!email || !password) && styles.primaryBtnDisabled]}
+                      style={[styles.primaryBtn, (!email || !password || (Platform.OS === 'web' && !turnstileToken)) && styles.primaryBtnDisabled]}
                       onPress={handlePasswordLogin}
-                      disabled={!email || !password || isLoading}
+                      disabled={!email || !password || isLoading || (Platform.OS === 'web' && !turnstileToken)}
                       activeOpacity={0.9}
                     >
                       {isLoading ? (
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <View style={styles.btnContent}>
-                          <Text style={[styles.primaryBtnText, (!email || !password) && styles.primaryBtnTextDisabled]}>SECURE LOGIN</Text>
-                          <Ionicons name="lock-closed" size={16} color={(!email || !password) ? 'rgba(255,255,255,0.45)' : '#FFFFFF'} />
+                          <Text style={[styles.primaryBtnText, (!email || !password || (Platform.OS === 'web' && !turnstileToken)) && styles.primaryBtnTextDisabled]}>
+                            {Platform.OS === 'web' && !turnstileToken ? 'VERIFYING SECURITY...' : 'SECURE LOGIN'}
+                          </Text>
+                          <Ionicons name="lock-closed" size={16} color={(!email || !password || (Platform.OS === 'web' && !turnstileToken)) ? 'rgba(255,255,255,0.45)' : '#FFFFFF'} />
                         </View>
                       )}
                     </TouchableOpacity>

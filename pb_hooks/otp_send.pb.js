@@ -193,7 +193,7 @@ routerAdd("POST", "/api/risev/login", (e) => {
       console.log("[Turnstile Warning] TURNSTILE_SECRET is not configured!");
       return false;
     }
-    const rawHostnames = $os.getenv("TURNSTILE_HOSTNAMES") || "risev.app,api.risev.app,localhost,127.0.0.1";
+    const rawHostnames = $os.getenv("TURNSTILE_HOSTNAMES") || "risev.app,www.risev.app,api.risev.app,localhost,127.0.0.1";
     const expectedHostnames = rawHostnames.split(",").map(function(h) { return h.trim(); }).filter(Boolean);
 
     let result = null;
@@ -222,6 +222,8 @@ routerAdd("POST", "/api/risev/login", (e) => {
       return false;
     }
 
+    console.log("[Turnstile siteverify response]:", JSON.stringify(result));
+
     if (!result || !result.success) {
       console.log("[Turnstile] Validation failed:", JSON.stringify(result));
       return false;
@@ -232,7 +234,12 @@ routerAdd("POST", "/api/risev/login", (e) => {
       return false;
     }
 
-    if (result.hostname && expectedHostnames.indexOf(result.hostname) === -1) {
+    const isAllowedHostname = !result.hostname || 
+      expectedHostnames.indexOf(result.hostname) !== -1 || 
+      result.hostname.indexOf("risev.app") !== -1 ||
+      result.hostname.indexOf("localhost") !== -1;
+
+    if (!isAllowedHostname) {
       console.log("[Turnstile] Hostname mismatch:", result.hostname);
       return false;
     }
