@@ -47,6 +47,7 @@ services:
       - JNT_CUST_CODE=${JNT_CUST_CODE}
       - JNT_API_KEY=${JNT_API_KEY}
       - JNT_ENV=${JNT_ENV}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET}
     networks:
       - risev-network
 

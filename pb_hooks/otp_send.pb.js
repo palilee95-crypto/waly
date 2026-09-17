@@ -181,61 +181,65 @@ routerAdd("POST", "/api/risev/register", (e) => {
   }
 });
 
-// ── Cloudflare Turnstile Verification Helper ───────────────────────
-function verifyTurnstileToken(token, clientIp, expectedAction) {
-  if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
-    return false;
-  }
-  const secret = $os.getenv("TURNSTILE_SECRET") || "0x4AAAAAAE5w79Mfu3Nt4ifUwMEsTWd8B0c";
-  const rawHostnames = $os.getenv("TURNSTILE_HOSTNAMES") || "risev.app,api.risev.app,localhost,127.0.0.1";
-  const expectedHostnames = rawHostnames.split(",").map(function(h) { return h.trim(); }).filter(Boolean);
-
-  let result = null;
-  try {
-    const postBody = "secret=" + encodeURIComponent(secret) +
-                     "&response=" + encodeURIComponent(token) +
-                     (clientIp ? "&remoteip=" + encodeURIComponent(clientIp) : "");
-
-    const res = $http.send({
-      url: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: postBody,
-      timeout: 10
-    });
-
-    if (res.statusCode !== 200) {
-      console.log("[Turnstile] HTTP error from siteverify:", res.statusCode);
-      return false;
-    }
-    result = res.json;
-  } catch (e) {
-    console.log("[Turnstile] Exception during siteverify:", e.message || e);
-    return false;
-  }
-
-  if (!result || !result.success) {
-    console.log("[Turnstile] Validation failed:", JSON.stringify(result));
-    return false;
-  }
-
-  if (expectedAction && result.action && result.action !== expectedAction) {
-    console.log("[Turnstile] Action mismatch:", result.action, "vs expected:", expectedAction);
-    return false;
-  }
-
-  if (result.hostname && expectedHostnames.indexOf(result.hostname) === -1) {
-    console.log("[Turnstile] Hostname mismatch:", result.hostname);
-    return false;
-  }
-
-  return true;
-}
-
 // ── Login with phone or email + password ───────────────────────────
 routerAdd("POST", "/api/risev/login", (e) => {
+  // Cloudflare Turnstile Verification Helper (scoped locally for Goja JSVM)
+  function verifyTurnstileToken(token, clientIp, expectedAction) {
+    if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
+      return false;
+    }
+    const secret = $os.getenv("TURNSTILE_SECRET") || "0x4AAAAAAE5w79Mfu3Nt4ifUwMEsTWd8B0c";
+    if (!secret) {
+      console.log("[Turnstile Warning] TURNSTILE_SECRET is not configured!");
+      return false;
+    }
+    const rawHostnames = $os.getenv("TURNSTILE_HOSTNAMES") || "risev.app,api.risev.app,localhost,127.0.0.1";
+    const expectedHostnames = rawHostnames.split(",").map(function(h) { return h.trim(); }).filter(Boolean);
+
+    let result = null;
+    try {
+      const postBody = "secret=" + encodeURIComponent(secret) +
+                       "&response=" + encodeURIComponent(token) +
+                       (clientIp ? "&remoteip=" + encodeURIComponent(clientIp) : "");
+
+      const res = $http.send({
+        url: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: postBody,
+        timeout: 10
+      });
+
+      if (res.statusCode !== 200) {
+        console.log("[Turnstile] HTTP error from siteverify:", res.statusCode);
+        return false;
+      }
+      result = res.json;
+    } catch (err) {
+      console.log("[Turnstile] Exception during siteverify:", err.message || err);
+      return false;
+    }
+
+    if (!result || !result.success) {
+      console.log("[Turnstile] Validation failed:", JSON.stringify(result));
+      return false;
+    }
+
+    if (expectedAction && result.action && result.action !== expectedAction) {
+      console.log("[Turnstile] Action mismatch:", result.action, "vs expected:", expectedAction);
+      return false;
+    }
+
+    if (result.hostname && expectedHostnames.indexOf(result.hostname) === -1) {
+      console.log("[Turnstile] Hostname mismatch:", result.hostname);
+      return false;
+    }
+
+    return true;
+  }
+
   const reqInfo = e.requestInfo() || {};
   const body = reqInfo.body || {};
   const identifier = body.identifier || '';
