@@ -141,7 +141,7 @@ interface AuthContextType {
   isStaff: boolean;
   staffPermissions: StaffPermissions;
   fetchStaffPermissions: () => Promise<StaffPermissions>;
-  loginWithIdentifier: (identifier: string, password: string) => Promise<void>;
+  loginWithIdentifier: (identifier: string, password: string, turnstileToken?: string) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<string>;
   resetPassword: (phone: string, otpId: string, otpCode: string, newPassword: string) => Promise<void>;
@@ -444,9 +444,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const loginWithIdentifier = async (identifier: string, password: string) => {
-    // Try email login first via PocketBase SDK if identifier is an email
-    if (identifier.includes('@')) {
+  const loginWithIdentifier = async (identifier: string, password: string, turnstileToken?: string) => {
+    // If no turnstileToken is passed and identifier is an email, try direct email login first
+    if (identifier.includes('@') && !turnstileToken) {
       try {
         await loginWithPassword(identifier.trim().toLowerCase(), password);
         return;
@@ -457,10 +457,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Call unified login endpoint (supports phone and email)
+    // Call unified login endpoint (supports phone and email, validated against Turnstile)
+    const body: any = { identifier: identifier.trim(), password };
+    if (turnstileToken) {
+      body['cf-turnstile-response'] = turnstileToken;
+    }
+
     const res = await pb.send<{ success: boolean; token?: string; record?: any; message?: string }>('/api/risev/login', {
       method: 'POST',
-      body: { identifier: identifier.trim(), password },
+      body,
       requestKey: null,
     });
 

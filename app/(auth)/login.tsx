@@ -23,6 +23,7 @@ import { useAuth, storage } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { validateEmailWithTypoCheck, parseAndNormalizeBirthday, formatMalaysianPhone, getFullMalaysianPhone } from '@/lib/emailValidator';
+import { TurnstileWidget, TurnstileWidgetRef } from '@/components/TurnstileWidget';
 
 const { width } = Dimensions.get('window');
 const COUNTRY_CODE = '+60';
@@ -35,6 +36,8 @@ export default function LoginScreen() {
   const [isFocused, setIsFocused] = useState(false);
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetModalIdentifier, setResetModalIdentifier] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = React.useRef<TurnstileWidgetRef>(null);
 
   const params = useLocalSearchParams<{ ref?: string; prefill_phone?: string; prefill_name?: string; redirect_to?: string }>();
 
@@ -324,7 +327,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      await loginWithIdentifier(targetIdentifier, password);
+      await loginWithIdentifier(targetIdentifier, password, turnstileToken);
       const record = pb.authStore.record;
       const userRole = record?.role || 'customer';
       const redirectUrl = getRedirectUrl();
@@ -335,9 +338,14 @@ export default function LoginScreen() {
       }
     } catch (e: any) {
       console.warn(e);
+      // Single-use token must be reset on any submission attempt / retry
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
       const raw = e?.message || '';
       if (raw === 'EMAIL_NOT_VERIFIED' || raw.includes('EMAIL_NOT_VERIFIED') || raw.includes('verified')) {
         setErrorMsg('Please verify your email before logging in. Check your inbox for the link.');
+      } else if (raw.includes('Security verification') || raw.includes('Human verification')) {
+        setErrorMsg('Security check failed. Please complete the verification.');
       } else {
         setErrorMsg('Invalid credentials. Please try again.');
       }
@@ -1020,6 +1028,23 @@ export default function LoginScreen() {
                         <Text style={styles.errorText}>{errorMsg}</Text>
                       </View>
                     ) : null}
+
+                    {/* Cloudflare Turnstile Verification */}
+                    {Platform.OS === 'web' && (
+                      <TurnstileWidget
+                        ref={turnstileRef}
+                        action="login"
+                        onVerify={(token) => {
+                          setTurnstileToken(token);
+                          setErrorMsg('');
+                        }}
+                        onError={() => {
+                          turnstileRef.current?.reset();
+                          setTurnstileToken('');
+                        }}
+                        onExpire={() => setTurnstileToken('')}
+                      />
+                    )}
 
                     {/* Primary Action Button for Password Login */}
                     <TouchableOpacity

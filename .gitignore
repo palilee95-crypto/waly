@@ -64,3 +64,6 @@ pb_schema_example.json
 # OpenCode config
 opencode.jsonc
 
+# Agent customizations
+.agents/
+

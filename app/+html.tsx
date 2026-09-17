@@ -46,6 +46,9 @@ export default function Root({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
+
+        {/* Cloudflare Turnstile */}
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer />
       </head>
       <body>{children}</body>
     </html>
