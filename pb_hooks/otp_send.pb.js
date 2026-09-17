@@ -188,9 +188,9 @@ routerAdd("POST", "/api/risev/login", (e) => {
     if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
       return false;
     }
-    const secret = $os.getenv("TURNSTILE_SECRET") || "0x4AAAAAAE5w79Mfu3Nt4ifUwMEsTWd8B0c";
+    const secret = $os.getenv("TURNSTILE_SECRET");
     if (!secret) {
-      console.log("[Turnstile Warning] TURNSTILE_SECRET is not configured!");
+      console.log("[Turnstile Warning] TURNSTILE_SECRET is not configured in server environment!");
       return false;
     }
     const rawHostnames = $os.getenv("TURNSTILE_HOSTNAMES") || "risev.app,www.risev.app,api.risev.app,localhost,127.0.0.1";
