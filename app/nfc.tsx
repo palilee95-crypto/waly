@@ -1872,15 +1872,6 @@ export default function NfcLandingScreen() {
               </Text>
             </View>
           </View>
-
-          {/* Paper Texture Overlay */}
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            <Image 
-              source={require('../assets/images/paper-texture.png')} 
-              style={[StyleSheet.absoluteFill, { opacity: 0.4, zIndex: 10 }]} 
-              resizeMode="cover"
-            />
-          </View>
         </View>
       </Animated.View>
     );
