@@ -1747,7 +1747,7 @@ export default function NfcLandingScreen() {
       outputRange: [0, 1]
     });
 
-    const animatedWidth = (step === 'form') ? `${progressPercent}%` : voucherProgressAnim.interpolate({
+    const animatedWidth: any = (step === 'form') ? `${progressPercent}%` : voucherProgressAnim.interpolate({
       inputRange: [0, 1],
       outputRange: ['0%', `${progressPercent}%`]
     });
