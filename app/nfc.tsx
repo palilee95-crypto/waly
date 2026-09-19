@@ -487,15 +487,26 @@ export default function NfcLandingScreen() {
           expand: 'linked_reward',
         });
         if (progs.length > 0 && isMounted) {
-          setProgram(progs[0]);
-          // Fetch rewards for this program
-          try {
-            const rws = await pb.collection('rewards').getFullList({
-              filter: `merchant = "${merchantId}"`,
-              sort: '-created',
-            });
-            if (rws.length > 0 && isMounted) setReward(rws[0]);
-          } catch (rErr) {}
+          const activeProg = progs[0];
+          setProgram(activeProg);
+          // Prioritize the exact reward linked to this stamp program
+          if (activeProg.expand?.linked_reward) {
+            setReward(activeProg.expand.linked_reward);
+          } else if (activeProg.linked_reward) {
+            try {
+              const rw = await pb.collection('rewards').getOne(activeProg.linked_reward);
+              if (isMounted) setReward(rw);
+            } catch (rErr) {}
+          } else {
+            // Fallback only if program has no linked reward at all
+            try {
+              const rws = await pb.collection('rewards').getFullList({
+                filter: `merchant = "${merchantId}" && is_active = true`,
+                sort: '-created',
+              });
+              if (rws.length > 0 && isMounted) setReward(rws[0]);
+            } catch (rErr) {}
+          }
         }
       } catch (pErr) {}
 
@@ -862,22 +873,22 @@ export default function NfcLandingScreen() {
   }, [currentStamps]);
 
   // Real Merchant Reward Title & Image Resolution
-  const linkedReward = program?.expand?.linked_reward;
+  const linkedReward = program?.expand?.linked_reward || reward;
   const rewardTitle =
-    reward?.title ||
-    reward?.name ||
-    reward?.reward_name ||
-    linkedReward?.title ||
-    linkedReward?.name ||
-    program?.reward_name ||
     program?.reward_description ||
+    linkedReward?.name ||
+    linkedReward?.title ||
+    reward?.name ||
+    reward?.title ||
+    program?.reward_name ||
     'Free Reward';
 
   const rewardSubtitle =
-    reward?.description ||
-    linkedReward?.description ||
-    program?.reward_description ||
-    `Collect ${stampGoal} stamps to unlock this voucher reward`;
+    (program?.reward_description && linkedReward?.description && !linkedReward.description.startsWith('Reward for completing'))
+      ? linkedReward.description
+      : (reward?.description && !reward.description.startsWith('Reward for completing'))
+      ? reward.description
+      : `Collect all ${stampGoal} stamps to unlock this voucher and redeem at counter.`;
 
   let rewardImageUrl = '';
   if (reward?.image) {
@@ -1267,31 +1278,33 @@ export default function NfcLandingScreen() {
   // ══════════════════════════════════════════════════════════════════
   const renderRewardVoucherPreview = () => {
     const isLight = getContrastColor(primaryColor) === '#1A1400';
-    const cardBg = isLight ? '#FFFFFF' : 'rgba(15, 23, 42, 0.88)';
-    const cardBorder = isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.18)';
-    const textColor = isLight ? '#0F172A' : '#FFFFFF';
-    const subtextColor = isLight ? '#64748B' : 'rgba(255, 255, 255, 0.72)';
-    const dividerColor = isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)';
-    const stubBg = isLight ? '#F8FAFC' : 'rgba(0, 0, 0, 0.28)';
-    const notchColor = primaryColor || (isLight ? '#F1F5F9' : '#0F172A');
+    
+    // Luxury Golden Ticket Aesthetic
+    const cardBg = '#FFFDF5';
+    const cardBorder = '#F59E0B';
+    const textColor = '#1E1B18';
+    const subtextColor = '#78716C';
+    const dividerColor = '#D97706';
+    const stubBg = '#FEF3C7';
+    const notchColor = primaryColor || (isLight ? '#FAF9F6' : '#0F172A');
 
     const isComplete = currentStamps >= stampGoal;
     const remainingStamps = Math.max(0, stampGoal - currentStamps);
     const progressPercent = Math.min(100, Math.round((currentStamps / Math.max(1, stampGoal)) * 100));
 
     // Dynamic ribbon text based on merchant stamp goal & current customer progress
-    let ribbonText = `🎁 UNLOCKS AT ${stampGoal} STAMPS`;
+    let ribbonText = `⭐ OFFICIAL REWARD VOUCHER • UNLOCKS AT ${stampGoal} STAMPS ⭐`;
     let ribbonBg = '#FEF3C7';
     let ribbonTextColor = '#92400E';
     let ribbonBorder = '#FDE68A';
 
     if (isComplete) {
-      ribbonText = '🎉 STAMP GOAL REACHED • REWARD UNLOCKED';
+      ribbonText = '🎉 STAMP GOAL REACHED • VOUCHER UNLOCKED!';
       ribbonBg = '#DEF7EC';
       ribbonTextColor = '#03543F';
       ribbonBorder = '#BCF0DA';
     } else if (currentStamps > 0) {
-      ribbonText = `🎁 ${remainingStamps} MORE ${remainingStamps === 1 ? 'STAMP' : 'STAMPS'} TO UNLOCK`;
+      ribbonText = `⭐ ${remainingStamps} MORE ${remainingStamps === 1 ? 'STAMP' : 'STAMPS'} TO UNLOCK THIS VOUCHER ⭐`;
       ribbonBg = '#FEF3C7';
       ribbonTextColor = '#92400E';
       ribbonBorder = '#FDE68A';
@@ -1299,46 +1312,47 @@ export default function NfcLandingScreen() {
 
     return (
       <View style={styles.voucherPreviewContainer}>
-        {/* Top Floating Ribbon Tag */}
-        <View style={styles.voucherRibbonRow}>
-          <View style={[styles.voucherRibbonTag, { backgroundColor: ribbonBg, borderColor: ribbonBorder }]}>
-            <Text style={[styles.voucherRibbonText, { color: ribbonTextColor }]}>
-              {ribbonText}
-            </Text>
-          </View>
+        {/* Top Attached Golden Ribbon Banner */}
+        <View style={[styles.voucherRibbonTag, { backgroundColor: ribbonBg, borderColor: ribbonBorder }]}>
+          <Text style={[styles.voucherRibbonText, { color: ribbonTextColor }]}>
+            {ribbonText}
+          </Text>
         </View>
 
-        {/* Perforated Ticket Card */}
+        {/* Perforated Golden Ticket Card */}
         <View style={[styles.voucherTicketCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Decorative Dashed Inner Border for authentic certificate look */}
+          <View style={[styles.voucherInnerDashedBorder, { borderColor: 'rgba(217, 119, 6, 0.25)' }]} pointerEvents="none" />
+
           {/* Left Stub: Merchant Brand & Barcode Motif */}
-          <View style={[styles.voucherStubLeft, { backgroundColor: stubBg, borderRightColor: cardBorder }]}>
+          <View style={[styles.voucherStubLeft, { backgroundColor: stubBg, borderRightColor: 'rgba(217, 119, 6, 0.2)' }]}>
             {/* Subtle decorative barcode lines on far left edge */}
             <View style={styles.voucherBarcodeLines} pointerEvents="none">
-              <View style={[styles.voucherBarcodeLine, { width: 3, opacity: isLight ? 0.25 : 0.45 }]} />
-              <View style={[styles.voucherBarcodeLine, { width: 1, opacity: isLight ? 0.25 : 0.45 }]} />
-              <View style={[styles.voucherBarcodeLine, { width: 2, opacity: isLight ? 0.25 : 0.45 }]} />
-              <View style={[styles.voucherBarcodeLine, { width: 1, opacity: isLight ? 0.25 : 0.45 }]} />
-              <View style={[styles.voucherBarcodeLine, { width: 3, opacity: isLight ? 0.25 : 0.45 }]} />
+              <View style={[styles.voucherBarcodeLine, { width: 3.5 }]} />
+              <View style={[styles.voucherBarcodeLine, { width: 1.5 }]} />
+              <View style={[styles.voucherBarcodeLine, { width: 2.5 }]} />
+              <View style={[styles.voucherBarcodeLine, { width: 1 }]} />
+              <View style={[styles.voucherBarcodeLine, { width: 3.5 }]} />
             </View>
 
             <View style={styles.voucherStubContent}>
-              <View style={[styles.voucherLogoWrap, { borderColor: cardBorder }]}>
+              <View style={[styles.voucherLogoWrap, { borderColor: '#F59E0B' }]}>
                 {merchantLogoUrl && !merchantLogoUrl.includes('placeholder') ? (
                   <Image source={{ uri: merchantLogoUrl }} style={styles.voucherLogoImage} resizeMode="cover" />
                 ) : (
-                  <Ionicons name="gift" size={18} color={isLight ? '#F59E0B' : '#FBBF24'} />
+                  <Ionicons name="gift" size={20} color="#D97706" />
                 )}
               </View>
-              <Text style={[styles.voucherMerchantName, { color: textColor }]} numberOfLines={2}>
+              <Text style={[styles.voucherMerchantName, { color: '#78350F' }]} numberOfLines={2}>
                 {merchantName}
               </Text>
               <View style={styles.voucherPillBadge}>
-                <Text style={styles.voucherPillBadgeText}>REWARD</Text>
+                <Text style={styles.voucherPillBadgeText}>STAMP PASS</Text>
               </View>
             </View>
           </View>
 
-          {/* Dotted Perforation with Top & Bottom Notches */}
+          {/* Dotted Perforation with Deep Top & Bottom Notches */}
           <View style={styles.voucherPerforationCol} pointerEvents="none">
             <View style={[styles.voucherNotchTop, { backgroundColor: notchColor }]} />
             <View style={[styles.voucherDashedLine, { borderColor: dividerColor }]} />
@@ -1349,18 +1363,23 @@ export default function NfcLandingScreen() {
           <View style={styles.voucherBodyRight}>
             <View style={styles.voucherBodyTopRow}>
               <View style={styles.voucherTagRow}>
-                <Ionicons name="sparkles" size={11} color="#EAB308" />
-                <Text style={styles.voucherBadgeLabel}>COMPLETION REWARD</Text>
+                <Ionicons name="sparkles" size={11} color="#D97706" />
+                <Text style={styles.voucherBadgeLabel}>COMPLETION PRIZE</Text>
               </View>
-              <View style={[styles.voucherWalletPill, { backgroundColor: isLight ? '#EEF2FF' : 'rgba(99, 102, 241, 0.2)' }]}>
-                <Ionicons name="wallet-outline" size={10} color="#6366F1" />
+              <View style={styles.voucherWalletPill}>
+                <Ionicons name="wallet-outline" size={10} color="#4F46E5" />
                 <Text style={styles.voucherWalletPillText}>Auto-Issued</Text>
               </View>
             </View>
 
-            <Text style={[styles.voucherMainTitle, { color: textColor }]} numberOfLines={1}>
-              {rewardTitle}
-            </Text>
+            {/* Prominent Reward Title */}
+            <View style={styles.voucherRewardTitleRow}>
+              <Text style={[styles.voucherMainTitle, { color: textColor }]} numberOfLines={1}>
+                {rewardTitle}
+              </Text>
+              <Text style={{ fontSize: 16 }}>🎁</Text>
+            </View>
+
             <Text style={[styles.voucherMainDesc, { color: subtextColor }]} numberOfLines={2}>
               {rewardSubtitle}
             </Text>
@@ -1368,20 +1387,20 @@ export default function NfcLandingScreen() {
             {/* Progress Row */}
             <View style={styles.voucherProgressSection}>
               <View style={styles.voucherProgressHeader}>
-                <Text style={[styles.voucherProgressLabel, { color: subtextColor }]}>
+                <Text style={styles.voucherProgressLabel}>
                   {currentStamps}/{stampGoal} stamps collected
                 </Text>
-                <Text style={[styles.voucherProgressPercent, { color: isComplete ? '#10B981' : textColor }]}>
-                  {progressPercent}%
+                <Text style={[styles.voucherProgressPercent, { color: isComplete ? '#10B981' : '#B45309' }]}>
+                  {progressPercent}% completed
                 </Text>
               </View>
-              <View style={[styles.voucherProgressBarBg, { backgroundColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.15)' }]}>
+              <View style={styles.voucherProgressBarBg}>
                 <View
                   style={[
                     styles.voucherProgressBarFill,
                     {
                       width: `${progressPercent}%`,
-                      backgroundColor: isComplete ? '#10B981' : (cardBgColor || '#F59E0B'),
+                      backgroundColor: isComplete ? '#10B981' : '#F59E0B',
                     },
                   ]}
                 />
@@ -2681,79 +2700,99 @@ const styles = StyleSheet.create({
 
   // Voucher Ticket Preview (Between Card & Form)
   voucherPreviewContainer: {
-    marginBottom: 18,
+    marginBottom: 20,
     width: '100%',
-  },
-  voucherRibbonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
   },
   voucherRibbonTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderWidth: 1.5,
+    borderBottomWidth: 0,
+    marginHorizontal: 14,
+    marginBottom: -1,
+    zIndex: 2,
   },
   voucherRibbonText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   voucherTicketCard: {
     flexDirection: 'row',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 2,
+    shadowColor: '#B45309',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 5,
+    minHeight: 128,
+    position: 'relative',
+  },
+  voucherInnerDashedBorder: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 4,
+    borderRadius: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-    minHeight: 112,
+    borderStyle: 'dashed',
+    zIndex: 1,
   },
   voucherStubLeft: {
-    width: 96,
+    width: 98,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 10,
     position: 'relative',
     overflow: 'hidden',
+    zIndex: 2,
   },
   voucherBarcodeLines: {
     position: 'absolute',
-    left: 4,
+    left: 5,
     top: 0,
     bottom: 0,
     width: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    opacity: 0.35,
   },
   voucherBarcodeLine: {
     height: '65%',
-    backgroundColor: '#000000',
+    backgroundColor: '#78350F',
     borderRadius: 1,
   },
   voucherStubContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    zIndex: 2,
+    gap: 5,
+    zIndex: 3,
     marginLeft: 6,
   },
   voucherLogoWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   voucherLogoImage: {
     width: '100%',
@@ -2769,48 +2808,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
   },
   voucherPillBadgeText: {
-    fontSize: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
+    fontSize: 7.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
     letterSpacing: 0.5,
   },
   voucherPerforationCol: {
-    width: 16,
+    width: 18,
     alignItems: 'center',
     justifyContent: 'space-between',
     position: 'relative',
+    zIndex: 3,
   },
   voucherNotchTop: {
-    width: 16,
-    height: 8,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    width: 18,
+    height: 9,
+    borderBottomLeftRadius: 9,
+    borderBottomRightRadius: 9,
     position: 'absolute',
-    top: -1,
-    zIndex: 3,
+    top: -2,
+    zIndex: 4,
   },
   voucherNotchBottom: {
-    width: 16,
-    height: 8,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    width: 18,
+    height: 9,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 9,
     position: 'absolute',
-    bottom: -1,
-    zIndex: 3,
+    bottom: -2,
+    zIndex: 4,
   },
   voucherDashedLine: {
-    width: 1,
+    width: 1.5,
     height: '100%',
     borderWidth: 1,
     borderStyle: 'dashed',
   },
   voucherBodyRight: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     justifyContent: 'space-between',
+    zIndex: 2,
   },
   voucherBodyTopRow: {
     flexDirection: 'row',
@@ -2822,32 +2863,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   voucherBadgeLabel: {
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#D97706',
+    color: '#B45309',
     letterSpacing: 0.5,
   },
   voucherWalletPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
+    gap: 4,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
+    backgroundColor: '#EEF2FF',
   },
   voucherWalletPillText: {
-    fontSize: 8,
+    fontSize: 8.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#6366F1',
+    color: '#4F46E5',
     letterSpacing: 0.2,
   },
+  voucherRewardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginVertical: 3,
+  },
   voucherMainTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: -0.2,
-    marginBottom: 2,
+    letterSpacing: -0.3,
+    flex: 1,
+    textTransform: 'uppercase',
   },
   voucherMainDesc: {
     fontSize: 11,
@@ -2865,22 +2919,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   voucherProgressLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#78350F',
   },
   voucherProgressPercent: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   voucherProgressBarBg: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
     width: '100%',
     overflow: 'hidden',
+    backgroundColor: '#FDE68A',
   },
   voucherProgressBarFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
 
   // Form Container
