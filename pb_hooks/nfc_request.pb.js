@@ -50,10 +50,6 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     if (digits.indexOf("60") !== 0 && digits.length >= 9) digits = "60" + digits;
     const cleanPhone = "+" + digits;
 
-    if (!name) {
-      name = "Customer " + digits.slice(-4);
-    }
-
     // Check if customer user record already exists
     let customerUser = null;
     if (digits) {
@@ -61,8 +57,18 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       const phoneFilter = `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`;
       try {
         const users = $app.findRecordsByFilter("users", phoneFilter, "-created", 1, 0);
-        if (users.length > 0) customerUser = users[0];
+        if (users.length > 0) {
+          customerUser = users[0];
+          const regName = (customerUser.getString("name") || "").trim();
+          if (regName && !regName.startsWith("Customer ")) {
+            name = regName;
+          }
+        }
       } catch (err) { /* ignore */ }
+    }
+
+    if (!name) {
+      name = "Customer " + digits.slice(-4);
     }
 
     // Generate random 6-character uppercase session code
