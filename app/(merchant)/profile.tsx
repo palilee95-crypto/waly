@@ -26,6 +26,15 @@ import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 import UpgradeModal from './_components/UpgradeModal';
+import {
+  isPushSupported,
+  getPushPermissionStatus,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+  sendTestPushNotification,
+} from '@/lib/push-notifications';
+import { playClaimChime } from '@/lib/audioChime';
+
 
 const { width } = Dimensions.get('window');
 
@@ -232,7 +241,62 @@ export default function ProfileScreen() {
   const [sunClosed, setSunClosed] = useState(false);
   const [isSavingHours, setIsSavingHours] = useState(false);
 
+  // Web Push Notification States
+  const [isPushSupportedState, setIsPushSupportedState] = useState(false);
+  const [isPushEnabled, setIsPushEnabled] = useState(false);
+  const [isPushLoading, setIsPushLoading] = useState(false);
+
+  useEffect(() => {
+    if (isPushSupported()) {
+      setIsPushSupportedState(true);
+      setIsPushEnabled(getPushPermissionStatus() === 'granted');
+    }
+  }, []);
+
+  const handleTogglePush = async (newValue: boolean) => {
+    if (!isPushSupportedState) {
+      Alert.alert(
+        locale === 'en' ? 'Not Supported' : 'Tidak Disokong',
+        locale === 'en' ? 'Web Push is not supported on this browser or platform.' : 'Notifikasi Web Push tidak disokong pada pelayar ini.'
+      );
+      return;
+    }
+
+    setIsPushLoading(true);
+    try {
+      if (newValue) {
+        playClaimChime();
+        const res = await subscribeToPushNotifications({
+          merchantId: user?.merchant_id,
+          branchId: user?.branch,
+        });
+        if (res.success) {
+          setIsPushEnabled(true);
+        } else {
+          setIsPushEnabled(getPushPermissionStatus() === 'granted');
+          Alert.alert(
+            locale === 'en' ? 'Permission Required' : 'Kebenaran Diperlukan',
+            res.message || (locale === 'en' ? 'Please allow notification permissions in your browser.' : 'Sila benarkan notifikasi dalam tetapan pelayar anda.')
+          );
+        }
+      } else {
+        await unsubscribeFromPushNotifications();
+        setIsPushEnabled(false);
+      }
+    } catch (err) {
+      console.error('Error toggling push notifications:', err);
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    playClaimChime();
+    await sendTestPushNotification();
+  };
+
   const logoUrl = merchant?.logo 
+
     ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
     : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200';
 
@@ -1204,6 +1268,59 @@ export default function ProfileScreen() {
               ? () => handleLockedItemPress(t('manage_staff'))
               : () => router.push('/(merchant)/staff' as any)}
           />
+
+          {/* NFC Claim Push Notifications Toggle */}
+          <View style={styles.settingCard}>
+            <View style={[styles.settingIconBg, { backgroundColor: isPushEnabled ? 'rgba(255, 199, 0, 0.15)' : '#F1F5F9' }]}>
+              <Ionicons
+                name={isPushEnabled ? "notifications" : "notifications-off-outline"}
+                size={20}
+                color={isPushEnabled ? colors.primary.DEFAULT : "#64748B"}
+              />
+            </View>
+            <View style={[styles.settingInfo, { paddingRight: 8 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <Text style={styles.settingTitle}>
+                  {locale === 'en' ? 'NFC Claim Alerts' : 'Notifikasi Tuntutan NFC'}
+                </Text>
+                {isPushEnabled && (
+                  <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#15803D' }} />
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#15803D' }}>ACTIVE</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.settingSubtitle}>
+                {isPushEnabled
+                  ? (locale === 'en' ? 'Active • Sound & vibration on NFC tap' : 'Aktif • Bunyi & getaran bila NFC diimbas')
+                  : (locale === 'en' ? 'Disabled • Tap switch to receive alerts' : 'Dimatikan • Tekan suis untuk terima amaran')}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {isPushEnabled && (
+                <TouchableOpacity
+                  onPress={handleTestPush}
+                  style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                    {locale === 'en' ? 'Test' : 'Uji'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {isPushLoading ? (
+                <ActivityIndicator size="small" color="#FFC700" />
+              ) : (
+                <Switch
+                  value={isPushEnabled}
+                  onValueChange={handleTogglePush}
+                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                  thumbColor={isPushEnabled ? '#050505' : '#FFFFFF'}
+                />
+              )}
+            </View>
+          </View>
+
 
           <SettingItem
             iconName="gift-outline"
