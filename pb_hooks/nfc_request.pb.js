@@ -108,6 +108,25 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
     }
 
+    // Trigger Web Push Notification to Merchant Owner & Branch Staff
+    try {
+      const pushHelper = require(`${__hooks}/push_notify.js`);
+      pushHelper.sendPushToMerchant(merchantId, branchId, {
+        title: "NFC Stamp Claim! 🏷️",
+        body: `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
+        url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cleanPhone)}`,
+        tag: `claim-${claim.id}`,
+        data: {
+          claim_id: claim.id,
+          customer_name: name,
+          phone: cleanPhone,
+          session_code: sessionCode
+        }
+      });
+    } catch (pushErr) {
+      console.log("[NFC CLAIM PUSH DISPATCH ERROR]", pushErr.message || pushErr);
+    }
+
     // Find current stamps for this customer & merchant if already registered
     let currentStamps = 0;
     let stampGoal = 10;
@@ -148,6 +167,28 @@ routerAdd("POST", "/api/risev/nfc/whatsapp-sent", (e) => {
     const claim = $app.findRecordById("nfc_claims", claimId);
     claim.set("status", "pending"); // Now ready for merchant terminal approval!
     $app.save(claim);
+
+    // Trigger Web Push Notification
+    try {
+      const pushHelper = require(`${__hooks}/push_notify.js`);
+      const mid = claim.getString("merchant");
+      const bid = claim.getString("branch");
+      const cName = claim.getString("customer_name") || "Customer";
+      const bName = claim.getString("branch_name") || "";
+      const cPhone = claim.getString("customer_phone") || "";
+      pushHelper.sendPushToMerchant(mid, bid, {
+        title: "NFC Stamp Claim! 🏷️",
+        body: `${cName} wants to claim stamps${bName ? ' (' + bName + ')' : ''}`,
+        url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cPhone)}`,
+        tag: `claim-${claim.id}`,
+        data: {
+          claim_id: claim.id,
+          customer_name: cName,
+          phone: cPhone,
+          session_code: claim.getString("session_code")
+        }
+      });
+    } catch (pushErr) {}
 
     console.log(`[NFC WHATSAPP SENT] Claim ${claimId} marked as pending (ready for merchant approval).`);
     return e.json(200, { success: true, status: "pending", claim_id: claimId });

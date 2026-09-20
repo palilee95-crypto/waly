@@ -83,10 +83,28 @@ services:
     networks:
       - risev-network
 
+  # Self-hosted Web Push Service (RFC 8291/8292)
+  push:
+    build:
+      context: ./push-service
+      dockerfile: Dockerfile
+    container_name: risev-push
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:support@risev.app}
+    volumes:
+      - push_data:/app
+    networks:
+      - risev-network
+
 volumes:
   caddy_data:
   caddy_config:
   portainer_data:
+  push_data:
 
 networks:
   risev-network:

@@ -1,0 +1,12 @@
+{
+  "name": "risev-push",
+  "version": "1.0.0",
+  "description": "Self-hosted RFC 8291/8292 Web Push Microservice for Risev",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

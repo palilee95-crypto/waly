@@ -15,6 +15,8 @@ import NfcClaimModal from '@/components/NfcClaimModal';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { LinearGradient } from 'expo-linear-gradient';
 import SubscriptionScreen from './subscription';
+import { playClaimChime } from '@/lib/audioChime';
+
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
@@ -346,6 +348,26 @@ export default function MerchantLayout() {
     if (selectedMonths === 9 && !pricing.enable_9m) setSelectedMonths(1);
     if (selectedMonths === 12 && !pricing.enable_12m) setSelectedMonths(1);
   }, [pricing, selectedMonths]);
+
+  // Global real-time listener for incoming NFC claims across all merchant screens
+  React.useEffect(() => {
+    if (!user?.merchant_id) return;
+
+    try {
+      pb.collection('nfc_claims').subscribe('*', (e: any) => {
+        if (e.action === 'create' || (e.action === 'update' && e.record?.status === 'pending')) {
+          playClaimChime();
+        }
+      }, {
+        filter: `merchant = '${user.merchant_id}'`
+      }).catch(() => {});
+    } catch (err) {}
+
+    return () => {
+      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
+    };
+  }, [user?.merchant_id]);
+
 
   const handleApplyPromo = async () => {
     setPromoError('');

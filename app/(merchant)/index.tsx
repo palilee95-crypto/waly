@@ -23,6 +23,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import PushNotificationPrompt from '@/components/PushNotificationPrompt';
+
 
 const { width } = Dimensions.get('window');
 
@@ -428,6 +430,9 @@ export default function MerchantDashboard() {
             style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
           />
         </View>
+
+        {/* Web Push Notification Enable Prompt */}
+        <PushNotificationPrompt merchantId={user?.merchant_id} branchId={user?.branch} />
 
         {/* Unified Floating Analytics Card */}
         <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
