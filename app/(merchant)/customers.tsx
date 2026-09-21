@@ -2289,12 +2289,16 @@ export default function CustomersScreen() {
         animationType="fade"
         onRequestClose={() => setInactiveFilterModalVisible(false)}
       >
-        <TouchableOpacity 
-          style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]} 
-          activeOpacity={1} 
-          onPress={() => setInactiveFilterModalVisible(false)}
-        >
-          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, padding: 20 }]} onStartShouldSetResponder={() => true}>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <Pressable 
+            style={StyleSheet.absoluteFill} 
+            onPress={() => setInactiveFilterModalVisible(false)} 
+          />
+          <View 
+            style={[styles.modalContent, { height: 'auto', paddingBottom: 24, padding: 20, width: '100%', maxWidth: 420 }]}
+            // @ts-ignore - web event containment
+            onClick={(e: any) => e.stopPropagation()}
+          >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                 Filter Inactive Customers
@@ -2347,6 +2351,14 @@ export default function CustomersScreen() {
                   placeholder="e.g. 45"
                   placeholderTextColor="#94A3B8"
                   keyboardType="number-pad"
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    const days = Number(customDaysInput);
+                    if (days > 0) {
+                      setInactiveFilterDays(days);
+                      setInactiveFilterModalVisible(false);
+                    }
+                  }}
                   style={{
                     flex: 1,
                     backgroundColor: '#F8FAFC',
@@ -2406,7 +2418,7 @@ export default function CustomersScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Inactive Customers View All Modal */}
@@ -3107,12 +3119,16 @@ export default function CustomersScreen() {
         animationType="fade"
         onRequestClose={() => setBranchModalVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setBranchModalVisible(false)}
-        >
-          <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 400 }]}>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <Pressable 
+            style={StyleSheet.absoluteFill} 
+            onPress={() => setBranchModalVisible(false)} 
+          />
+          <View 
+            style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 400, width: '100%' }]}
+            // @ts-ignore - web event containment
+            onClick={(e: any) => e.stopPropagation()}
+          >
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
@@ -3193,7 +3209,7 @@ export default function CustomersScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
         </View>
       </ScrollView>
