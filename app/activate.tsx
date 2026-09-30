@@ -29,6 +29,7 @@ export default function ActivateStandPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [activatedQuota, setActivatedQuota] = useState<number | null>(null);
 
   useEffect(() => {
     if (incomingCode) {
@@ -66,13 +67,16 @@ export default function ActivateStandPage() {
     setError('');
 
     try {
-      const res = await pb.send<{ success: boolean; message: string; plan?: string }>('/api/risev/merchant/redeem-stand-code', {
+      const res = await pb.send<{ success: boolean; message: string; plan?: string; quota?: number }>('/api/risev/merchant/redeem-stand-code', {
         method: 'POST',
         body: { code: formattedCode }
       });
 
       if (res.success) {
         setSuccess(true);
+        if (res.quota) {
+          setActivatedQuota(res.quota);
+        }
         await refreshSession();
       } else {
         setError(res.message || 'Invalid activation code.');
@@ -109,8 +113,8 @@ export default function ActivateStandPage() {
             </Text>
             <Text style={styles.successDesc}>
               {locale === 'en'
-                ? 'Your 500 customer database capacity is now active with no expiration date. Place your stand at your counter and start collecting members!'
-                : 'Kapasiti 500 pelanggan anda kini aktif tanpa tarikh luput. Letakkan stand di kaunter anda dan mula kumpul ahli!'}
+                ? `Your ${(activatedQuota || 500).toLocaleString()} customer database capacity is now active with no expiration date. Place your stand at your counter and start collecting members!`
+                : `Kapasiti ${(activatedQuota || 500).toLocaleString()} pelanggan anda kini aktif tanpa tarikh luput. Letakkan stand di kaunter anda dan mula kumpul ahli!`}
             </Text>
 
             <TouchableOpacity
@@ -130,8 +134,8 @@ export default function ActivateStandPage() {
             </Text>
             <Text style={styles.subtitle}>
               {locale === 'en'
-                ? 'Enter the unique Activation Code found on your package card to unlock 500 free customer database capacity.'
-                : 'Masukkan Kod Pengaktifan dari kad bungkusan anda untuk membuka kuota 500 pelanggan percuma.'}
+                ? 'Enter the unique Activation Code found on your package card to unlock your customer database capacity.'
+                : 'Masukkan Kod Pengaktifan dari kad bungkusan anda untuk membuka kuota pelanggan anda.'}
             </Text>
 
             {/* Code Input */}

@@ -1527,7 +1527,9 @@ export default function NfcLandingScreen() {
                   <Ionicons name="people" size={18} color="#FFC700" />
                 </View>
                 <View style={styles.pairingPerkContent}>
-                  <Text style={styles.pairingPerkTitleDark}>500 Customer Database Capacity</Text>
+                  <Text style={styles.pairingPerkTitleDark}>
+                    {(unclaimedStand?.quota || 500).toLocaleString()} Customer Database Capacity
+                  </Text>
                   <Text style={styles.pairingPerkDescDark}>Collect member profiles, contact numbers & lifetime visit history.</Text>
                 </View>
               </View>
