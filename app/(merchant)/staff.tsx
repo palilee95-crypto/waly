@@ -18,9 +18,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+
+export interface StaffAnomalyTx {
+  id: string;
+  created: string;
+  stamps: number;
+  bill_amount: number;
+}
+
+export interface StaffAnomaly {
+  id: string;
+  staff_id: string;
+  staff_name: string;
+  staff_role?: string;
+  customer_id: string;
+  customer_name?: string;
+  customer_phone?: string;
+  stamp_count: number;
+  threshold: number;
+  total_sales: number;
+  transactions: StaffAnomalyTx[];
+}
+
+export interface AnomalySettings {
+  enabled: boolean;
+  max_stamps_per_customer: number;
+}
 
 interface StaffMember {
   id: string;
@@ -35,10 +61,13 @@ interface StaffMember {
   customers_served?: number;
   sales_volume?: number;
   rank?: number;
+  has_anomaly?: boolean;
+  anomaly_note?: string;
 }
 
 export default function StaffManagementScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string; anomaly_staff_id?: string }>();
   const { user, fetchStaffPermissions } = useAuth();
   const { t, locale } = useLanguage();
   const { width } = useWindowDimensions();
@@ -63,6 +92,17 @@ export default function StaffManagementScreen() {
   const [topPerformer, setTopPerformer] = useState<StaffMember | null>(null);
   const [summary, setSummary] = useState<any>(null);
 
+  // Unusual Activity / Anomaly States
+  const [anomalies, setAnomalies] = useState<StaffAnomaly[]>([]);
+  const [anomalySettings, setAnomalySettings] = useState<AnomalySettings>({
+    enabled: true,
+    max_stamps_per_customer: 5
+  });
+  const [investigationModalVisible, setInvestigationModalVisible] = useState(false);
+  const [selectedAnomaly, setSelectedAnomaly] = useState<StaffAnomaly | null>(null);
+  const [isDismissingAnomaly, setIsDismissingAnomaly] = useState(false);
+  const [isRestrictingStaff, setIsRestrictingStaff] = useState(false);
+
   // Permissions State
   const [permissionsState, setPermissionsState] = useState<StaffPermissions>(defaultStaffPermissions);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -73,6 +113,15 @@ export default function StaffManagementScreen() {
   const [warningTitle, setWarningTitle] = useState('');
   const [warningMessage, setWarningMessage] = useState('');
 
+  // Handle push notification deep links
+  useEffect(() => {
+    if (params.tab === 'performance' || params.tab === 'rank') {
+      setActiveTab('performance');
+    } else if (params.tab === 'settings' || params.tab === 'permissions') {
+      setActiveTab('settings');
+    }
+  }, [params.tab]);
+
   const fetchStaff = async (tFrame = timeframe, sBy = sortBy) => {
     if (!user || !user.merchant_id) return;
     try {
@@ -81,6 +130,8 @@ export default function StaffManagementScreen() {
         staff: StaffMember[];
         top_performer?: StaffMember | null;
         summary?: any;
+        anomalies?: StaffAnomaly[];
+        anomaly_settings?: AnomalySettings;
       }>(`/api/risev/merchant/staff?timeframe=${tFrame}&sort_by=${sBy}`, {
         method: 'GET',
         headers: {
@@ -91,6 +142,21 @@ export default function StaffManagementScreen() {
         setStaff(res.staff);
         setTopPerformer(res.top_performer || null);
         setSummary(res.summary || null);
+
+        if (res.anomalies) {
+          setAnomalies(res.anomalies);
+          // Auto-open investigation modal if deep linked with anomaly_staff_id
+          if (params.anomaly_staff_id) {
+            const matched = res.anomalies.find(a => a.staff_id === params.anomaly_staff_id);
+            if (matched) {
+              setSelectedAnomaly(matched);
+              setInvestigationModalVisible(true);
+            }
+          }
+        }
+        if (res.anomaly_settings) {
+          setAnomalySettings(res.anomaly_settings);
+        }
       }
 
       // Fetch branches
@@ -183,6 +249,111 @@ export default function StaffManagementScreen() {
     } finally {
       setSavingPermissions(false);
     }
+  };
+
+  const handleToggleAnomalySettings = async (enabled: boolean, maxStamps = anomalySettings.max_stamps_per_customer) => {
+    const updated = { enabled, max_stamps_per_customer: maxStamps };
+    setAnomalySettings(updated);
+    try {
+      setSavingPermissions(true);
+      await pb.send('/api/risev/merchant/staff/permissions', {
+        method: 'POST',
+        body: {
+          permissions: permissionsState,
+          anomaly_settings: updated
+        },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      fetchStaff();
+    } catch (err: any) {
+      console.warn("Failed to save anomaly settings:", err);
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const handleDismissAnomaly = async () => {
+    if (!selectedAnomaly) return;
+    try {
+      setIsDismissingAnomaly(true);
+      await pb.send('/api/risev/merchant/staff/dismiss-anomaly', {
+        method: 'POST',
+        body: {
+          staff_id: selectedAnomaly.staff_id,
+          customer_id: selectedAnomaly.customer_id,
+          timeframe: timeframe
+        },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+
+      // Update local state: remove this anomaly
+      setAnomalies(prev => prev.filter(a => a.id !== selectedAnomaly.id));
+      setStaff(prev => prev.map(s => {
+        if (s.id === selectedAnomaly.staff_id) {
+          return { ...s, has_anomaly: false, anomaly_note: '' };
+        }
+        return s;
+      }));
+      setInvestigationModalVisible(false);
+      setSelectedAnomaly(null);
+      Alert.alert(
+        locale === 'en' ? "Reviewed" : "Disemak",
+        locale === 'en' ? "Unusual activity marked as reviewed." : "Aktiviti luar biasa telah ditandakan sebagai disemak."
+      );
+    } catch (err: any) {
+      Alert.alert(
+        locale === 'en' ? "Error" : "Ralat",
+        err?.data?.message || err?.message || "Failed to dismiss activity."
+      );
+    } finally {
+      setIsDismissingAnomaly(false);
+    }
+  };
+
+  const handleRestrictStaffFromAnomaly = () => {
+    if (!selectedAnomaly) return;
+    Alert.alert(
+      locale === 'en' ? "Remove Staff Member?" : "Buang Kakitangan?",
+      locale === 'en'
+        ? `Are you sure you want to remove ${selectedAnomaly.staff_name} from your store staff to prevent further stamp issuance?`
+        : `Adakah anda pasti mahu mengalih keluar ${selectedAnomaly.staff_name} daripada kakitangan kedai anda untuk menghalang pengeluaran cop seterusnya?`,
+      [
+        { text: locale === 'en' ? "Cancel" : "Batal", style: "cancel" },
+        {
+          text: locale === 'en' ? "Remove Staff" : "Buang Staf",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsRestrictingStaff(true);
+              await pb.send('/api/risev/merchant/staff', {
+                method: 'DELETE',
+                body: { userId: selectedAnomaly.staff_id },
+                headers: {
+                  'Authorization': 'Bearer ' + pb.authStore.token
+                }
+              });
+              setInvestigationModalVisible(false);
+              setSelectedAnomaly(null);
+              Alert.alert(
+                locale === 'en' ? "Staff Removed" : "Kakitangan Dibuang",
+                locale === 'en'
+                  ? "Staff member has been removed and can no longer issue stamps."
+                  : "Kakitangan telah dibuang dan tidak lagi boleh mengeluarkan cop."
+              );
+              fetchStaff();
+            } catch (err: any) {
+              Alert.alert(locale === 'en' ? "Error" : "Ralat", err?.data?.message || err?.message || "Failed to remove staff.");
+            } finally {
+              setIsRestrictingStaff(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleOpenAddModal = () => {
@@ -540,6 +711,38 @@ export default function StaffManagementScreen() {
               </View>
             </View>
 
+            {/* Unusual Activity Detected Banner */}
+            {anomalies.length > 0 && (
+              <View style={styles.anomalyBanner}>
+                <View style={styles.anomalyBannerIconWrap}>
+                  <Ionicons name="warning" size={24} color="#DC2626" />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.anomalyBannerTitle}>
+                    {locale === 'en' ? 'Unusual Activity Detected' : 'Aktiviti Luar Biasa Dikesan'}
+                  </Text>
+                  <Text style={styles.anomalyBannerDesc}>
+                    {locale === 'en'
+                      ? `Staff ${anomalies[0].staff_name} has approved more than ${anomalies[0].threshold} stamps for the same customer (${anomalies[0].customer_phone || anomalies[0].customer_name || 'member'}). Please review this activity.`
+                      : `Staf ${anomalies[0].staff_name} telah meluluskan lebih ${anomalies[0].threshold} cop untuk pelanggan yang sama (${anomalies[0].customer_phone || anomalies[0].customer_name || 'ahli'}). Sila semak aktiviti ini.`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.anomalyBannerBtn}
+                  onPress={() => {
+                    setSelectedAnomaly(anomalies[0]);
+                    setInvestigationModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.anomalyBannerBtnText}>
+                    {locale === 'en' ? 'View Details' : 'Lihat Butiran'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color="#991B1B" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Hero Top Performer Spotlight Card */}
             {topPerformer && (
               <View style={styles.spotlightCard}>
@@ -619,12 +822,28 @@ export default function StaffManagementScreen() {
                   const rank = member.rank || index + 1;
                   const isTop3 = rank <= 3;
                   const rankBadge = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+                  const hasAnomaly = !!member.has_anomaly;
+                  const matchedAnomaly = anomalies.find(a => a.staff_id === member.id);
 
                   return (
-                    <View key={member.id} style={[styles.perfStaffCard, rank === 1 && styles.perfStaffCardGold]}>
-                      <View style={[styles.rankPill, isTop3 && styles.rankPillTop]}>
-                        <Text style={[styles.rankPillText, isTop3 && styles.rankPillTopText]}>
-                          {rankBadge}
+                    <TouchableOpacity
+                      key={member.id}
+                      style={[
+                        styles.perfStaffCard,
+                        rank === 1 && !hasAnomaly && styles.perfStaffCardGold,
+                        hasAnomaly && styles.perfStaffCardWarning
+                      ]}
+                      activeOpacity={hasAnomaly ? 0.7 : 1}
+                      onPress={() => {
+                        if (hasAnomaly && matchedAnomaly) {
+                          setSelectedAnomaly(matchedAnomaly);
+                          setInvestigationModalVisible(true);
+                        }
+                      }}
+                    >
+                      <View style={[styles.rankPill, isTop3 && styles.rankPillTop, hasAnomaly && styles.rankPillWarning]}>
+                        <Text style={[styles.rankPillText, isTop3 && styles.rankPillTopText, hasAnomaly && styles.rankPillWarningText]}>
+                          {hasAnomaly ? `${rank} ⚠️` : rankBadge}
                         </Text>
                       </View>
 
@@ -636,17 +855,26 @@ export default function StaffManagementScreen() {
                       </View>
 
                       <View style={styles.perfMetricsColumn}>
-                        <View style={styles.perfBadgeStamps}>
-                          <Ionicons name="ribbon" size={11} color="#B45309" />
-                          <Text style={styles.perfBadgeStampsText}>
+                        <View style={[styles.perfBadgeStamps, hasAnomaly && styles.perfBadgeStampsWarning]}>
+                          <Ionicons name="ribbon" size={11} color={hasAnomaly ? "#DC2626" : "#B45309"} />
+                          <Text style={[styles.perfBadgeStampsText, hasAnomaly && styles.perfBadgeStampsTextWarning]}>
                             {member.stamps_issued || 0} {locale === 'en' ? 'stamps' : 'cop'}
                           </Text>
                         </View>
+                        {hasAnomaly && (
+                          <Text style={styles.anomalySubText}>
+                            ⚠️ {member.anomaly_note || 'Excess stamps'}
+                          </Text>
+                        )}
                         <Text style={styles.perfSalesText}>
                           RM {(member.sales_volume || 0).toFixed(2)} · {member.customers_served || 0} cust
                         </Text>
                       </View>
-                    </View>
+
+                      {hasAnomaly && (
+                        <Ionicons name="chevron-forward" size={16} color="#DC2626" style={{ marginLeft: 4 }} />
+                      )}
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -688,6 +916,61 @@ export default function StaffManagementScreen() {
                   ? 'Cashier Mode (Issue Stamps, Scan QR, & Redeem Vouchers) and Customer Lookup are always unlocked for all active staff.'
                   : 'Mod Juruwang (Beri Stamp, Imbas QR, & Tebus Baucar) dan Carian Pelanggan sentiasa dibuka untuk semua staf aktif.'}
               </Text>
+            </View>
+
+            {/* Fraud & Unusual Activity Guard Card */}
+            <View style={styles.anomalySettingsCard}>
+              <View style={styles.anomalySettingsHeader}>
+                <View style={[styles.permIconBg, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="shield-outline" size={20} color="#DC2626" />
+                </View>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={styles.permTitle}>
+                    {locale === 'en' ? 'Fraud & Unusual Activity Guard' : 'Kawalan Penipuan & Aktiviti Luar Biasa'}
+                  </Text>
+                  <Text style={styles.permSubtitle}>
+                    {locale === 'en'
+                      ? 'Receive instant Web Push alerts and highlight staff when excessive stamps are issued to the same customer.'
+                      : 'Terima amaran Web Push segera dan tandakan staf apabila pengeluaran cop berlebihan kepada pelanggan yang sama berlaku.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={anomalySettings.enabled}
+                  onValueChange={(val) => handleToggleAnomalySettings(val, anomalySettings.max_stamps_per_customer)}
+                  trackColor={{ false: '#CBD5E1', true: '#DC2626' }}
+                  thumbColor={anomalySettings.enabled ? '#FFFFFF' : '#FFFFFF'}
+                />
+              </View>
+
+              {anomalySettings.enabled && (
+                <View style={styles.thresholdConfigBox}>
+                  <Text style={styles.thresholdConfigLabel}>
+                    {locale === 'en' ? 'Alert Threshold (Max stamps to same customer):' : 'Had Ambang Amaran (Maksimum cop ke pelanggan sama):'}
+                  </Text>
+                  <View style={styles.thresholdChipsRow}>
+                    {[3, 5, 8, 10, 15].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[
+                          styles.thresholdChip,
+                          anomalySettings.max_stamps_per_customer === num && styles.thresholdChipActive
+                        ]}
+                        onPress={() => handleToggleAnomalySettings(true, num)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.thresholdChipText,
+                            anomalySettings.max_stamps_per_customer === num && styles.thresholdChipTextActive
+                          ]}
+                        >
+                          {num} {locale === 'en' ? 'stamps' : 'cop'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Permission Toggles List */}
@@ -828,6 +1111,144 @@ export default function StaffManagementScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Staff Unusual Activity Investigation Modal */}
+      <Modal
+        visible={investigationModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInvestigationModalVisible(false)}
+      >
+        <View style={styles.investigationModalOverlay}>
+          <View style={styles.investigationModalBox}>
+            {/* Header */}
+            <View style={styles.investigationHeader}>
+              <View style={[styles.anomalyBannerIconWrap, { width: 44, height: 44, borderRadius: 14 }]}>
+                <Ionicons name="warning" size={24} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.investigationHeaderTitle}>
+                  {locale === 'en' ? 'Unusual Activity Investigation' : 'Siasatan Aktiviti Luar Biasa'}
+                </Text>
+                <Text style={styles.investigationHeaderSub}>
+                  {locale === 'en'
+                    ? 'Review excessive stamp issuances to the same customer'
+                    : 'Semak pengeluaran cop berlebihan kepada pelanggan yang sama'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setInvestigationModalVisible(false)}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAnomaly && (
+              <ScrollView style={styles.investigationBody} showsVerticalScrollIndicator={false}>
+                {/* Staff Info Card */}
+                <View style={styles.investigationStaffCard}>
+                  <View style={[styles.permIconBg, { backgroundColor: '#F1F5F9' }]}>
+                    <Ionicons name="person" size={20} color="#475569" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.investigationStaffName}>{selectedAnomaly.staff_name}</Text>
+                    <Text style={styles.investigationStaffRole}>{selectedAnomaly.staff_role || 'Staff Member'}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                      {locale === 'en' ? 'CUSTOMER' : 'PELANGGAN'}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {selectedAnomaly.customer_phone || selectedAnomaly.customer_name || 'Member'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Key Metrics Stats */}
+                <View style={styles.investigationStatsRow}>
+                  <View style={styles.investigationStatBox}>
+                    <Text style={styles.investigationStatVal}>{selectedAnomaly.stamp_count}</Text>
+                    <Text style={styles.investigationStatLbl}>
+                      {locale === 'en' ? 'Stamps Issued' : 'Cop Dikeluarkan'}
+                    </Text>
+                  </View>
+                  <View style={styles.investigationStatBox}>
+                    <Text style={styles.investigationStatVal}>{selectedAnomaly.threshold}</Text>
+                    <Text style={styles.investigationStatLbl}>
+                      {locale === 'en' ? 'Store Limit' : 'Had Kedai'}
+                    </Text>
+                  </View>
+                  <View style={styles.investigationStatBox}>
+                    <Text style={styles.investigationStatVal}>RM {selectedAnomaly.total_sales.toFixed(2)}</Text>
+                    <Text style={styles.investigationStatLbl}>
+                      {locale === 'en' ? 'Total Sales' : 'Jumlah Jualan'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Transactions Timeline */}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {locale === 'en' ? 'Transaction Audit Log' : 'Log Audit Transaksi'} ({selectedAnomaly.transactions ? selectedAnomaly.transactions.length : 0})
+                </Text>
+
+                <View style={styles.investigationTxList}>
+                  {(selectedAnomaly.transactions || []).map((tx, idx) => (
+                    <View key={tx.id || idx} style={styles.investigationTxItem}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.investigationTxDate}>
+                          {new Date(tx.created).toLocaleDateString()} · {new Date(tx.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                        <Text style={styles.investigationTxBill}>
+                          Bill: RM {(tx.bill_amount || 0).toFixed(2)}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.investigationTxStamps}>
+                          +{tx.stamps || 1} {locale === 'en' ? 'stamps' : 'cop'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.investigationActions}>
+                  <TouchableOpacity
+                    style={styles.investigationDismissBtn}
+                    onPress={handleDismissAnomaly}
+                    disabled={isDismissingAnomaly}
+                    activeOpacity={0.8}
+                  >
+                    {isDismissingAnomaly ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.investigationDismissBtnText}>
+                        {locale === 'en' ? 'Mark as Reviewed' : 'Tanda Telah Disemak'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.restrictBtn}
+                    onPress={handleRestrictStaffFromAnomaly}
+                    disabled={isRestrictingStaff}
+                    activeOpacity={0.8}
+                  >
+                    {isRestrictingStaff ? (
+                      <ActivityIndicator size="small" color="#991B1B" />
+                    ) : (
+                      <Text style={styles.restrictBtnText}>
+                        {locale === 'en' ? 'Remove Staff' : 'Buang Staf'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Staff Name Modal */}
       <Modal
@@ -1804,5 +2225,284 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     textAlign: 'center',
+  },
+  // Anomaly & Unusual Activity Alert Styles
+  anomalyBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  anomalyBannerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  anomalyBannerTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#991B1B',
+  },
+  anomalyBannerDesc: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#7F1D1D',
+    lineHeight: 16,
+  },
+  anomalyBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  anomalyBannerBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#991B1B',
+  },
+  perfStaffCardWarning: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FCA5A5',
+    borderWidth: 1.5,
+  },
+  rankPillWarning: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+  },
+  rankPillWarningText: {
+    color: '#991B1B',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  perfBadgeStampsWarning: {
+    backgroundColor: '#FEE2E2',
+  },
+  perfBadgeStampsTextWarning: {
+    color: '#991B1B',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  anomalySubText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
+    marginTop: 1,
+    marginBottom: 1,
+  },
+  // Investigation Modal Styles
+  investigationModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  investigationModalBox: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    maxHeight: '90%',
+  },
+  investigationHeader: {
+    backgroundColor: '#FEF2F2',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FEE2E2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  investigationHeaderTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#991B1B',
+  },
+  investigationHeaderSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#7F1D1D',
+    marginTop: 1,
+  },
+  investigationBody: {
+    padding: 16,
+  },
+  investigationStaffCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  investigationStaffName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  investigationStaffRole: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  investigationStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  investigationStatBox: {
+    flex: 1,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  investigationStatVal: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#991B1B',
+  },
+  investigationStatLbl: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#7F1D1D',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  investigationTxList: {
+    maxHeight: 180,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 8,
+    marginBottom: 16,
+  },
+  investigationTxItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  investigationTxDate: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#475569',
+  },
+  investigationTxStamps: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
+  },
+  investigationTxBill: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  investigationActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  investigationDismissBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#006D37',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  investigationDismissBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  restrictBtn: {
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restrictBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#991B1B',
+  },
+  // Threshold Settings Card Styles
+  anomalySettingsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    marginBottom: 12,
+  },
+  anomalySettingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  thresholdConfigBox: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#FEE2E2',
+  },
+  thresholdConfigLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#991B1B',
+    marginBottom: 8,
+  },
+  thresholdChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  thresholdChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  thresholdChipActive: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  thresholdChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  thresholdChipTextActive: {
+    color: '#FFFFFF',
   },
 });

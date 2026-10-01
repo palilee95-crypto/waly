@@ -31,6 +31,22 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   const timeframe = (query.timeframe || "all").toLowerCase();
   const sortBy = (query.sort_by || "stamps").toLowerCase();
 
+  // Read merchant metadata for anomaly detection settings and dismissals
+  let merchantMeta = {};
+  try {
+    const rawM = merchant.get("metadata");
+    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+  } catch (mErr) {
+    merchantMeta = {};
+  }
+
+  const anomalySettings = Object.assign({
+    enabled: true,
+    max_stamps_per_customer: 5
+  }, merchantMeta.anomaly_settings || {});
+
+  const dismissedAnomalies = Array.isArray(merchantMeta.dismissed_anomalies) ? merchantMeta.dismissed_anomalies : [];
+
   // Find all users linked to this merchant (excluding the owner)
   let staffMembers = [];
   try {
@@ -77,6 +93,9 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   let totalStoreSales = 0;
   let totalStoreTxns = 0;
 
+  // Track (staff_id -> customer_id) for anomaly detection
+  const staffCustomerMap = {};
+
   // Build lookup maps for fast O(1) matching
   const staffMapById = {};
   const staffMapByName = {};
@@ -96,7 +115,9 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       stamps_issued: 0,
       vouchers_redeemed: 0,
       customers_served: 0,
-      sales_volume: 0
+      sales_volume: 0,
+      has_anomaly: false,
+      anomaly_note: ""
     };
     staffMapById[u.id] = sObj;
     if (sName) {
@@ -163,7 +184,30 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       matchedStaff.sales_volume += bill;
 
       if (txType === "earn") {
-        matchedStaff.stamps_issued += (stamps || 1);
+        const earnedStamps = stamps || 1;
+        matchedStaff.stamps_issued += earnedStamps;
+
+        const custId = tx.getString("customer") || (meta && meta.customer_id) || "";
+        if (custId) {
+          if (!staffCustomerMap[matchedStaff.id]) {
+            staffCustomerMap[matchedStaff.id] = {};
+          }
+          if (!staffCustomerMap[matchedStaff.id][custId]) {
+            staffCustomerMap[matchedStaff.id][custId] = {
+              count: 0,
+              billTotal: 0,
+              txs: []
+            };
+          }
+          staffCustomerMap[matchedStaff.id][custId].count += earnedStamps;
+          staffCustomerMap[matchedStaff.id][custId].billTotal += bill;
+          staffCustomerMap[matchedStaff.id][custId].txs.push({
+            id: tx.id,
+            created: tx.getString("created"),
+            stamps: earnedStamps,
+            bill_amount: bill
+          });
+        }
       } else if (txType === "redeem" || txType === "reward") {
         matchedStaff.vouchers_redeemed += 1;
       }
@@ -177,6 +221,63 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       }
     }
   });
+
+  // Calculate anomalies if enabled
+  const detectedAnomalies = [];
+  if (anomalySettings.enabled) {
+    const threshold = parseInt(anomalySettings.max_stamps_per_customer) || 5;
+    const customerCache = {};
+
+    Object.keys(staffCustomerMap).forEach(sId => {
+      const custMap = staffCustomerMap[sId];
+      const sObj = staffMapById[sId];
+      if (!sObj) return;
+
+      Object.keys(custMap).forEach(cId => {
+        const item = custMap[cId];
+        if (item.count >= threshold) {
+          const dismissalKey = `${sId}_${cId}_${timeframe}`;
+          const isDismissed = dismissedAnomalies.some(d => (
+            d.key === dismissalKey ||
+            (d.staff_id === sId && d.customer_id === cId && d.timeframe === timeframe)
+          ));
+
+          if (!isDismissed) {
+            let custName = "Customer";
+            let custPhone = "";
+            try {
+              if (!customerCache[cId]) {
+                const cRec = $app.findRecordById("users", cId);
+                customerCache[cId] = {
+                  name: cRec.getString("name") || "Customer",
+                  phone: cRec.getString("phone") || ""
+                };
+              }
+              custName = customerCache[cId].name;
+              custPhone = customerCache[cId].phone;
+            } catch (cErr) {}
+
+            sObj.has_anomaly = true;
+            sObj.anomaly_note = `${item.count} to same customer`;
+
+            detectedAnomalies.push({
+              id: `${sId}_${cId}`,
+              staff_id: sId,
+              staff_name: sObj.name,
+              staff_role: sObj.role || "Staff",
+              customer_id: cId,
+              customer_name: custName,
+              customer_phone: custPhone,
+              stamp_count: item.count,
+              threshold: threshold,
+              total_sales: Math.round(item.billTotal * 100) / 100,
+              transactions: item.txs
+            });
+          }
+        }
+      });
+    });
+  }
 
   let staffStats = staffMembers.map(u => {
     const sObj = staffMapById[u.id];
@@ -206,6 +307,8 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     staff: staffStats,
     timeframe: timeframe,
     top_performer: topPerformer,
+    anomalies: detectedAnomalies,
+    anomaly_settings: anomalySettings,
     summary: {
       total_staff: staffStats.length,
       total_stamps: totalStoreStamps,
@@ -597,6 +700,13 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
     can_manage_branches: !!newPermissions.can_manage_branches
   };
 
+  if (body.anomaly_settings && typeof body.anomaly_settings === "object") {
+    meta.anomaly_settings = {
+      enabled: body.anomaly_settings.enabled !== false,
+      max_stamps_per_customer: parseInt(body.anomaly_settings.max_stamps_per_customer) || 5
+    };
+  }
+
   merchant.set("metadata", meta);
 
   try {
@@ -606,8 +716,157 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
   }
 
   return e.json(200, {
-    message: "Staff permissions updated successfully.",
-    permissions: meta.staff_permissions
+    message: "Staff permissions and anomaly settings updated successfully.",
+    permissions: meta.staff_permissions,
+    anomaly_settings: meta.anomaly_settings
   });
 }, $apis.requireAuth("users"));
+
+// Dismiss a detected staff anomaly
+routerAdd("POST", "/api/risev/merchant/staff/dismiss-anomaly", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  let merchant;
+  try {
+    merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
+  } catch (err) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const staffId = (body.staff_id || "").trim();
+  const customerId = (body.customer_id || "").trim();
+  const timeframe = (body.timeframe || "all").trim();
+
+  if (!staffId || !customerId) {
+    return e.json(400, { message: "staff_id and customer_id are required." });
+  }
+
+  let meta = {};
+  try {
+    const rawMeta = merchant.get("metadata");
+    meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+  } catch (mErr) {
+    meta = {};
+  }
+
+  if (!Array.isArray(meta.dismissed_anomalies)) {
+    meta.dismissed_anomalies = [];
+  }
+
+  const dismissalKey = `${staffId}_${customerId}_${timeframe}`;
+  meta.dismissed_anomalies.push({
+    key: dismissalKey,
+    staff_id: staffId,
+    customer_id: customerId,
+    timeframe: timeframe,
+    dismissed_at: new Date().toISOString(),
+    dismissed_by: authRecord.id
+  });
+
+  if (meta.dismissed_anomalies.length > 100) {
+    meta.dismissed_anomalies = meta.dismissed_anomalies.slice(-100);
+  }
+
+  merchant.set("metadata", meta);
+  try {
+    $app.save(merchant);
+  } catch (saveErr) {
+    return e.json(500, { message: "Failed to save dismissal: " + saveErr.message });
+  }
+
+  return e.json(200, {
+    success: true,
+    message: "Activity marked as reviewed."
+  });
+}, $apis.requireAuth("users"));
+
+// Proactive Owner Web Push Notification on Unusual Staff Stamp Activity
+onRecordCreate((e) => {
+  if (e.record.getString("type") !== "earn") return;
+
+  const stamps = parseInt(e.record.get("stamps")) || 1;
+  const merchantId = e.record.getString("merchant");
+  const customerId = e.record.getString("customer");
+  const staffId = e.record.getString("staff");
+
+  if (!merchantId || !customerId || !staffId) return;
+
+  try {
+    const merchant = $app.findRecordById("merchants", merchantId);
+    if (!merchant) return;
+
+    const ownerId = merchant.getString("owner");
+    // Ignore self-issuance by store owner
+    if (staffId === ownerId) return;
+
+    let meta = {};
+    try {
+      const rawMeta = merchant.get("metadata");
+      meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+    } catch (mErr) {
+      meta = {};
+    }
+
+    const anomalySettings = Object.assign({
+      enabled: true,
+      max_stamps_per_customer: 5
+    }, meta.anomaly_settings || {});
+
+    if (!anomalySettings.enabled) return;
+
+    const threshold = parseInt(anomalySettings.max_stamps_per_customer) || 5;
+
+    // Check count of earn transactions in the last 30 days between this staff and customer
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dateStr = thirtyDaysAgo.toISOString().replace('T', ' ').substring(0, 19);
+
+    const recentTxns = $app.findRecordsByFilter(
+      "transactions",
+      `merchant = "${merchantId}" && staff = "${staffId}" && customer = "${customerId}" && type = "earn" && created >= "${dateStr}"`,
+      "-created",
+      200,
+      0
+    );
+
+    let totalStamps = 0;
+    recentTxns.forEach(t => {
+      totalStamps += (parseInt(t.get("stamps")) || 1);
+    });
+
+    // Check if crossing the threshold on this specific transaction
+    if (totalStamps >= threshold && (totalStamps - stamps) < threshold) {
+      let staffName = "Staff";
+      let customerPhone = "";
+      try {
+        const staffRec = $app.findRecordById("users", staffId);
+        staffName = staffRec.getString("name") || "Staff";
+      } catch (stErr) {}
+
+      try {
+        const custRec = $app.findRecordById("users", customerId);
+        customerPhone = custRec.getString("phone") || "";
+      } catch (cuErr) {}
+
+      const pushHelper = require(`${__hooks}/push_notify.js`);
+      pushHelper.sendPushToUser(ownerId, {
+        title: "⚠️ Unusual Activity Detected",
+        body: `Staff ${staffName} has approved ${totalStamps} stamps for customer ${customerPhone || 'member'}. Tap to review.`,
+        url: `/(merchant)/staff?tab=performance&anomaly_staff_id=${staffId}`,
+        tag: `anomaly-${staffId}-${customerId}`
+      });
+      console.log(`[UNUSUAL ACTIVITY ALERT] Dispatched Web Push to owner ${ownerId} for staff ${staffId} -> customer ${customerId}`);
+    }
+  } catch (err) {
+    console.log("[UNUSUAL ACTIVITY HOOK ERROR]", err.message || err);
+  }
+}, "transactions");
 
