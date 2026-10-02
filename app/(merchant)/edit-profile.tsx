@@ -142,8 +142,9 @@ export default function EditProfileScreen() {
         const mapInstance = L.map('store-edit-map', { attributionControl: false }).setView([startLat, startLng], 14);
         mapRef.current = mapInstance;
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          attribution: '© OpenStreetMap contributors, © CARTO'
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
         }).addTo(mapInstance);
 
         // Custom Yellow Marker Pin HTML

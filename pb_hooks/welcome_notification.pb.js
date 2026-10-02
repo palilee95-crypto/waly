@@ -1,5 +1,5 @@
 onRecordCreate((e) => {
-  if (e.record.get('type') !== 'earn') return;
+  if (e.record.get('type') !== 'earn') return e.next();
 
   const customerId = e.record.get('customer');
   const merchantId = e.record.get('merchant');

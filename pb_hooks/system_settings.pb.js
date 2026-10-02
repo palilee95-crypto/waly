@@ -4,7 +4,7 @@
 onRecordUpdate((e) => {
   try {
     const settings = e.record;
-    if (!settings) return;
+    if (!settings) return e.next();
     const wabaId = settings.getString("official_waba_id");
     const accessToken = settings.getString("official_access_token");
 
@@ -16,12 +16,13 @@ onRecordUpdate((e) => {
   } catch (err) {
     console.log("[System Settings Hook Error]", err.message || err);
   }
+  return e.next();
 }, "system_settings");
 
 onRecordCreate((e) => {
   try {
     const settings = e.record;
-    if (!settings) return;
+    if (!settings) return e.next();
     const wabaId = settings.getString("official_waba_id");
     const accessToken = settings.getString("official_access_token");
 
@@ -33,4 +34,6 @@ onRecordCreate((e) => {
   } catch (err) {
     console.log("[System Settings Hook Error]", err.message || err);
   }
+  return e.next();
 }, "system_settings");
+

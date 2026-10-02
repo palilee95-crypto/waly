@@ -791,22 +791,22 @@ routerAdd("POST", "/api/risev/merchant/staff/dismiss-anomaly", (e) => {
 
 // Proactive Owner Web Push Notification on Unusual Staff Stamp Activity
 onRecordCreate((e) => {
-  if (e.record.getString("type") !== "earn") return;
+  if (e.record.getString("type") !== "earn") return e.next();
 
   const stamps = parseInt(e.record.get("stamps")) || 1;
   const merchantId = e.record.getString("merchant");
   const customerId = e.record.getString("customer");
   const staffId = e.record.getString("staff");
 
-  if (!merchantId || !customerId || !staffId) return;
+  if (!merchantId || !customerId || !staffId) return e.next();
 
   try {
     const merchant = $app.findRecordById("merchants", merchantId);
-    if (!merchant) return;
+    if (!merchant) return e.next();
 
     const ownerId = merchant.getString("owner");
     // Ignore self-issuance by store owner
-    if (staffId === ownerId) return;
+    if (staffId === ownerId) return e.next();
 
     let meta = {};
     try {
@@ -821,7 +821,7 @@ onRecordCreate((e) => {
       max_stamps_per_customer: 5
     }, meta.anomaly_settings || {});
 
-    if (!anomalySettings.enabled) return;
+    if (!anomalySettings.enabled) return e.next();
 
     const threshold = parseInt(anomalySettings.max_stamps_per_customer) || 5;
 
@@ -868,5 +868,8 @@ onRecordCreate((e) => {
   } catch (err) {
     console.log("[UNUSUAL ACTIVITY HOOK ERROR]", err.message || err);
   }
+
+  return e.next();
 }, "transactions");
+
 
