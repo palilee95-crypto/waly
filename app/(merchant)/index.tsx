@@ -24,6 +24,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
+import MerchantNoticeCarousel from '@/components/MerchantNoticeCarousel';
 
 
 const { width } = Dimensions.get('window');
@@ -445,25 +446,77 @@ export default function MerchantDashboard() {
         <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
             {/* Stamps / Points Awarded */}
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, paddingRight: 12, justifyContent: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name={isPointsOnlyMerchant ? "sparkles-outline" : "wallet-outline"} size={14} color="#050505" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                <View style={{ backgroundColor: 'rgba(5,5,5,0.06)', padding: 4, borderRadius: 8 }}>
+                  <Ionicons name={isPointsOnlyMerchant ? "sparkles-outline" : "wallet-outline"} size={12} color="#050505" />
+                </View>
+                <Text 
+                  style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', flexShrink: 1, textTransform: 'uppercase', letterSpacing: 0.5 }} 
+                  numberOfLines={2} 
+                >
                   {isPointsOnlyMerchant ? (t('total_points_awarded') || 'Total Points Awarded') : t('total_stamps_awarded')}
                 </Text>
               </View>
-              <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -1 }}>
+              <Text style={{ fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -1 }}>
                 {loading ? '...' : (isPointsOnlyMerchant ? totalPointsAwarded.toLocaleString() : totalStampsAwarded.toLocaleString())}
               </Text>
             </View>
 
-            {/* Scan QR Button */}
-            <TouchableOpacity 
-              style={{ backgroundColor: '#050505', borderRadius: 16, width: 64, height: 64, alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
-              onPress={() => router.push('/(merchant)/give')}
-            >
-              <Ionicons name="qr-code" size={28} color="#FFC700" />
-            </TouchableOpacity>
+            {/* Header Action Buttons Row: Video Academy & Scan QR */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {/* Tutorial Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#EF4444',
+                  borderRadius: 16,
+                  width: 60,
+                  height: 60,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#EF4444',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 4,
+                }}
+                onPress={() => {
+                  const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+                  const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.open(url, '_blank');
+                  } else {
+                    Linking.openURL(url);
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="play" size={20} color="#FFFFFF" style={{ marginBottom: 2 }} />
+                <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.5 }}>TUTORIAL</Text>
+              </TouchableOpacity>
+
+              {/* Scan QR Button */}
+              <TouchableOpacity 
+                style={{ 
+                  backgroundColor: '#050505', 
+                  borderRadius: 16, 
+                  width: 60, 
+                  height: 60, 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  shadowColor: '#050505', 
+                  shadowOffset: { width: 0, height: 4 }, 
+                  shadowOpacity: 0.2, 
+                  shadowRadius: 8,
+                  elevation: 4,
+                }}
+                onPress={() => router.push('/(merchant)/give')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="qr-code" size={20} color="#FFC700" style={{ marginBottom: 2 }} />
+                <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5 }}>SCAN QR</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Sales Progress (Only for Owner or Staff with can_view_analytics) */}
@@ -583,54 +636,12 @@ export default function MerchantDashboard() {
 
 
 
-        {/* 🎓 RISEV ACADEMY QUICK TUTORIAL BANNER */}
-        <TouchableOpacity
-          onPress={() => {
-            const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
-            const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
-              window.open(url, '_blank');
-            } else {
-              Linking.openURL(url);
-            }
-          }}
-          activeOpacity={0.85}
-          style={{
-            backgroundColor: '#0F172A',
-            borderRadius: 18,
-            padding: 16,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderWidth: 1,
-            borderColor: '#1E293B',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 10,
-            marginBottom: 4,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="play-circle" size={26} color="#D97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                  {locale === 'en' ? 'Risev Video Academy' : 'Pusat Tutorial & Video Panduan'}
-                </Text>
-                <View style={{ backgroundColor: '#D97706', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>TUTORIAL</Text>
-                </View>
-              </View>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                {locale === 'en' ? 'Watch 2-min guides on stand setup & counter SOP' : 'Tonton video 2-minit cara setup stand & SOP juruwang'}
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
+        {/* 📢 AUTO-ROTATING ANNOUNCEMENT CAROUSEL (Tutorials, Free Quota, Promos, Updates) */}
+        <MerchantNoticeCarousel
+          merchant={merchant}
+          locale={locale}
+          onOpenUpgrade={() => setShowUpgradeModal(true)}
+        />
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>

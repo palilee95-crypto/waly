@@ -1173,13 +1173,10 @@ export default function UnifiedRewardsScreen() {
         {activeTab === 'card_design' && (
           <View style={{ marginTop: 12, gap: 16 }}>
             {/* Toggle Program Status */}
-            <View style={styles.configCard}>
-              <View style={styles.toggleRow}>
+            <View style={[styles.configCard, { paddingVertical: 16 }]}>
+              <View style={[styles.toggleRow, { alignItems: 'center' }]}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.cardSectionTitle}>{t('enable_loyalty_program')}</Text>
-                  <Text style={styles.cardSectionDesc}>
-                    {t('enable_loyalty_desc')}
-                  </Text>
+                  <Text style={[styles.cardSectionTitle, { marginBottom: 0 }]}>{t('enable_loyalty_program')}</Text>
                 </View>
                 <Switch
                   value={isActive}
@@ -1190,33 +1187,285 @@ export default function UnifiedRewardsScreen() {
               </View>
             </View>
 
-            {/* Stamps Goal selector */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('total_stamps_required')}</Text>
-              <Text style={styles.cardSectionDesc}>
-                {t('total_stamps_desc')}
-              </Text>
-              <View style={styles.segmentRow}>
-                {[5, 10, 15].map((num) => (
-                  <TouchableOpacity
-                    key={num}
-                    style={[
-                      styles.segmentBtn,
-                      requiredStamps === num && styles.segmentBtnActive,
-                    ]}
-                    onPress={() => setRequiredStamps(num as any)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        requiredStamps === num && styles.segmentTextActive,
-                      ]}
-                    >
-                      {num} {locale === 'en' ? 'Stamps' : 'Setem'}
+            {/* Live Visual Preview Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 24 }}>
+              <Text style={[styles.previewSectionHeader, { marginTop: 0, marginBottom: 0 }]}>{t('live_preview_card')}</Text>
+              <TouchableOpacity style={[styles.flipBtn, { marginTop: 0, marginBottom: 0 }]} onPress={flipCard} activeOpacity={0.8}>
+                <Ionicons name="sync-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
+                <Text style={styles.flipBtnText}>Tap card to flip</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Card preview — mirrors customer Stamp Card Details modal exactly */}
+            <TouchableOpacity activeOpacity={1} onPress={flipCard} style={styles.flipCardContainer}>
+              {(() => {
+                const previewExpiryDate = new Date();
+                previewExpiryDate.setDate(previewExpiryDate.getDate() + (parseInt(expiryDays, 10) || 0));
+                const previewValidString = `${String(previewExpiryDate.getMonth() + 1).padStart(2, '0')}/${String(previewExpiryDate.getFullYear()).slice(-2)}`;
+                return (
+                  <>
+                  {/* Transparent placeholder so the container gets its aspect-ratio height */}
+                  <View style={{ width: '100%', aspectRatio: 1.586 }} />
+
+              {/* Front of Card */}
+              <Animated.View style={[styles.liveCardPreview, { backgroundColor: cardColor, backfaceVisibility: 'hidden', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, frontAnimatedStyle]}>
+                {bgImage ? (
+                  <Image source={{ uri: bgImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : null}
+                {/* Subtle metallic sheen: single diagonal + top edge */}
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+                <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
+                {/* Header: merchant name + category + LOYALTY CARD badge */}
+                <View style={styles.cardPreviewHeader}>
+                  <View style={styles.previewShopLogoBg}>
+                    {merchantLogo ? (
+                      <Image source={{ uri: merchantLogo }} style={styles.previewShopLogo} resizeMode="cover" />
+                    ) : null}
+                  </View>
+                  <View style={styles.previewShopTextCol}>
+                    <Text style={[styles.previewShopName, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
+                      {merchant?.name || (locale === 'en' ? 'Your Shop' : 'Kedai Anda')}
                     </Text>
-                  </TouchableOpacity>
-                ))}
+                    <Text style={[styles.previewShopCategory, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
+                      {(merchant?.category || (locale === 'en' ? 'FOOD' : 'MAKANAN')).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: fontColor || '#FFFFFF' }}>
+                      3/{requiredStamps}
+                    </Text>
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: fontColor || '#FFFFFF', opacity: 0.75 }}>STAMPS</Text>
+                  </View>
+                </View>
+
+                {/* EMV Chip + Wifi */}
+                <View style={styles.cardMidRow}>
+                  <View style={styles.cardChip}>
+                    <View style={styles.chipLineHoriz} />
+                    <View style={styles.chipLineVert} />
+                    <View style={styles.chipCenterPin} />
+                  </View>
+                  <Ionicons name="wifi" size={18} color={fontColor || 'rgba(255,255,255,0.35)'} style={{ opacity: 0.35 }} />
+                </View>
+
+                <View style={{ flex: 1 }} />
+
+                {/* Footer: CARD HOLDER | VALID | CVV | brand badge */}
+                <View style={styles.cardBottomRow}>
+                  <View style={styles.holderBlock}>
+                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('card_holder')}</Text>
+                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
+                      {(user?.name || (locale === 'en' ? 'MERCHANT' : 'PENIAGA')).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.validBlock}>
+                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('valid')}</Text>
+                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>{previewValidString}</Text>
+                  </View>
+                  <View style={styles.cvvBlock}>
+                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('cvv')}</Text>
+                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>888</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Image
+                      source={require('../../assets/risev logo.png')}
+                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: previewLogoTint }}
+                    />
+                  </View>
+                </View>
+              </Animated.View>
+
+              {/* Back of Card */}
+              <Animated.View style={[styles.liveCardPreview, { backgroundColor: cardColor, backfaceVisibility: 'hidden', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 0, gap: 0 }, backAnimatedStyle]}>
+                {bgImageBack ? (
+                  <Image source={{ uri: bgImageBack }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : null}
+                {/* Subtle metallic sheen: single diagonal + top edge */}
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
+                <View style={{ position: 'absolute', top: -300, right: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '-40deg' }], zIndex: 1, pointerEvents: 'none' }} />
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
+
+                {/* Magnetic Stripe */}
+                <View style={{ width: '100%', height: 44, backgroundColor: '#111827', marginTop: 16, opacity: 0.95, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.15)', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, letterSpacing: 6 }} numberOfLines={1}>
+                    {(merchant?.name || (locale === 'en' ? 'Your Shop' : 'Kedai Anda')).toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12, flex: 1 }}>
+                  {/* Minimalist Status Header */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, gap: 8 }}>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: fontColor || '#FFFFFF', letterSpacing: 0.5, opacity: 0.7 }}>
+                      {locale === 'en' ? 'YOUR STAMPS' : 'SETEM ANDA'}
+                    </Text>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: fontColor || '#FFFFFF' }}>
+                      3/{requiredStamps}
+                    </Text>
+                  </View>
+
+                  <View style={styles.previewGrid}>{renderPreviewStamps()}</View>
+                  
+                  <View style={{ position: 'absolute', bottom: 16, right: 24 }}>
+                    <Image
+                      source={require('../../assets/risev logo.png')}
+                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: previewLogoTint }}
+                    />
+                  </View>
+                </View>
+              </Animated.View>
+              {/* End of preview render block */}
+              </>
+              );})()}
+            </TouchableOpacity>
+
+            <View style={{ marginBottom: 24 }} />
+
+            {/* Card Settings & Rules Combined Card */}
+            <View style={styles.configCard}>
+              <Text style={styles.cardSectionTitle}>{t('card_settings')}</Text>
+
+              {/* Total Stamps */}
+              <View style={{ marginTop: 8 }}>
+                <Text style={styles.settingsLabel}>{t('total_stamps_required')}</Text>
+                <View style={[styles.segmentRow, { marginTop: 8 }]}>
+                  {[5, 10, 15].map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.segmentBtn,
+                        requiredStamps === num && styles.segmentBtnActive,
+                      ]}
+                      onPress={() => setRequiredStamps(num as any)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          requiredStamps === num && styles.segmentTextActive,
+                        ]}
+                      >
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
+
+              {/* Expiry */}
+              <Text style={styles.settingsLabel}>{t('card_expiration_days')}</Text>
+              <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused, { marginTop: 8 }]}>
+                <TextInput
+                  style={styles.nestedTextInput}
+                  value={expiryDays}
+                  onChangeText={setExpiryDays}
+                  keyboardType="number-pad"
+                  placeholder={locale === 'en' ? "e.g. 30" : "cth. 30"}
+                  placeholderTextColor="#94A3B8"
+                  onFocus={() => setExpiryFocused(true)}
+                  onBlur={() => setExpiryFocused(false)}
+                />
+                <Text style={styles.inputSuffix}>{t('days')}</Text>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
+
+              {/* Reward */}
+              <Text style={styles.settingsLabel}>{t('stamp_completion_desc')}</Text>
+              <View style={[
+                styles.inputWrapper, 
+                rewardFocused && styles.inputWrapperFocused, 
+                showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 },
+                { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10, marginTop: 8 }
+              ]}>
+                <TextInput
+                  style={styles.nestedTextInputMultiline}
+                  value={rewardDesc}
+                  onChangeText={(val) => {
+                    setRewardDesc(val);
+                    if (val.trim()) setShowValidationWarning(false);
+                  }}
+                  placeholder={locale === 'en' ? "e.g. One Free Double Cheeseburger" : "cth. Satu Burger Keju Ganda Percuma"}
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  onFocus={() => setRewardFocused(true)}
+                  onBlur={() => setRewardFocused(false)}
+                />
+              </View>
+              {showValidationWarning && (
+                <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 4, marginLeft: 4 }}>
+                  {locale === 'en' ? 'Reward description is mandatory' : 'Keterangan ganjaran adalah wajib'}
+                </Text>
+              )}
+            </View>
+
+            {/* Custom Background Image Uploader */}
+            <View style={styles.configCard}>
+              <Text style={styles.cardSectionTitle}>{t('custom_bg_image')}</Text>
+              <Text style={styles.cardSectionDesc}>
+                Upload custom designs for the front and back of your card.
+              </Text>
+              <View style={[styles.bgUploadRow, { gap: 16 }]}>
+                {/* Front Image */}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Front Design</Text>
+                  {bgImage ? (
+                    <View style={styles.bgPreviewContainer}>
+                      <Image source={{ uri: bgImage }} style={styles.bgPreviewThumb} />
+                      <TouchableOpacity 
+                        style={styles.bgRemoveBtn}
+                        onPress={() => {
+                          setBgImage('');
+                          setBgFile(null);
+                          setRemoveBgImage(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.bgUploadBtn}
+                      onPress={handlePickCardBg}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
+                      <Text style={styles.bgUploadBtnText}>{t('upload_card_image')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Back Image */}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Back Design</Text>
+                  {bgImageBack ? (
+                    <View style={styles.bgPreviewContainer}>
+                      <Image source={{ uri: bgImageBack }} style={styles.bgPreviewThumb} />
+                      <TouchableOpacity 
+                        style={styles.bgRemoveBtn}
+                        onPress={() => {
+                          setBgImageBack('');
+                          setBgFileBack(null);
+                          setRemoveBgImageBack(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.bgUploadBtn}
+                      onPress={handlePickCardBgBack}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
+                      <Text style={styles.bgUploadBtnText}>Upload Back</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -1447,254 +1696,6 @@ export default function UnifiedRewardsScreen() {
                   </View>
                 </View>
               </View>
-            </View>
-
-            {/* Custom Background Image Uploader */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('custom_bg_image')}</Text>
-              <Text style={styles.cardSectionDesc}>
-                Upload custom designs for the front and back of your card.
-              </Text>
-              <View style={[styles.bgUploadRow, { gap: 16 }]}>
-                {/* Front Image */}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Front Design</Text>
-                  {bgImage ? (
-                    <View style={styles.bgPreviewContainer}>
-                      <Image source={{ uri: bgImage }} style={styles.bgPreviewThumb} />
-                      <TouchableOpacity 
-                        style={styles.bgRemoveBtn}
-                        onPress={() => {
-                          setBgImage('');
-                          setBgFile(null);
-                          setRemoveBgImage(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.bgUploadBtn}
-                      onPress={handlePickCardBg}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                      <Text style={styles.bgUploadBtnText}>{t('upload_card_image')}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Back Image */}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Back Design</Text>
-                  {bgImageBack ? (
-                    <View style={styles.bgPreviewContainer}>
-                      <Image source={{ uri: bgImageBack }} style={styles.bgPreviewThumb} />
-                      <TouchableOpacity 
-                        style={styles.bgRemoveBtn}
-                        onPress={() => {
-                          setBgImageBack('');
-                          setBgFileBack(null);
-                          setRemoveBgImageBack(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.bgUploadBtn}
-                      onPress={handlePickCardBgBack}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                      <Text style={styles.bgUploadBtnText}>Upload Back</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* Expiry & Milestone Reward in one card */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('card_settings')}</Text>
-
-              <Text style={styles.settingsLabel}>{t('card_expiration_days')}</Text>
-              <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused]}>
-                <TextInput
-                  style={styles.nestedTextInput}
-                  value={expiryDays}
-                  onChangeText={setExpiryDays}
-                  keyboardType="number-pad"
-                  placeholder={locale === 'en' ? "e.g. 30" : "cth. 30"}
-                  placeholderTextColor="#94A3B8"
-                  onFocus={() => setExpiryFocused(true)}
-                  onBlur={() => setExpiryFocused(false)}
-                />
-                <Text style={styles.inputSuffix}>{t('days')}</Text>
-              </View>
-
-              <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('stamp_completion_desc')}</Text>
-              <View style={[
-                styles.inputWrapper, 
-                rewardFocused && styles.inputWrapperFocused, 
-                showValidationWarning && { borderColor: '#EF4444', borderWidth: 2 },
-                { height: 72, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }
-              ]}>
-                <TextInput
-                  style={styles.nestedTextInputMultiline}
-                  value={rewardDesc}
-                  onChangeText={(val) => {
-                    setRewardDesc(val);
-                    if (val.trim()) setShowValidationWarning(false);
-                  }}
-                  placeholder={locale === 'en' ? "e.g. One Free Double Cheeseburger" : "cth. Satu Burger Keju Ganda Percuma"}
-                  placeholderTextColor="#94A3B8"
-                  multiline
-                  onFocus={() => setRewardFocused(true)}
-                  onBlur={() => setRewardFocused(false)}
-                />
-              </View>
-              {showValidationWarning && (
-                <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 4, marginLeft: 4 }}>
-                  {locale === 'en' ? 'Reward description is mandatory' : 'Keterangan ganjaran adalah wajib'}
-                </Text>
-              )}
-            </View>
-
-            {/* Live Visual Preview Header */}
-            <Text style={styles.previewSectionHeader}>{t('live_preview_card')}</Text>
-
-            {/* Card preview — mirrors customer Stamp Card Details modal exactly */}
-            <View style={styles.flipCardContainer}>
-              {(() => {
-                const previewExpiryDate = new Date();
-                previewExpiryDate.setDate(previewExpiryDate.getDate() + (parseInt(expiryDays, 10) || 0));
-                const previewValidString = `${String(previewExpiryDate.getMonth() + 1).padStart(2, '0')}/${String(previewExpiryDate.getFullYear()).slice(-2)}`;
-                return (
-                  <>
-                  {/* Transparent placeholder so the container gets its aspect-ratio height */}
-                  <View style={{ width: '100%', aspectRatio: 1.586 }} />
-
-              {/* Front of Card */}
-              <Animated.View style={[styles.liveCardPreview, { backgroundColor: cardColor, backfaceVisibility: 'hidden', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, frontAnimatedStyle]}>
-                {bgImage ? (
-                  <Image source={{ uri: bgImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : null}
-                {/* Subtle metallic sheen: single diagonal + top edge */}
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
-                <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
-                {/* Header: merchant name + category + LOYALTY CARD badge */}
-                <View style={styles.cardPreviewHeader}>
-                  <View style={styles.previewShopLogoBg}>
-                    {merchantLogo ? (
-                      <Image source={{ uri: merchantLogo }} style={styles.previewShopLogo} resizeMode="cover" />
-                    ) : null}
-                  </View>
-                  <View style={styles.previewShopTextCol}>
-                    <Text style={[styles.previewShopName, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                      {merchant?.name || (locale === 'en' ? 'Your Shop' : 'Kedai Anda')}
-                    </Text>
-                    <Text style={[styles.previewShopCategory, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                      {(merchant?.category || (locale === 'en' ? 'FOOD' : 'MAKANAN')).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: fontColor || '#FFFFFF' }}>
-                      3/{requiredStamps}
-                    </Text>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: fontColor || '#FFFFFF', opacity: 0.75 }}>STAMPS</Text>
-                  </View>
-                </View>
-
-                {/* EMV Chip + Wifi */}
-                <View style={styles.cardMidRow}>
-                  <View style={styles.cardChip}>
-                    <View style={styles.chipLineHoriz} />
-                    <View style={styles.chipLineVert} />
-                    <View style={styles.chipCenterPin} />
-                  </View>
-                  <Ionicons name="wifi" size={18} color={fontColor || 'rgba(255,255,255,0.35)'} style={{ opacity: 0.35 }} />
-                </View>
-
-                <View style={{ flex: 1 }} />
-
-                {/* Footer: CARD HOLDER | VALID | CVV | brand badge */}
-                <View style={styles.cardBottomRow}>
-                  <View style={styles.holderBlock}>
-                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('card_holder')}</Text>
-                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]} numberOfLines={1}>
-                      {(user?.name || (locale === 'en' ? 'MERCHANT' : 'PENIAGA')).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.validBlock}>
-                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('valid')}</Text>
-                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>{previewValidString}</Text>
-                  </View>
-                  <View style={styles.cvvBlock}>
-                    <Text style={[styles.cardLabelText, { color: fontColor || '#FFFFFF', opacity: 0.5 }]}>{t('cvv')}</Text>
-                    <Text style={[styles.holderValueText, { color: fontColor || '#FFFFFF' }]}>888</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Image
-                      source={require('../../assets/risev logo.png')}
-                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: previewLogoTint }}
-                    />
-                  </View>
-                </View>
-              </Animated.View>
-
-              {/* Back of Card */}
-              <Animated.View style={[styles.liveCardPreview, { backgroundColor: cardColor, backfaceVisibility: 'hidden', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 0, gap: 0 }, backAnimatedStyle]}>
-                {bgImageBack ? (
-                  <Image source={{ uri: bgImageBack }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : null}
-                {/* Subtle metallic sheen: single diagonal + top edge */}
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
-                <View style={{ position: 'absolute', top: -300, right: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '-40deg' }], zIndex: 1, pointerEvents: 'none' }} />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
-
-                {/* Magnetic Stripe */}
-                <View style={{ width: '100%', height: 44, backgroundColor: '#111827', marginTop: 16, opacity: 0.95, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.15)', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, letterSpacing: 6 }} numberOfLines={1}>
-                    {(merchant?.name || (locale === 'en' ? 'Your Shop' : 'Kedai Anda')).toUpperCase()}
-                  </Text>
-                </View>
-
-                <View style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12, flex: 1 }}>
-                  {/* Minimalist Status Header */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, gap: 8 }}>
-                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: fontColor || '#FFFFFF', letterSpacing: 0.5, opacity: 0.7 }}>
-                      {locale === 'en' ? 'YOUR STAMPS' : 'SETEM ANDA'}
-                    </Text>
-                    <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: fontColor || '#FFFFFF' }}>
-                      3/{requiredStamps}
-                    </Text>
-                  </View>
-
-                  <View style={styles.previewGrid}>{renderPreviewStamps()}</View>
-                  
-                  <View style={{ position: 'absolute', bottom: 16, right: 24 }}>
-                    <Image
-                      source={require('../../assets/risev logo.png')}
-                      style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: previewLogoTint }}
-                    />
-                  </View>
-                </View>
-              </Animated.View>
-              {/* End of preview render block */}
-              </>
-              );})()}
-            </View>
-
-            <View style={{ alignItems: 'center', marginBottom: 24 }}>
-              <TouchableOpacity style={styles.flipBtn} onPress={flipCard} activeOpacity={0.8}>
-                <Ionicons name="sync-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
-                <Text style={styles.flipBtnText}>Tap card to flip</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Action Save Button */}
@@ -2644,38 +2645,33 @@ const styles = StyleSheet.create({
   },
   segmentRow: {
     flexDirection: 'row',
-    backgroundColor: '#171717',
-    borderRadius: 100,
-    padding: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
     marginTop: 16,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   segmentBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 100,
+    borderRadius: 8,
   },
   segmentBtnActive: {
-    backgroundColor: '#FFC700',
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   segmentText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#94A3B8',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
   segmentTextActive: {
-    color: '#1A1400',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   colorRow: {
     flexDirection: 'row',

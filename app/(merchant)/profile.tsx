@@ -1385,6 +1385,18 @@ export default function ProfileScreen() {
           />
 
           <SettingItem
+            iconName="star"
+            title="Google Reviews Integration"
+            subtitle="Setup your 1-click review popup"
+            iconBgColor="#FFFBEB"
+            iconColor="#F59E0B"
+            isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
+            onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
+              ? () => handleLockedItemPress('Google Reviews Integration')
+              : () => router.push('/(merchant)/google-reviews' as any)}
+          />
+
+          <SettingItem
             iconName="cart-outline"
             title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
             subtitle={locale === 'en' ? 'Explore NFC stand marketplace & plates' : 'Teroka pasaran stand & plat NFC'}
