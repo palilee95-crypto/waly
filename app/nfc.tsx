@@ -1711,6 +1711,43 @@ export default function NfcLandingScreen() {
             </View>
           </View>
         </ScrollView>
+
+        {/* WhatsApp Help FAB for Stand Setup */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.', '_blank');
+            } else {
+              Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.');
+            }
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            right: 24,
+            backgroundColor: '#FFFFFF',
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderBottomLeftRadius: 28,
+            borderBottomRightRadius: 8, // Chat bubble tail
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 10,
+            zIndex: 9999,
+          }}
+        >
+          <Ionicons name="chatbubble-ellipses" size={20} color="#050505" />
+          <Text style={{ color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, letterSpacing: 0.3, marginLeft: 8 }}>
+            Need Help?
+          </Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
