@@ -845,6 +845,28 @@ export default function UnifiedRewardsScreen() {
 
           return (
             <View style={{ flex: 1 }}>
+              {/* Catalogue Header & Action Bar */}
+              <View style={styles.catalogueActionBar}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.catalogueTitle}>
+                    {t('rewards_catalog')}
+                  </Text>
+                  <Text style={styles.catalogueSubtitle}>
+                    {locale === 'en' ? 'Manage point redemptions & rewards' : 'Urus penebusan mata & ganjaran'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.addRewardBtn}
+                  onPress={handleOpenCreate}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={18} color="#FFC700" />
+                  <Text style={styles.addRewardBtnText}>
+                    {t('create_reward')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Filter Pills Bar */}
               {rewards.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsContainer} style={{ marginBottom: 16 }}>
@@ -1791,6 +1813,17 @@ export default function UnifiedRewardsScreen() {
           )}
         </ScrollView>
 
+      {/* Floating Action Button for Adding Reward (Catalogue Tab) */}
+      {activeTab === 'catalogue' && (
+        <TouchableOpacity
+          style={[styles.fabBtn, isDesktop && styles.fabBtnDesktop]}
+          onPress={handleOpenCreate}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={28} color="#050505" />
+        </TouchableOpacity>
+      )}
+
       {/* Save Reward Modal */}
       <Modal
         visible={modalVisible}
@@ -2026,13 +2059,64 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.4,
   },
-  addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+  catalogueActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  catalogueTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  catalogueSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  addRewardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#050505',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  addRewardBtnText: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+  },
+  fabBtn: {
+    position: 'absolute',
+    bottom: 85,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFC700',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 99,
+  },
+  fabBtnDesktop: {
+    right: 32,
+    bottom: 32,
   },
   scrollContent: {
     paddingHorizontal: 16,
