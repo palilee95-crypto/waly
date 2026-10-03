@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { handleSmartBack } from '@/lib/navigation';
 import * as Clipboard from 'expo-clipboard';
 
 interface Branch {
@@ -409,7 +410,7 @@ export default function BranchesScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => router.back()}
+              onPress={() => handleSmartBack(router, '/(merchant)/profile')}
               activeOpacity={0.8}
             >
               <Ionicons name="arrow-back" size={20} color="#FFFFFF" />

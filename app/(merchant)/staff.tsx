@@ -21,6 +21,7 @@ import { colors, radii } from '@/theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { handleSmartBack } from '@/lib/navigation';
 
 export interface StaffAnomalyTx {
   id: string;
@@ -465,7 +466,7 @@ export default function StaffManagementScreen() {
         {/* Header */}
         <View style={[styles.header, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => handleSmartBack(router, '/(merchant)/profile')} activeOpacity={0.8}>
               <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{t('manage_staff')}</Text>
@@ -487,8 +488,11 @@ export default function StaffManagementScreen() {
             onPress={() => setActiveTab('members')}
             activeOpacity={0.8}
           >
-            <Ionicons name="people" size={16} color={activeTab === 'members' ? '#050505' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'members' && styles.tabBtnTextActive]}>
+            <Ionicons name="people" size={15} color={activeTab === 'members' ? '#050505' : '#64748B'} />
+            <Text 
+              style={[styles.tabBtnText, activeTab === 'members' && styles.tabBtnTextActive]}
+              numberOfLines={1}
+            >
               {locale === 'en' ? 'Staff Members' : 'Senarai Staf'}
             </Text>
           </TouchableOpacity>
@@ -498,9 +502,12 @@ export default function StaffManagementScreen() {
             onPress={() => setActiveTab('performance')}
             activeOpacity={0.8}
           >
-            <Ionicons name="trophy" size={16} color={activeTab === 'performance' ? '#050505' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'performance' && styles.tabBtnTextActive]}>
-              {locale === 'en' ? 'Performance Rank' : 'Prestasi Staf'}
+            <Ionicons name="trophy" size={15} color={activeTab === 'performance' ? '#050505' : '#64748B'} />
+            <Text 
+              style={[styles.tabBtnText, activeTab === 'performance' && styles.tabBtnTextActive]}
+              numberOfLines={1}
+            >
+              {locale === 'en' ? 'Rankings' : 'Prestasi'}
             </Text>
           </TouchableOpacity>
 
@@ -509,8 +516,11 @@ export default function StaffManagementScreen() {
             onPress={() => setActiveTab('settings')}
             activeOpacity={0.8}
           >
-            <Ionicons name="shield-checkmark" size={16} color={activeTab === 'settings' ? '#050505' : '#64748B'} />
-            <Text style={[styles.tabBtnText, activeTab === 'settings' && styles.tabBtnTextActive]}>
+            <Ionicons name="shield-checkmark" size={15} color={activeTab === 'settings' ? '#050505' : '#64748B'} />
+            <Text 
+              style={[styles.tabBtnText, activeTab === 'settings' && styles.tabBtnTextActive]}
+              numberOfLines={1}
+            >
               {locale === 'en' ? 'Permissions' : 'Kebenaran'}
             </Text>
           </TouchableOpacity>
@@ -1710,28 +1720,34 @@ const styles = StyleSheet.create({
   },
   tabBarWrapper: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 100,
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 4,
+    gap: 3,
   },
   tabBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 100,
   },
   tabBtnActive: {
     backgroundColor: '#FFC700',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tabBtnText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#64748B',
   },

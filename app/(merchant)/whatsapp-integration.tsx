@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { handleSmartBack } from '../../lib/navigation';
 import { pb } from '../../lib/pocketbase';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -233,7 +234,7 @@ export default function WhatsappIntegration() {
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => handleSmartBack(router, '/(merchant)/marketing')} style={styles.backButton} activeOpacity={0.8}>
             <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>WhatsApp Cloud API</Text>

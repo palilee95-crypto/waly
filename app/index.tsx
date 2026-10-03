@@ -1004,22 +1004,28 @@ export default function LandingPage() {
           )}
 
           {/* Right: Actions */}
-          <View style={styles.navActions}>
+          <View style={[styles.navActions, isMobile && { gap: 12 }]}>
             {!isMobile && (
               <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
                 <Text style={styles.loginText}>Login</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity 
-              style={styles.ctaButton}
-              onPress={() => router.push('/(auth)/login')} // Or to merchant onboarding
+              style={[styles.ctaButton, isMobile && styles.ctaButtonMobile]}
+              onPress={() => {
+                if (isMobile) {
+                  router.push('/(auth)/login');
+                } else {
+                  scrollToSection('pricing');
+                }
+              }}
             >
-              <Text style={styles.ctaText}>Get Your Stand</Text>
+              <Text style={styles.ctaText}>{isMobile ? 'Login' : 'Get Your Stand'}</Text>
             </TouchableOpacity>
             {/* Mobile Sidebar Toggle */}
             {isMobile && (
               <TouchableOpacity 
-                style={{ marginLeft: 8 }}
+                style={{ marginLeft: 4 }}
                 onPress={() => setSidebarOpen(true)}
               >
                 <Feather name="menu" size={28} color="#000" />
@@ -1062,13 +1068,23 @@ export default function LandingPage() {
 
             <View style={styles.sidebarFooter}>
               <TouchableOpacity 
+                style={[styles.ctaButton, { alignItems: 'center', marginBottom: 12, paddingVertical: 14 }]}
+                onPress={() => {
+                  setSidebarOpen(false);
+                  setTimeout(() => scrollToSection('pricing'), 100);
+                }}
+              >
+                <Text style={styles.ctaText}>Get Your Stand</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
                 style={styles.sidebarLoginBtn}
                 onPress={() => {
                   setSidebarOpen(false);
                   router.push('/(auth)/login');
                 }}
               >
-                <Text style={styles.sidebarLoginText}>Login</Text>
+                <Text style={styles.sidebarLoginText}>Login to Dashboard</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1096,10 +1112,16 @@ export default function LandingPage() {
 
           {/* CTA Buttons */}
           <View style={styles.heroActionGroup}>
-            <TouchableOpacity style={[styles.heroPrimaryBtn, isMobile && styles.heroBtnMobile]}>
+            <TouchableOpacity 
+              style={[styles.heroPrimaryBtn, isMobile && styles.heroBtnMobile]}
+              onPress={() => scrollToSection('pricing')}
+            >
               <Text style={[styles.heroPrimaryBtnText, isMobile && styles.heroBtnTextMobile]}>Get Your Stand</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.heroSecondaryBtn, isMobile && styles.heroBtnMobile]}>
+            <TouchableOpacity 
+              style={[styles.heroSecondaryBtn, isMobile && styles.heroBtnMobile]}
+              onPress={() => scrollToSection('pricing')}
+            >
               <Text style={[styles.heroSecondaryBtnText, isMobile && styles.heroBtnTextMobile]}>View Pricing</Text>
             </TouchableOpacity>
           </View>
@@ -1437,6 +1459,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 100, // Pill shape
+  },
+  ctaButtonMobile: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   ctaText: {
     fontFamily: 'Outfit_700Bold',

@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { handleSmartBack } from '@/lib/navigation';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
@@ -338,7 +339,7 @@ export default function CreateTemplateScreen() {
     else if (currentStep === 4) setCurrentStep(3);
     else if (currentStep === 3) setCurrentStep(2);
     else if (currentStep === 2) setCurrentStep(1);
-    else router.back();
+    else handleSmartBack(router, '/(merchant)/marketing');
   };
 
   const handleCreateTemplate = async () => {

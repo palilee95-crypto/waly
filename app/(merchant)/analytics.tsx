@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { useRouter } from 'expo-router';
+import { handleSmartBack } from '@/lib/navigation';
 import Svg, { Circle, G, Defs, LinearGradient, Stop, Path, Polyline } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
@@ -784,7 +785,7 @@ export default function AnalyticsScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16, backgroundColor: '#050505' }}>
           <TouchableOpacity 
-            onPress={() => router.back()} 
+            onPress={() => handleSmartBack(router, '/(merchant)')} 
             style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.8}
           >
@@ -847,7 +848,7 @@ export default function AnalyticsScreen() {
         {/* 🧭 Subscription-Style Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, marginTop: 10, marginBottom: 20, width: '100%' }}>
           <TouchableOpacity 
-            onPress={() => router.back()} 
+            onPress={() => handleSmartBack(router, '/(merchant)')} 
             style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
             activeOpacity={0.8}
           >

@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radii, shadows } from '@/theme';
+import { colors, radii } from '@/theme';
 import {
   isPushSupported,
   getPushPermissionStatus,
@@ -50,7 +50,7 @@ export default function PushNotificationPrompt({
       const result = await subscribeToPushNotifications({ merchantId, branchId });
       if (result.success) {
         setStatus('granted');
-        setSuccessMessage('Notifications enabled! You will be alerted when customers tap NFC.');
+        setSuccessMessage('Real-time alerts active! Sound will chime on every NFC claim.');
         // Auto-dismiss success message after 5 seconds
         setTimeout(() => {
           setDismissed(true);
@@ -78,11 +78,9 @@ export default function PushNotificationPrompt({
   if (successMessage) {
     return (
       <View style={styles.successContainer}>
-        <View style={styles.successIconWrapper}>
-          <Ionicons name="checkmark-circle" size={22} color={colors.success.DEFAULT} />
-        </View>
-        <View style={styles.textWrapper}>
-          <Text style={styles.successTitle}>Notifications Active 🔔</Text>
+        <Ionicons name="checkmark-circle" size={20} color="#22C55E" style={{ marginRight: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.successTitle}>Alerts Active 🔔</Text>
           <Text style={styles.successBody}>{successMessage}</Text>
         </View>
         <TouchableOpacity style={styles.testButton} onPress={handleTestNotification}>
@@ -96,32 +94,39 @@ export default function PushNotificationPrompt({
     <View style={styles.container}>
       <View style={styles.contentRow}>
         <View style={styles.iconCircle}>
-          <Ionicons name="notifications" size={22} color={colors.primary.DEFAULT} />
+          <Ionicons name="notifications" size={18} color="#FFC700" />
         </View>
+
         <View style={styles.textWrapper}>
-          <Text style={styles.title}>Never Miss an NFC Tap</Text>
+          <Text style={styles.title}>Enable NFC Tap Alerts</Text>
           <Text style={styles.description}>
-            Enable device notifications to get alerted with sound & vibration even when your screen is locked.
+            Get instant sound & lock-screen alerts whenever a customer claims stamps at your stand.
           </Text>
         </View>
-        <TouchableOpacity style={styles.closeIcon} onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="close" size={18} color={colors.text.muted} />
+
+        <TouchableOpacity 
+          style={styles.closeIcon} 
+          onPress={handleDismiss} 
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Ionicons name="close" size={16} color="#6B7280" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.dismissButton} onPress={handleDismiss} disabled={loading}>
-          <Text style={styles.dismissText}>Maybe Later</Text>
+        <TouchableOpacity onPress={handleDismiss} disabled={loading} style={styles.dismissBtn}>
+          <Text style={styles.dismissText}>Maybe later</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.enableButton} onPress={handleEnable} disabled={loading}>
+        <TouchableOpacity 
+          style={[styles.enableButton, loading && { opacity: 0.8 }]} 
+          onPress={handleEnable} 
+          disabled={loading}
+        >
           {loading ? (
             <ActivityIndicator size="small" color="#000000" />
           ) : (
-            <>
-              <Ionicons name="notifications-outline" size={16} color="#000000" style={{ marginRight: 6 }} />
-              <Text style={styles.enableText}>Enable Notifications</Text>
-            </>
+            <Text style={styles.enableText}>Enable Alerts</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -131,91 +136,90 @@ export default function PushNotificationPrompt({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0F172A', // Dark sleek slate
-    borderRadius: radii.lg,
-    padding: spacing[4],
-    marginHorizontal: spacing[4],
-    marginBottom: spacing[4],
+    backgroundColor: '#0D0D0E',
+    borderRadius: 18,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    ...shadows.md,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 199, 0, 0.15)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 199, 0, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing[3],
+    marginRight: 12,
   },
   textWrapper: {
     flex: 1,
+    paddingRight: 8,
   },
   title: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 14,
+    fontSize: 14.5,
     color: '#FFFFFF',
     marginBottom: 2,
   },
   description: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 12,
-    color: '#94A3B8',
-    lineHeight: 16,
+    color: '#9CA3AF',
+    lineHeight: 17,
   },
   closeIcon: {
     padding: 2,
-    marginLeft: spacing[2],
   },
+
+  /* Action Buttons */
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: spacing[3],
-    gap: spacing[2],
+    marginTop: 14,
+    gap: 16,
   },
-  dismissButton: {
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
-    borderRadius: radii.md,
+  dismissBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   dismissText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: 12.5,
+    color: '#9CA3AF',
   },
   enableButton: {
     backgroundColor: colors.primary.DEFAULT,
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[4],
-    borderRadius: radii.md,
-    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   enableText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#000000',
   },
+
+  /* Success Banner State */
   successContainer: {
-    backgroundColor: '#064E3B', // Deep green
-    borderRadius: radii.lg,
-    padding: spacing[3.5],
-    marginHorizontal: spacing[4],
-    marginBottom: spacing[4],
+    backgroundColor: '#0B1A12',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#059669',
-  },
-  successIconWrapper: {
-    marginRight: spacing[3],
+    borderColor: 'rgba(34, 197, 94, 0.3)',
   },
   successTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -224,20 +228,20 @@ const styles = StyleSheet.create({
   },
   successBody: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11,
-    color: '#A7F3D0',
-    marginTop: 1,
+    fontSize: 11.5,
+    color: '#86EFAC',
   },
   testButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radii.sm,
-    marginLeft: spacing[2],
+    paddingHorizontal: 12,
+    borderRadius: radii.full,
+    marginLeft: 10,
   },
   testButtonText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#FFFFFF',
   },
 });
+

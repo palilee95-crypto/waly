@@ -959,6 +959,7 @@ export default function MerchantLayout() {
   return (
     <View style={styles.container}>
       <Tabs
+        backBehavior="history"
         tabBar={(props) => <CustomMerchantTabBar {...props} isSidebarExpanded={isSidebarExpanded} toggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} sidebarWidth={sidebarWidth} />}
         screenOptions={{
           headerShown: false,

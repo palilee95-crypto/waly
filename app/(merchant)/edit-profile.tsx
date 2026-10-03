@@ -20,6 +20,7 @@ import { colors } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
+import { handleSmartBack } from '@/lib/navigation';
 import { pb } from '@/lib/pocketbase';
 
 export default function EditProfileScreen() {
@@ -570,7 +571,7 @@ export default function EditProfileScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => handleSmartBack(router, '/(merchant)/profile')} activeOpacity={0.8}>
               <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{t('edit_store_profile')}</Text>
@@ -611,7 +612,7 @@ export default function EditProfileScreen() {
       {/* Custom Header Bar */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => handleSmartBack(router, '/(merchant)/profile')} activeOpacity={0.8}>
             <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('edit_store_profile')}</Text>
@@ -1115,7 +1116,7 @@ export default function EditProfileScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} disabled={isSaving}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => handleSmartBack(router, '/(merchant)/profile')} disabled={isSaving}>
             <Text style={styles.cancelBtnText}>{t('cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
@@ -1153,7 +1154,7 @@ export default function EditProfileScreen() {
               style={styles.successModalBtn}
               onPress={() => {
                 setShowSuccessModal(false);
-                router.back();
+                handleSmartBack(router, '/(merchant)/profile');
               }}
               activeOpacity={0.8}
             >
