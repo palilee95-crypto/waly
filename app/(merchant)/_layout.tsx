@@ -13,6 +13,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import SubscriptionScreen from './subscription';
 import { playClaimChime } from '@/lib/audioChime';
@@ -276,6 +277,7 @@ export default function MerchantLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout, switchRole } = useAuth();
+  const { locale } = useLanguage();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const [isPaying, setIsPaying] = React.useState(false);
@@ -983,6 +985,53 @@ export default function MerchantLayout() {
         <Tabs.Screen name="whatsapp-integration" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
+
+      {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => {
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
+          } else {
+            Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.');
+          }
+        }}
+        style={{
+          position: 'absolute',
+          bottom: isDesktop ? 40 : 100,
+          right: 24,
+          shadowColor: '#050505',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.25,
+          shadowRadius: 12,
+          elevation: 8,
+          zIndex: 9999,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          borderBottomLeftRadius: 28,
+          borderBottomRightRadius: 8, // Chat bubble tail
+          overflow: 'hidden', // Important for BlurView
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.4)', // Glass edge reflection
+        }}
+      >
+        <BlurView
+          intensity={60}
+          tint="light"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            backgroundColor: 'rgba(255, 199, 0, 0.75)', // Risev yellow glass
+          }}
+        >
+          <Ionicons name="chatbubble-ellipses" size={20} color="#050505" />
+          <Text style={{ color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, letterSpacing: 0.3, marginLeft: 8 }}>
+            {locale === 'en' ? 'Need Help?' : 'Perlu Bantuan?'}
+          </Text>
+        </BlurView>
+      </TouchableOpacity>
     </View>
   );
 }

@@ -808,117 +808,106 @@ export default function UnifiedRewardsScreen() {
           />
         </View>
 
-        {/* Intro */}
-        <View style={[styles.introSection, { zIndex: 1 }]}>
-          <Text style={[styles.screenTitle, { color: '#FFFFFF' }]}>{t('rewards_loyalty_setup')}</Text>
-          <Text style={[styles.screenSubtitle, { color: '#94A3B8' }]}>
-            {t('rewards_loyalty_setup_desc')}
-          </Text>
-        </View>
 
         {/* Loyalty Program Modules Toggle Card */}
         <View style={styles.modulesConfigCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="options-outline" size={18} color="#FFC700" />
+              <Ionicons name="options-outline" size={18} color="#050505" />
               <Text style={styles.modulesCardTitle}>
                 {locale === 'en' ? 'Loyalty Program Modules' : 'Modul Program Kesetiaan'}
               </Text>
             </View>
             {savingLoyaltyModules && (
-              <ActivityIndicator size="small" color="#FFC700" />
+              <ActivityIndicator size="small" color="#050505" />
             )}
           </View>
 
-          <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             {/* Toggle 1: Stamp Cards */}
-            <View style={styles.moduleRow}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="card-outline" size={16} color={enableStamps ? '#10B981' : '#94A3B8'} />
-                  <Text style={[styles.moduleName, !enableStamps && { color: '#94A3B8' }]}>
-                    {locale === 'en' ? 'Stamp Cards' : 'Kad Setem'}
-                  </Text>
+            <View style={{ flex: 1, backgroundColor: enableStamps ? '#FFFFFF' : 'rgba(5, 5, 5, 0.05)', borderWidth: 1, borderColor: enableStamps ? '#FFFFFF' : 'transparent', borderRadius: 16, padding: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: enableStamps ? 'rgba(16, 185, 129, 0.15)' : 'rgba(5, 5, 5, 0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={enableStamps ? "card" : "card-outline"} size={18} color={enableStamps ? '#10B981' : 'rgba(5, 5, 5, 0.6)'} />
                 </View>
-                <Text style={styles.moduleDesc}>
-                  {locale === 'en' ? 'Digital punch cards with milestone rewards' : 'Kad tebuk digital dengan ganjaran pencapaian'}
-                </Text>
-              </View>
-              <Switch
-                value={enableStamps}
-                onValueChange={async (val) => {
-                  if (!val && !enablePoints) {
-                    Alert.alert(
-                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
-                      locale === 'en' 
-                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
-                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
-                    );
-                    return;
-                  }
-                  setEnableStamps(val);
-                  if (!val && activeTab === 'card_design') {
-                    setActiveTab(enablePoints ? 'catalogue' : 'birthday');
-                  }
-                  if (programId) {
-                    try {
-                      setSavingLoyaltyModules(true);
-                      await pb.collection('loyalty_programs').update(programId, { enable_stamps: val });
-                    } catch (err) {
-                      console.warn("Failed to toggle stamps:", err);
-                    } finally {
-                      setSavingLoyaltyModules(false);
+                <Switch
+                  value={enableStamps}
+                  onValueChange={async (val) => {
+                    if (!val && !enablePoints) {
+                      Alert.alert(
+                        locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                        locale === 'en' 
+                          ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                          : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                      );
+                      return;
                     }
-                  }
-                }}
-                trackColor={{ false: '#334155', true: '#FFC700' }}
-                thumbColor="#FFFFFF"
-              />
+                    setEnableStamps(val);
+                    if (!val && activeTab === 'card_design') {
+                      setActiveTab(enablePoints ? 'catalogue' : 'birthday');
+                    }
+                    if (programId) {
+                      try {
+                        setSavingLoyaltyModules(true);
+                        await pb.collection('loyalty_programs').update(programId, { enable_stamps: val });
+                      } catch (err) {
+                        console.warn("Failed to toggle stamps:", err);
+                      } finally {
+                        setSavingLoyaltyModules(false);
+                      }
+                    }
+                  }}
+                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#10B981' }}
+                  thumbColor="#FFFFFF"
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                {locale === 'en' ? 'Stamp Cards' : 'Kad Setem'}
+              </Text>
             </View>
 
             {/* Toggle 2: Points & Tiers */}
-            <View style={styles.moduleRow}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="star-outline" size={16} color={enablePoints ? '#FFC700' : '#94A3B8'} />
-                  <Text style={[styles.moduleName, !enablePoints && { color: '#94A3B8' }]}>
-                    {locale === 'en' ? 'Points & Tiers' : 'Mata & Tahap'}
-                  </Text>
+            <View style={{ flex: 1, backgroundColor: enablePoints ? '#FFFFFF' : 'rgba(5, 5, 5, 0.05)', borderWidth: 1, borderColor: enablePoints ? '#FFFFFF' : 'transparent', borderRadius: 16, padding: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: enablePoints ? 'rgba(217, 119, 6, 0.15)' : 'rgba(5, 5, 5, 0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={enablePoints ? "star" : "star-outline"} size={18} color={enablePoints ? '#D97706' : 'rgba(5, 5, 5, 0.6)'} />
                 </View>
-                <Text style={styles.moduleDesc}>
-                  {locale === 'en' ? 'Spend-based points (RM 1 = 1 Pt), VIP tiers & catalogue' : 'Mata perbelanjaan, tahap VIP & katalog'}
-                </Text>
-              </View>
-              <Switch
-                value={enablePoints}
-                onValueChange={async (val) => {
-                  if (!val && !enableStamps) {
-                    Alert.alert(
-                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
-                      locale === 'en' 
-                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
-                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
-                    );
-                    return;
-                  }
-                  setEnablePoints(val);
-                  if (!val && (activeTab === 'catalogue' || activeTab === 'points_tiers')) {
-                    setActiveTab(enableStamps ? 'card_design' : 'birthday');
-                  }
-                  if (programId) {
-                    try {
-                      setSavingLoyaltyModules(true);
-                      await pb.collection('loyalty_programs').update(programId, { enable_points: val });
-                    } catch (err) {
-                      console.warn("Failed to toggle points:", err);
-                    } finally {
-                      setSavingLoyaltyModules(false);
+                <Switch
+                  value={enablePoints}
+                  onValueChange={async (val) => {
+                    if (!val && !enableStamps) {
+                      Alert.alert(
+                        locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                        locale === 'en' 
+                          ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                          : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                      );
+                      return;
                     }
-                  }
-                }}
-                trackColor={{ false: '#334155', true: '#FFC700' }}
-                thumbColor="#FFFFFF"
-              />
+                    setEnablePoints(val);
+                    if (!val && (activeTab === 'catalogue' || activeTab === 'points_tiers')) {
+                      setActiveTab(enableStamps ? 'card_design' : 'birthday');
+                    }
+                    if (programId) {
+                      try {
+                        setSavingLoyaltyModules(true);
+                        await pb.collection('loyalty_programs').update(programId, { enable_points: val });
+                      } catch (err) {
+                        console.warn("Failed to toggle points:", err);
+                      } finally {
+                        setSavingLoyaltyModules(false);
+                      }
+                    }
+                  }}
+                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#D97706' }}
+                  thumbColor="#FFFFFF"
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                {locale === 'en' ? 'Points & Tiers' : 'Mata & Tahap'}
+              </Text>
             </View>
           </View>
         </View>
@@ -1172,20 +1161,6 @@ export default function UnifiedRewardsScreen() {
         {/* TAB 2: Card Customizer */}
         {activeTab === 'card_design' && (
           <View style={{ marginTop: 12, gap: 16 }}>
-            {/* Toggle Program Status */}
-            <View style={[styles.configCard, { paddingVertical: 16 }]}>
-              <View style={[styles.toggleRow, { alignItems: 'center' }]}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.cardSectionTitle, { marginBottom: 0 }]}>{t('enable_loyalty_program')}</Text>
-                </View>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ false: '#E2E8F0', true: '#050505' }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-            </View>
 
             {/* Live Visual Preview Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 24 }}>
@@ -2048,16 +2023,7 @@ export default function UnifiedRewardsScreen() {
           )}
         </ScrollView>
 
-      {/* Floating Action Button for Adding Reward (Catalogue Tab) */}
-      {activeTab === 'catalogue' && (
-        <TouchableOpacity
-          style={[styles.fabBtn, isDesktop && styles.fabBtnDesktop]}
-          onPress={handleOpenCreate}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={28} color="#050505" />
-        </TouchableOpacity>
-      )}
+
 
       {/* Save Reward Modal */}
       <Modal
@@ -2359,22 +2325,20 @@ const styles = StyleSheet.create({
     paddingBottom: 140,
   },
   modulesConfigCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#FFC700',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowRadius: 20,
+    elevation: 6,
   },
   modulesCardTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#050505',
     letterSpacing: 0.3,
   },
   moduleRow: {

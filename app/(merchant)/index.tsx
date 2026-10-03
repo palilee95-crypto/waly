@@ -24,7 +24,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
-import MerchantNoticeCarousel from '@/components/MerchantNoticeCarousel';
+
 
 
 const { width } = Dimensions.get('window');
@@ -636,12 +636,6 @@ export default function MerchantDashboard() {
 
 
 
-        {/* 📢 AUTO-ROTATING ANNOUNCEMENT CAROUSEL (Tutorials, Free Quota, Promos, Updates) */}
-        <MerchantNoticeCarousel
-          merchant={merchant}
-          locale={locale}
-          onOpenUpgrade={() => setShowUpgradeModal(true)}
-        />
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>
