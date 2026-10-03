@@ -1,13 +1,8 @@
 const { createNotification } = require(`${__hooks}/notification_helper.js`);
 
 onRecordCreate((e) => {
-  if (e.record.get('type') !== 'earn') return e.next();
-
-  const customerId = e.record.get('customer');
-  const merchantId = e.record.get('merchant');
-  const cardId = e.record.get('loyalty_card');
-
-  if (!cardId) return e.next();
+  // Membership tiers removed in favor of customizable flat points rules
+  return e.next();
 
   const now = new Date();
   const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();

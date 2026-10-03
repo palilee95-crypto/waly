@@ -43,12 +43,33 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       return e.json(403, { message: "Forbidden. You are not authorized to confirm claims for this store." });
     }
 
-    if (stampAmount < 1 || stampAmount > 100) {
-      return e.json(400, { message: "Invalid stamp amount. Must be between 1 and 100." });
-    }
-
     if (billAmount < 0) {
       return e.json(400, { message: "Bill amount cannot be negative." });
+    }
+
+    // Fetch loyalty program to know active modes
+    const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
+    let program = programs.length > 0 ? programs[0] : null;
+    if (!program) {
+      const progCol = $app.findCollectionByNameOrId("loyalty_programs");
+      program = new Record(progCol);
+      program.set("id", $security.randomString(15).toLowerCase());
+      program.set("merchant", merchantId);
+      program.set("name", "Standard Loyalty Card");
+      program.set("stamp_goal", 10);
+      program.set("status", "active");
+      program.set("is_active", true);
+      program.set("reward_name", "Free Reward");
+      program.set("reward_description", "Free reward upon completing stamp card");
+      $app.save(program);
+    }
+
+    const isStampsEnabled = program.get("enable_stamps") !== false;
+    const isPointsEnabled = program.get("enable_points") !== false;
+    const actualStamps = isStampsEnabled ? stampAmount : 0;
+
+    if (isStampsEnabled && (stampAmount < 1 || stampAmount > 100)) {
+      return e.json(400, { message: "Invalid stamp amount. Must be between 1 and 100." });
     }
 
     const cleanPhone = claim.getString("customer_phone");
@@ -84,23 +105,6 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
     }
 
-    // 2. Find or auto-create merchant's loyalty program
-    const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
-    let program = programs.length > 0 ? programs[0] : null;
-    if (!program) {
-      const progCol = $app.findCollectionByNameOrId("loyalty_programs");
-      program = new Record(progCol);
-      program.set("id", $security.randomString(15).toLowerCase());
-      program.set("merchant", merchantId);
-      program.set("name", "Standard Loyalty Card");
-      program.set("stamp_goal", 10);
-      program.set("status", "active");
-      program.set("is_active", true);
-      program.set("reward_name", "Free Reward");
-      program.set("reward_description", "Free reward upon completing stamp card");
-      $app.save(program);
-    }
-
     const programId = program.id;
     const goal = parseInt(program.get("stamp_goal")) || 10;
 
@@ -126,8 +130,10 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
 
       const currentStamps = parseInt(card.get("stamps_collected")) || parseInt(card.get("stamps")) || 0;
-      const totalStamps = currentStamps + stampAmount;
-      card.set("stamps_collected", totalStamps);
+      const totalStamps = isStampsEnabled ? (currentStamps + actualStamps) : currentStamps;
+      if (isStampsEnabled) {
+        card.set("stamps_collected", totalStamps);
+      }
       card.set("last_activity", new Date().toISOString().replace('T', ' ').substring(0, 19));
       $app.save(card);
 
@@ -142,7 +148,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         const txn = new Record(txnCol);
         txn.set("id", $security.randomString(15).toLowerCase());
         txn.set("type", "earn");
-        txn.set("stamps", stampAmount);
+        txn.set("stamps", actualStamps);
         txn.set("bill_amount", billAmount);
         txn.set("customer", customer.id);
         txn.set("merchant", merchantId);
@@ -165,7 +171,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       // 5. Update nfc_claim record to completed
       claim.set("status", "completed");
       claim.set("bill_amount", billAmount);
-      claim.set("stamp_amount", stampAmount);
+      claim.set("stamp_amount", actualStamps);
       claim.set("handled_by", staffId);
       claim.set("staff_name", staffName);
       if (customer) claim.set("customer", customer.id);

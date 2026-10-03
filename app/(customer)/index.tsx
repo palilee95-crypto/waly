@@ -46,6 +46,8 @@ type LoyaltyCardItem = {
   tier?: string;
   merchantId?: string;
   linkedRewardId?: string;
+  enable_stamps?: boolean;
+  enable_points?: boolean;
 };
 
 const stampIcons = [
@@ -187,6 +189,8 @@ export default function CustomerDashboard() {
           tier: rec.tier || 'bronze',
           merchantId: merchant?.id,
           linkedRewardId: program?.linked_reward,
+          enable_stamps: program?.enable_stamps,
+          enable_points: program?.enable_points,
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'] as string[],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
@@ -864,12 +868,21 @@ export default function CustomerDashboard() {
                               {item.category.toUpperCase()}
                             </Text>
                           </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
-                              {item.collectedStamps}/{item.totalStamps}
-                            </Text>
-                            <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
-                          </View>
+                          {item.enable_stamps === false && item.enable_points === true ? (
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={[{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }, item.fontColor && { color: item.fontColor }]}>
+                                {item.points.toLocaleString()}
+                              </Text>
+                              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>POINTS</Text>
+                            </View>
+                          ) : (
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
+                                {item.collectedStamps}/{item.totalStamps}
+                              </Text>
+                              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
+                            </View>
+                          )}
                         </View>
 
                         {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
@@ -1047,7 +1060,11 @@ export default function CustomerDashboard() {
           {selectedCard && (
             <View style={[styles.detailContent, isDesktop && { maxWidth: 500, width: '90%', borderRadius: 32, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, borderTopWidth: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.2, shadowRadius: 25, elevation: 10 }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.detailModalTitle}>Stamp Card Details</Text>
+                <Text style={styles.detailModalTitle}>
+                  {selectedCard.enable_stamps === false && selectedCard.enable_points === true
+                    ? 'VIP Points Card Details'
+                    : 'Stamp Card Details'}
+                </Text>
                 <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.closeBtn}>
                   <Ionicons name="close" size={24} color="#0b1c30" />
                 </TouchableOpacity>
@@ -1069,68 +1086,74 @@ export default function CustomerDashboard() {
                   </View>
                 </View>
 
-                {/* Points & Tier Info Section */}
-                <View style={styles.pointsTierCard}>
-                  <View style={styles.pointsTierInfo}>
-                    <Text style={styles.pointsTierTitle}>Points Balance</Text>
-                    <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
-                  </View>
-                  <View style={[styles.tierBadge, { backgroundColor: getTierColor(selectedCard.tier) }]}>
-                    <Ionicons name="ribbon" size={14} color="#FFFFFF" />
-                    <Text style={styles.tierBadgeText}>{(selectedCard.tier || 'bronze').toUpperCase()}</Text>
-                  </View>
-                </View>
-
-                {/* Reward description card */}
-                <View style={styles.rewardDetailPanel}>
-                  <View style={styles.rewardIconBg}>
-                    <Ionicons name="gift" size={22} color="#FFFFFF" />
-                  </View>
-                  <View style={styles.rewardDetailInfo}>
-                    <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
-                    <Text style={styles.rewardDetailSub}>
-                      Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Points Catalog Section */}
-                <View style={styles.catalogSection}>
-                  <Text style={styles.catalogTitle}>Points Catalog</Text>
-                  <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
-                  
-                  {loadingRewards ? (
-                    <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
-                  ) : merchantRewards.length === 0 ? (
-                    <View style={styles.emptyCatalogCard}>
-                      <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                {/* Points & Tier Info Section (Hidden in Stamps-Only Mode) */}
+                {selectedCard.enable_points !== false && (
+                  <View style={styles.pointsTierCard}>
+                    <View style={styles.pointsTierInfo}>
+                      <Text style={styles.pointsTierTitle}>Points Balance</Text>
+                      <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
                     </View>
-                  ) : (
-                    <View style={styles.catalogList}>
-                      {merchantRewards.map((reward: any) => (
-                        <View key={reward.id} style={styles.catalogItem}>
-                          <View style={{ flex: 1, marginRight: 12 }}>
-                            <Text style={styles.catalogItemName}>{reward.name}</Text>
-                            <Text style={styles.catalogItemCost}>{reward.points_cost} Points</Text>
-                            {reward.description ? (
-                              <Text style={styles.catalogItemDesc}>{reward.description}</Text>
-                            ) : null}
+                    <View style={[styles.tierBadge, { backgroundColor: '#FFC700' }]}>
+                      <Ionicons name="sparkles" size={13} color="#1A1400" />
+                      <Text style={[styles.tierBadgeText, { color: '#1A1400' }]}>VIP MEMBER</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Reward description card (Hidden in Points-Only Mode) */}
+                {selectedCard.enable_stamps !== false && (
+                  <View style={styles.rewardDetailPanel}>
+                    <View style={styles.rewardIconBg}>
+                      <Ionicons name="gift" size={22} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.rewardDetailInfo}>
+                      <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
+                      <Text style={styles.rewardDetailSub}>
+                        Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Points Catalog Section (Hidden in Stamps-Only Mode) */}
+                {selectedCard.enable_points !== false && (
+                  <View style={styles.catalogSection}>
+                    <Text style={styles.catalogTitle}>Points Catalog</Text>
+                    <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
+                    
+                    {loadingRewards ? (
+                      <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
+                    ) : merchantRewards.length === 0 ? (
+                      <View style={styles.emptyCatalogCard}>
+                        <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.catalogList}>
+                        {merchantRewards.map((reward: any) => (
+                          <View key={reward.id} style={styles.catalogItem}>
+                            <View style={{ flex: 1, marginRight: 12 }}>
+                              <Text style={styles.catalogItemName}>{reward.name}</Text>
+                              <Text style={styles.catalogItemCost}>{reward.points_cost} Points</Text>
+                              {reward.description ? (
+                                <Text style={styles.catalogItemDesc}>{reward.description}</Text>
+                              ) : null}
+                            </View>
+                            <TouchableOpacity
+                              style={[
+                                styles.redeemBtn,
+                                selectedCard.points < reward.points_cost && styles.redeemBtnDisabled
+                              ]}
+                              disabled={selectedCard.points < reward.points_cost}
+                              onPress={() => handleRedeemReward(reward)}
+                            >
+                              <Text style={styles.redeemBtnText}>Redeem</Text>
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            style={[
-                              styles.redeemBtn,
-                              selectedCard.points < reward.points_cost && styles.redeemBtnDisabled
-                            ]}
-                            disabled={selectedCard.points < reward.points_cost}
-                            onPress={() => handleRedeemReward(reward)}
-                          >
-                            <Text style={styles.redeemBtnText}>Redeem</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
               </ScrollView>
 
               {/* Scan Trigger Button */}

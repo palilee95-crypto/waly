@@ -86,6 +86,9 @@ export default function GiveStampsScreen() {
   const [stampAmount, setStampAmount] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Active Loyalty Program & Mode Configuration
+  const [program, setProgram] = useState<any>(null);
+
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
@@ -95,19 +98,28 @@ export default function GiveStampsScreen() {
 
   const merchantId = user?.merchant_id;
 
-  // 1. Fetch recent transactions for active merchant
+  // Mode helpers
+  const isPointsOnly = program?.enable_stamps === false && program?.enable_points === true;
+  const isStampsOnly = program?.enable_stamps !== false && program?.enable_points === false;
+  const isBoth = !isPointsOnly && !isStampsOnly;
+
+  // 1. Fetch recent transactions & active loyalty program for merchant
   const fetchTransactions = useCallback(async () => {
     if (!merchantId) return;
     try {
       setLoadingTxns(true);
-      const res = await pb.collection('transactions').getList(1, 10, {
-        filter: `merchant = '${merchantId}'`,
-        sort: '-created',
-        expand: 'customer',
-      });
-      setTransactions(res.items || []);
+      const [txRes, progRes] = await Promise.all([
+        pb.collection('transactions').getList(1, 10, {
+          filter: `merchant = '${merchantId}'`,
+          sort: '-created',
+          expand: 'customer',
+        }),
+        pb.collection('loyalty_programs').getFirstListItem(`merchant = '${merchantId}' && is_active = true`).catch(() => null),
+      ]);
+      setTransactions(txRes.items || []);
+      if (progRes) setProgram(progRes);
     } catch (err) {
-      console.warn('Failed to fetch recent transactions:', err);
+      console.warn('Failed to fetch transactions/program:', err);
     } finally {
       setLoadingTxns(false);
     }
@@ -240,7 +252,7 @@ export default function GiveStampsScreen() {
     executeRedemption(code);
   };
 
-  // 4. Submit Manual Stamp Issuance
+  // 4. Submit Manual Stamp or Points Issuance
   const handleManualIssue = async () => {
     if (!phoneInput.trim()) {
       Alert.alert('Validation Error', 'Please enter customer phone number.');
@@ -248,8 +260,14 @@ export default function GiveStampsScreen() {
     }
 
     const bill = parseFloat(billAmount) || 0;
-    const stamps = parseInt(stampAmount, 10) || 1;
-    if (stamps < 1) {
+    const stamps = isPointsOnly ? 0 : (parseInt(stampAmount, 10) || 1);
+
+    if (isPointsOnly && bill <= 0) {
+      Alert.alert('Validation Error', 'Please enter a bill amount to calculate points.');
+      return;
+    }
+
+    if (!isPointsOnly && stamps < 1) {
       Alert.alert('Validation Error', 'Stamps to issue must be at least 1.');
       return;
     }
@@ -257,7 +275,7 @@ export default function GiveStampsScreen() {
     setIsSubmitting(true);
     setSuccessMsg(null);
     try {
-      const res = await pb.send<{ success: boolean; message: string; customerName: string }>(
+      const res = await pb.send<{ success: boolean; message: string; customerName: string; pointsEarned?: number }>(
         '/api/risev/merchant/give-manual',
         {
           method: 'POST',
@@ -271,7 +289,11 @@ export default function GiveStampsScreen() {
       );
 
       const resolvedName = res.customerName || customerName.trim() || 'Customer';
-      setSuccessMsg(res.message || `${stamps} stamp(s) issued to ${resolvedName}`);
+      if (isPointsOnly) {
+        setSuccessMsg(res.message || `Points awarded to ${resolvedName}`);
+      } else {
+        setSuccessMsg(res.message || `${stamps} stamp(s) issued to ${resolvedName}`);
+      }
 
       // Fetch real transaction record and merchant details from PocketBase
       let realTxnId = (res as any).transactionId || '';
@@ -296,6 +318,8 @@ export default function GiveStampsScreen() {
         } catch (fetchErr) {}
       }
 
+      const pointsEarnedCalc = (res as any).pointsEarned || Math.floor(bill);
+
       const receiptInfo: ReceiptData = {
         id: realTxnId || ('TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()),
         storeName: storeName || (user as any)?.merchant_name || 'Risev Partner Store',
@@ -309,6 +333,8 @@ export default function GiveStampsScreen() {
         customerPhone: phoneInput.trim(),
         customerName: resolvedName,
         cashierName: user?.name,
+        pointsEarned: pointsEarnedCalc,
+        isPointsOnly,
       };
       setActiveReceipt(receiptInfo);
       setReceiptModalVisible(true);
@@ -320,7 +346,7 @@ export default function GiveStampsScreen() {
       setStampAmount('1');
       fetchTransactions();
     } catch (err: any) {
-      const msg = err?.message || 'Failed to issue stamps manually.';
+      const msg = err?.message || (isPointsOnly ? 'Failed to award points manually.' : 'Failed to issue stamps manually.');
       Alert.alert('Error', msg);
     } finally {
       setIsSubmitting(false);
@@ -358,7 +384,7 @@ export default function GiveStampsScreen() {
                 Issue & Redeem
               </Text>
               <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                Scan vouchers or issue stamps manually
+                {isPointsOnly ? 'Scan vouchers or award points manually' : isStampsOnly ? 'Scan vouchers or issue stamps manually' : 'Scan vouchers or issue stamps & points'}
               </Text>
             </View>
           </View>
@@ -398,9 +424,9 @@ export default function GiveStampsScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="create-outline" size={18} color={activeTab === 'manual' ? '#050505' : '#FFC700'} />
+            <Ionicons name={isPointsOnly ? "sparkles-outline" : "ribbon-outline"} size={18} color={activeTab === 'manual' ? '#050505' : '#FFC700'} />
             <Text style={[styles.tabBtnText, { color: activeTab === 'manual' ? '#050505' : '#FFC700', fontFamily: activeTab === 'manual' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold' }]}>
-              Manual Issuance
+              {isPointsOnly ? 'Award Points' : isStampsOnly ? 'Issue Stamps' : 'Issue Stamps & Points'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -601,9 +627,15 @@ export default function GiveStampsScreen() {
         {/* ───────────────────────────────────────────────────────────── */}
         {activeTab === 'manual' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Manual Stamp Issuance</Text>
+            <Text style={styles.cardTitle}>
+              {isPointsOnly ? 'Manual Points Issuance' : isStampsOnly ? 'Manual Stamp Issuance' : 'Manual Loyalty Issuance'}
+            </Text>
             <Text style={styles.cardSubtitle}>
-              Enter customer phone number to credit loyalty stamps directly if NFC card is unavailable.
+              {isPointsOnly
+                ? 'Enter customer phone number and bill amount to credit loyalty points directly.'
+                : isStampsOnly
+                ? 'Enter customer phone number to credit loyalty stamps directly if NFC card is unavailable.'
+                : 'Enter customer phone and bill amount to credit stamps and loyalty points.'}
             </Text>
 
             {/* Customer Phone Input */}
@@ -656,7 +688,9 @@ export default function GiveStampsScreen() {
 
             {/* Bill Amount Input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>BILL AMOUNT (RM)</Text>
+              <Text style={styles.label}>
+                {isPointsOnly ? 'BILL AMOUNT (RM) *' : isStampsOnly ? 'BILL AMOUNT (RM) - OPTIONAL (TRACKS SALES)' : 'BILL AMOUNT (RM)'}
+              </Text>
               <View style={styles.inputWrap}>
                 <Text style={styles.currencyPrefix}>RM</Text>
                 <TextInput
@@ -668,6 +702,20 @@ export default function GiveStampsScreen() {
                   keyboardType="decimal-pad"
                 />
               </View>
+
+              {/* Points Preview for Points-Enabled Programs */}
+              {!isStampsOnly && parseFloat(billAmount || '0') > 0 ? (() => {
+                const spp = Number(program?.spend_per_point) > 0 ? Number(program.spend_per_point) : 1;
+                const earnedPts = Math.floor(parseFloat(billAmount || '0') / spp);
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFDF0', borderRadius: 8, borderWidth: 1, borderColor: '#FEF08A' }}>
+                    <Ionicons name="sparkles" size={14} color="#B45309" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                      Customer will earn +{earnedPts} Points{spp !== 1 ? ` (RM ${spp} = 1 Pt)` : ''}
+                    </Text>
+                  </View>
+                );
+              })() : null}
 
               {/* Quick Bill Presets */}
               <View style={styles.presetRow}>
@@ -684,37 +732,39 @@ export default function GiveStampsScreen() {
               </View>
             </View>
 
-            {/* Stamps to Issue Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>STAMPS TO ISSUE</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="ribbon-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
-                <TextInput
-                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                  placeholder="1"
-                  placeholderTextColor="#94A3B8"
-                  value={stampAmount}
-                  onChangeText={setStampAmount}
-                  keyboardType="number-pad"
-                />
-              </View>
+            {/* Stamps to Issue Input (Hidden if Points-Only) */}
+            {!isPointsOnly && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>STAMPS TO ISSUE</Text>
+                <View style={styles.inputWrap}>
+                  <Ionicons name="ribbon-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
+                  <TextInput
+                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    placeholder="1"
+                    placeholderTextColor="#94A3B8"
+                    value={stampAmount}
+                    onChangeText={setStampAmount}
+                    keyboardType="number-pad"
+                  />
+                </View>
 
-              {/* Quick Stamp Presets */}
-              <View style={styles.presetRow}>
-                {['1', '2', '3', '5'].map((s) => (
-                  <TouchableOpacity
-                    key={s}
-                    style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
-                    onPress={() => setStampAmount(s)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
-                      {s} {parseInt(s, 10) === 1 ? 'Stamp' : 'Stamps'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {/* Quick Stamp Presets */}
+                <View style={styles.presetRow}>
+                  {['1', '2', '3', '5'].map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
+                      onPress={() => setStampAmount(s)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
+                        {s} {parseInt(s, 10) === 1 ? 'Stamp' : 'Stamps'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Submit Button */}
             <TouchableOpacity
@@ -727,8 +777,10 @@ export default function GiveStampsScreen() {
                 <ActivityIndicator color="#FFC700" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>Issue Stamps Directly</Text>
+                  <Ionicons name={isPointsOnly ? "sparkles" : "checkmark-circle-outline"} size={20} color="#FFC700" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>
+                    {isPointsOnly ? 'Award Points Directly' : isBoth ? 'Issue Stamps & Points' : 'Issue Stamps Directly'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>

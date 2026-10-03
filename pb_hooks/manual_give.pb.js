@@ -85,6 +85,9 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
 
     const programId = program.id;
     const goal = parseInt(program.get("stamp_goal")) || 10;
+    const isStampsEnabled = program.get("enable_stamps") !== false;
+    const isPointsEnabled = program.get("enable_points") !== false;
+    const actualStampsToAward = isStampsEnabled ? stampAmount : 0;
 
     // 3. Find or create loyalty card & add stamps
     let card = null;
@@ -107,8 +110,10 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     }
 
     const currentStamps = parseInt(card.get("stamps_collected")) || parseInt(card.get("stamps")) || 0;
-    const totalStamps = currentStamps + stampAmount;
-    card.set("stamps_collected", totalStamps);
+    const totalStamps = isStampsEnabled ? (currentStamps + actualStampsToAward) : currentStamps;
+    if (isStampsEnabled) {
+      card.set("stamps_collected", totalStamps);
+    }
     card.set("last_activity", new Date().toISOString().replace('T', ' ').substring(0, 19));
     $app.save(card);
 
@@ -120,7 +125,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     const txn = new Record(txnCol);
     txn.set("id", $security.randomString(15).toLowerCase());
     txn.set("type", "earn");
-    txn.set("stamps", stampAmount);
+    txn.set("stamps", actualStampsToAward);
     txn.set("bill_amount", billAmount);
     txn.set("customer", customer.id);
     txn.set("merchant", merchantId);
@@ -139,7 +144,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
 
     // 6. Transaction completed - welcome_notification.pb.js handles sending the WhatsApp receipt
     const resolvedCustomerName = customer.getString("name") || customerNameInput || ("Customer " + digits.slice(-4));
-    console.log(`[MANUAL GIVE] Issued ${stampAmount} stamp(s) to ${resolvedCustomerName} (${cleanPhone}), total stamps: ${totalStamps}/${goal}`);
+    console.log(`[MANUAL GIVE] Processed transaction for ${resolvedCustomerName} (${cleanPhone}), stamps: ${actualStampsToAward}, bill: RM${billAmount}`);
 
     let nextRewardName = "";
     try {
@@ -156,16 +161,20 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       if (merchRec) merchantStoreName = merchRec.getString("name");
     } catch (mErr) {}
 
+    const successMessage = isStampsEnabled
+      ? `${actualStampsToAward} stamp(s) issued to ${resolvedCustomerName}`
+      : `Points awarded to ${resolvedCustomerName}`;
+
     return e.json(200, {
       success: true,
-      message: `${stampAmount} stamp(s) issued to ${resolvedCustomerName}`,
+      message: successMessage,
       customerName: resolvedCustomerName,
       phone: cleanPhone,
       totalStamps: totalStamps,
       goal: goal,
       transactionId: txn.id,
       billAmount: billAmount,
-      stampsEarned: stampAmount,
+      stampsEarned: actualStampsToAward,
       storeName: merchantStoreName,
       branchName: branchName,
       nextRewardName: nextRewardName,

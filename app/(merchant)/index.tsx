@@ -72,6 +72,7 @@ export default function MerchantDashboard() {
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [standTotalQuota, setStandTotalQuota] = useState<number>(500);
   const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
+  const [loyaltyProgram, setLoyaltyProgram] = useState<any>(null);
 
   useEffect(() => {
     const loadPricing = async () => {
@@ -265,9 +266,13 @@ export default function MerchantDashboard() {
         }
       } catch (codeErr) {}
 
-      // 1. Fetch merchant details
-      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
-      setMerchant(mRec);
+      // 1. Fetch merchant details & active loyalty program
+      const [mRec, prog] = await Promise.all([
+        pb.collection('merchants').getOne(user.merchant_id).catch(() => null),
+        pb.collection('loyalty_programs').getFirstListItem(`merchant = '${user.merchant_id}' && is_active = true`).catch(() => null),
+      ]);
+      if (mRec) setMerchant(mRec);
+      if (prog) setLoyaltyProgram(prog);
 
       // 2. Fetch recent transactions
       const txs = await pb.collection('transactions').getFullList({
@@ -334,7 +339,9 @@ export default function MerchantDashboard() {
   }, [user]);
 
   // Aggregate stats
+  const isPointsOnlyMerchant = loyaltyProgram?.enable_stamps === false && loyaltyProgram?.enable_points === true;
   const totalStampsAwarded = transactions.reduce((acc, tx) => acc + (tx.stamps || 0), 0);
+  const totalPointsAwarded = transactions.reduce((acc, tx) => acc + (tx.points || 0), 0);
 
   // Filter transactions based on date
   const getFilteredTransactions = () => {
@@ -437,14 +444,16 @@ export default function MerchantDashboard() {
         {/* Unified Floating Analytics Card */}
         <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
-            {/* Stamps Awarded */}
+            {/* Stamps / Points Awarded */}
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name="wallet-outline" size={14} color="#050505" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{t('total_stamps_awarded')}</Text>
+                <Ionicons name={isPointsOnlyMerchant ? "sparkles-outline" : "wallet-outline"} size={14} color="#050505" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
+                  {isPointsOnlyMerchant ? (t('total_points_awarded') || 'Total Points Awarded') : t('total_stamps_awarded')}
+                </Text>
               </View>
               <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -1 }}>
-                {loading ? '...' : totalStampsAwarded.toLocaleString()}
+                {loading ? '...' : (isPointsOnlyMerchant ? totalPointsAwarded.toLocaleString() : totalStampsAwarded.toLocaleString())}
               </Text>
             </View>
 

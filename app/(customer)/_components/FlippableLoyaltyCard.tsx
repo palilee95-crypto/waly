@@ -30,7 +30,19 @@ const stampIcons = [
   { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
 ];
 
-export default function FlippableLoyaltyCard({ card, user, startFlipped = false, autoFlipDelay }: { card: any, user: any, startFlipped?: boolean, autoFlipDelay?: number }) {
+export default function FlippableLoyaltyCard({ 
+  card, 
+  user, 
+  mode,
+  startFlipped = false, 
+  autoFlipDelay 
+}: { 
+  card: any, 
+  user: any, 
+  mode?: 'stamps' | 'points' | 'both',
+  startFlipped?: boolean, 
+  autoFlipDelay?: number 
+}) {
   const flipAnim = useRef(new Animated.Value(startFlipped ? 1 : 0)).current;
   const [isFlipped, setIsFlipped] = useState(startFlipped);
   const userInteracted = useRef(false);
@@ -140,6 +152,18 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
     } catch { return false; }
   };
 
+  const isStampsEnabled = card?.enable_stamps !== false;
+  const isPointsEnabled = card?.enable_points !== false;
+  const effectiveMode: 'stamps' | 'points' | 'both' = mode 
+    ? mode 
+    : (!isStampsEnabled && isPointsEnabled) 
+      ? 'points' 
+      : (isStampsEnabled && !isPointsEnabled) 
+        ? 'stamps' 
+        : 'both';
+
+  const spendPerPoint = card.spend_per_point || card.spendPerPoint || 1;
+
   const bgColor = (card.gradientColors ?? ['#EC4899'])[0];
   const logoTint = isColorBright(bgColor) ? '#000000' : '#FFFFFF';
 
@@ -199,26 +223,50 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
                     {card.category.toUpperCase()}
                   </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, card.fontColor && { color: card.fontColor }]}>
-                    {card.collectedStamps}/{card.totalStamps}
-                  </Text>
-                  <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, card.fontColor && { color: card.fontColor, opacity: 0.75 }]}>STAMPS</Text>
-                </View>
+                {effectiveMode === 'points' ? (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <View style={styles.tierPill}>
+                      <Ionicons name="sparkles" size={11} color="#F59E0B" />
+                      <Text style={[styles.tierPillText, card.fontColor && { color: card.fontColor }]}>
+                        VIP MEMBER
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, card.fontColor && { color: card.fontColor }]}>
+                      {card.collectedStamps}/{card.totalStamps}
+                    </Text>
+                    <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, card.fontColor && { color: card.fontColor, opacity: 0.75 }]}>STAMPS</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.cardMidRow}>
-                <View style={styles.cardChip}>
-                  <View style={styles.chipLineHoriz} />
-                  <View style={styles.chipLineVert} />
-                  <View style={styles.chipCenterPin} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={styles.cardChip}>
+                    <View style={styles.chipLineHoriz} />
+                    <View style={styles.chipLineVert} />
+                    <View style={styles.chipCenterPin} />
+                  </View>
+                  <Ionicons 
+                    name="wifi" 
+                    size={22} 
+                    color={card.fontColor ? card.fontColor : "rgba(255, 255, 255, 0.35)"} 
+                    style={{ opacity: 0.45 }} 
+                  />
                 </View>
-                <Ionicons 
-                  name="wifi" 
-                  size={22} 
-                  color={card.fontColor ? card.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                  style={{ opacity: 0.45 }} 
-                />
+
+                {(effectiveMode === 'points' || effectiveMode === 'both') && (
+                  <View style={styles.pointsDisplayWrap}>
+                    <Text style={[styles.pointsValueText, card.fontColor && { color: card.fontColor }]}>
+                      {card.points ?? card.points_balance ?? card.pointsBalance ?? 0}
+                    </Text>
+                    <Text style={[styles.pointsLabelText, card.fontColor && { color: card.fontColor, opacity: 0.75 }]}>
+                      PTS BALANCE
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.largeCardFooter}>
@@ -273,22 +321,55 @@ export default function FlippableLoyaltyCard({ card, user, startFlipped = false,
             </View>
             
             <View style={styles.cardContentPaddingBack}>
-              <View>
-                {/* Minimalist Status Header */}
-                <View style={styles.minimalBackHeader}>
-                  <Text style={[styles.minimalBackLabel, card.fontColor && { color: card.fontColor, opacity: 0.6 }]}>
-                    YOUR STAMPS
-                  </Text>
-                  <Text style={[styles.minimalBackProgress, card.fontColor && { color: card.fontColor }]}>
-                    {card.collectedStamps}/{card.totalStamps}
-                  </Text>
-                </View>
+              {effectiveMode === 'points' ? (
+                <View style={{ gap: 8 }}>
+                  {/* Membership Points Header */}
+                  <View style={styles.minimalBackHeader}>
+                    <Text style={[styles.minimalBackLabel, card.fontColor && { color: card.fontColor, opacity: 0.7 }]}>
+                      AVAILABLE POINTS
+                    </Text>
+                    <Text style={[styles.minimalBackProgress, card.fontColor && { color: card.fontColor }]}>
+                      {card.points ?? card.points_balance ?? card.pointsBalance ?? 0} PTS
+                    </Text>
+                  </View>
 
-                {/* Stamps grid details */}
-                <View style={styles.largeStampsGridWrapper}>
-                  {renderMiniStamps()}
+                  {/* Embedded Member QR Code */}
+                  <View style={styles.memberQrBox}>
+                    <Image
+                      source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(user?.phone || card.customerPhone || 'risev-member')}` }}
+                      style={styles.qrThumbnail}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberIdLabel}>MEMBER ID</Text>
+                      <Text style={[styles.memberIdValue, card.fontColor && { color: card.fontColor }]}>
+                        {user?.phone || card.customerPhone || '+60 12-345 6789'}
+                      </Text>
+                      <Text style={styles.memberIdNotice}>
+                        {spendPerPoint && spendPerPoint > 1
+                          ? `Earn 1 point per RM ${spendPerPoint} spent`
+                          : 'Scan at checkout to earn points'}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View>
+                  {/* Minimalist Status Header */}
+                  <View style={styles.minimalBackHeader}>
+                    <Text style={[styles.minimalBackLabel, card.fontColor && { color: card.fontColor, opacity: 0.6 }]}>
+                      YOUR STAMPS
+                    </Text>
+                    <Text style={[styles.minimalBackProgress, card.fontColor && { color: card.fontColor }]}>
+                      {card.collectedStamps}/{card.totalStamps}
+                    </Text>
+                  </View>
+
+                  {/* Stamps grid details */}
+                  <View style={styles.largeStampsGridWrapper}>
+                    {renderMiniStamps()}
+                  </View>
+                </View>
+              )}
 
               <View style={{ position: 'absolute', bottom: 16, right: 24 }}>
                 <Image
@@ -381,6 +462,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingRight: 4,
     marginVertical: 10,
+  },
+  tierPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  tierPillText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  pointsDisplayWrap: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  pointsValueText: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    lineHeight: 22,
+  },
+  pointsLabelText: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: 'rgba(255, 255, 255, 0.75)',
+    letterSpacing: 0.5,
+  },
+  tierProgressWrap: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: 8,
+    borderRadius: 10,
+  },
+  tierProgressBarBg: {
+    height: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  tierProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFC700',
+    borderRadius: 3,
+  },
+  tierGoalText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  memberQrBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    padding: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  qrThumbnail: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  memberIdLabel: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 0.5,
+  },
+  memberIdValue: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    marginTop: 1,
+  },
+  memberIdNotice: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 1,
   },
   cardChip: {
     width: 32,

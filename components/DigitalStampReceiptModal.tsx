@@ -27,6 +27,8 @@ export interface ReceiptData {
   customerPhone?: string;
   customerName?: string;
   cashierName?: string;
+  pointsEarned?: number;
+  isPointsOnly?: boolean;
 }
 
 interface DigitalStampReceiptModalProps {
@@ -54,6 +56,8 @@ export default function DigitalStampReceiptModal({
     ? receiptData.billAmount
     : parseFloat(receiptData.billAmount) || 0;
 
+  const isPointsOnly = !!receiptData.isPointsOnly;
+  const pointsEarned = receiptData.pointsEarned || Math.floor(numBill);
   const stampsEarned = receiptData.stampsEarned || 1;
   const currentStamps = receiptData.currentStamps || 0;
   const goal = receiptData.stampGoal || 10;
@@ -174,6 +178,12 @@ export default function DigitalStampReceiptModal({
       <div class="bill-value">RM ${numBill.toFixed(2)}</div>
     </div>
 
+    ${isPointsOnly ? `
+    <div class="stamp-box">
+      <div class="stamp-earned">+${pointsEarned} POINTS EARNED</div>
+      <div class="stamp-progress">VIP Points Credited to Account</div>
+    </div>
+    ` : `
     <div class="stamp-box">
       <div class="stamp-earned">+${stampsEarned} STAMP${stampsEarned > 1 ? 'S' : ''} EARNED</div>
       <div class="stamp-progress">Progress: ${currentStamps} / ${goal} Stamps</div>
@@ -184,6 +194,7 @@ export default function DigitalStampReceiptModal({
       <b>Next Reward: ${nextReward}</b><br/>
       (${remaining > 0 ? `${remaining} stamps to unlock` : 'Ready to claim! 🎉'})
     </div>` : ''}
+    `}
 
     <div class="divider"></div>
     <div class="footer">
@@ -253,7 +264,9 @@ export default function DigitalStampReceiptModal({
                 <Ionicons name="checkmark" size={26} color="#050505" />
               </View>
               <Text style={styles.headerTitle}>
-                {mode === 'merchant' ? 'Stamp Issued Successfully!' : 'Stamp Added!'}
+                {isPointsOnly
+                  ? (mode === 'merchant' ? 'Points Awarded Successfully!' : 'Points Added!')
+                  : (mode === 'merchant' ? 'Stamp Issued Successfully!' : 'Stamp Added!')}
               </Text>
               <Text style={styles.headerSub}>
                 {mode === 'merchant' ? 'Receipt recorded in loyalty ledger' : 'Your digital loyalty receipt is ready'}
@@ -289,39 +302,52 @@ export default function DigitalStampReceiptModal({
                 <Text style={styles.billAmount}>RM {numBill.toFixed(2)}</Text>
               </View>
 
-              {/* ⭐️ STAMP EARNED HIGHLIGHT BADGE (Black with Yellow Accent) */}
-              <View style={styles.stampBadgeContainer}>
-                <View style={styles.stampBadgeLeft}>
-                  <Ionicons name="ribbon" size={18} color="#FFC700" />
+              {/* ⭐️ STAMP / POINTS HIGHLIGHT BADGE */}
+              {isPointsOnly ? (
+                <View style={styles.stampBadgeContainer}>
+                  <View style={styles.stampBadgeLeft}>
+                    <Ionicons name="sparkles" size={18} color="#FFC700" />
+                  </View>
+                  <Text style={styles.stampBadgeText}>
+                    +{pointsEarned} POINTS EARNED
+                  </Text>
                 </View>
-                <Text style={styles.stampBadgeText}>
-                  +{stampsEarned} STAMP{stampsEarned > 1 ? 'S' : ''} EARNED
-                </Text>
-              </View>
-
-              {/* 📊 PROGRESS TRACKER (Yellow dots) */}
-              <View style={styles.progressSection}>
-                <Text style={styles.progressText}>
-                  {currentStamps} / {goal} Stamps Collected
-                </Text>
-                <View style={styles.dotsRow}>
-                  {Array.from({ length: Math.min(goal, 10) }).map((_, idx) => {
-                    const isFilled = idx < currentStamps;
-                    return (
-                      <View
-                        key={idx}
-                        style={[
-                          styles.dot,
-                          isFilled ? styles.dotFilled : styles.dotEmpty,
-                        ]}
-                      />
-                    );
-                  })}
+              ) : (
+                <View style={styles.stampBadgeContainer}>
+                  <View style={styles.stampBadgeLeft}>
+                    <Ionicons name="ribbon" size={18} color="#FFC700" />
+                  </View>
+                  <Text style={styles.stampBadgeText}>
+                    +{stampsEarned} STAMP{stampsEarned > 1 ? 'S' : ''} EARNED
+                  </Text>
                 </View>
-              </View>
+              )}
 
-              {/* 🎁 NEXT REWARD TEASER (Warm Cream with Yellow Accent) */}
-              {nextReward && (
+              {/* 📊 PROGRESS TRACKER (Only for stamps) */}
+              {!isPointsOnly && (
+                <View style={styles.progressSection}>
+                  <Text style={styles.progressText}>
+                    {currentStamps} / {goal} Stamps Collected
+                  </Text>
+                  <View style={styles.dotsRow}>
+                    {Array.from({ length: Math.min(goal, 10) }).map((_, idx) => {
+                      const isFilled = idx < currentStamps;
+                      return (
+                        <View
+                          key={idx}
+                          style={[
+                            styles.dot,
+                            isFilled ? styles.dotFilled : styles.dotEmpty,
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* 🎁 NEXT REWARD TEASER (Only for stamps) */}
+              {!isPointsOnly && nextReward && (
                 <View style={styles.rewardBanner}>
                   <View style={styles.rewardBannerContent}>
                     <Text style={styles.rewardTitle} numberOfLines={1}>

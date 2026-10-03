@@ -105,6 +105,13 @@ export default function UnifiedRewardsScreen() {
   // Sub-tabs Selection
   const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'points_tiers' | 'birthday'>('catalogue');
 
+  // Loyalty Program Modes (Stamps, Points & Tiers)
+  const [enableStamps, setEnableStamps] = useState<boolean>(true);
+  const [enablePoints, setEnablePoints] = useState<boolean>(true);
+  const [savingLoyaltyModules, setSavingLoyaltyModules] = useState<boolean>(false);
+  const [spendPerPoint, setSpendPerPoint] = useState<string>('1');
+  const [savingPointsRate, setSavingPointsRate] = useState<boolean>(false);
+
   // Shared Loading & Authorization States
   const [merchant, setMerchant] = useState<any>(null);
   const [loadingMerchant, setLoadingMerchant] = useState(true);
@@ -234,6 +241,9 @@ export default function UnifiedRewardsScreen() {
 
       if (prog) {
         setProgramId(prog.id);
+        setEnableStamps(prog.enable_stamps !== false);
+        setEnablePoints(prog.enable_points !== false);
+        setSpendPerPoint(String(prog.spend_per_point || '1'));
         setLinkedRewardId(prog.linked_reward || null);
         setIsActive(prog.is_active);
         setRequiredStamps(prog.stamp_goal as any || 10);
@@ -563,6 +573,8 @@ export default function UnifiedRewardsScreen() {
         merchant: user.merchant_id,
         name: `${merchant?.name || 'Store'} Reward Card`,
         is_active: isActive,
+        enable_stamps: enableStamps,
+        enable_points: enablePoints,
         stamp_goal: requiredStamps,
         reward_description: rewardDesc.trim(),
         card_color: cardColor,
@@ -629,6 +641,51 @@ export default function UnifiedRewardsScreen() {
       Alert.alert("Error", err.message || "Failed to save card configuration.");
     } finally {
       setIsSavingCard(false);
+    }
+  };
+
+  const handleSavePointsRate = async () => {
+    const parsed = parseFloat(spendPerPoint);
+    if (isNaN(parsed) || parsed <= 0) {
+      Alert.alert(
+        locale === 'en' ? 'Invalid Input' : 'Input Tidak Sah',
+        locale === 'en'
+          ? 'Please enter a valid spend amount greater than 0.'
+          : 'Sila masukkan jumlah perbelanjaan yang sah lebih daripada 0.'
+      );
+      return;
+    }
+
+    if (!user?.merchant_id) return;
+
+    try {
+      setSavingPointsRate(true);
+      if (programId) {
+        await pb.collection('loyalty_programs').update(programId, {
+          spend_per_point: parsed,
+        });
+      } else {
+        const newProg = await pb.collection('loyalty_programs').create({
+          merchant: user.merchant_id,
+          name: `${merchant?.name || 'Store'} Loyalty Program`,
+          spend_per_point: parsed,
+          enable_stamps: enableStamps,
+          enable_points: enablePoints,
+          is_active: true,
+        });
+        setProgramId(newProg.id);
+      }
+      Alert.alert(
+        locale === 'en' ? 'Points Rule Saved' : 'Peraturan Mata Disimpan',
+        locale === 'en'
+          ? `Points earning rule updated: RM ${parsed} spent = 1 Point.`
+          : `Peraturan pendapatan mata dikemas kini: RM ${parsed} dibelanjakan = 1 Mata.`
+      );
+    } catch (err: any) {
+      console.warn("Failed to save points rate:", err);
+      Alert.alert("Error", err.message || "Failed to save points rule.");
+    } finally {
+      setSavingPointsRate(false);
     }
   };
 
@@ -759,35 +816,151 @@ export default function UnifiedRewardsScreen() {
           </Text>
         </View>
 
+        {/* Loyalty Program Modules Toggle Card */}
+        <View style={styles.modulesConfigCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="options-outline" size={18} color="#FFC700" />
+              <Text style={styles.modulesCardTitle}>
+                {locale === 'en' ? 'Loyalty Program Modules' : 'Modul Program Kesetiaan'}
+              </Text>
+            </View>
+            {savingLoyaltyModules && (
+              <ActivityIndicator size="small" color="#FFC700" />
+            )}
+          </View>
+
+          <View style={{ gap: 10 }}>
+            {/* Toggle 1: Stamp Cards */}
+            <View style={styles.moduleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="card-outline" size={16} color={enableStamps ? '#10B981' : '#94A3B8'} />
+                  <Text style={[styles.moduleName, !enableStamps && { color: '#94A3B8' }]}>
+                    {locale === 'en' ? 'Stamp Cards' : 'Kad Setem'}
+                  </Text>
+                </View>
+                <Text style={styles.moduleDesc}>
+                  {locale === 'en' ? 'Digital punch cards with milestone rewards' : 'Kad tebuk digital dengan ganjaran pencapaian'}
+                </Text>
+              </View>
+              <Switch
+                value={enableStamps}
+                onValueChange={async (val) => {
+                  if (!val && !enablePoints) {
+                    Alert.alert(
+                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                      locale === 'en' 
+                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                    );
+                    return;
+                  }
+                  setEnableStamps(val);
+                  if (!val && activeTab === 'card_design') {
+                    setActiveTab(enablePoints ? 'catalogue' : 'birthday');
+                  }
+                  if (programId) {
+                    try {
+                      setSavingLoyaltyModules(true);
+                      await pb.collection('loyalty_programs').update(programId, { enable_stamps: val });
+                    } catch (err) {
+                      console.warn("Failed to toggle stamps:", err);
+                    } finally {
+                      setSavingLoyaltyModules(false);
+                    }
+                  }
+                }}
+                trackColor={{ false: '#334155', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
+            {/* Toggle 2: Points & Tiers */}
+            <View style={styles.moduleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="star-outline" size={16} color={enablePoints ? '#FFC700' : '#94A3B8'} />
+                  <Text style={[styles.moduleName, !enablePoints && { color: '#94A3B8' }]}>
+                    {locale === 'en' ? 'Points & Tiers' : 'Mata & Tahap'}
+                  </Text>
+                </View>
+                <Text style={styles.moduleDesc}>
+                  {locale === 'en' ? 'Spend-based points (RM 1 = 1 Pt), VIP tiers & catalogue' : 'Mata perbelanjaan, tahap VIP & katalog'}
+                </Text>
+              </View>
+              <Switch
+                value={enablePoints}
+                onValueChange={async (val) => {
+                  if (!val && !enableStamps) {
+                    Alert.alert(
+                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                      locale === 'en' 
+                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                    );
+                    return;
+                  }
+                  setEnablePoints(val);
+                  if (!val && (activeTab === 'catalogue' || activeTab === 'points_tiers')) {
+                    setActiveTab(enableStamps ? 'card_design' : 'birthday');
+                  }
+                  if (programId) {
+                    try {
+                      setSavingLoyaltyModules(true);
+                      await pb.collection('loyalty_programs').update(programId, { enable_points: val });
+                    } catch (err) {
+                      console.warn("Failed to toggle points:", err);
+                    } finally {
+                      setSavingLoyaltyModules(false);
+                    }
+                  }
+                }}
+                trackColor={{ false: '#334155', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Tab Selection Bar */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tabBtn, activeTab === 'catalogue' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('catalogue')}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.tabBtnText, activeTab === 'catalogue' && styles.tabBtnTextActive]}>
-              {t('catalogue_tab')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tabBtn, activeTab === 'card_design' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('card_design')}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.tabBtnText, activeTab === 'card_design' && styles.tabBtnTextActive]}>
-              {t('card_design_tab')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tabBtn, activeTab === 'points_tiers' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('points_tiers')}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
-              {t('points_tiers_tab')}
-            </Text>
-          </TouchableOpacity>
+          {enablePoints && (
+            <TouchableOpacity 
+              style={[styles.tabBtn, activeTab === 'catalogue' && styles.tabBtnActive]}
+              onPress={() => setActiveTab('catalogue')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'catalogue' && styles.tabBtnTextActive]}>
+                {t('catalogue_tab')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {enableStamps && (
+            <TouchableOpacity 
+              style={[styles.tabBtn, activeTab === 'card_design' && styles.tabBtnActive]}
+              onPress={() => setActiveTab('card_design')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'card_design' && styles.tabBtnTextActive]}>
+                {t('card_design_tab')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {enablePoints && (
+            <TouchableOpacity 
+              style={[styles.tabBtn, activeTab === 'points_tiers' && styles.tabBtnActive]}
+              onPress={() => setActiveTab('points_tiers')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
+                {t('points_tiers_tab')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity 
             style={[styles.tabBtn, activeTab === 'birthday' && styles.tabBtnActive]}
             onPress={() => setActiveTab('birthday')}
@@ -1540,107 +1713,168 @@ export default function UnifiedRewardsScreen() {
           </View>
         )}
 
-        {/* TAB 3: Points & Tiers Rules Dashboard */}
-        {activeTab === 'points_tiers' && (
-          <View style={{ marginTop: 12, gap: 16 }}>
-
-            {/* Hero Banner for Points Rule */}
-            <View style={[styles.configCard, { backgroundColor: '#1A1400', paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <Ionicons name="star" size={28} color="#FFC700" />
-                <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                  RM 1 = 1 Point
+        {/* TAB 3: Points Rules Dashboard */}
+        {activeTab === 'points_tiers' && (() => {
+          const parsedSpend = parseFloat(spendPerPoint) || 1;
+          return (
+            <View style={{ marginTop: 12, gap: 16 }}>
+              {/* Hero Banner for Points Rule */}
+              <View style={[styles.configCard, { backgroundColor: '#1A1400', paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <Ionicons name="star" size={28} color="#FFC700" />
+                  <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    RM {parsedSpend} = 1 Point
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
+                  Example: RM 50.00 spent = {Math.floor(50 / parsedSpend)} points automatically
                 </Text>
               </View>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-                Example: RM 45.50 spent = 45 points automatically
-              </Text>
-            </View>
 
-            {/* Membership Tiers Minimal Table */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('membership_tiers')}</Text>
-              
-              <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' }}>
-                
-                {/* Header Row */}
-                <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5 }}>TIER</Text>
-                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5 }}>SPEND (12M)</Text>
-                  <Text style={{ width: 80, fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textAlign: 'right', letterSpacing: 0.5 }}>POINTS</Text>
+              {/* Points Conversion Rate Card */}
+              <View style={styles.configCard}>
+                <View style={styles.cardSectionHeader}>
+                  <Ionicons name="calculator-outline" size={22} color="#0F172A" />
+                  <Text style={styles.cardSectionTitle}>Points Earning Rate</Text>
+                </View>
+                <Text style={styles.cardSectionDesc}>
+                  Set how many Malaysian Ringgit (RM) a customer must spend to earn 1 loyalty point at checkout.
+                </Text>
+
+                {/* Quick Presets */}
+                <View style={{ marginTop: 16 }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 8, letterSpacing: 0.5 }}>
+                    QUICK PRESETS
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {[
+                      { label: 'RM 1 = 1 Pt', val: '1' },
+                      { label: 'RM 2 = 1 Pt', val: '2' },
+                      { label: 'RM 5 = 1 Pt', val: '5' },
+                      { label: 'RM 10 = 1 Pt', val: '10' },
+                    ].map((preset) => {
+                      const isSel = spendPerPoint === preset.val;
+                      return (
+                        <TouchableOpacity
+                          key={preset.val}
+                          style={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 12,
+                            backgroundColor: isSel ? '#1A1400' : '#F1F5F9',
+                            borderWidth: 1,
+                            borderColor: isSel ? '#FFC700' : '#E2E8F0',
+                          }}
+                          onPress={() => setSpendPerPoint(preset.val)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{
+                            fontSize: 13,
+                            fontFamily: 'PlusJakartaSans_700Bold',
+                            color: isSel ? '#FFC700' : '#475569',
+                          }}>
+                            {preset.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
 
-                {/* Bronze */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 18 }}>🥉</Text>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Bronze</Text>
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>0 - RM 99</Text>
-                  <View style={{ width: 80, alignItems: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#FFEDD5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#C2410C' }}>1x</Text>
+                {/* Custom Spend Input */}
+                <View style={{ marginTop: 20 }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 8, letterSpacing: 0.5 }}>
+                    SPEND REQUIRED PER 1 POINT (RM)
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', height: 52, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1' }}>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginLeft: 16, marginRight: 8 }}>
+                      RM
+                    </Text>
+                    <TextInput
+                      style={[{ flex: 1, fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', paddingVertical: 12 }, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      placeholder="e.g. 2"
+                      placeholderTextColor="#94A3B8"
+                      value={spendPerPoint}
+                      onChangeText={(text) => {
+                        const cleaned = text.replace(/[^0-9.]/g, '');
+                        setSpendPerPoint(cleaned);
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                    <View style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginRight: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                        = 1 Point
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Silver */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 18 }}>🥈</Text>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Silver</Text>
+                {/* Live Simulation Preview */}
+                <View style={{ marginTop: 20, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="sparkles" size={16} color="#D97706" />
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                      Live Checkout Simulation
+                    </Text>
                   </View>
-                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>RM 100+</Text>
-                  <View style={{ width: 80, alignItems: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#E2E8F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>1.25x</Text>
-                    </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 20.00</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      +{Math.floor(20 / parsedSpend)} Points
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 50.00</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      +{Math.floor(50 / parsedSpend)} Points
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 100.00</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      +{Math.floor(100 / parsedSpend)} Points
+                    </Text>
                   </View>
                 </View>
 
-                {/* Gold */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 18 }}>🥇</Text>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Gold</Text>
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>RM 300+</Text>
-                  <View style={{ width: 80, alignItems: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>1.5x</Text>
-                    </View>
-                  </View>
-                </View>
+                {/* Save Points Rule Action Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.saveSubmitBtn,
+                    { marginTop: 24, backgroundColor: '#050505', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+                    savingPointsRate && { opacity: 0.6 },
+                  ]}
+                  onPress={handleSavePointsRate}
+                  disabled={savingPointsRate}
+                  activeOpacity={0.85}
+                >
+                  {savingPointsRate ? (
+                    <ActivityIndicator color="#FFC700" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
+                      <Text style={styles.saveSubmitBtnText}>Save Points Earning Rule</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
 
-                {/* Platinum */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 18 }}>💎</Text>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Platinum</Text>
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>RM 1,000+</Text>
-                  <View style={{ width: 80, alignItems: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#E0E7FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#3730A3' }}>2x</Text>
-                    </View>
-                  </View>
+              {/* Informative Tip Card */}
+              <View style={styles.tipCard}>
+                <View style={styles.tipCardHeader}>
+                  <Ionicons name="bulb-outline" size={20} color="#D97706" />
+                  <Text style={styles.tipCardTitle}>Points Rate Strategy</Text>
                 </View>
-
+                <Text style={styles.tipCardText}>
+                  A lower spend requirement (like RM 1 = 1 Point) creates higher customer engagement and excitement, while higher amounts (like RM 5 = 1 Point) work great for higher ticket merchants. You can adjust this anytime without affecting past customer balances.
+                </Text>
               </View>
             </View>
-
-            {/* Tip Card */}
-            <View style={styles.tipCard}>
-              <View style={styles.tipCardHeader}>
-                <Ionicons name="bulb-outline" size={20} color="#D97706" />
-                <Text style={styles.tipCardTitle}>{t('why_tiers_matter')}</Text>
-              </View>
-              <Text style={styles.tipCardText}>
-                {t('why_tiers_matter_desc')}
-              </Text>
-            </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* TAB 4: Birthday Rewards */}
         {activeTab === 'birthday' && (
@@ -2122,6 +2356,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 140,
+  },
+  modulesConfigCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  modulesCardTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  moduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    padding: 12,
+  },
+  moduleName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  moduleDesc: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 2,
   },
   introSection: {
     marginBottom: 20,

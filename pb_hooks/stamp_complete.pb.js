@@ -6,6 +6,9 @@ onRecordUpdate((e) => {
   const new_stamps  = e.record.get('stamps_collected');
   
   const program = $app.findRecordById('loyalty_programs', e.record.get('program'));
+  if (!program || program.get('enable_stamps') === false) {
+    return e.next();
+  }
   const goal = program.get('stamp_goal');
 
   if (new_stamps >= goal && prev_stamps < goal) {

@@ -22,16 +22,23 @@ onRecordCreate((e) => {
     return e.next();
   }
 
-  // 2. Fetch tier from card
-  const tier = card.get('tier') || 'bronze';
-
-  const TIER_MULTIPLIERS = {
-    bronze: 1.0,
-    silver: 1.25,
-    gold: 1.5,
-    platinum: 2.0
-  };
-  const tierMult = TIER_MULTIPLIERS[tier] || 1.0;
+  // 2. Fetch spend_per_point from loyalty program (default 1.0)
+  let spendPerPoint = 1.0;
+  try {
+    const programId = card.get('program');
+    if (programId) {
+      const prog = $app.findRecordById('loyalty_programs', programId);
+      if (prog) {
+        if (prog.get('enable_points') === false) {
+          return e.next();
+        }
+        const spp = Number(prog.get('spend_per_point'));
+        if (spp && spp > 0) {
+          spendPerPoint = spp;
+        }
+      }
+    }
+  } catch (pErr) {}
 
   // 3. Fetch active double_points campaign
   let campaignMult = 1.0;
@@ -91,9 +98,10 @@ onRecordCreate((e) => {
     // No streak record yet, ignore
   }
 
-  // 6. Calculate final points
-  const basePoints = e.record.get('bill_amount') || e.record.get('points') || 0; // represent the bill amount
-  const finalPoints = Math.floor(basePoints * tierMult * campaignMult * streakMult) + flatBonus;
+  // 6. Calculate final points using customizable spend_per_point
+  const rawBill = e.record.get('bill_amount') || e.record.get('points') || 0;
+  const basePoints = Math.floor(rawBill / spendPerPoint);
+  const finalPoints = Math.floor(basePoints * campaignMult * streakMult) + flatBonus;
   e.record.set('points', finalPoints);
 
   // 7. Fetch active bonus_stamps campaign
@@ -151,8 +159,9 @@ onRecordCreate((e) => {
   } catch (mErr) {}
 
   const mergedMetadata = Object.assign({}, existingMetadata, {
+    bill_amount: rawBill,
+    spend_per_point: spendPerPoint,
     base_points: basePoints,
-    tier_multiplier: tierMult,
     campaign_multiplier: campaignMult,
     flat_bonus: flatBonus,
     bonus_stamps: bonusStamps,
