@@ -381,6 +381,56 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
     }
   } catch (err) {}
 
+  // Check subscription staff limits (Stand Bundle: 3, Starter: 5, PRO: 10, Business: Unlimited)
+  const isAlreadyThisStoreStaff = targetUser && targetUser.getString("merchant_id") === merchantId;
+  if (!isAlreadyThisStoreStaff) {
+    let existingStaffCount = 0;
+    try {
+      const existingStaff = $app.findRecordsByFilter(
+        "users",
+        `merchant_id = "${merchantId}" && id != "${merchant.getString("owner")}"`,
+        "-created",
+        200,
+        0
+      );
+      existingStaffCount = existingStaff.length;
+    } catch (cntErr) {}
+
+    let activePlan = "stand_bundle";
+    try {
+      const subs = $app.findRecordsByFilter(
+        "subscriptions",
+        `merchant = "${merchantId}" && (status = "active" || status = "trialing")`,
+        "-created",
+        1,
+        0
+      );
+      if (subs.length > 0) {
+        activePlan = (subs[0].getString("plan") || "stand_bundle").toLowerCase();
+      }
+    } catch (sErr) {}
+
+    let maxStaffAllowed = 3;
+    if (activePlan === "starter") {
+      maxStaffAllowed = 5;
+    } else if (activePlan === "pro") {
+      maxStaffAllowed = 10;
+    } else if (activePlan === "business" || activePlan === "enterprise") {
+      maxStaffAllowed = 999999;
+    } else {
+      maxStaffAllowed = 3;
+    }
+
+    if (existingStaffCount >= maxStaffAllowed) {
+      const planLabel = activePlan === "starter" 
+        ? "Starter Plan (limit: 5 staff)" 
+        : (activePlan === "pro" ? "PRO Plan (limit: 10 staff)" : "NFC Stand Package (limit: 3 staff)");
+      return e.json(403, { 
+        message: `You have reached the staff account limit for your ${planLabel}. Please upgrade your plan to add more staff.` 
+      });
+    }
+  }
+
   if (!targetUser) {
     // Auto-create shadow staff account!
     try {

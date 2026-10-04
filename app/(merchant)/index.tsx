@@ -547,7 +547,7 @@ export default function MerchantDashboard() {
           const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
           const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
           const isStarter = activeSubscription?.plan === 'starter';
-          const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 500);
+          const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 300);
           const percentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
           const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
           const isCritical = !isPro && customerCount >= Math.round(quotaLimit * 0.95);

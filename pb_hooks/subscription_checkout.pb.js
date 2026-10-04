@@ -44,7 +44,7 @@ routerAdd("POST", "/api/risev/merchant/subscription/checkout", (e) => {
 
   // Pricing Matrix (in RM)
   const PRICING = {
-    starter: { monthly: 47, annually: 456, quota: 500, title: "Starter Plan" },
+    starter: { monthly: 47, annually: 456, quota: 300, title: "Starter Plan" },
     pro: { monthly: 97, annually: 936, quota: "unlimited", title: "PRO Plan" },
     business: { monthly: 329, annually: 3156, quota: "unlimited", title: "Business Plan" }
   };

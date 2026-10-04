@@ -182,7 +182,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
                   <View style={styles.checkWrap}>
                     <Ionicons name="checkmark" size={12} color="#FFC700" />
                   </View>
-                  <Text style={styles.featureText}>Up to 5 staff accounts</Text>
+                  <Text style={styles.featureText}>Up to 10 staff accounts</Text>
                 </View>
 
                 <View style={styles.featureRow}>

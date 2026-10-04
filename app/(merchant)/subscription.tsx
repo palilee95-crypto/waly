@@ -207,13 +207,13 @@ export default function SubscriptionScreen() {
         total,
         periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual)' : '12 Bulan (Tahunan)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
         highlights: locale === 'en' ? [
-          '500 customer quota per renewal',
+          '300 customer quota per renewal',
           'Basic analytics dashboard',
-          '1 staff account'
+          'Up to 5 staff accounts'
         ] : [
-          'Kuota 500 pelanggan setiap pembaharuan',
+          'Kuota 300 pelanggan setiap pembaharuan',
           'Papan pemuka analitik asas',
-          '1 akaun staf'
+          'Hingga 5 akaun staf'
         ]
       };
     } else if (selectedPlan === 'pro') {
@@ -237,12 +237,12 @@ export default function SubscriptionScreen() {
           'Unlimited customer database ♾️',
           'Official Meta WhatsApp Automation',
           'Promotional WhatsApp Broadcasts',
-          'Up to 5 staff accounts'
+          'Up to 10 staff accounts'
         ] : [
           'Database pelanggan tanpa had ♾️',
           'Automasi Rasmi Meta WhatsApp',
           'Pemasaran Broadcast WhatsApp',
-          'Hingga 5 akaun staf'
+          'Hingga 10 akaun staf'
         ]
       };
     } else {
@@ -333,17 +333,17 @@ export default function SubscriptionScreen() {
   const getFeaturesList = () => {
     if (selectedPlan === 'starter') {
       return [
-        '500 customer quota per renewal',
+        '300 customer quota per renewal',
         'Single Store Outlet (HQ)',
         'Basic Analytics Dashboard',
         'Up to 10 active vouchers',
-        '1 staff account',
+        'Up to 5 staff accounts',
         'Email support',
         '[LOCK] Unlimited Customer Database',
         '[LOCK] Official Meta WhatsApp Automation',
         '[LOCK] 1 Extra Branch (1 HQ + 1 Branch)',
         '[LOCK] Promotional Broadcasts',
-        '[LOCK] Up to 5 staff accounts'
+        '[LOCK] Up to 10 staff accounts'
       ];
     } else if (selectedPlan === 'pro') {
       return [
@@ -354,7 +354,7 @@ export default function SubscriptionScreen() {
         'Promotional WhatsApp Broadcasts',
         'Pro Sales & Opportunity Analytics',
         'Unlimited active vouchers',
-        'Up to 5 staff accounts',
+        'Up to 10 staff accounts',
         'Priority WhatsApp support',
         '[LOCK] Unlimited (3+) Multi-Branch Engine',
         '[LOCK] Custom integration & White-label'
@@ -457,7 +457,7 @@ export default function SubscriptionScreen() {
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
                     {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                       ? `${customerCount.toLocaleString()} (Unlimited ♾️)`
-                      : `${customerCount.toLocaleString()} / ${(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 500).toLocaleString()}`}
+                      : `${customerCount.toLocaleString()} / ${(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300).toLocaleString()}`}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
@@ -465,7 +465,7 @@ export default function SubscriptionScreen() {
                     height: '100%', 
                     width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                       ? '100%'
-                      : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 500)) * 100))}%`, 
+                      : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300)) * 100))}%`, 
                     backgroundColor: '#FFC700', 
                     borderRadius: 3 
                   }} />

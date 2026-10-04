@@ -71,7 +71,7 @@ onRecordCreate((e) => {
           }
         }
 
-        // 2. Starter Plan: 500 customer quota per renewal cycle
+        // 2. Starter Plan: 300 customer quota per renewal cycle
         if (plan === 'starter') {
           const subStart = activeSub.getString('created') || activeSub.getString('updated');
           let cycleStart = subStart ? new Date(subStart.replace(' ', 'T')).toISOString().replace('T', ' ').substring(0, 19) : '';
@@ -84,11 +84,11 @@ onRecordCreate((e) => {
               'loyalty_cards',
               filter,
               '-created',
-              505,
+              305,
               0
             );
-            if (cycleCards.length >= 500) {
-              throw new ForbiddenError('You have reached your 500 customer quota for this renewal cycle. Renew your subscription or upgrade to PRO for unlimited customers.');
+            if (cycleCards.length >= 300) {
+              throw new ForbiddenError('You have reached your 300 customer quota for this renewal cycle. Renew your subscription or upgrade to PRO for unlimited customers.');
             }
           } catch (qErr) {
             if (qErr.name === 'ForbiddenError') throw qErr;
