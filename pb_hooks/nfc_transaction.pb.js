@@ -61,6 +61,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       program.set("is_active", true);
       program.set("reward_name", "Free Reward");
       program.set("reward_description", "Free reward upon completing stamp card");
+      program.set("enable_stamps", true);
+      program.set("enable_points", true);
+      program.set("spend_per_point", 1);
       $app.save(program);
     }
 

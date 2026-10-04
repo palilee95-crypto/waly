@@ -5,6 +5,17 @@ onRecordCreate((e) => {
   const rewardDesc = e.record.get('reward_description');
   const isActive = e.record.get('is_active');
   
+  // Guarantee both stamps and points are enabled by default for new programs
+  const stampsVal = e.record.get('enable_stamps');
+  const pointsVal = e.record.get('enable_points');
+  if (stampsVal === null || stampsVal === undefined || (stampsVal === false && pointsVal === false)) {
+    e.record.set('enable_stamps', true);
+    e.record.set('enable_points', true);
+  }
+  if (!e.record.get('spend_per_point')) {
+    e.record.set('spend_per_point', 1);
+  }
+  
   if (isActive) {
     // Deactivate other active programs for this merchant
     try {

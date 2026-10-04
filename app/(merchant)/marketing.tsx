@@ -959,6 +959,12 @@ export default function MarketingScreen() {
         expiry_days: days,
       };
 
+      if (!programId) {
+        payload.enable_stamps = true;
+        payload.enable_points = true;
+        payload.spend_per_point = 1;
+      }
+
       if (bgFile) {
         // Create FormData for multipart image upload
         const formData = new FormData();

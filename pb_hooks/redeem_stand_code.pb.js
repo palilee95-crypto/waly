@@ -177,6 +177,53 @@ routerAdd("POST", "/api/risev/merchant/redeem-stand-code", (c) => {
     codeRecord.set("redeemed_at", nowStr);
     $app.save(codeRecord);
 
+    // 6. Ensure merchant has an active loyalty program with both stamps and points enabled
+    try {
+      const existingProgs = $app.findRecordsByFilter(
+        "loyalty_programs",
+        `merchant = '${merchantId}'`,
+        "-created",
+        1,
+        0
+      );
+      if (existingProgs.length > 0) {
+        const prog = existingProgs[0];
+        let progChanged = false;
+        // If uninitialized (null/undefined or both false from SQLite zero default)
+        const stampsVal = prog.get("enable_stamps");
+        const pointsVal = prog.get("enable_points");
+        if (stampsVal === null || stampsVal === undefined || (stampsVal === false && pointsVal === false)) {
+          prog.set("enable_stamps", true);
+          prog.set("enable_points", true);
+          progChanged = true;
+        }
+        if (!prog.get("spend_per_point")) {
+          prog.set("spend_per_point", 1);
+          progChanged = true;
+        }
+        if (progChanged) {
+          $app.save(prog);
+        }
+      } else {
+        const progCol = $app.findCollectionByNameOrId("loyalty_programs");
+        const newProg = new Record(progCol);
+        newProg.set("id", $security.randomString(15).toLowerCase());
+        newProg.set("merchant", merchantId);
+        newProg.set("name", "Standard Loyalty Card");
+        newProg.set("stamp_goal", 10);
+        newProg.set("enable_stamps", true);
+        newProg.set("enable_points", true);
+        newProg.set("spend_per_point", 1);
+        newProg.set("status", "active");
+        newProg.set("is_active", true);
+        newProg.set("reward_name", "Free Reward");
+        newProg.set("reward_description", "Free reward upon completing stamp card");
+        $app.save(newProg);
+      }
+    } catch (progErr) {
+      console.log("[REDEEM STAND CODE] Loyalty program initialization notice:", progErr.message || progErr);
+    }
+
     console.log(`[REDEEM STAND CODE] Merchant ${merchantId} activated ${targetPlan} using code ${rawCode} (Branch: ${branchId || 'HQ'})`);
 
     return c.json(200, {
