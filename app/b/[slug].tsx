@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -47,6 +47,32 @@ export default function CustomerBookingPwaScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
 
+  // Dynamic upcoming dates from today
+  const upcomingDates = useMemo(() => {
+    const list = [];
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayNum = d.getDate().toString();
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+      const year = d.getFullYear();
+      const iso = d.toISOString().split('T')[0];
+      const full = `${dayName}, ${dayNum} ${monthName} ${year}`;
+      list.push({ day: dayName, num: dayNum, monthName, year, iso, full });
+    }
+    return list;
+  }, []);
+
+  const timeSlotsByPeriod = useMemo(() => {
+    return {
+      Morning: ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'],
+      Afternoon: ['12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'],
+      Evening: ['05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM']
+    };
+  }, []);
+
   // Wizard state (0 = Storefront Profile, 1 = Select Service, 2 = Pick Date & Time, 3 = Details, 4 = Confirmed Pass)
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -59,9 +85,15 @@ export default function CustomerBookingPwaScreen() {
   // Selection states
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<BranchItem | null>(null);
+  const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffItem | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('Tue, 5 Oct 2026');
+  const [showStaffPicker, setShowStaffPicker] = useState(false);
+  const [selectedIsoDate, setSelectedIsoDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.toLocaleDateString('en-US', { weekday: 'short' })}, ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })} ${d.getFullYear()}`;
+  });
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<'Morning' | 'Afternoon' | 'Evening'>('Morning');
   const [selectedTime, setSelectedTime] = useState<string>('11:00 AM');
   const [customerName, setCustomerName] = useState('');
@@ -254,7 +286,7 @@ export default function CustomerBookingPwaScreen() {
           staff: (selectedStaff?.id && selectedStaff.id !== 'any') ? selectedStaff.id : null,
           customer_name: customerName,
           customer_phone: customerPhone,
-          booking_date: new Date().toISOString().split('T')[0],
+          booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
           start_time: selectedTime,
           service_name: selectedServices.map(s => s.name).join(', '),
           staff_name: selectedStaff?.name || 'Any Provider',
@@ -633,43 +665,96 @@ export default function CustomerBookingPwaScreen() {
           <View style={styles.stepContainer}>
             
             {/* Branch Selector Dropdown Box */}
-            <View style={styles.dropdownCardBox}>
+            <TouchableOpacity
+              style={styles.dropdownCardBox}
+              onPress={() => setShowBranchPicker(!showBranchPicker)}
+              activeOpacity={0.7}
+            >
               <Ionicons name="location-outline" size={18} color="#0F172A" />
-              <Text style={styles.dropdownTextValue}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
-              <Ionicons name="chevron-down" size={18} color="#64748B" />
-            </View>
+              <Text style={styles.dropdownTextValue}>{selectedBranch?.name || 'Main Branch'}</Text>
+              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+            </TouchableOpacity>
+
+            {showBranchPicker && branches.length > 0 && (
+              <View style={styles.pickerOptionsContainer}>
+                {branches.map(br => (
+                  <TouchableOpacity
+                    key={br.id}
+                    style={[styles.pickerOptionItem, selectedBranch?.id === br.id && styles.pickerOptionItemActive]}
+                    onPress={() => {
+                      setSelectedBranch(br);
+                      setShowBranchPicker(false);
+                    }}
+                  >
+                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? "#000" : "#64748B"} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickerOptionItemTitle, selectedBranch?.id === br.id && styles.pickerOptionItemTitleActive]}>
+                        {br.name}
+                      </Text>
+                      {br.address ? <Text style={styles.pickerOptionItemSub}>{br.address}</Text> : null}
+                    </View>
+                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color="#000" />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Provider Selector Dropdown Box */}
-            <View style={styles.dropdownCardBox}>
+            <TouchableOpacity
+              style={styles.dropdownCardBox}
+              onPress={() => setShowStaffPicker(!showStaffPicker)}
+              activeOpacity={0.7}
+            >
               <Ionicons name="person-outline" size={18} color="#0F172A" />
               <Text style={styles.dropdownTextValue}>{selectedStaff?.name || 'Any Provider'}</Text>
-              <Ionicons name="chevron-down" size={18} color="#64748B" />
-            </View>
+              <Ionicons name={showStaffPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+            </TouchableOpacity>
+
+            {showStaffPicker && staffList.length > 0 && (
+              <View style={styles.pickerOptionsContainer}>
+                {staffList.map(st => (
+                  <TouchableOpacity
+                    key={st.id}
+                    style={[styles.pickerOptionItem, selectedStaff?.id === st.id && styles.pickerOptionItemActive]}
+                    onPress={() => {
+                      setSelectedStaff(st);
+                      setShowStaffPicker(false);
+                    }}
+                  >
+                    <Ionicons name="person-circle-outline" size={18} color={selectedStaff?.id === st.id ? "#000" : "#64748B"} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickerOptionItemTitle, selectedStaff?.id === st.id && styles.pickerOptionItemTitleActive]}>
+                        {st.name}
+                      </Text>
+                      {st.role_title ? <Text style={styles.pickerOptionItemSub}>{st.role_title}</Text> : null}
+                    </View>
+                    {selectedStaff?.id === st.id && <Ionicons name="checkmark-circle" size={16} color="#000" />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Date Picker Header */}
             <View style={styles.datePickerHeaderRow}>
               <Text style={styles.dateGroupTitle}>Select Date</Text>
-              <Text style={styles.monthYearTitle}>October 2026</Text>
+              <Text style={styles.monthYearTitle}>
+                {upcomingDates.find(d => d.iso === selectedIsoDate)?.monthName || 'Upcoming'}{' '}
+                {upcomingDates.find(d => d.iso === selectedIsoDate)?.year || new Date().getFullYear()}
+              </Text>
             </View>
 
             {/* Horizontal Day Selector Strip */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
-              {[
-                { day: 'Sun', num: '3' },
-                { day: 'Mon', num: '4' },
-                { day: 'Tue', num: '5', active: true },
-                { day: 'Wed', num: '6' },
-                { day: 'Thu', num: '7' },
-                { day: 'Fri', num: '8' },
-                { day: 'Sat', num: '9' },
-              ].map(dt => {
-                const dateFull = `${dt.day}, ${dt.num} Oct 2026`;
-                const isSelected = selectedDate.includes(`${dt.num} Oct`);
+              {upcomingDates.map(dt => {
+                const isSelected = selectedIsoDate === dt.iso;
                 return (
                   <TouchableOpacity
-                    key={dt.num}
+                    key={dt.iso}
                     style={[styles.dayColumnCard, isSelected && styles.dayColumnCardActive]}
-                    onPress={() => setSelectedDate(dateFull)}
+                    onPress={() => {
+                      setSelectedIsoDate(dt.iso);
+                      setSelectedDate(dt.full);
+                    }}
                     activeOpacity={0.85}
                   >
                     <Text style={[styles.dayNameText, isSelected && styles.dayNameTextActive]}>{dt.day}</Text>
@@ -686,7 +771,13 @@ export default function CustomerBookingPwaScreen() {
                 <TouchableOpacity
                   key={p}
                   style={[styles.periodSegmentPill, selectedTimePeriod === p && styles.periodSegmentPillActive]}
-                  onPress={() => setSelectedTimePeriod(p)}
+                  onPress={() => {
+                    setSelectedTimePeriod(p);
+                    const slots = timeSlotsByPeriod[p] || [];
+                    if (!slots.includes(selectedTime) && slots.length > 0) {
+                      setSelectedTime(slots[0]);
+                    }
+                  }}
                 >
                   <Text style={[styles.periodSegmentText, selectedTimePeriod === p && styles.periodSegmentTextActive]}>
                     {p}
@@ -697,12 +788,7 @@ export default function CustomerBookingPwaScreen() {
 
             {/* 3-Column Time Slot Grid */}
             <View style={styles.timeSlotsGrid}>
-              {[
-                '09:00 AM', '09:30 AM', '10:00 AM',
-                '10:30 AM', '11:00 AM', '11:30 AM',
-                '12:00 PM', '12:30 PM', '01:00 PM',
-                '01:30 PM', '02:00 PM', '02:30 PM'
-              ].map(tm => {
+              {(timeSlotsByPeriod[selectedTimePeriod] || []).map(tm => {
                 const isSelected = selectedTime === tm;
                 return (
                   <TouchableOpacity
@@ -1475,6 +1561,43 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
     flex: 1,
+  },
+  pickerOptionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 8,
+    marginBottom: 14,
+    marginTop: -4,
+    gap: 6,
+  },
+  pickerOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    gap: 10,
+  },
+  pickerOptionItemActive: {
+    backgroundColor: '#FEF08A',
+  },
+  pickerOptionItemTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  pickerOptionItemTitleActive: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  pickerOptionItemSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
   },
   datePickerHeaderRow: {
     flexDirection: 'row',

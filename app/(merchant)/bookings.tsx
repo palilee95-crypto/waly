@@ -110,6 +110,15 @@ export default function BookingsScreen() {
   const [depositPolicy, setDepositPolicy] = useState('No deposit');
   const [isSavingService, setIsSavingService] = useState(false);
 
+  // Wizard Dropdown & Staff Picker States
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showBufferPicker, setShowBufferPicker] = useState(false);
+  const [showDepositPicker, setShowDepositPicker] = useState(false);
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [newStaffInput, setNewStaffInput] = useState('');
+
   // PWA State & Branding Customizer
   const [pwaSlug, setPwaSlug] = useState('store');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -263,39 +272,64 @@ export default function BookingsScreen() {
     });
   };
 
-  const handleCreateService = async () => {
-    if (!newServiceName || !newServicePrice) {
-      Alert.alert('Missing Details', 'Service name and price are required.');
+  const handleAddStaffSubmit = () => {
+    const trimmed = newStaffInput.trim();
+    if (!trimmed) {
+      setIsAddingStaff(false);
       return;
+    }
+    if (!assignedStaff.includes(trimmed)) {
+      setAssignedStaff(prev => [...prev, trimmed]);
+      if (user?.merchant_id) {
+        pb.collection('merchant_staff').create({
+          merchant: user.merchant_id,
+          name: trimmed,
+          role_title: 'Provider',
+          is_active: true
+        }).catch(() => {});
+      }
+    }
+    setNewStaffInput('');
+    setIsAddingStaff(false);
+  };
+
+  const handleCreateService = async (): Promise<boolean> => {
+    if (!newServiceName.trim()) {
+      Alert.alert('Missing Details', 'Service name is required.');
+      return false;
+    }
+    if (!newServicePrice.trim()) {
+      Alert.alert('Missing Details', 'Price is required.');
+      return false;
     }
     setIsSavingService(true);
     try {
-      const priceNum = parseFloat(newServicePrice);
+      const priceNum = parseFloat(newServicePrice) || 0;
       const durNum = parseInt(newServiceDuration) || 0;
       
       const newService: ServiceItem = {
         id: `srv-${Date.now()}`,
-        name: newServiceName,
+        name: newServiceName.trim(),
         category: newServiceCategory,
         price: priceNum,
         duration_minutes: durNum,
         item_type: addItemType,
-        is_active: true,
-        image_url: addItemType === 'service' 
+        is_active: isOnlineAvailable,
+        image_url: photoUri || (addItemType === 'service' 
           ? 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&auto=format&fit=crop&q=80')
       };
 
       if (user?.merchant_id) {
         try {
           const rec = await pb.collection('merchant_services').create({
             merchant: user.merchant_id,
-            name: newServiceName,
+            name: newServiceName.trim(),
             category: newServiceCategory,
             price: priceNum,
             duration_minutes: durNum,
             item_type: addItemType,
-            is_active: true,
+            is_active: isOnlineAvailable,
             image_url: newService.image_url
           });
           newService.id = rec.id;
@@ -307,11 +341,14 @@ export default function BookingsScreen() {
 
       setServices(prev => [newService, ...prev]);
       setShowAddServiceModal(false);
+      setAddModalStep(1);
       setNewServiceName('');
       setNewServicePrice('');
-      Alert.alert('Success', 'New item has been added to catalog.');
+      Alert.alert('Success 🎉', `"${newService.name}" has been added to your catalog.`);
+      return true;
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to add service.');
+      return false;
     } finally {
       setIsSavingService(false);
     }
@@ -1240,11 +1277,33 @@ export default function BookingsScreen() {
 
                 <View style={styles.wizardFormGroup}>
                   <Text style={styles.wizardInputLabel}>Category</Text>
-                  <View style={styles.dropdownPickerBox}>
+                  <TouchableOpacity
+                    style={styles.dropdownPickerBox}
+                    onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+                    activeOpacity={0.7}
+                  >
                     <Ionicons name="cut-outline" size={16} color="#000" />
                     <Text style={styles.dropdownPickerValue}>{newServiceCategory}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748B" />
-                  </View>
+                    <Ionicons name={showCategoryPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                  </TouchableOpacity>
+                  {showCategoryPicker && (
+                    <View style={styles.pickerOptionsWrap}>
+                      {['Haircut', 'Hair Treatment', 'Shave & Beard', 'Facial & Spa', 'Styling', 'Coloring', 'Massage', 'Other'].map(cat => (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[styles.pickerOptionChip, newServiceCategory === cat && styles.pickerOptionChipActive]}
+                          onPress={() => {
+                            setNewServiceCategory(cat);
+                            setShowCategoryPicker(false);
+                          }}
+                        >
+                          <Text style={[styles.pickerOptionText, newServiceCategory === cat && styles.pickerOptionTextActive]}>
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Price & Duration */}
@@ -1263,12 +1322,35 @@ export default function BookingsScreen() {
 
                   <View style={{ flex: 1 }}>
                     <Text style={styles.wizardInputLabel}>Duration</Text>
-                    <View style={styles.dropdownPickerBox}>
-                      <Text style={styles.dropdownPickerValue}>{newServiceDuration} minutes</Text>
-                      <Ionicons name="chevron-down" size={16} color="#64748B" />
-                    </View>
+                    <TouchableOpacity
+                      style={styles.dropdownPickerBox}
+                      onPress={() => setShowDurationPicker(!showDurationPicker)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.dropdownPickerValue}>{newServiceDuration} mins</Text>
+                      <Ionicons name={showDurationPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                    </TouchableOpacity>
                   </View>
                 </View>
+
+                {showDurationPicker && (
+                  <View style={[styles.pickerOptionsWrap, { marginBottom: 16, marginTop: -8 }]}>
+                    {['15', '30', '45', '60', '90', '120'].map(dur => (
+                      <TouchableOpacity
+                        key={dur}
+                        style={[styles.pickerOptionChip, newServiceDuration === dur && styles.pickerOptionChipActive]}
+                        onPress={() => {
+                          setNewServiceDuration(dur);
+                          setShowDurationPicker(false);
+                        }}
+                      >
+                        <Text style={[styles.pickerOptionText, newServiceDuration === dur && styles.pickerOptionTextActive]}>
+                          {dur} mins
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
                 {/* Available for Online Booking Toggle */}
                 <View style={styles.toggleRowCard}>
@@ -1286,14 +1368,34 @@ export default function BookingsScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Primary Button */}
-                <TouchableOpacity
-                  style={styles.btnWizardPrimary}
-                  onPress={() => setAddModalStep(3)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.btnWizardPrimaryText}>Next: More Settings ➔</Text>
-                </TouchableOpacity>
+                {/* Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={[styles.btnWizardPrimary, { flex: 1, backgroundColor: '#F1F5F9', elevation: 0, shadowOpacity: 0 }]}
+                    onPress={async () => {
+                      const ok = await handleCreateService();
+                      if (ok) {
+                        setAddModalStep(1);
+                      }
+                    }}
+                    disabled={isSavingService}
+                    activeOpacity={0.8}
+                  >
+                    {isSavingService ? (
+                      <ActivityIndicator color="#000" />
+                    ) : (
+                      <Text style={[styles.btnWizardPrimaryText, { color: '#0F172A' }]}>Quick Save</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.btnWizardPrimary, { flex: 1.4 }]}
+                    onPress={() => setAddModalStep(3)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.btnWizardPrimaryText}>More Settings ➔</Text>
+                  </TouchableOpacity>
+                </View>
 
               </ScrollView>
             )}
@@ -1331,7 +1433,6 @@ export default function BookingsScreen() {
                       <Text style={styles.settingTitle}>Staff Assignment</Text>
                       <Text style={styles.settingSub}>Choose who can provide this service</Text>
                     </View>
-                    <Ionicons name="chevron-up" size={18} color="#64748B" />
                   </View>
 
                   {/* Selected Staff Chips */}
@@ -1349,11 +1450,48 @@ export default function BookingsScreen() {
                       </View>
                     ))}
 
-                    <TouchableOpacity style={styles.btnAddStaffPill} onPress={() => setAssignedStaff(prev => [...prev, 'Aiman'])}>
-                      <Ionicons name="add" size={14} color="#000" />
-                      <Text style={styles.btnAddStaffText}>Add Staff</Text>
-                    </TouchableOpacity>
+                    {!isAddingStaff && (
+                      <TouchableOpacity
+                        style={styles.btnAddStaffPill}
+                        onPress={() => setIsAddingStaff(true)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="add" size={14} color="#000" />
+                        <Text style={styles.btnAddStaffText}>Add Staff</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
+
+                  {/* Inline Staff Input */}
+                  {isAddingStaff && (
+                    <View style={styles.staffInputWrap}>
+                      <TextInput
+                        style={styles.staffInputField}
+                        placeholder="Staff or Provider Name..."
+                        placeholderTextColor="#94A3B8"
+                        value={newStaffInput}
+                        onChangeText={setNewStaffInput}
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        style={styles.btnStaffInlineAdd}
+                        onPress={handleAddStaffSubmit}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="checkmark" size={16} color="#000" />
+                        <Text style={styles.btnStaffInlineAddText}>Add</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.btnStaffInlineCancel}
+                        onPress={() => {
+                          setNewStaffInput('');
+                          setIsAddingStaff(false);
+                        }}
+                      >
+                        <Ionicons name="close" size={16} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 {/* Settings Card 2: Location */}
@@ -1364,13 +1502,35 @@ export default function BookingsScreen() {
                       <Text style={styles.settingTitle}>Location</Text>
                       <Text style={styles.settingSub}>Where is this service provided?</Text>
                     </View>
-                    <Ionicons name="chevron-up" size={18} color="#64748B" />
                   </View>
 
-                  <View style={styles.dropdownPickerBox}>
+                  <TouchableOpacity
+                    style={styles.dropdownPickerBox}
+                    onPress={() => setShowLocationPicker(!showLocationPicker)}
+                    activeOpacity={0.7}
+                  >
                     <Text style={styles.dropdownPickerValue}>{selectedLocation}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748B" />
-                  </View>
+                    <Ionicons name={showLocationPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {showLocationPicker && (
+                    <View style={styles.pickerOptionsWrap}>
+                      {['Main Branch', 'Branch 2 (Sentral)', 'At Customer Location', 'Online / Virtual'].map(loc => (
+                        <TouchableOpacity
+                          key={loc}
+                          style={[styles.pickerOptionChip, selectedLocation === loc && styles.pickerOptionChipActive]}
+                          onPress={() => {
+                            setSelectedLocation(loc);
+                            setShowLocationPicker(false);
+                          }}
+                        >
+                          <Text style={[styles.pickerOptionText, selectedLocation === loc && styles.pickerOptionTextActive]}>
+                            {loc}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Settings Card 3: Buffer Time */}
@@ -1381,13 +1541,35 @@ export default function BookingsScreen() {
                       <Text style={styles.settingTitle}>Buffer Time</Text>
                       <Text style={styles.settingSub}>Add time before and after each booking</Text>
                     </View>
-                    <Ionicons name="chevron-up" size={18} color="#64748B" />
                   </View>
 
-                  <View style={styles.dropdownPickerBox}>
+                  <TouchableOpacity
+                    style={styles.dropdownPickerBox}
+                    onPress={() => setShowBufferPicker(!showBufferPicker)}
+                    activeOpacity={0.7}
+                  >
                     <Text style={styles.dropdownPickerValue}>{bufferTime}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748B" />
-                  </View>
+                    <Ionicons name={showBufferPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {showBufferPicker && (
+                    <View style={styles.pickerOptionsWrap}>
+                      {['No buffer', '5 minutes', '10 minutes', '15 minutes', '30 minutes'].map(buf => (
+                        <TouchableOpacity
+                          key={buf}
+                          style={[styles.pickerOptionChip, bufferTime === buf && styles.pickerOptionChipActive]}
+                          onPress={() => {
+                            setBufferTime(buf);
+                            setShowBufferPicker(false);
+                          }}
+                        >
+                          <Text style={[styles.pickerOptionText, bufferTime === buf && styles.pickerOptionTextActive]}>
+                            {buf}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Settings Card 4: Deposit */}
@@ -1398,21 +1580,45 @@ export default function BookingsScreen() {
                       <Text style={styles.settingTitle}>Deposit</Text>
                       <Text style={styles.settingSub}>Require a deposit to confirm booking</Text>
                     </View>
-                    <Ionicons name="chevron-up" size={18} color="#64748B" />
                   </View>
 
-                  <View style={styles.dropdownPickerBox}>
+                  <TouchableOpacity
+                    style={styles.dropdownPickerBox}
+                    onPress={() => setShowDepositPicker(!showDepositPicker)}
+                    activeOpacity={0.7}
+                  >
                     <Text style={styles.dropdownPickerValue}>{depositPolicy}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#64748B" />
-                  </View>
+                    <Ionicons name={showDepositPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {showDepositPicker && (
+                    <View style={styles.pickerOptionsWrap}>
+                      {['No deposit', 'RM 10.00', 'RM 20.00', '50% Deposit', 'Full Payment Required'].map(dep => (
+                        <TouchableOpacity
+                          key={dep}
+                          style={[styles.pickerOptionChip, depositPolicy === dep && styles.pickerOptionChipActive]}
+                          onPress={() => {
+                            setDepositPolicy(dep);
+                            setShowDepositPicker(false);
+                          }}
+                        >
+                          <Text style={[styles.pickerOptionText, depositPolicy === dep && styles.pickerOptionTextActive]}>
+                            {dep}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Submit Button */}
                 <TouchableOpacity
                   style={styles.btnWizardPrimary}
-                  onPress={() => {
-                    handleCreateService();
-                    setAddModalStep(1);
+                  onPress={async () => {
+                    const ok = await handleCreateService();
+                    if (ok) {
+                      setAddModalStep(1);
+                    }
                   }}
                   disabled={isSavingService}
                   activeOpacity={0.85}
@@ -1561,84 +1767,52 @@ export default function BookingsScreen() {
               {/* Selected Day Schedule Title Row */}
               <View style={styles.dayScheduleHeaderRow}>
                 <Text style={styles.dayScheduleTitle}>{selectedDateTitle}</Text>
-                <Text style={styles.dayScheduleSub}>8 appointments</Text>
+                <Text style={styles.dayScheduleSub}>{bookings.length} {bookings.length === 1 ? 'appointment' : 'appointments'}</Text>
               </View>
 
               {/* Appointment Cards List Below Calendar */}
               <View style={styles.dayApptList}>
-                
-                {/* Appointment 1 */}
-                <View style={styles.calApptCard}>
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80' }}
-                    style={styles.calCustAvatar}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.calApptTime}>10:00 AM – 10:30 AM</Text>
-                    <Text style={styles.calCustName}>Hafiz Danial</Text>
-                    <Text style={styles.calSrvStaff}>Signature Fade Cut • Aiman</Text>
+                {bookings.length === 0 ? (
+                  <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+                    <Ionicons name="calendar-outline" size={44} color="#CBD5E1" />
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginTop: 12 }}>
+                      No Appointments Found
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, textAlign: 'center', paddingHorizontal: 30 }}>
+                      When customers book appointments online or in-store, they will appear right here.
+                    </Text>
                   </View>
-                  <View style={styles.badgeConfirmed}>
-                    <Ionicons name="checkmark-circle" size={12} color="#2563EB" />
-                    <Text style={styles.badgeConfirmedText}>Confirmed</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                </View>
-
-                {/* Appointment 2 */}
-                <View style={styles.calApptCard}>
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80' }}
-                    style={styles.calCustAvatar}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.calApptTime}>11:00 AM – 12:00 PM</Text>
-                    <Text style={styles.calCustName}>Sarah Lim</Text>
-                    <Text style={styles.calSrvStaff}>Hair Treatment • Sarah</Text>
-                  </View>
-                  <View style={styles.badgeArrived}>
-                    <Ionicons name="checkmark-circle" size={12} color="#15803D" />
-                    <Text style={styles.badgeArrivedText}>Arrived</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                </View>
-
-                {/* Appointment 3 */}
-                <View style={styles.calApptCard}>
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80' }}
-                    style={styles.calCustAvatar}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.calApptTime}>2:30 PM – 3:00 PM</Text>
-                    <Text style={styles.calCustName}>Ahmad Rizal</Text>
-                    <Text style={styles.calSrvStaff}>Classic Haircut • Daniel</Text>
-                  </View>
-                  <View style={styles.badgePending}>
-                    <Ionicons name="time" size={12} color="#D97706" />
-                    <Text style={styles.badgePendingText}>Pending</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                </View>
-
-                {/* Appointment 4 */}
-                <View style={styles.calApptCard}>
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80' }}
-                    style={styles.calCustAvatar}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.calApptTime}>4:00 PM – 4:30 PM</Text>
-                    <Text style={styles.calCustName}>Nurul Huda</Text>
-                    <Text style={styles.calSrvStaff}>Beard Trim • Aiman</Text>
-                  </View>
-                  <View style={styles.badgeConfirmed}>
-                    <Ionicons name="checkmark-circle" size={12} color="#2563EB" />
-                    <Text style={styles.badgeConfirmedText}>Confirmed</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                </View>
-
+                ) : (
+                  bookings.map((b) => (
+                    <TouchableOpacity
+                      key={b.id}
+                      style={styles.calApptCard}
+                      onPress={() => handleCustomerWhatsApp(b)}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80' }}
+                        style={styles.calCustAvatar}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.calApptTime}>{b.start_time || '10:00 AM'} • {b.booking_date}</Text>
+                        <Text style={styles.calCustName}>{b.customer_name || 'Customer'}</Text>
+                        <Text style={styles.calSrvStaff}>{b.service_name || 'Service'} • {b.staff_name || 'Staff'}</Text>
+                      </View>
+                      <View style={b.status === 'completed' ? styles.badgeArrived : b.status === 'cancelled' ? styles.badgePending : styles.badgeConfirmed}>
+                        <Ionicons
+                          name={b.status === 'completed' ? "checkmark-circle" : b.status === 'cancelled' ? "close-circle" : "time"}
+                          size={12}
+                          color={b.status === 'completed' ? "#15803D" : b.status === 'cancelled' ? "#EF4444" : "#2563EB"}
+                        />
+                        <Text style={b.status === 'completed' ? styles.badgeArrivedText : b.status === 'cancelled' ? [styles.badgePendingText, { color: '#EF4444' }] : styles.badgeConfirmedText}>
+                          {(b.status || 'booked').toUpperCase()}
+                        </Text>
+                      </View>
+                      <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                    </TouchableOpacity>
+                  ))
+                )}
               </View>
 
             </ScrollView>
@@ -2726,6 +2900,74 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
+  },
+  pickerOptionsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pickerOptionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  pickerOptionChipActive: {
+    backgroundColor: '#FFC700',
+    borderColor: '#EAB308',
+  },
+  pickerOptionText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  pickerOptionTextActive: {
+    color: '#000000',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  staffInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  staffInputField: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#050505',
+    paddingVertical: 4,
+  },
+  btnStaffInlineAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  btnStaffInlineAddText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  btnStaffInlineCancel: {
+    padding: 6,
   },
   typePill: {
     flex: 1,
