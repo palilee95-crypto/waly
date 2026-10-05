@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -108,8 +108,10 @@ export default function BookingsScreen() {
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration, setNewServiceDuration] = useState('30');
   const [isOnlineAvailable, setIsOnlineAvailable] = useState(true);
-  const [assignedStaff, setAssignedStaff] = useState<string[]>(['Main Provider']);
-  const [selectedLocation, setSelectedLocation] = useState('Main Branch');
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [assignedStaff, setAssignedStaff] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState('');
   const [bufferTime, setBufferTime] = useState('10 minutes');
   const [depositPolicy, setDepositPolicy] = useState('No deposit');
   const [isSavingService, setIsSavingService] = useState(false);
@@ -123,10 +125,26 @@ export default function BookingsScreen() {
   const [isAddingStaff, setIsAddingStaff] = useState(false);
   const [newStaffInput, setNewStaffInput] = useState('');
 
+  // Dynamic Location Options based on real branches + flexible options
+  const locationOptions = useMemo(() => {
+    const list: string[] = [];
+    if (branchesList && branchesList.length > 0) {
+      branchesList.forEach(b => {
+        if (b.name && !list.includes(b.name)) list.push(b.name);
+      });
+    } else {
+      const fallbackName = `${merchantData?.name || user?.name || 'Store'} (HQ)`;
+      list.push(fallbackName);
+    }
+    if (!list.includes('At Customer Location')) list.push('At Customer Location');
+    if (!list.includes('Online / Virtual')) list.push('Online / Virtual');
+    return list;
+  }, [branchesList, merchantData, user]);
+
   // PWA State & Branding Customizer
   const [pwaSlug, setPwaSlug] = useState('store');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [customCoverUrl, setCustomCoverUrl] = useState<string>('https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=800&auto=format&fit=crop&q=80');
+  const [customCoverUrl, setCustomCoverUrl] = useState<string>('');
   const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
@@ -163,7 +181,13 @@ export default function BookingsScreen() {
           setMerchantData(mRecord);
           const computedSlug = mRecord.pwa_slug || mRecord.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'store';
           setPwaSlug(computedSlug);
-          if (mRecord.cover_url) setCustomCoverUrl(mRecord.cover_url);
+          if (mRecord.banner) {
+            setCustomCoverUrl(`${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`);
+          } else if (mRecord.cover_url) {
+            setCustomCoverUrl(mRecord.cover_url);
+          } else {
+            setCustomCoverUrl('');
+          }
           if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
           if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
 
@@ -239,6 +263,48 @@ export default function BookingsScreen() {
         setServices([]);
       }
 
+      // Fetch branches (live data only, no mock fallback)
+      let bList: any[] = [];
+      try {
+        if (user?.merchant_id) {
+          const bRes = await pb.collection('branches').getFullList({
+            filter: `merchant = "${user.merchant_id}" && status = "active"`,
+            sort: '-is_hq,name',
+            requestKey: null,
+          });
+          bList = bRes || [];
+        }
+      } catch (brErr) {
+        console.warn('Error fetching branches:', brErr);
+      }
+      setBranchesList(bList);
+      if (bList.length > 0) {
+        setSelectedLocation(bList[0].name);
+      } else {
+        setSelectedLocation(`${mRecord?.name || user?.name || 'Store'} (HQ)`);
+      }
+
+      // Fetch staff members (live data only, no mock fallback)
+      let sMembers: any[] = [];
+      try {
+        if (user?.merchant_id) {
+          const sRes = await pb.send<any>('/api/risev/merchant/staff?timeframe=all&sort_by=stamps', {
+            method: 'GET',
+            headers: {
+              'Authorization': 'Bearer ' + pb.authStore.token
+            }
+          });
+          if (sRes && Array.isArray(sRes.staff)) {
+            sMembers = sRes.staff;
+          }
+        }
+      } catch (stErr) {
+        console.warn('Error fetching staff:', stErr);
+      }
+      setStaffList(sMembers);
+      const defaultStaff = user?.name || mRecord?.name || 'Owner';
+      setAssignedStaff([defaultStaff]);
+
     } catch (err) {
       console.warn('Load booking error:', err);
     } finally {
@@ -312,6 +378,12 @@ export default function BookingsScreen() {
     setNewServicePrice('');
     setNewServiceDuration('30');
     setIsOnlineAvailable(true);
+    const primaryStaff = user?.name || merchantData?.name || 'Owner';
+    setAssignedStaff([primaryStaff]);
+    const defaultLoc = branchesList.length > 0
+      ? branchesList[0].name
+      : `${merchantData?.name || user?.name || 'Store'} (HQ)`;
+    setSelectedLocation(defaultLoc);
     setShowAddServiceModal(true);
   };
 
@@ -402,9 +474,13 @@ export default function BookingsScreen() {
       };
 
       if (user?.merchant_id) {
+        const matchingBranch = branchesList.find(b => b.name === selectedLocation);
         try {
           const formData = new FormData();
           formData.append('merchant', user.merchant_id);
+          if (matchingBranch?.id) {
+            formData.append('branch', matchingBranch.id);
+          }
           formData.append('name', newServiceName.trim());
           formData.append('category', newServiceCategory);
           formData.append('price', String(priceNum));
@@ -432,6 +508,7 @@ export default function BookingsScreen() {
           try {
             const rec = await pb.collection('merchant_services').create({
               merchant: user.merchant_id,
+              ...(matchingBranch?.id ? { branch: matchingBranch.id } : {}),
               name: newServiceName.trim(),
               category: newServiceCategory,
               price: priceNum,
@@ -445,6 +522,7 @@ export default function BookingsScreen() {
             console.warn('Fallback JSON with image_url failed, trying basic fields:', jsonErr);
             const rec = await pb.collection('merchant_services').create({
               merchant: user.merchant_id,
+              ...(matchingBranch?.id ? { branch: matchingBranch.id } : {}),
               name: newServiceName.trim(),
               category: newServiceCategory,
               price: priceNum,
@@ -1001,16 +1079,29 @@ export default function BookingsScreen() {
                   
                   {/* Hero Cover Banner Image in Mockup */}
                   <View style={styles.mockupHeroCoverWrapper}>
-                    <Image
-                      source={{ uri: customCoverUrl || 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=800&auto=format&fit=crop&q=80' }}
-                      style={styles.mockupHeroCoverImg}
-                    />
+                    {customCoverUrl || merchantData?.banner ? (
+                      <Image
+                        source={{
+                          uri: customCoverUrl || (merchantData?.banner ? `${pb.baseUrl}/api/files/merchants/${merchantData.id}/${merchantData.banner}` : '')
+                        }}
+                        style={styles.mockupHeroCoverImg}
+                      />
+                    ) : (
+                      <View style={[styles.mockupHeroCoverImg, { backgroundColor: selectedBrandColor || '#121318', opacity: 0.85 }]} />
+                    )}
                     <View style={styles.mockupCoverOverlay} />
                   </View>
 
                   <View style={styles.phoneScreenHeader}>
                     <View style={styles.mockupEmblemBox}>
-                      <Text style={{ fontSize: 16 }}>✨</Text>
+                      {merchantData?.logo ? (
+                        <Image
+                          source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchantData.id}/${merchantData.logo}` }}
+                          style={{ width: 34, height: 34, borderRadius: 17 }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 16 }}>✨</Text>
+                      )}
                     </View>
 
                     <Text style={styles.miniStoreTitle}>{merchantData?.name || merchantData?.store_name || user?.name || 'My Store'}</Text>
@@ -1574,10 +1665,11 @@ export default function BookingsScreen() {
                   <View style={styles.staffChipsRow}>
                     {assignedStaff.map(st => (
                       <View key={st} style={styles.staffChipPill}>
-                        <Image
-                          source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' }}
-                          style={styles.staffChipAvatar}
-                        />
+                        <View style={styles.staffChipAvatarBadge}>
+                          <Text style={styles.staffChipAvatarBadgeText}>
+                            {(st || 'S').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
                         <Text style={styles.staffChipName}>{st}</Text>
                         <TouchableOpacity onPress={() => setAssignedStaff(prev => prev.filter(s => s !== st))}>
                           <Ionicons name="close" size={14} color="#64748B" />
@@ -1597,34 +1689,55 @@ export default function BookingsScreen() {
                     )}
                   </View>
 
-                  {/* Inline Staff Input */}
+                  {/* Inline Staff Input & Quick Suggestions */}
                   {isAddingStaff && (
-                    <View style={styles.staffInputWrap}>
-                      <TextInput
-                        style={styles.staffInputField}
-                        placeholder="Staff or Provider Name..."
-                        placeholderTextColor="#94A3B8"
-                        value={newStaffInput}
-                        onChangeText={setNewStaffInput}
-                        autoFocus
-                      />
-                      <TouchableOpacity
-                        style={styles.btnStaffInlineAdd}
-                        onPress={handleAddStaffSubmit}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="checkmark" size={16} color="#000" />
-                        <Text style={styles.btnStaffInlineAddText}>Add</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.btnStaffInlineCancel}
-                        onPress={() => {
-                          setNewStaffInput('');
-                          setIsAddingStaff(false);
-                        }}
-                      >
-                        <Ionicons name="close" size={16} color="#64748B" />
-                      </TouchableOpacity>
+                    <View style={{ marginTop: 10 }}>
+                      {staffList.filter(s => s.name && !assignedStaff.includes(s.name)).length > 0 && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                          {staffList
+                            .filter(s => s.name && !assignedStaff.includes(s.name))
+                            .map(s => (
+                              <TouchableOpacity
+                                key={s.id || s.name}
+                                style={[styles.staffChipPill, { backgroundColor: '#F8FAFC' }]}
+                                onPress={() => {
+                                  setAssignedStaff(prev => [...prev, s.name]);
+                                  setIsAddingStaff(false);
+                                }}
+                              >
+                                <Ionicons name="person-add-outline" size={12} color="#050505" />
+                                <Text style={styles.staffChipName}>{s.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                        </View>
+                      )}
+                      <View style={styles.staffInputWrap}>
+                        <TextInput
+                          style={styles.staffInputField}
+                          placeholder="Staff or Provider Name..."
+                          placeholderTextColor="#94A3B8"
+                          value={newStaffInput}
+                          onChangeText={setNewStaffInput}
+                          autoFocus
+                        />
+                        <TouchableOpacity
+                          style={styles.btnStaffInlineAdd}
+                          onPress={handleAddStaffSubmit}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="checkmark" size={16} color="#000" />
+                          <Text style={styles.btnStaffInlineAddText}>Add</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.btnStaffInlineCancel}
+                          onPress={() => {
+                            setNewStaffInput('');
+                            setIsAddingStaff(false);
+                          }}
+                        >
+                          <Ionicons name="close" size={16} color="#64748B" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -1644,13 +1757,13 @@ export default function BookingsScreen() {
                     onPress={() => setShowLocationPicker(!showLocationPicker)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.dropdownPickerValue}>{selectedLocation}</Text>
+                    <Text style={styles.dropdownPickerValue}>{selectedLocation || locationOptions[0] || 'Main Location'}</Text>
                     <Ionicons name={showLocationPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
                   </TouchableOpacity>
 
                   {showLocationPicker && (
                     <View style={styles.pickerOptionsWrap}>
-                      {['Main Branch', 'Branch 2 (Sentral)', 'At Customer Location', 'Online / Virtual'].map(loc => (
+                      {locationOptions.map(loc => (
                         <TouchableOpacity
                           key={loc}
                           style={[styles.pickerOptionChip, selectedLocation === loc && styles.pickerOptionChipActive]}
@@ -1925,10 +2038,11 @@ export default function BookingsScreen() {
                       onPress={() => handleCustomerWhatsApp(b)}
                       activeOpacity={0.8}
                     >
-                      <Image
-                        source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80' }}
-                        style={styles.calCustAvatar}
-                      />
+                      <View style={styles.calCustAvatarBadge}>
+                        <Text style={styles.calCustAvatarBadgeText}>
+                          {(b.customer_name || 'C').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.calApptTime}>{b.start_time || '10:00 AM'} • {b.booking_date}</Text>
                         <Text style={styles.calCustName}>{b.customer_name || 'Customer'}</Text>
@@ -3070,6 +3184,19 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
   },
+  staffChipAvatarBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffChipAvatarBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
   staffChipName: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -3373,6 +3500,21 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
+  },
+  calCustAvatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calCustAvatarBadgeText: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
   },
   calApptTime: {
     fontSize: 10,
