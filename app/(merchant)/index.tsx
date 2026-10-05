@@ -24,7 +24,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
-
+import MerchantNoticeCarousel from '@/components/MerchantNoticeCarousel';
 
 
 const { width } = Dimensions.get('window');
@@ -541,6 +541,46 @@ export default function MerchantDashboard() {
           )}
         </View>
 
+        {/* 📅 Booking & Appointments Quick Widget */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            padding: 14,
+            marginBottom: 14,
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 6,
+            elevation: 2,
+          }}
+          onPress={() => router.push('/(merchant)/bookings' as any)}
+          activeOpacity={0.85}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFBEA', borderWidth: 1, borderColor: '#FFC700', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="calendar" size={22} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Booking & PWA Suite</Text>
+                <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000' }}>ADD-ON</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                Urus slot temujanji, servis & semak ketibaan pelanggan
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </TouchableOpacity>
+
         {/* 🎯 Real-time Customer Quota Tracker Card */}
         {(() => {
           const txCustomersCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
@@ -636,6 +676,13 @@ export default function MerchantDashboard() {
 
 
 
+
+        {/* 📢 AUTO-ROTATING ANNOUNCEMENT CAROUSEL (Tutorials, Free Quota, Promos, Updates) */}
+        <MerchantNoticeCarousel
+          merchant={merchant}
+          locale={locale}
+          onOpenUpgrade={() => setShowUpgradeModal(true)}
+        />
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>

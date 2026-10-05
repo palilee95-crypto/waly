@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
@@ -36,6 +37,10 @@ export default function NfcClaimModal() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [merchantColor, setMerchantColor] = useState('#5C3BCC');
 
+  // Booking & Quick Add-on states
+  const [activeBooking, setActiveBooking] = useState<any>(null);
+  const [quickAddons, setQuickAddons] = useState<any[]>([]);
+
   useEffect(() => {
     if (!merchantId) return;
     (async () => {
@@ -47,6 +52,41 @@ export default function NfcClaimModal() {
       } catch (e) {}
     })();
   }, [merchantId]);
+
+  // Check active booking & quick add-ons when customer taps
+  useEffect(() => {
+    if (!claim?.customer_phone || !merchantId) {
+      setActiveBooking(null);
+      return;
+    }
+    (async () => {
+      try {
+        const bRes = await pb.collection('service_bookings').getList(1, 1, {
+          filter: `merchant = "${merchantId}" && customer_phone = "${claim.customer_phone}" && (status = "booked" || status = "arrived")`,
+          sort: '-created',
+        });
+        if (bRes.items.length > 0) {
+          const bk = bRes.items[0];
+          setActiveBooking(bk);
+          if (bk.total_price) {
+            setBillAmount(String(bk.total_price));
+          }
+        } else {
+          setActiveBooking(null);
+        }
+      } catch (e) {
+        setActiveBooking(null);
+      }
+
+      try {
+        const qRes = await pb.collection('merchant_services').getList(1, 6, {
+          filter: `merchant = "${merchantId}" && is_active = true`,
+          sort: '-item_type,price',
+        });
+        setQuickAddons(qRes.items);
+      } catch (e) {}
+    })();
+  }, [claim?.id, claim?.customer_phone, merchantId]);
 
   const activeClaimRef = React.useRef<any>(null);
   activeClaimRef.current = claim;
@@ -125,6 +165,28 @@ export default function NfcClaimModal() {
           branch_id: user?.branch || '',
         },
       });
+
+      // If customer had an active booking, mark completed & create digital receipt
+      if (activeBooking?.id) {
+        try {
+          await pb.collection('service_bookings').update(activeBooking.id, {
+            status: 'completed'
+          });
+
+          await pb.collection('digital_receipts').create({
+            merchant: merchantId,
+            booking: activeBooking.id,
+            customer_phone: claim.customer_phone,
+            receipt_number: `REC-${Date.now().toString().slice(-6)}`,
+            total_amount: bill,
+            payment_method: 'nfc_counter',
+            stamps_earned: stamps,
+            line_items: activeBooking.items_summary || [{ name: 'Service', price: bill }]
+          });
+        } catch (bErr) {
+          console.warn('Booking reconciliation note:', bErr);
+        }
+      }
 
       // Show sleek in-modal success view
       setIsSuccess(true);
@@ -312,6 +374,42 @@ export default function NfcClaimModal() {
                       </View>
                     </View>
                   </View>
+
+                  {/* Active Booking Detected Banner */}
+                  {activeBooking && (
+                    <View style={styles.activeBookingBanner}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <Ionicons name="flash" size={14} color="#D97706" />
+                        <Text style={styles.activeBookingTitle}>TEMPAHAN AKTIF DIKESAN</Text>
+                      </View>
+                      <Text style={styles.activeBookingSubtitle}>
+                        {activeBooking.items_summary?.[0]?.name || 'Temujanji Servis'} • Slot: {activeBooking.start_time || 'Hari Ini'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Quick Add-On Products Chips */}
+                  {quickAddons.length > 0 && (
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.quickAddonLabel}>+ TAMBAH PRODUK / EXTRA (1-KLIK):</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {quickAddons.map((item: any) => (
+                            <TouchableOpacity
+                              key={item.id}
+                              style={styles.quickAddonChip}
+                              onPress={() => {
+                                const currentBill = parseFloat(billAmount) || 0;
+                                setBillAmount((currentBill + (item.price || 0)).toFixed(2));
+                              }}
+                            >
+                              <Text style={styles.quickAddonChipText}>+ {item.name} (RM {item.price})</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  )}
 
                   {/* Inputs */}
                   <View style={styles.inputRow}>
@@ -787,5 +885,44 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+  },
+  activeBookingBanner: {
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1.5,
+    borderColor: '#FFC700',
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 12,
+  },
+  activeBookingTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  activeBookingSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#1A1400',
+  },
+  quickAddonLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  quickAddonChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  quickAddonChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
 });

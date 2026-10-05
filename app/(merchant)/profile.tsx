@@ -1323,6 +1323,17 @@ export default function ProfileScreen() {
 
 
           <SettingItem
+            iconName="calendar-outline"
+            title="Booking & PWA Suite"
+            subtitle="Urus slot temujanji, servis & PWA kedai anda"
+            iconBgColor="#FFFBEA"
+            iconColor="#D97706"
+            badgeText="ADD-ON ⚡"
+            badgeColor="#FFC700"
+            onPress={() => router.push('/(merchant)/bookings' as any)}
+          />
+
+          <SettingItem
             iconName="gift-outline"
             title={t('manage_rewards')}
             subtitle={t('manage_rewards_desc')}

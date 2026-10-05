@@ -983,6 +983,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="edit-profile" options={{ href: null }} />
         <Tabs.Screen name="onboarding-setup" options={{ href: null }} />
         <Tabs.Screen name="whatsapp-integration" options={{ href: null }} />
+        <Tabs.Screen name="bookings" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
 
