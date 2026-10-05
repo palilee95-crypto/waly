@@ -246,13 +246,16 @@ export default function BookingsScreen() {
   const handleSaveBranding = async () => {
     setIsSavingBranding(true);
     try {
-      if (user?.merchant_id) {
+      const targetMerchantId = user?.merchant_id || merchantData?.id;
+      if (targetMerchantId) {
+        let updated: any = null;
         if (bannerFile) {
           const formData = new FormData();
           formData.append('banner', bannerFile);
           formData.append('pwa_brand_color', selectedBrandColor);
           formData.append('subtitle', customTagline);
-          const updated = await pb.collection('merchants').update(user.merchant_id, formData);
+          formData.append('pwa_slug', pwaSlug || merchantData?.pwa_slug || 'store');
+          updated = await pb.collection('merchants').update(targetMerchantId, formData, { requestKey: null });
           setMerchantData(updated);
           if (updated.banner) {
             const bUrl = `${pb.baseUrl}/api/files/merchants/${updated.id}/${updated.banner}`;
@@ -261,16 +264,27 @@ export default function BookingsScreen() {
           }
           setBannerFile(null);
         } else {
-          const updated = await pb.collection('merchants').update(user.merchant_id, {
-            cover_url: bannerPreview || customCoverUrl || '',
+          const payload: any = {
             pwa_brand_color: selectedBrandColor,
             subtitle: customTagline,
-          });
+            pwa_slug: pwaSlug || merchantData?.pwa_slug || 'store',
+          };
+          if (customCoverUrl) {
+            payload.cover_url = customCoverUrl;
+          }
+          updated = await pb.collection('merchants').update(targetMerchantId, payload, { requestKey: null });
           setMerchantData(updated);
         }
+
+        // Keep local preview synchronized
+        broadcastPreviewUpdate({
+          brandColor: selectedBrandColor,
+          tagline: customTagline,
+          coverUrl: bannerPreview || customCoverUrl,
+        });
       }
       setPreviewRefreshKey(Date.now());
-      Alert.alert('Branding Saved', 'Your live booking PWA has been updated!');
+      Alert.alert('Branding Saved', 'Your live booking PWA color and branding have been updated!');
     } catch (e: any) {
       console.warn('Save branding error:', e);
       Alert.alert('Error', e?.message || 'Failed to update branding.');
@@ -287,31 +301,42 @@ export default function BookingsScreen() {
     setLoading(true);
     try {
       let mRecord: any = null;
-      if (user?.merchant_id) {
+      const targetMerchantId = user?.merchant_id || merchantData?.id;
+      
+      if (targetMerchantId) {
         try {
-          mRecord = await pb.collection('merchants').getOne(user.merchant_id);
-          setMerchantData(mRecord);
-          const computedSlug = mRecord.pwa_slug || mRecord.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'store';
-          setPwaSlug(computedSlug);
-          if (mRecord.banner) {
-            const bUrl = `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`;
-            setCustomCoverUrl(bUrl);
-            setBannerPreview(bUrl);
-          } else if (mRecord.cover_url) {
-            setCustomCoverUrl(mRecord.cover_url);
-            setBannerPreview(mRecord.cover_url);
-          } else {
-            setCustomCoverUrl('');
-            setBannerPreview(null);
-          }
-          if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
-          if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
-
-          if (!mRecord.pwa_slug && computedSlug && user.merchant_id) {
-            pb.collection('merchants').update(user.merchant_id, { pwa_slug: computedSlug }).catch(() => {});
-          }
+          mRecord = await pb.collection('merchants').getOne(targetMerchantId, { requestKey: null });
         } catch (e) {
-          console.warn('Error fetching merchant:', e);
+          console.warn('Error fetching merchant by ID:', e);
+        }
+      }
+
+      if (!mRecord && user?.id) {
+        try {
+          mRecord = await pb.collection('merchants').getFirstListItem(`owner = "${user.id}"`, { requestKey: null });
+        } catch (e) {}
+      }
+
+      if (mRecord) {
+        setMerchantData(mRecord);
+        const computedSlug = mRecord.pwa_slug || mRecord.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'store';
+        setPwaSlug(computedSlug);
+        if (mRecord.banner) {
+          const bUrl = `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`;
+          setCustomCoverUrl(bUrl);
+          setBannerPreview(bUrl);
+        } else if (mRecord.cover_url) {
+          setCustomCoverUrl(mRecord.cover_url);
+          setBannerPreview(mRecord.cover_url);
+        } else {
+          setCustomCoverUrl('');
+          setBannerPreview(null);
+        }
+        if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
+        if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
+
+        if (!mRecord.pwa_slug && computedSlug) {
+          pb.collection('merchants').update(mRecord.id, { pwa_slug: computedSlug }, { requestKey: null }).catch(() => {});
         }
       }
 

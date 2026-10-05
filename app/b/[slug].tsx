@@ -285,14 +285,20 @@ export default function CustomerBookingPwaScreen() {
       let mRecord: any = null;
       try {
         if (slug) {
-          mRecord = await pb.collection('merchants').getFirstListItem(`pwa_slug = "${slug}"`);
+          mRecord = await pb.collection('merchants').getFirstListItem(`pwa_slug = "${slug}"`, { requestKey: null });
         }
       } catch (slugErr) {
         try {
-          if (slug) {
-            mRecord = await pb.collection('merchants').getOne(slug as string);
-          }
-        } catch (idErr) {}
+          // Fallback 1: Match by slug formatted name (e.g. "scoop-creamy" matches "Scoop creamy")
+          const nameNormalized = (slug as string).replace(/-/g, ' ');
+          mRecord = await pb.collection('merchants').getFirstListItem(`name ~ "${nameNormalized}"`, { requestKey: null });
+        } catch (nameErr) {
+          try {
+            if (slug) {
+              mRecord = await pb.collection('merchants').getOne(slug as string, { requestKey: null });
+            }
+          } catch (idErr) {}
+        }
       }
 
       if (!mRecord) {
