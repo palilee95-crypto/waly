@@ -62,13 +62,6 @@ const COLOR_PALETTES = [
   { id: 'dark', name: 'Midnight Obsidian', primary: '#1E2028', bg: '#F1F5F9', border: '#CBD5E1' },
 ];
 
-const HERO_COVER_PRESETS = [
-  { id: 'gelato', title: 'Artisanal Gelato', url: 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=800&auto=format&fit=crop&q=80' },
-  { id: 'barber', title: 'Gentlemen Barber', url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&auto=format&fit=crop&q=80' },
-  { id: 'spa', title: 'Luxury Wellness', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80' },
-  { id: 'cafe', title: 'Modern Café', url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&auto=format&fit=crop&q=80' },
-];
-
 export default function BookingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -145,25 +138,97 @@ export default function BookingsScreen() {
   const [pwaSlug, setPwaSlug] = useState('store');
   const [copiedLink, setCopiedLink] = useState(false);
   const [customCoverUrl, setCustomCoverUrl] = useState<string>('');
+  const [bannerFile, setBannerFile] = useState<any>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
 
+  const handlePickBanner = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            setBannerFile(file);
+            const reader = new FileReader();
+            reader.onload = (event: any) => {
+              const res = event.target?.result as string;
+              setBannerPreview(res);
+              setCustomCoverUrl(res);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (e) {
+        console.warn('Web banner picker error:', e);
+      }
+    } else {
+      try {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [16, 9],
+          quality: 0.85,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          setBannerPreview(asset.uri);
+          setCustomCoverUrl(asset.uri);
+          setBannerFile({
+            uri: asset.uri,
+            name: `banner_${Date.now()}.jpg`,
+            type: 'image/jpeg'
+          });
+        }
+      } catch (err: any) {
+        Alert.alert('Error', 'Failed to pick image from library.');
+      }
+    }
+  };
+
   const handleSaveBranding = async () => {
     setIsSavingBranding(true);
     try {
       if (user?.merchant_id) {
-        await pb.collection('merchants').update(user.merchant_id, {
-          cover_url: customCoverUrl,
-          pwa_brand_color: selectedBrandColor,
-          subtitle: customTagline,
-        });
+        if (bannerFile) {
+          const formData = new FormData();
+          formData.append('banner', bannerFile);
+          formData.append('pwa_brand_color', selectedBrandColor);
+          formData.append('subtitle', customTagline);
+          const updated = await pb.collection('merchants').update(user.merchant_id, formData);
+          setMerchantData(updated);
+          if (updated.banner) {
+            const bUrl = `${pb.baseUrl}/api/files/merchants/${updated.id}/${updated.banner}`;
+            setBannerPreview(bUrl);
+            setCustomCoverUrl(bUrl);
+          }
+          setBannerFile(null);
+        } else {
+          const updated = await pb.collection('merchants').update(user.merchant_id, {
+            cover_url: bannerPreview || customCoverUrl || '',
+            pwa_brand_color: selectedBrandColor,
+            subtitle: customTagline,
+          });
+          setMerchantData(updated);
+        }
       }
       setPreviewRefreshKey(Date.now());
       Alert.alert('Branding Saved', 'Your live booking PWA has been updated!');
     } catch (e: any) {
-      Alert.alert('Branding Updated (Preview)', 'Saved locally for your booking page!');
+      console.warn('Save branding error:', e);
+      Alert.alert('Error', e?.message || 'Failed to update branding.');
     } finally {
       setIsSavingBranding(false);
     }
@@ -184,11 +249,15 @@ export default function BookingsScreen() {
           const computedSlug = mRecord.pwa_slug || mRecord.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'store';
           setPwaSlug(computedSlug);
           if (mRecord.banner) {
-            setCustomCoverUrl(`${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`);
+            const bUrl = `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`;
+            setCustomCoverUrl(bUrl);
+            setBannerPreview(bUrl);
           } else if (mRecord.cover_url) {
             setCustomCoverUrl(mRecord.cover_url);
+            setBannerPreview(mRecord.cover_url);
           } else {
             setCustomCoverUrl('');
+            setBannerPreview(null);
           }
           if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
           if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
@@ -1185,40 +1254,79 @@ export default function BookingsScreen() {
                   })}
                 </View>
 
-                {/* Hero Cover Image Selection */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 16 }]}>Custom Hero Cover Banner URL</Text>
-                <View style={styles.coverInputRow}>
-                  <Ionicons name="image-outline" size={18} color="#64748B" />
+                {/* Custom Hex Color Code */}
+                <View style={styles.hexInputRow}>
+                  <View style={[styles.hexInputSwatch, { backgroundColor: selectedBrandColor || '#FFC700' }]} />
                   <TextInput
-                    style={styles.coverTextInput}
-                    placeholder="Paste cover image URL..."
-                    value={customCoverUrl}
-                    onChangeText={setCustomCoverUrl}
+                    style={styles.hexTextInput}
+                    placeholder="#FFC700"
+                    placeholderTextColor="#94A3B8"
+                    value={selectedBrandColor}
+                    onChangeText={(val) => {
+                      let formatted = val.trim();
+                      if (formatted && !formatted.startsWith('#')) formatted = '#' + formatted;
+                      setSelectedBrandColor(formatted);
+                    }}
+                    maxLength={7}
+                    autoCapitalize="characters"
                   />
+                  <Text style={styles.hexHelperText}>Custom Hex Code</Text>
                 </View>
 
-                {/* Preset Hero Cover Library */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 12, fontSize: 11 }]}>Or choose a preset cover image:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6, marginBottom: 8 }}>
-                  {HERO_COVER_PRESETS.map(h => (
+                {/* Real Store Hero Banner Photo Uploader */}
+                <Text style={[styles.brandingFieldLabel, { marginTop: 18 }]}>Store Hero Banner Photo</Text>
+                <Text style={styles.brandingFieldSub}>
+                  Upload a high-quality photo of your storefront, salon, or workspace (16:9 recommended).
+                </Text>
+
+                <View style={styles.bannerUploadCard}>
+                  {bannerPreview ? (
+                    <View style={styles.bannerPreviewWrapper}>
+                      <Image source={{ uri: bannerPreview }} style={styles.bannerPreviewImg} />
+                      <View style={styles.bannerActionsOverlay}>
+                        <TouchableOpacity
+                          style={styles.btnChangeBannerPill}
+                          onPress={handlePickBanner}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="camera-outline" size={14} color="#FFF" />
+                          <Text style={styles.btnChangeBannerPillText}>Change Photo</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.btnRemoveBannerPill}
+                          onPress={() => {
+                            setBannerPreview(null);
+                            setBannerFile(null);
+                            setCustomCoverUrl('');
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#FFF" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
                     <TouchableOpacity
-                      key={h.id}
-                      style={[styles.presetCoverThumb, customCoverUrl === h.url && styles.presetCoverThumbSelected]}
-                      onPress={() => setCustomCoverUrl(h.url)}
-                      activeOpacity={0.8}
+                      style={styles.bannerPlaceholderBox}
+                      onPress={handlePickBanner}
+                      activeOpacity={0.7}
                     >
-                      <Image source={{ uri: h.url }} style={styles.presetCoverImg} />
-                      <Text style={styles.presetCoverLabel} numberOfLines={1}>{h.title}</Text>
+                      <View style={styles.bannerPlaceholderIconCircle}>
+                        <Ionicons name="cloud-upload-outline" size={26} color="#D97706" />
+                      </View>
+                      <Text style={styles.bannerPlaceholderTitle}>Tap to Upload Store Banner</Text>
+                      <Text style={styles.bannerPlaceholderSubtitle}>PNG, JPG, or WEBP up to 5MB</Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                  )}
+                </View>
 
                 {/* Tagline Field */}
                 <Text style={[styles.brandingFieldLabel, { marginTop: 12 }]}>Store Tagline & Subtitle</Text>
-                <View style={styles.coverInputRow}>
+                <View style={styles.taglineInputRow}>
                   <Ionicons name="pricetag-outline" size={18} color="#64748B" />
                   <TextInput
-                    style={styles.coverTextInput}
+                    style={styles.taglineTextInput}
                     placeholder="e.g. Handcrafted Gelato • Waffles • Desserts"
                     value={customTagline}
                     onChangeText={setCustomTagline}
@@ -3760,7 +3868,120 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#334155',
   },
-  coverInputRow: {
+  hexInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  hexInputSwatch: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  hexTextInput: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    width: 80,
+  },
+  hexHelperText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginLeft: 'auto',
+  },
+  brandingFieldSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  bannerUploadCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  bannerPreviewWrapper: {
+    width: '100%',
+    height: 140,
+    position: 'relative',
+  },
+  bannerPreviewImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  bannerActionsOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  btnChangeBannerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  btnChangeBannerPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  btnRemoveBannerPill: {
+    backgroundColor: 'rgba(239,68,68,0.85)',
+    padding: 6,
+    borderRadius: 20,
+  },
+  bannerPlaceholderBox: {
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    borderRadius: 16,
+  },
+  bannerPlaceholderIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  bannerPlaceholderTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  bannerPlaceholderSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  taglineInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -3772,36 +3993,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
   },
-  coverTextInput: {
+  taglineTextInput: {
     flex: 1,
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#0F172A',
-  },
-  presetCoverThumb: {
-    width: 96,
-    marginRight: 10,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    backgroundColor: '#F1F5F9',
-  },
-  presetCoverThumbSelected: {
-    borderColor: '#000000',
-  },
-  presetCoverImg: {
-    width: '100%',
-    height: 52,
-    borderRadius: 10,
-  },
-  presetCoverLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
-    textAlign: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 2,
   },
   btnSaveBranding: {
     flexDirection: 'row',
