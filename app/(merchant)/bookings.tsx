@@ -1081,18 +1081,18 @@ export default function BookingsScreen() {
                 <View style={styles.previewToolbar}>
                   <View style={styles.previewUrlBadge}>
                     <Text style={styles.previewLiveDot}>●</Text>
-                    <Text style={styles.previewUrlText} numberOfLines={1}>
+                    <Text style={styles.previewUrlText} numberOfLines={1} ellipsizeMode="tail">
                       /b/{pwaSlug}
                     </Text>
                   </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 }}>
                     <TouchableOpacity
                       style={styles.btnToolbarAction}
                       onPress={() => setPreviewRefreshKey(Date.now())}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="reload" size={14} color="#0F172A" />
+                      <Ionicons name="reload" size={13} color="#0F172A" />
                       <Text style={styles.btnToolbarActionText}>Reload</Text>
                     </TouchableOpacity>
 
@@ -1108,8 +1108,8 @@ export default function BookingsScreen() {
                       }}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="open-outline" size={14} color="#000" />
-                      <Text style={styles.btnToolbarActionPrimaryText}>Open Live ↗</Text>
+                      <Ionicons name="open-outline" size={13} color="#000" />
+                      <Text style={styles.btnToolbarActionPrimaryText}>Open ↗</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2730,8 +2730,8 @@ const styles = StyleSheet.create({
   // Live Interactive PWA Preview Container
   previewContainerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 22,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 20,
@@ -2747,40 +2747,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    marginBottom: 16,
+    marginBottom: 12,
+    gap: 6,
   },
   previewUrlBadge: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: 20,
-    maxWidth: '55%',
+    borderRadius: 16,
   },
   previewLiveDot: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#22C55E',
   },
   previewUrlText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
+    flexShrink: 1,
   },
   btnToolbarAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   btnToolbarActionText: {
     fontSize: 11,
