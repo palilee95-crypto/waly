@@ -24,6 +24,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
+import * as ImagePicker from 'expo-image-picker';
 import BookingAccessModal from './_components/BookingAccessModal';
 
 interface BookingItem {
@@ -100,7 +101,8 @@ export default function BookingsScreen() {
   // Add Item Wizard State (Step 1, 2, 3)
   const [addModalStep, setAddModalStep] = useState<1 | 2 | 3>(1);
   const [addItemType, setAddItemType] = useState<'service' | 'class' | 'product' | 'addon'>('service');
-  const [photoUri, setPhotoUri] = useState<string | null>('https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<any>(null);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceCategory, setNewServiceCategory] = useState('Haircut');
   const [newServicePrice, setNewServicePrice] = useState('');
@@ -224,7 +226,12 @@ export default function BookingsScreen() {
             filter: `merchant = "${user.merchant_id}"`,
             sort: 'created'
           });
-          sItems = sRes.items;
+          sItems = sRes.items.map((item: any) => ({
+            ...item,
+            image_url: item.image
+              ? `${pb.baseUrl}/api/files/merchant_services/${item.id}/${item.image}`
+              : (item.image_url || '')
+          }));
         }
         setServices(sItems as any);
       } catch (sErr) {
@@ -295,6 +302,78 @@ export default function BookingsScreen() {
     setIsAddingStaff(false);
   };
 
+  const handleOpenAddService = () => {
+    setAddModalStep(1);
+    setAddItemType('service');
+    setPhotoUri(null);
+    setPhotoFile(null);
+    setNewServiceName('');
+    setNewServiceCategory('Haircut');
+    setNewServicePrice('');
+    setNewServiceDuration('30');
+    setIsOnlineAvailable(true);
+    setShowAddServiceModal(true);
+  };
+
+  const handleCloseAddService = () => {
+    setShowAddServiceModal(false);
+    setAddModalStep(1);
+    setPhotoUri(null);
+    setPhotoFile(null);
+    setNewServiceName('');
+    setNewServicePrice('');
+  };
+
+  const handlePickPhoto = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            setPhotoFile(file);
+            const reader = new FileReader();
+            reader.onload = (event: any) => {
+              setPhotoUri(event.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (e) {
+        console.warn('Web file picker error:', e);
+      }
+    } else {
+      try {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          setPhotoUri(asset.uri);
+          setPhotoFile({
+            uri: asset.uri,
+            name: `service_${Date.now()}.jpg`,
+            type: 'image/jpeg'
+          });
+        }
+      } catch (err: any) {
+        Alert.alert('Error', 'Failed to pick image from library.');
+      }
+    }
+  };
+
   const handleCreateService = async (): Promise<boolean> => {
     if (!newServiceName.trim()) {
       Alert.alert('Missing Details', 'Service name is required.');
@@ -309,6 +388,8 @@ export default function BookingsScreen() {
       const priceNum = parseFloat(newServicePrice) || 0;
       const durNum = parseInt(newServiceDuration) || 0;
       
+      let finalImageUrl = photoUri || '';
+
       const newService: ServiceItem = {
         id: `srv-${Date.now()}`,
         name: newServiceName.trim(),
@@ -317,35 +398,67 @@ export default function BookingsScreen() {
         duration_minutes: durNum,
         item_type: addItemType,
         is_active: isOnlineAvailable,
-        image_url: photoUri || (addItemType === 'service' 
-          ? 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&auto=format&fit=crop&q=80')
+        image_url: finalImageUrl
       };
 
       if (user?.merchant_id) {
         try {
-          const rec = await pb.collection('merchant_services').create({
-            merchant: user.merchant_id,
-            name: newServiceName.trim(),
-            category: newServiceCategory,
-            price: priceNum,
-            duration_minutes: durNum,
-            item_type: addItemType,
-            is_active: isOnlineAvailable,
-            image_url: newService.image_url
-          });
+          const formData = new FormData();
+          formData.append('merchant', user.merchant_id);
+          formData.append('name', newServiceName.trim());
+          formData.append('category', newServiceCategory);
+          formData.append('price', String(priceNum));
+          formData.append('duration_minutes', String(durNum));
+          formData.append('item_type', addItemType);
+          formData.append('is_active', String(isOnlineAvailable));
+
+          if (photoFile) {
+            formData.append('image', photoFile);
+          } else if (photoUri && !photoUri.startsWith('data:')) {
+            formData.append('image_url', photoUri);
+          }
+
+          const rec = await pb.collection('merchant_services').create(formData);
           newService.id = rec.id;
+          if (rec.image) {
+            finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+            newService.image_url = finalImageUrl;
+          } else if (rec.image_url) {
+            finalImageUrl = rec.image_url;
+            newService.image_url = finalImageUrl;
+          }
         } catch (pbErr: any) {
-          console.warn('Failed to save service in PB:', pbErr);
-          throw pbErr;
+          console.warn('FormData create failed, trying fallback JSON:', pbErr);
+          try {
+            const rec = await pb.collection('merchant_services').create({
+              merchant: user.merchant_id,
+              name: newServiceName.trim(),
+              category: newServiceCategory,
+              price: priceNum,
+              duration_minutes: durNum,
+              item_type: addItemType,
+              is_active: isOnlineAvailable,
+              image_url: photoUri || ''
+            });
+            newService.id = rec.id;
+          } catch (jsonErr: any) {
+            console.warn('Fallback JSON with image_url failed, trying basic fields:', jsonErr);
+            const rec = await pb.collection('merchant_services').create({
+              merchant: user.merchant_id,
+              name: newServiceName.trim(),
+              category: newServiceCategory,
+              price: priceNum,
+              duration_minutes: durNum,
+              item_type: addItemType,
+              is_active: isOnlineAvailable
+            });
+            newService.id = rec.id;
+          }
         }
       }
 
       setServices(prev => [newService, ...prev]);
-      setShowAddServiceModal(false);
-      setAddModalStep(1);
-      setNewServiceName('');
-      setNewServicePrice('');
+      handleCloseAddService();
       Alert.alert('Success 🎉', `"${newService.name}" has been added to your catalog.`);
       return true;
     } catch (err: any) {
@@ -760,7 +873,7 @@ export default function BookingsScreen() {
                 </View>
                 <TouchableOpacity
                   style={styles.btnAddItemPill}
-                  onPress={() => setShowAddServiceModal(true)}
+                  onPress={handleOpenAddService}
                   activeOpacity={0.85}
                 >
                   <Ionicons name="add" size={16} color="#000" />
@@ -792,10 +905,20 @@ export default function BookingsScreen() {
                 <View style={styles.servicesCatalogList}>
                   {filteredServices.map(s => (
                     <View key={s.id} style={styles.catalogCard}>
-                      <Image
-                        source={{ uri: s.image_url || 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80' }}
-                        style={styles.catalogThumb}
-                      />
+                      {s.image_url ? (
+                        <Image
+                          source={{ uri: s.image_url }}
+                          style={styles.catalogThumb}
+                        />
+                      ) : (
+                        <View style={[styles.catalogThumb, { backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons 
+                            name={s.item_type === 'product' ? 'cube-outline' : 'cut-outline'} 
+                            size={22} 
+                            color="#94A3B8" 
+                          />
+                        </View>
+                      )}
 
                       <View style={{ flex: 1, justifyContent: 'center' }}>
                         <Text style={styles.catalogItemTitle}>{s.name}</Text>
@@ -827,7 +950,7 @@ export default function BookingsScreen() {
                   </Text>
                   <TouchableOpacity
                     style={[styles.btnEmptyPrimary, { marginTop: 16 }]}
-                    onPress={() => setShowAddServiceModal(true)}
+                    onPress={handleOpenAddService}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="add" size={18} color="#000" />
@@ -1135,10 +1258,7 @@ export default function BookingsScreen() {
                     <Text style={styles.wizardSubTitle}>What would you like to add?</Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => {
-                      setShowAddServiceModal(false);
-                      setAddModalStep(1);
-                    }}
+                    onPress={handleCloseAddService}
                     style={styles.btnCloseWizard}
                   >
                     <Ionicons name="close" size={20} color="#050505" />
@@ -1240,7 +1360,7 @@ export default function BookingsScreen() {
                     <Text style={styles.wizardStepIndicatorText}>Step 1 of 2 • Basic Info</Text>
                   </View>
 
-                  <TouchableOpacity onPress={() => setShowAddServiceModal(false)} style={styles.btnCloseWizard}>
+                  <TouchableOpacity onPress={handleCloseAddService} style={styles.btnCloseWizard}>
                     <Ionicons name="close" size={20} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -1255,7 +1375,14 @@ export default function BookingsScreen() {
                   {photoUri ? (
                     <View style={styles.photoPreviewBox}>
                       <Image source={{ uri: photoUri }} style={styles.photoImage} />
-                      <TouchableOpacity onPress={() => setPhotoUri(null)} style={styles.btnRemovePhoto}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setPhotoUri(null);
+                          setPhotoFile(null);
+                        }} 
+                        style={styles.btnRemovePhoto}
+                        activeOpacity={0.8}
+                      >
                         <Ionicons name="close" size={14} color="#FFF" />
                       </TouchableOpacity>
                     </View>
@@ -1263,10 +1390,11 @@ export default function BookingsScreen() {
 
                   <TouchableOpacity
                     style={styles.btnAddPhotoBox}
-                    onPress={() => setPhotoUri('https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80')}
+                    onPress={handlePickPhoto}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons name="add" size={22} color="#64748B" />
-                    <Text style={styles.btnAddPhotoText}>Add Photo</Text>
+                    <Ionicons name={photoUri ? "images-outline" : "camera-outline"} size={22} color="#64748B" />
+                    <Text style={styles.btnAddPhotoText}>{photoUri ? 'Change' : 'Add Photo'}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1422,7 +1550,7 @@ export default function BookingsScreen() {
                     <Text style={styles.wizardStepIndicatorText}>Step 2 of 2 • Optional</Text>
                   </View>
 
-                  <TouchableOpacity onPress={() => setShowAddServiceModal(false)} style={styles.btnCloseWizard}>
+                  <TouchableOpacity onPress={handleCloseAddService} style={styles.btnCloseWizard}>
                     <Ionicons name="close" size={20} color="#050505" />
                   </TouchableOpacity>
                 </View>

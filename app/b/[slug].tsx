@@ -190,9 +190,15 @@ export default function CustomerBookingPwaScreen() {
           filter: `merchant = "${mRecord.id}" && is_active = true`,
           sort: 'created'
         });
-        setServices(sRes.items as any);
-        if (sRes.items.length > 0) {
-          setSelectedServices([sRes.items[0] as any]);
+        const sItems = sRes.items.map((item: any) => ({
+          ...item,
+          image_url: item.image 
+            ? `${pb.baseUrl}/api/files/merchant_services/${item.id}/${item.image}` 
+            : (item.image_url || '')
+        }));
+        setServices(sItems as any);
+        if (sItems.length > 0) {
+          setSelectedServices([sItems[0] as any]);
         } else {
           setSelectedServices([]);
         }
@@ -621,10 +627,20 @@ export default function CustomerBookingPwaScreen() {
                     onPress={() => toggleServiceSelection(srv)}
                     activeOpacity={0.85}
                   >
-                    <Image
-                      source={{ uri: srv.image_url || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=300&auto=format&fit=crop&q=80' }}
-                      style={styles.servicePhotoThumb}
-                    />
+                    {srv.image_url ? (
+                      <Image
+                        source={{ uri: srv.image_url }}
+                        style={styles.servicePhotoThumb}
+                      />
+                    ) : (
+                      <View style={[styles.servicePhotoThumb, { backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons 
+                          name={srv.item_type === 'product' ? 'cube-outline' : 'sparkles-outline'} 
+                          size={24} 
+                          color="#94A3B8" 
+                        />
+                      </View>
+                    )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.whiteServiceTitle}>{srv.name}</Text>
                       {srv.description && (
