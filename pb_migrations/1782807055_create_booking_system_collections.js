@@ -5,32 +5,50 @@ migrate((app) => {
     try {
       const merchantsCol = app.findCollectionByNameOrId("pbc_merchants00") || app.findCollectionByNameOrId("merchants");
       if (merchantsCol) {
+        let hasBookingAddon = false;
         try {
+          if (merchantsCol.fields.getByName("has_booking_addon")) hasBookingAddon = true;
+        } catch (e) {}
+
+        if (!hasBookingAddon) {
           merchantsCol.fields.add(new Field({
             "id": "bool_has_bk_addon",
             "name": "has_booking_addon",
             "type": "bool",
+            "system": false,
             "required": false
           }));
+        }
+
+        let hasPwaSlug = false;
+        try {
+          if (merchantsCol.fields.getByName("pwa_slug")) hasPwaSlug = true;
         } catch (e) {}
 
-        try {
+        if (!hasPwaSlug) {
           merchantsCol.fields.add(new Field({
             "id": "text_pwa_slug",
             "name": "pwa_slug",
             "type": "text",
+            "system": false,
             "required": false
           }));
+        }
+
+        let hasPwaColor = false;
+        try {
+          if (merchantsCol.fields.getByName("pwa_brand_color")) hasPwaColor = true;
         } catch (e) {}
 
-        try {
+        if (!hasPwaColor) {
           merchantsCol.fields.add(new Field({
             "id": "text_pwa_color",
             "name": "pwa_brand_color",
             "type": "text",
+            "system": false,
             "required": false
           }));
-        } catch (e) {}
+        }
 
         app.save(merchantsCol);
         console.log("[MIGRATION 1782807055] Successfully added booking fields to merchants");
@@ -46,6 +64,12 @@ migrate((app) => {
     try {
       branchesColId = app.findCollectionByNameOrId("branches").id;
     } catch (bErr) {}
+
+    let usersColId = "_pb_users_auth_";
+    try {
+      const uCol = app.findCollectionByNameOrId("users");
+      if (uCol) usersColId = uCol.id;
+    } catch (uErr) {}
 
     // 2. Create merchant_services collection
     try {
@@ -105,6 +129,7 @@ migrate((app) => {
           { "id": "autodate_up_stf", "name": "updated", "type": "autodate", "system": true, "onCreate": true, "onUpdate": true },
           { "id": "rel_merchant_stf", "name": "merchant", "type": "relation", "system": false, "required": true, "collectionId": merchantsColId, "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "rel_branch_stf", "name": "branch", "type": "relation", "system": false, "required": false, "collectionId": branchesColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
+          { "id": "rel_user_stf", "name": "user", "type": "relation", "system": false, "required": false, "collectionId": usersColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "text_name_stf", "name": "name", "type": "text", "system": false, "required": true },
           { "id": "text_role_stf", "name": "role_title", "type": "text", "system": false, "required": false },
           { "id": "text_phone_stf", "name": "phone", "type": "text", "system": false, "required": false },
@@ -145,6 +170,7 @@ migrate((app) => {
           { "id": "rel_merchant_bkg", "name": "merchant", "type": "relation", "system": false, "required": true, "collectionId": merchantsColId, "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "rel_branch_bkg", "name": "branch", "type": "relation", "system": false, "required": false, "collectionId": branchesColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "rel_staff_bkg", "name": "staff", "type": "relation", "system": false, "required": false, "collectionId": staffColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
+          { "id": "rel_cust_bkg", "name": "customer", "type": "relation", "system": false, "required": false, "collectionId": usersColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "text_cname_bkg", "name": "customer_name", "type": "text", "system": false, "required": true },
           { "id": "text_cphone_bkg", "name": "customer_phone", "type": "text", "system": false, "required": true },
           { "id": "text_date_bkg", "name": "booking_date", "type": "text", "system": false, "required": true },
@@ -187,6 +213,7 @@ migrate((app) => {
           { "id": "autodate_up_rec", "name": "updated", "type": "autodate", "system": true, "onCreate": true, "onUpdate": true },
           { "id": "rel_merchant_rec", "name": "merchant", "type": "relation", "system": false, "required": true, "collectionId": merchantsColId, "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "rel_booking_rec", "name": "booking", "type": "relation", "system": false, "required": false, "collectionId": bookingsColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
+          { "id": "rel_cust_rec", "name": "customer", "type": "relation", "system": false, "required": false, "collectionId": usersColId, "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
           { "id": "text_cphone_rec", "name": "customer_phone", "type": "text", "system": false, "required": true },
           { "id": "text_recnum_rec", "name": "receipt_number", "type": "text", "system": false, "required": true },
           { "id": "json_lines_rec", "name": "line_items", "type": "json", "system": false, "required": false },

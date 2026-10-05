@@ -76,6 +76,8 @@ export default function BookingsScreen() {
   const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'pwa'>('appointments');
   const [loading, setLoading] = useState(true);
   const [merchantData, setMerchantData] = useState<any>(null);
+  const [hasBookingAccess, setHasBookingAccess] = useState(true);
+  const [currentPlan, setCurrentPlan] = useState('stand_bundle');
 
   // Appointments State
   const [bookings, setBookings] = useState<BookingItem[]>([]);
@@ -148,6 +150,28 @@ export default function BookingsScreen() {
           if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
         } catch (e) {}
       }
+
+      let planName = 'stand_bundle';
+      let hasAccess = false;
+      if (mRecord?.has_booking_addon === true) {
+        hasAccess = true;
+      }
+      if (user?.merchant_id) {
+        try {
+          const subs = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${user.merchant_id}" && (status = "active" || status = "trialing")`,
+            requestKey: null
+          });
+          if (subs.items.length > 0) {
+            planName = (subs.items[0].plan || 'stand_bundle').toLowerCase();
+            if (planName === 'pro' || planName === 'business') {
+              hasAccess = true;
+            }
+          }
+        } catch (sErr) {}
+      }
+      setCurrentPlan(planName);
+      setHasBookingAccess(hasAccess);
 
       if (!mRecord) {
         setMerchantData({ store_name: 'SCOOP CREAMY' });
@@ -395,6 +419,31 @@ export default function BookingsScreen() {
           <Text style={styles.addonTagText}>ADD-ON ⚡</Text>
         </View>
       </View>
+
+      {/* Plan Upgrade Banner if not PRO and no Add-on */}
+      {!hasBookingAccess && (
+        <View style={{ marginHorizontal: 20, marginBottom: 14, padding: 14, backgroundColor: '#FFFBEB', borderRadius: 16, borderWidth: 1, borderColor: '#FDE68A', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              <Ionicons name="sparkles" size={15} color="#D97706" />
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                PRO Feature
+              </Text>
+            </View>
+            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E', lineHeight: 15 }}>
+              The Live Booking Engine & Customer PWA is included with the PRO Plan (RM97/mo). Upgrade to unlock online bookings for your store.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/(merchant)/subscription' as any)}
+            style={{ backgroundColor: '#050505', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="flash" size={12} color="#FFC700" />
+            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Upgrade</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Segmented Top Tabs */}
       <View style={styles.tabBarWrap}>
