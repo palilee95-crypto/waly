@@ -153,52 +153,25 @@ export default function CustomerBookingPwaScreen() {
     const borderColor = isBrandDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
     const pillBgColor = isBrandDark ? '#1C1E26' : '#EAE3D7';
 
-    // 4. Shadow System for Neumorphism
-    const shadowDark = isBrandDark ? '#08090C' : 'rgba(180, 168, 150, 0.45)';
-    const shadowLight = isBrandDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF';
-
-    // Neumorphic Convex Card Style (Soft 3D elevation matching base background)
+    // 4. Clean Flat Card & Surface Styles (No Shadows)
     const neumorphicCard = {
       backgroundColor: baseBgColor,
-      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.8)',
+      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
       borderWidth: 1,
-      shadowColor: shadowDark,
-      shadowOffset: { width: 4, height: 6 },
-      shadowOpacity: 0.35,
-      shadowRadius: 10,
-      elevation: 4,
-      ...(Platform.OS === 'web' ? {
-        boxShadow: isBrandDark
-          ? '6px 6px 16px #08090c, -6px -6px 16px #20232b'
-          : '6px 6px 16px rgba(185, 172, 154, 0.4), -6px -6px 16px #ffffff',
-      } : {}),
     };
 
-    // Neumorphic Recessed / Inset Surface (Pills, inputs, chips)
+    // Surface / Pill Style (No Shadows)
     const neumorphicInset = {
       backgroundColor: pillBgColor,
-      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
       borderWidth: 1,
-      ...(Platform.OS === 'web' ? {
-        boxShadow: isBrandDark
-          ? 'inset 3px 3px 6px #08090c, inset -3px -3px 6px #20232b'
-          : 'inset 3px 3px 6px rgba(185, 172, 154, 0.35), inset -3px -3px 6px #ffffff',
-      } : {}),
     };
 
-    // Neumorphic Active Accent Button Style
+    // Active Accent Button Style (No Shadows)
     const neumorphicActiveBtn = {
       backgroundColor: activeBrandColor,
       borderColor: activeBrandColor,
       borderWidth: 1,
-      shadowColor: activeBrandColor,
-      shadowOffset: { width: 3, height: 6 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
-      elevation: 5,
-      ...(Platform.OS === 'web' ? {
-        boxShadow: `4px 4px 14px ${activeBrandColor}66`,
-      } : {}),
     };
 
     return {
@@ -208,8 +181,6 @@ export default function CustomerBookingPwaScreen() {
       textMutedColor,
       borderColor,
       pillBgColor,
-      shadowDark,
-      shadowLight,
       isBrandDark,
       contrastColor,
       activeBrandColor,
@@ -1252,10 +1223,6 @@ const styles = StyleSheet.create({
     padding: 14,
     zIndex: 999,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
   },
   toastText: {
     color: '#FFFFFF',
@@ -1279,11 +1246,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0E8',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#D3CBBD',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
     borderWidth: 1,
     borderColor: '#FAF6F0',
   },
@@ -1400,11 +1362,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     alignItems: 'center',
-    shadowColor: '#D3CBBD',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
   },
   brandNameText: {
     fontSize: 30,
@@ -1422,24 +1379,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Soft Golden Rating Pill Capsule (Neumorphic Pod)
+  // Soft Rating Pill Capsule
   ratingCapsulePill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     paddingHorizontal: 22,
     paddingVertical: 10,
     borderRadius: 30,
     marginBottom: 20,
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
   },
   ratingCapsuleNum: {
     fontSize: 16,
@@ -1470,15 +1422,10 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 3,
   },
   locationBoldText: {
     fontSize: 14,
@@ -1517,7 +1464,7 @@ const styles = StyleSheet.create({
     marginVertical: 18,
   },
 
-  // Quick Nav Strip (3D Embossed Soft Circle Buttons)
+  // Quick Nav Strip
   quickNavStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1534,25 +1481,15 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 5,
   },
   quickNavCircleActive: {
     backgroundColor: '#FFC700',
     borderWidth: 0,
-    shadowColor: '#D97706',
-    shadowOffset: { width: 4, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 7,
   },
   quickNavTitle: {
     fontSize: 11,
@@ -1604,14 +1541,9 @@ const styles = StyleSheet.create({
     width: 155,
     backgroundColor: '#F5F0E8',
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     overflow: 'hidden',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
   },
   popularCardPhoto: {
     width: '100%',
@@ -1643,19 +1575,13 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: '#F5F0E8',
     borderWidth: 1,
-    borderColor: '#FAF6F0',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 2, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
   },
   popularAddCircleBtnSelected: {
     backgroundColor: '#FFC700',
     borderColor: '#FFC700',
-    shadowColor: '#D97706',
   },
 
   // Category Strip (Step 1)
@@ -1668,22 +1594,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: '#F5F0E8',
     marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
   categoryChipPillActive: {
     backgroundColor: '#FFC700',
     borderColor: '#FFC700',
-    shadowColor: '#D97706',
-    shadowOffset: { width: 3, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
   },
   categoryChipText: {
     fontSize: 13,
@@ -1705,19 +1621,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 14,
     gap: 12,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
   whiteServiceCardSelected: {
     borderColor: '#FFC700',
     backgroundColor: '#FFFBEA',
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.35,
   },
   servicePhotoThumb: {
     width: 60,
