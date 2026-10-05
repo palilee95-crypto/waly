@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -133,6 +134,98 @@ export default function CustomerBookingPwaScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+
+  const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || '#FFC700';
+  const contrastColor = getContrastColor(activeBrandColor);
+  const isBrandDark = contrastColor === '#FFFFFF';
+  
+  const themeStyles = useMemo(() => {
+    // 1. Base Adaptive Neumorphic Background Color
+    const baseBgColor = isBrandDark ? '#14161C' : '#F5F0E8';
+    
+    // 2. Text Color Palette
+    const textPrimaryColor = isBrandDark ? '#F8FAFC' : '#0F172A';
+    const textSecondaryColor = isBrandDark ? 'rgba(248, 250, 252, 0.65)' : '#64748B';
+    const textMutedColor = isBrandDark ? 'rgba(248, 250, 252, 0.45)' : '#94A3B8';
+
+    // 3. Borders & Inset Surfaces
+    const borderColor = isBrandDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+    const pillBgColor = isBrandDark ? '#1C1E26' : '#EAE3D7';
+
+    // 4. Shadow System for Neumorphism
+    const shadowDark = isBrandDark ? '#08090C' : 'rgba(180, 168, 150, 0.45)';
+    const shadowLight = isBrandDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF';
+
+    // Neumorphic Convex Card Style (Soft 3D elevation matching base background)
+    const neumorphicCard = {
+      backgroundColor: baseBgColor,
+      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.8)',
+      borderWidth: 1,
+      shadowColor: shadowDark,
+      shadowOffset: { width: 4, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      elevation: 4,
+      ...(Platform.OS === 'web' ? {
+        boxShadow: isBrandDark
+          ? '6px 6px 16px #08090c, -6px -6px 16px #20232b'
+          : '6px 6px 16px rgba(185, 172, 154, 0.4), -6px -6px 16px #ffffff',
+      } : {}),
+    };
+
+    // Neumorphic Recessed / Inset Surface (Pills, inputs, chips)
+    const neumorphicInset = {
+      backgroundColor: pillBgColor,
+      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+      borderWidth: 1,
+      ...(Platform.OS === 'web' ? {
+        boxShadow: isBrandDark
+          ? 'inset 3px 3px 6px #08090c, inset -3px -3px 6px #20232b'
+          : 'inset 3px 3px 6px rgba(185, 172, 154, 0.35), inset -3px -3px 6px #ffffff',
+      } : {}),
+    };
+
+    // Neumorphic Active Accent Button Style
+    const neumorphicActiveBtn = {
+      backgroundColor: activeBrandColor,
+      borderColor: activeBrandColor,
+      borderWidth: 1,
+      shadowColor: activeBrandColor,
+      shadowOffset: { width: 3, height: 6 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+      elevation: 5,
+      ...(Platform.OS === 'web' ? {
+        boxShadow: `4px 4px 14px ${activeBrandColor}66`,
+      } : {}),
+    };
+
+    return {
+      baseBgColor,
+      textPrimaryColor,
+      textSecondaryColor,
+      textMutedColor,
+      borderColor,
+      pillBgColor,
+      shadowDark,
+      shadowLight,
+      isBrandDark,
+      contrastColor,
+      activeBrandColor,
+
+      // Pre-baked Neumorphic Objects & Helpers
+      neumorphicCard,
+      neumorphicInset,
+      neumorphicActiveBtn,
+      bg: { backgroundColor: baseBgColor },
+      textPrimary: { color: textPrimaryColor },
+      textSecondary: { color: textSecondaryColor },
+      border: { borderColor: borderColor },
+      pillSurface: { backgroundColor: pillBgColor },
+      iconCircle: { backgroundColor: pillBgColor },
+    };
+  }, [activeBrandColor, contrastColor, isBrandDark]);
 
   // 1. Live Preview real-time listener from parent customization panel
   useEffect(() => {
@@ -442,7 +535,6 @@ export default function CustomerBookingPwaScreen() {
     );
   }
 
-  const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || '#FFC700';
   const activeCoverUrl = (liveCoverUrl !== null && liveCoverUrl !== undefined) 
     ? liveCoverUrl 
     : (merchant?.cover_url || 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80');
@@ -459,8 +551,9 @@ export default function CustomerBookingPwaScreen() {
     ? services
     : services.filter(s => s.category?.toLowerCase() === activeCategory.toLowerCase());
 
+
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themeStyles.baseBgColor }]} edges={['top', 'left', 'right', 'bottom']}>
       
       {/* Toast Overlay */}
       {toastMessage && (
@@ -471,21 +564,21 @@ export default function CustomerBookingPwaScreen() {
 
       {/* Top Header Bar for Steps 1, 2, 3 */}
       {currentStep > 0 && currentStep < 4 && (
-        <View style={styles.headerBar}>
-          <TouchableOpacity onPress={handlePrevStep} style={styles.btnHeaderBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={22} color="#0F172A" />
+        <View style={[styles.headerBar, { backgroundColor: themeStyles.baseBgColor, borderBottomColor: themeStyles.borderColor }]}>
+          <TouchableOpacity onPress={handlePrevStep} style={[styles.btnHeaderBack, themeStyles.neumorphicInset]} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={22} color={themeStyles.textPrimaryColor} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
+          <Text style={[styles.headerTitle, { color: themeStyles.textPrimaryColor }]}>
             {currentStep === 1 && 'Select Service'}
             {currentStep === 2 && 'Schedule Appointment'}
             {currentStep === 3 && 'Your Details'}
           </Text>
-          <Text style={styles.stepBadgeText}>Step {currentStep} of 3</Text>
+          <Text style={[styles.stepBadgeText, { color: themeStyles.textSecondaryColor }]}>Step {currentStep} of 3</Text>
         </View>
       )}
 
       {/* Main Body Scroll */}
-      <ScrollView style={styles.mainScroll} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView style={[styles.mainScroll, { backgroundColor: themeStyles.baseBgColor }]} contentContainerStyle={{ paddingBottom: 120 }}>
         
         {/* ======================================================== */}
         {/* SCREEN 0: STOREFRONT BUSINESS PROFILE LANDING            */}
@@ -519,79 +612,79 @@ export default function CustomerBookingPwaScreen() {
               </View>
             </View>
 
-            {/* Brand Card Info with Warm Background & Organic Blob */}
-            <View style={styles.brandInfoCard}>
+            {/* Brand Card Info with Warm/Dark Adaptive Neumorphism */}
+            <View style={[styles.brandInfoCard, themeStyles.neumorphicCard, { marginTop: -28 }]}>
               
               {/* Store Title & Subtitle */}
-              <Text style={styles.brandNameText}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
-              <Text style={styles.brandSubtitleText}>{activeTagline}</Text>
+              <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
+              <Text style={[styles.brandSubtitleText, { color: themeStyles.textSecondaryColor }]}>{activeTagline}</Text>
 
-              {/* Soft Golden Rating Pill Capsule */}
-              <View style={styles.ratingCapsulePill}>
+              {/* Soft Rating Pill Capsule */}
+              <View style={[styles.ratingCapsulePill, themeStyles.neumorphicInset]}>
                 <Ionicons name="star" size={24} color="#FFC700" />
-                <Text style={styles.ratingCapsuleNum}>4.9</Text>
-                <Text style={styles.ratingCapsuleRev}>(450 reviews)</Text>
+                <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>4.9</Text>
+                <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>(450 reviews)</Text>
               </View>
 
               {/* Split Meta Location & Operating Hours */}
               <View style={styles.splitMetaRow}>
                 {/* Left Location Column */}
                 <View style={styles.splitMetaCol}>
-                  <View style={styles.iconCircleBg}>
-                    <Ionicons name="location-outline" size={20} color="#0F172A" />
+                  <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
+                    <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
                   </View>
-                  <Text style={styles.locationBoldText}>Bangi Sentral</Text>
+                  <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]}>Bangi Sentral</Text>
                 </View>
 
                 {/* Vertical Divider Line */}
-                <View style={styles.pipeDivider} />
+                <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
 
                 {/* Right Hours Column */}
                 <View style={styles.splitMetaCol}>
-                  <View style={styles.iconCircleBg}>
-                    <Ionicons name="time-outline" size={20} color="#0F172A" />
+                  <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
+                    <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
                   </View>
                   <View style={{ flexDirection: 'column' }}>
                     <View style={styles.openBadgePill}>
                       <Text style={styles.openBadgeText}>Open</Text>
                     </View>
-                    <Text style={styles.hoursSubText}>11:00 AM – 11:00 PM</Text>
+                    <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>11:00 AM – 11:00 PM</Text>
                   </View>
                 </View>
               </View>
 
               {/* Horizontal Divider Line */}
-              <View style={styles.headerHorizontalDivider} />
+              <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
 
               {/* Quick Action Navigation Bar */}
               <View style={styles.quickNavStrip}>
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, styles.quickNavCircleActive, { backgroundColor: activeBrandColor }]}>
-                    <Ionicons name="calendar" size={22} color={getContrastColor(activeBrandColor)} />
+                  <View style={[styles.quickNavCircle, themeStyles.neumorphicActiveBtn]}>
+                    <Ionicons name="calendar" size={22} color={themeStyles.contrastColor} />
                   </View>
-                  <Text style={styles.quickNavTitleActive}>Book{'\n'}Appointment</Text>
+                  <Text style={[styles.quickNavTitleActive, { color: themeStyles.textPrimaryColor }]}>Book{'\n'}Appointment</Text>
                   <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                  <View style={styles.quickNavCircle}>
-                    <Ionicons name="list-outline" size={22} color="#0F172A" />
+                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                    <Ionicons name="list-outline" size={22} color={themeStyles.textPrimaryColor} />
                   </View>
-                  <Text style={styles.quickNavTitle}>Menu</Text>
+                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Menu</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')} activeOpacity={0.8}>
-                  <View style={styles.quickNavCircle}>
-                    <Ionicons name="pricetag-outline" size={22} color="#0F172A" />
+                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                    <Ionicons name="pricetag-outline" size={22} color={themeStyles.textPrimaryColor} />
                   </View>
-                  <Text style={styles.quickNavTitle}>Promotions</Text>
+                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Promotions</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('📍 Main Outlet: Bangi Sentral Seksyen 9')} activeOpacity={0.8}>
-                  <View style={styles.quickNavCircle}>
-                    <Ionicons name="location-outline" size={22} color="#0F172A" />
+                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                    <Ionicons name="location-outline" size={22} color={themeStyles.textPrimaryColor} />
                   </View>
-                  <Text style={styles.quickNavTitle}>Location</Text>
+                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Location</Text>
                 </TouchableOpacity>
               </View>
 
@@ -599,10 +692,10 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Popular Items Horizontal Grid / Carousel */}
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeadingTitle}>Popular Items</Text>
+              <Text style={[styles.sectionHeadingTitle, { color: themeStyles.textPrimaryColor }]}>Popular Items</Text>
               <TouchableOpacity onPress={() => setCurrentStep(1)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={styles.seeAllText}>See all</Text>
-                <Ionicons name="arrow-forward" size={14} color="#64748B" />
+                <Text style={[styles.seeAllText, { color: themeStyles.textSecondaryColor }]}>See all</Text>
+                <Ionicons name="arrow-forward" size={14} color={themeStyles.textSecondaryColor} />
               </TouchableOpacity>
             </View>
 
@@ -611,7 +704,7 @@ export default function CustomerBookingPwaScreen() {
                 {services.slice(0, 5).map(srv => {
                   const isSelected = selectedServices.some(s => s.id === srv.id);
                   return (
-                    <View key={srv.id} style={styles.popularCardItem}>
+                    <View key={srv.id} style={[styles.popularCardItem, themeStyles.neumorphicCard]}>
                       <TouchableOpacity
                         onPress={() => {
                           setSelectedServices([srv]);
@@ -626,15 +719,15 @@ export default function CustomerBookingPwaScreen() {
                       </TouchableOpacity>
 
                       <View style={styles.popularCardBody}>
-                        <Text style={styles.popularCardName} numberOfLines={1}>{srv.name}</Text>
+                        <Text style={[styles.popularCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>{srv.name}</Text>
 
                         <View style={styles.popularCardBottomRow}>
-                          <Text style={styles.popularCardPrice}>RM{srv.price}</Text>
+                          <Text style={[styles.popularCardPrice, { color: activeBrandColor }]}>RM{srv.price}</Text>
 
                           <TouchableOpacity
                             style={[
                               styles.popularAddCircleBtn, 
-                              isSelected && [styles.popularAddCircleBtnSelected, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]
+                              isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
                             ]}
                             onPress={() => toggleServiceSelection(srv)}
                             activeOpacity={0.8}
@@ -642,7 +735,7 @@ export default function CustomerBookingPwaScreen() {
                             <Ionicons
                               name={isSelected ? "checkmark" : "add"}
                               size={20}
-                              color={isSelected ? getContrastColor(activeBrandColor) : "#D97706"}
+                              color={isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor}
                             />
                           </TouchableOpacity>
                         </View>
@@ -653,7 +746,7 @@ export default function CustomerBookingPwaScreen() {
               </ScrollView>
             ) : (
               <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                <Text style={styles.seeAllText}>No items published yet.</Text>
+                <Text style={[styles.seeAllText, { color: themeStyles.textSecondaryColor }]}>No items published yet.</Text>
               </View>
             )}
 
@@ -673,10 +766,13 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={cat}
-                    style={[styles.categoryChipPill, isActive && [styles.categoryChipPillActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
+                    style={[
+                      styles.categoryChipPill,
+                      isActive ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
+                    ]}
                     onPress={() => setActiveCategory(cat)}
                   >
-                    <Text style={[styles.categoryChipText, isActive && [styles.categoryChipTextActive, { color: getContrastColor(activeBrandColor) }]]}>
+                    <Text style={[styles.categoryChipText, { color: isActive ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>
                       {cat}
                     </Text>
                   </TouchableOpacity>
@@ -686,16 +782,16 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Service Cards List */}
             {services.length === 0 ? (
-              <View style={[styles.whiteServiceCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
-                <Ionicons name="sparkles-outline" size={32} color="#94A3B8" />
-                <Text style={[styles.whiteServiceTitle, { marginTop: 10, textAlign: 'center' }]}>No Services Available</Text>
-                <Text style={[styles.whiteServiceSub, { textAlign: 'center', marginTop: 4 }]}>
+              <View style={[styles.whiteServiceCard, themeStyles.neumorphicCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
+                <Ionicons name="sparkles-outline" size={32} color={themeStyles.textMutedColor} />
+                <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor, marginTop: 10, textAlign: 'center' }]}>No Services Available</Text>
+                <Text style={[styles.whiteServiceSub, { color: themeStyles.textSecondaryColor, textAlign: 'center', marginTop: 4 }]}>
                   This store has not published any services for online booking yet.
                 </Text>
               </View>
             ) : filteredServices.length === 0 ? (
-              <View style={[styles.whiteServiceCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
-                <Text style={styles.whiteServiceTitle}>No items in this category</Text>
+              <View style={[styles.whiteServiceCard, themeStyles.neumorphicCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
+                <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor }]}>No items in this category</Text>
               </View>
             ) : (
               <View style={styles.serviceCardsContainer}>
@@ -704,7 +800,11 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={srv.id}
-                    style={[styles.whiteServiceCard, isSelected && styles.whiteServiceCardSelected]}
+                    style={[
+                      styles.whiteServiceCard,
+                      themeStyles.neumorphicCard,
+                      isSelected && { borderColor: activeBrandColor, borderWidth: 2 }
+                    ]}
                     onPress={() => toggleServiceSelection(srv)}
                     activeOpacity={0.85}
                   >
@@ -714,39 +814,39 @@ export default function CustomerBookingPwaScreen() {
                         style={styles.servicePhotoThumb}
                       />
                     ) : (
-                      <View style={[styles.servicePhotoThumb, { backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }]}>
+                      <View style={[styles.servicePhotoThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
                         <Ionicons 
                           name={srv.item_type === 'product' ? 'cube-outline' : 'sparkles-outline'} 
                           size={24} 
-                          color="#94A3B8" 
+                          color={themeStyles.textMutedColor} 
                         />
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.whiteServiceTitle}>{srv.name}</Text>
+                      <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor }]}>{srv.name}</Text>
                       {srv.description && (
-                        <Text style={styles.whiteServiceSub} numberOfLines={1}>
+                        <Text style={[styles.whiteServiceSub, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
                           {srv.description}
                         </Text>
                       )}
                       <View style={styles.whiteServiceMetaRow}>
-                        <Ionicons name="time-outline" size={13} color="#64748B" />
-                        <Text style={styles.whiteServiceDuration}>{srv.duration_minutes} min</Text>
-                        <Text style={styles.whiteServicePrice}>RM{srv.price}</Text>
+                        <Ionicons name="time-outline" size={13} color={themeStyles.textSecondaryColor} />
+                        <Text style={[styles.whiteServiceDuration, { color: themeStyles.textSecondaryColor }]}>{srv.duration_minutes} min</Text>
+                        <Text style={[styles.whiteServicePrice, { color: activeBrandColor }]}>RM{srv.price}</Text>
                       </View>
                     </View>
 
                     <TouchableOpacity
                       style={[
                         styles.circleAddBtn, 
-                        isSelected && [styles.circleAddBtnSelected, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]
+                        isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
                       ]}
                       onPress={() => toggleServiceSelection(srv)}
                     >
                       <Ionicons
                         name={isSelected ? 'checkmark' : 'add'}
                         size={20}
-                        color={isSelected ? getContrastColor(activeBrandColor) : '#000000'}
+                        color={isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor}
                       />
                     </TouchableOpacity>
                   </TouchableOpacity>
@@ -766,34 +866,37 @@ export default function CustomerBookingPwaScreen() {
             
             {/* Branch Selector Dropdown Box */}
             <TouchableOpacity
-              style={styles.dropdownCardBox}
+              style={[styles.dropdownCardBox, themeStyles.neumorphicCard]}
               onPress={() => setShowBranchPicker(!showBranchPicker)}
               activeOpacity={0.7}
             >
-              <Ionicons name="location-outline" size={18} color="#0F172A" />
-              <Text style={styles.dropdownTextValue}>{selectedBranch?.name || 'Main Branch'}</Text>
-              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+              <Ionicons name="location-outline" size={18} color={themeStyles.textPrimaryColor} />
+              <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Main Branch'}</Text>
+              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
             </TouchableOpacity>
 
             {showBranchPicker && branches.length > 0 && (
-              <View style={styles.pickerOptionsContainer}>
+              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard]}>
                 {branches.map(br => (
                   <TouchableOpacity
                     key={br.id}
-                    style={[styles.pickerOptionItem, selectedBranch?.id === br.id && styles.pickerOptionItemActive]}
+                    style={[
+                      styles.pickerOptionItem,
+                      { backgroundColor: selectedBranch?.id === br.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
+                    ]}
                     onPress={() => {
                       setSelectedBranch(br);
                       setShowBranchPicker(false);
                     }}
                   >
-                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? "#000" : "#64748B"} />
+                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickerOptionItemTitle, selectedBranch?.id === br.id && styles.pickerOptionItemTitleActive]}>
+                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
                         {br.name}
                       </Text>
-                      {br.address ? <Text style={styles.pickerOptionItemSub}>{br.address}</Text> : null}
+                      {br.address ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{br.address}</Text> : null}
                     </View>
-                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color="#000" />}
+                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -801,34 +904,37 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Provider Selector Dropdown Box */}
             <TouchableOpacity
-              style={styles.dropdownCardBox}
+              style={[styles.dropdownCardBox, themeStyles.neumorphicCard]}
               onPress={() => setShowStaffPicker(!showStaffPicker)}
               activeOpacity={0.7}
             >
-              <Ionicons name="person-outline" size={18} color="#0F172A" />
-              <Text style={styles.dropdownTextValue}>{selectedStaff?.name || 'Any Provider'}</Text>
-              <Ionicons name={showStaffPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+              <Ionicons name="person-outline" size={18} color={themeStyles.textPrimaryColor} />
+              <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
+              <Ionicons name={showStaffPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
             </TouchableOpacity>
 
             {showStaffPicker && staffList.length > 0 && (
-              <View style={styles.pickerOptionsContainer}>
+              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard]}>
                 {staffList.map(st => (
                   <TouchableOpacity
                     key={st.id}
-                    style={[styles.pickerOptionItem, selectedStaff?.id === st.id && styles.pickerOptionItemActive]}
+                    style={[
+                      styles.pickerOptionItem,
+                      { backgroundColor: selectedStaff?.id === st.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
+                    ]}
                     onPress={() => {
                       setSelectedStaff(st);
                       setShowStaffPicker(false);
                     }}
                   >
-                    <Ionicons name="person-circle-outline" size={18} color={selectedStaff?.id === st.id ? "#000" : "#64748B"} />
+                    <Ionicons name="person-circle-outline" size={18} color={selectedStaff?.id === st.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickerOptionItemTitle, selectedStaff?.id === st.id && styles.pickerOptionItemTitleActive]}>
+                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
                         {st.name}
                       </Text>
-                      {st.role_title ? <Text style={styles.pickerOptionItemSub}>{st.role_title}</Text> : null}
+                      {st.role_title ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{st.role_title}</Text> : null}
                     </View>
-                    {selectedStaff?.id === st.id && <Ionicons name="checkmark-circle" size={16} color="#000" />}
+                    {selectedStaff?.id === st.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -836,8 +942,8 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Date Picker Header */}
             <View style={styles.datePickerHeaderRow}>
-              <Text style={styles.dateGroupTitle}>Select Date</Text>
-              <Text style={styles.monthYearTitle}>
+              <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Date</Text>
+              <Text style={[styles.monthYearTitle, { color: themeStyles.textSecondaryColor }]}>
                 {upcomingDates.find(d => d.iso === selectedIsoDate)?.monthName || 'Upcoming'}{' '}
                 {upcomingDates.find(d => d.iso === selectedIsoDate)?.year || new Date().getFullYear()}
               </Text>
@@ -850,27 +956,33 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={dt.iso}
-                    style={[styles.dayColumnCard, isSelected && [styles.dayColumnCardActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
+                    style={[
+                      styles.dayColumnCard,
+                      isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
+                    ]}
                     onPress={() => {
                       setSelectedIsoDate(dt.iso);
                       setSelectedDate(dt.full);
                     }}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.dayNameText, isSelected && [styles.dayNameTextActive, { color: getContrastColor(activeBrandColor) }]]}>{dt.day}</Text>
-                    <Text style={[styles.dayNumText, isSelected && [styles.dayNumTextActive, { color: getContrastColor(activeBrandColor) }]]}>{dt.num}</Text>
+                    <Text style={[styles.dayNameText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>{dt.day}</Text>
+                    <Text style={[styles.dayNumText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor }]}>{dt.num}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
 
             {/* Time Period Filter Segment */}
-            <Text style={styles.dateGroupTitle}>Select Time</Text>
-            <View style={styles.periodSegmentTrack}>
+            <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Time</Text>
+            <View style={[styles.periodSegmentTrack, themeStyles.neumorphicInset]}>
               {(['Morning', 'Afternoon', 'Evening'] as const).map(p => (
                 <TouchableOpacity
                   key={p}
-                  style={[styles.periodSegmentPill, selectedTimePeriod === p && styles.periodSegmentPillActive]}
+                  style={[
+                    styles.periodSegmentPill,
+                    selectedTimePeriod === p ? themeStyles.neumorphicActiveBtn : null
+                  ]}
                   onPress={() => {
                     setSelectedTimePeriod(p);
                     const slots = timeSlotsByPeriod[p] || [];
@@ -879,7 +991,7 @@ export default function CustomerBookingPwaScreen() {
                     }
                   }}
                 >
-                  <Text style={[styles.periodSegmentText, selectedTimePeriod === p && styles.periodSegmentTextActive]}>
+                  <Text style={[styles.periodSegmentText, { color: selectedTimePeriod === p ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>
                     {p}
                   </Text>
                 </TouchableOpacity>
@@ -893,11 +1005,14 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={tm}
-                    style={[styles.timeSlotGridPill, isSelected && [styles.timeSlotGridPillActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
+                    style={[
+                      styles.timeSlotGridPill,
+                      isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
+                    ]}
                     onPress={() => setSelectedTime(tm)}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.timeSlotGridText, isSelected && [styles.timeSlotGridTextActive, { color: getContrastColor(activeBrandColor) }]]}>
+                    <Text style={[styles.timeSlotGridText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor }]}>
                       {tm}
                     </Text>
                   </TouchableOpacity>
@@ -915,13 +1030,13 @@ export default function CustomerBookingPwaScreen() {
           <View style={styles.stepContainer}>
             
             <View style={styles.inputFieldGroup}>
-              <Text style={styles.inputFieldLabel}>Full Name</Text>
-              <View style={styles.inputWithIconBox}>
-                <Ionicons name="person-outline" size={18} color="#64748B" />
+              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Full Name</Text>
+              <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
+                <Ionicons name="person-outline" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
-                  style={styles.inputTextInner}
+                  style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
                   placeholder="Hafiz Danial"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={themeStyles.textMutedColor}
                   value={customerName}
                   onChangeText={setCustomerName}
                 />
@@ -929,13 +1044,13 @@ export default function CustomerBookingPwaScreen() {
             </View>
 
             <View style={styles.inputFieldGroup}>
-              <Text style={styles.inputFieldLabel}>WhatsApp Number</Text>
-              <View style={styles.inputWithIconBox}>
-                <Ionicons name="logo-whatsapp" size={18} color="#64748B" />
+              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>WhatsApp Number</Text>
+              <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
+                <Ionicons name="logo-whatsapp" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
-                  style={styles.inputTextInner}
+                  style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
                   placeholder="0123456789"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={themeStyles.textMutedColor}
                   keyboardType="phone-pad"
                   value={customerPhone}
                   onChangeText={setCustomerPhone}
@@ -944,13 +1059,13 @@ export default function CustomerBookingPwaScreen() {
             </View>
 
             <View style={styles.inputFieldGroup}>
-              <Text style={styles.inputFieldLabel}>Add Note (Optional)</Text>
-              <View style={styles.inputWithIconBox}>
-                <Ionicons name="chatbox-outline" size={18} color="#64748B" />
+              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Add Note (Optional)</Text>
+              <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
+                <Ionicons name="chatbox-outline" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
-                  style={styles.inputTextInner}
+                  style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
                   placeholder="Any special request?"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={themeStyles.textMutedColor}
                   value={customerNotes}
                   onChangeText={setCustomerNotes}
                 />
@@ -958,23 +1073,23 @@ export default function CustomerBookingPwaScreen() {
             </View>
 
             {/* Selection Summary Box */}
-            <View style={styles.summaryRecapCard}>
-              <Text style={styles.summaryRecapTitle}>Booking Details</Text>
+            <View style={[styles.summaryRecapCard, themeStyles.neumorphicCard]}>
+              <Text style={[styles.summaryRecapTitle, { color: themeStyles.textPrimaryColor }]}>Booking Details</Text>
               <View style={styles.recapItemRow}>
-                <Text style={styles.recapItemLabel}>Services:</Text>
-                <Text style={styles.recapItemVal}>{selectedServices.map(s => s.name).join(', ')}</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Services:</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedServices.map(s => s.name).join(', ')}</Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={styles.recapItemLabel}>Branch:</Text>
-                <Text style={styles.recapItemVal}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Branch:</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={styles.recapItemLabel}>Provider:</Text>
-                <Text style={styles.recapItemVal}>{selectedStaff?.name || 'Any Provider'}</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={styles.recapItemLabel}>Date & Time:</Text>
-                <Text style={styles.recapItemVal}>{selectedDate} @ {selectedTime}</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Date & Time:</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedDate} @ {selectedTime}</Text>
               </View>
             </View>
 
@@ -986,69 +1101,69 @@ export default function CustomerBookingPwaScreen() {
         {/* ======================================================== */}
         {currentStep === 4 && (
           <View style={styles.stepContainer}>
-            <View style={styles.ticketCardBoarding}>
+            <View style={[styles.ticketCardBoarding, themeStyles.neumorphicCard]}>
               <View style={styles.ticketGreenBadge}>
                 <View style={styles.pulseDotGreen} />
                 <Text style={styles.ticketBadgeGreenText}>BOOKING CONFIRMED</Text>
               </View>
 
-              <Text style={styles.boardingPassTitle}>Appointment Pass</Text>
+              <Text style={[styles.boardingPassTitle, { color: themeStyles.textPrimaryColor }]}>Appointment Pass</Text>
 
-              <View style={styles.timerCountdownCard}>
-                <Text style={styles.timerSubText}>Your appointment starts in:</Text>
-                <Text style={styles.timerMainText}>24 Mins 30 Secs</Text>
+              <View style={[styles.timerCountdownCard, themeStyles.neumorphicInset]}>
+                <Text style={[styles.timerSubText, { color: themeStyles.textSecondaryColor }]}>Your appointment starts in:</Text>
+                <Text style={[styles.timerMainText, { color: activeBrandColor }]}>24 Mins 30 Secs</Text>
               </View>
 
-              <View style={styles.boardingInfoGrid}>
+              <View style={[styles.boardingInfoGrid, { borderColor: themeStyles.borderColor }]}>
                 <View style={styles.boardingGridCell}>
-                  <Text style={styles.cellLabelText}>Service</Text>
-                  <Text style={styles.cellValueText}>{selectedServices[0]?.name || 'Signature Massage'}</Text>
+                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Service</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedServices[0]?.name || 'Signature Massage'}</Text>
                 </View>
                 <View style={styles.boardingGridCell}>
-                  <Text style={styles.cellLabelText}>Provider</Text>
-                  <Text style={[styles.cellValueText, { color: '#0F172A' }]}>{selectedStaff?.name || 'Any Provider'}</Text>
+                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Provider</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
                 </View>
                 <View style={styles.boardingGridCell}>
-                  <Text style={styles.cellLabelText}>Slot Time</Text>
-                  <Text style={[styles.cellValueText, { color: '#0F172A' }]}>{selectedDate} @ {selectedTime}</Text>
+                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Slot Time</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedDate} @ {selectedTime}</Text>
                 </View>
                 <View style={styles.boardingGridCell}>
-                  <Text style={styles.cellLabelText}>Branch</Text>
-                  <Text style={styles.cellValueText}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
+                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Branch</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
                 </View>
               </View>
 
-              <Text style={styles.arrivedInstructionText}>
+              <Text style={[styles.arrivedInstructionText, { color: themeStyles.textSecondaryColor }]}>
                 Tap the button below as soon as you step inside the store:
               </Text>
 
               <TouchableOpacity
-                style={[styles.btnArrivedAction, { backgroundColor: hasArrived ? '#22C55E' : activeBrandColor }]}
+                style={[styles.btnArrivedAction, hasArrived ? { backgroundColor: '#22C55E' } : themeStyles.neumorphicActiveBtn]}
                 onPress={handleArrived}
                 activeOpacity={0.85}
               >
-                <Ionicons name="location" size={18} color={hasArrived ? '#FFFFFF' : getContrastColor(activeBrandColor)} />
-                <Text style={[styles.btnArrivedTextLabel, { color: hasArrived ? '#FFFFFF' : getContrastColor(activeBrandColor) }]}>
+                <Ionicons name="location" size={18} color={hasArrived ? '#FFFFFF' : themeStyles.contrastColor} />
+                <Text style={[styles.btnArrivedTextLabel, { color: hasArrived ? '#FFFFFF' : themeStyles.contrastColor }]}>
                   {hasArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* PWA Save App Card */}
-            <View style={styles.pwaCardBox}>
-              <View style={[styles.pwaIconBox, { backgroundColor: activeBrandColor + '20' }]}>
+            <View style={[styles.pwaCardBox, themeStyles.neumorphicCard]}>
+              <View style={[styles.pwaIconBox, themeStyles.neumorphicInset]}>
                 <Ionicons name="phone-portrait-outline" size={22} color={activeBrandColor} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.pwaTitleText}>Save {merchant?.store_name || 'Aura Wellness'} App</Text>
-                <Text style={styles.pwaSubText}>Get instant slot reminders & fast re-booking</Text>
+                <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>Save {merchant?.store_name || 'Aura Wellness'} App</Text>
+                <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>Get instant slot reminders & fast re-booking</Text>
               </View>
               <TouchableOpacity
-                style={styles.btnInstallPwa}
+                style={[styles.btnInstallPwa, themeStyles.neumorphicActiveBtn, { paddingHorizontal: 14, paddingVertical: 7 }]}
                 onPress={() => showToast('Tap Share ➔ Add to Home Screen')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.btnInstallPwaText}>Install</Text>
+                <Text style={[styles.btnInstallPwaText, { color: themeStyles.contrastColor }]}>Install</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1058,31 +1173,31 @@ export default function CustomerBookingPwaScreen() {
 
       {/* Screen 0 Floating Yellow Button */}
       {currentStep === 0 && (
-        <View style={styles.floatingBottomProfileContainer}>
+        <View style={[styles.floatingBottomProfileContainer, { backgroundColor: themeStyles.baseBgColor, borderTopColor: themeStyles.borderColor }]}>
           <TouchableOpacity
-            style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor }]}
+            style={[styles.btnFullYellowBook, themeStyles.neumorphicActiveBtn]}
             onPress={() => setCurrentStep(1)}
             activeOpacity={0.85}
           >
-            <Text style={[styles.btnFullYellowBookText, { color: getContrastColor(activeBrandColor) }]}>Book Appointment</Text>
+            <Text style={[styles.btnFullYellowBookText, { color: themeStyles.contrastColor }]}>Book Appointment</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Sticky Dark Action Bar (Steps 1, 2, 3) */}
       {currentStep > 0 && currentStep < 4 && (
-        <View style={styles.stickyDarkBar}>
+        <View style={[styles.stickyDarkBar, { backgroundColor: themeStyles.baseBgColor, borderTopColor: themeStyles.borderColor }]}>
           <View>
             {currentStep === 1 && (
               <>
-                <Text style={styles.darkBarMetaLabel}>{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''}</Text>
+                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''}</Text>
                 <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
               </>
             )}
 
             {currentStep === 2 && (
               <>
-                <Text style={styles.darkBarMetaLabel}>{selectedDate}</Text>
+                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedDate}</Text>
                 <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>{selectedTime}</Text>
               </>
             )}
@@ -1090,21 +1205,21 @@ export default function CustomerBookingPwaScreen() {
             {currentStep === 3 && (
               <>
                 <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
-                <Text style={styles.darkBarMetaLabel}>{selectedServices.length} service • {calculateTotalDuration()} min</Text>
+                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service • {calculateTotalDuration()} min</Text>
               </>
             )}
           </View>
 
           <TouchableOpacity
-            style={[styles.btnYellowContinue, { backgroundColor: activeBrandColor }]}
+            style={[styles.btnYellowContinue, themeStyles.neumorphicActiveBtn]}
             onPress={handleNextStep}
             disabled={isSubmitting}
             activeOpacity={0.85}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={getContrastColor(activeBrandColor)} />
+              <ActivityIndicator color={themeStyles.contrastColor} />
             ) : (
-              <Text style={[styles.btnYellowContinueText, { color: getContrastColor(activeBrandColor) }]}>
+              <Text style={[styles.btnYellowContinueText, { color: themeStyles.contrastColor }]}>
                 {currentStep === 3 ? 'Confirm & Book 🚀' : 'Continue ➔'}
               </Text>
             )}
