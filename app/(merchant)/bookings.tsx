@@ -1430,9 +1430,9 @@ export default function BookingsScreen() {
                   />
                 </View>
 
-                {/* Save Branding Button */}
+                {/* Save Branding Button (Fixed Yellow) */}
                 <TouchableOpacity
-                  style={[styles.btnSaveBranding, { backgroundColor: selectedBrandColor }]}
+                  style={styles.btnSaveBranding}
                   onPress={handleSaveBranding}
                   disabled={isSavingBranding}
                   activeOpacity={0.85}
@@ -4119,6 +4119,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   btnSaveBranding: {
+    backgroundColor: '#FFC700',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
