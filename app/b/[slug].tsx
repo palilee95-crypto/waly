@@ -100,28 +100,30 @@ export default function CustomerBookingPwaScreen() {
       } catch (slugErr) {
         try {
           if (slug) {
-            mRecord = await pb.collection('merchants').getOne(slug);
+            mRecord = await pb.collection('merchants').getOne(slug as string);
           }
         } catch (idErr) {}
       }
 
-      if (!mRecord || slug === 'scoop-creamy') {
-        mRecord = {
-          id: 'demo-merchant',
-          store_name: 'SCOOP CREAMY',
-          subtitle: 'Handcrafted Gelato • Waffles • Desserts',
-          rating: '4.9',
-          reviews_count: '450',
-          city: 'Bangi Sentral',
-          hours: '11:00 AM - 11:00 PM',
-          cover_url: 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80',
-          logo_url: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=200&auto=format&fit=crop&q=80',
-          pwa_brand_color: '#FFC700',
-        };
-      } else if (!mRecord.cover_url || mRecord.cover_url.trim().length < 5) {
-        mRecord.cover_url = 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80';
+      if (!mRecord) {
+        setMerchant(null);
+        setServices([]);
+        setBranches([]);
+        setStaffList([]);
+        return;
       }
-      setMerchant(mRecord);
+
+      const normalizedMerchant = {
+        ...mRecord,
+        store_name: mRecord.name || mRecord.store_name || 'Store',
+        subtitle: mRecord.subtitle || mRecord.category || 'Quality Services & Bookings',
+        rating: mRecord.rating || '5.0',
+        reviews_count: mRecord.reviews_count || '120',
+        cover_url: mRecord.cover_url || (mRecord.banner ? pb.files.getURL(mRecord, mRecord.banner) : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80'),
+        logo_url: mRecord.logo_url || (mRecord.logo ? pb.files.getURL(mRecord, mRecord.logo) : null),
+        pwa_brand_color: mRecord.pwa_brand_color || '#FFC700',
+      };
+      setMerchant(normalizedMerchant);
 
       // Fetch branches
       try {
@@ -132,129 +134,63 @@ export default function CustomerBookingPwaScreen() {
           setBranches(bRes.items as any);
           setSelectedBranch(bRes.items[0] as any);
         } else {
-          setBranches([
-            { id: 'b-1', name: 'Bangi Sentral Main Outlet', address: 'Jalan Medan Pusat 2d, Seksyen 9, Bandar Baru Bangi' },
-            { id: 'b-2', name: 'Shah Alam Outlet', address: 'Jalan Plumbum 7/95, Seksyen 7, Shah Alam' }
-          ]);
-          setSelectedBranch({ id: 'b-1', name: 'Bangi Sentral Main Outlet', address: 'Jalan Medan Pusat 2d, Seksyen 9, Bandar Baru Bangi' });
+          const mainBranch = {
+            id: 'main',
+            name: `${normalizedMerchant.store_name} Main`,
+            address: normalizedMerchant.address || 'In-store service'
+          };
+          setBranches([mainBranch]);
+          setSelectedBranch(mainBranch);
         }
       } catch (bErr) {
-        setBranches([
-          { id: 'b-1', name: 'Bangi Sentral Main Outlet', address: 'Jalan Medan Pusat 2d, Seksyen 9, Bandar Baru Bangi' }
-        ]);
-        setSelectedBranch({ id: 'b-1', name: 'Bangi Sentral Main Outlet' });
+        const mainBranch = {
+          id: 'main',
+          name: `${normalizedMerchant.store_name} Main`,
+          address: normalizedMerchant.address || 'In-store service'
+        };
+        setBranches([mainBranch]);
+        setSelectedBranch(mainBranch);
       }
 
-      // Fetch services
+      // Fetch services (live active services only)
       try {
-        const sRes = await pb.collection('merchant_services').getList(1, 20, {
-          filter: `merchant = "${mRecord.id}" && is_active = true`
+        const sRes = await pb.collection('merchant_services').getList(1, 50, {
+          filter: `merchant = "${mRecord.id}" && is_active = true`,
+          sort: 'created'
         });
+        setServices(sRes.items as any);
         if (sRes.items.length > 0) {
-          setServices(sRes.items as any);
           setSelectedServices([sRes.items[0] as any]);
         } else {
-          const defaultServices: ServiceItem[] = [
-            {
-              id: 's-1',
-              name: 'Strawberry Gelato',
-              category: 'Gelato Scoops',
-              description: 'Fresh strawberry scoop made with wild berries & organic milk',
-              price: 16,
-              duration_minutes: 5,
-              image_url: 'https://images.unsplash.com/photo-1557142046-c704a3adf364?w=400&auto=format&fit=crop&q=80',
-              item_type: 'service'
-            },
-            {
-              id: 's-2',
-              name: 'Cookies & Cream',
-              category: 'Gelato Scoops',
-              description: 'Creamy Madagascar vanilla folded with crunchy Oreo cookies',
-              price: 16,
-              duration_minutes: 5,
-              image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&auto=format&fit=crop&q=80',
-              item_type: 'service'
-            },
-            {
-              id: 's-3',
-              name: 'Belgian Chocolate',
-              category: 'Gelato Scoops',
-              description: '70% dark Belgian cocoa gelato topped with chocolate fudge sauce',
-              price: 18,
-              duration_minutes: 5,
-              image_url: 'https://images.unsplash.com/photo-1580915411954-282cb1b0d780?w=400&auto=format&fit=crop&q=80',
-              item_type: 'service'
-            },
-            {
-              id: 's-4',
-              name: 'Signature Belgian Waffle with Gelato',
-              category: 'Waffles & Pastries',
-              description: 'Freshly baked Belgian waffle topped with 1 gelato scoop & maple syrup',
-              price: 24,
-              duration_minutes: 15,
-              image_url: 'https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=400&auto=format&fit=crop&q=80',
-              item_type: 'service'
-            },
-            {
-              id: 's-5',
-              name: 'Affogato Espresso Delight',
-              category: 'Beverages',
-              description: 'Double shot hot espresso poured over vanilla gelato scoop',
-              price: 14,
-              duration_minutes: 10,
-              image_url: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&auto=format&fit=crop&q=80',
-              item_type: 'service'
-            }
-          ];
-          setServices(defaultServices);
-          setSelectedServices([defaultServices[0]]);
+          setSelectedServices([]);
         }
       } catch (sErr) {
-        setServices([
-          {
-            id: 's-1',
-            name: 'Double Scoop Artisanal Gelato',
-            category: 'Gelato Scoops',
-            description: 'Choose 2 flavors of fresh handcrafted gelato with waffle cone',
-            price: 18,
-            duration_minutes: 10,
-            image_url: 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=300&auto=format&fit=crop&q=80',
-            item_type: 'service'
-          }
-        ]);
-        setSelectedServices([{
-          id: 's-1',
-          name: 'Double Scoop Artisanal Gelato',
-          price: 18,
-          duration_minutes: 10,
-          item_type: 'service'
-        }]);
+        console.warn('Error fetching services:', sErr);
+        setServices([]);
+        setSelectedServices([]);
       }
 
-      // Fetch staff
+      // Fetch staff (live active staff only)
       try {
         const stRes = await pb.collection('merchant_staff').getList(1, 10, {
           filter: `merchant = "${mRecord.id}" && is_active = true`
         });
         if (stRes.items.length > 0) {
           setStaffList([
-            { id: 'any', name: 'Any Provider', role_title: 'First Available Slot' },
+            { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' },
             ...(stRes.items as any)
           ]);
-          setSelectedStaff({ id: 'any', name: 'Any Provider', role_title: 'First Available Slot' });
         } else {
           setStaffList([
-            { id: 'any', name: 'Any Staff', role_title: 'First Available Slot' },
-            { id: 'st-1', name: 'Chef Marco', role_title: 'Master Gelatieri' },
-            { id: 'st-2', name: 'Aina Rose', role_title: 'Pastry & Dessert Specialist' }
+            { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' }
           ]);
-          setSelectedStaff({ id: 'any', name: 'Any Staff' });
         }
+        setSelectedStaff({ id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' });
       } catch (stErr) {
         setStaffList([
-          { id: 'any', name: 'Any Provider', role_title: 'First Available Slot' }
+          { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' }
         ]);
-        setSelectedStaff({ id: 'any', name: 'Any Provider' });
+        setSelectedStaff({ id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' });
       }
 
     } catch (err) {
@@ -314,12 +250,14 @@ export default function CustomerBookingPwaScreen() {
         const totalPrice = calculateTotal();
         const bookingPayload = {
           merchant: merchant?.id,
-          branch: selectedBranch?.id,
-          staff: selectedStaff?.id !== 'any' ? selectedStaff?.id : null,
+          branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
+          staff: (selectedStaff?.id && selectedStaff.id !== 'any') ? selectedStaff.id : null,
           customer_name: customerName,
           customer_phone: customerPhone,
           booking_date: new Date().toISOString().split('T')[0],
           start_time: selectedTime,
+          service_name: selectedServices.map(s => s.name).join(', '),
+          staff_name: selectedStaff?.name || 'Any Provider',
           total_price: totalPrice,
           items_summary: selectedServices.map(s => ({ name: s.name, price: s.price })),
           notes: customerNotes,
@@ -330,8 +268,9 @@ export default function CustomerBookingPwaScreen() {
         if (merchant?.id && !merchant.id.startsWith('demo-')) {
           try {
             newRec = await pb.collection('service_bookings').create(bookingPayload);
-          } catch (pbErr) {
+          } catch (pbErr: any) {
             console.warn('Booking create err:', pbErr);
+            throw pbErr;
           }
         }
 
@@ -342,8 +281,8 @@ export default function CustomerBookingPwaScreen() {
 
         showToast('Booking Confirmed! 🎉');
         setCurrentStep(4);
-      } catch (err) {
-        Alert.alert('Error', 'Failed to process booking. Please try again.');
+      } catch (err: any) {
+        Alert.alert('Error', err?.message || 'Failed to process booking. Please try again.');
       } finally {
         setIsSubmitting(false);
       }
@@ -375,6 +314,28 @@ export default function CustomerBookingPwaScreen() {
       </View>
     );
   }
+
+  if (!merchant && !loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <View style={[styles.brandInfoCard, { width: '100%', alignItems: 'center', padding: 32 }]}>
+          <Ionicons name="storefront-outline" size={48} color="#94A3B8" style={{ alignSelf: 'center', marginBottom: 12 }} />
+          <Text style={[styles.brandNameText, { textAlign: 'center', fontSize: 18 }]}>Store Not Found</Text>
+          <Text style={[styles.brandSubtitleText, { textAlign: 'center', marginTop: 6 }]}>
+            The booking page for "{slug}" does not exist or may have been renamed.
+          </Text>
+          <TouchableOpacity
+            style={[styles.btnFullYellowBook, { marginTop: 24, paddingHorizontal: 24 }]}
+            onPress={() => router.push('/')}
+          >
+            <Text style={styles.btnFullYellowBookText}>Go to Risev Home</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const availableCategories: string[] = ['All', ...Array.from(new Set(services.map(s => s.category).filter((c): c is string => Boolean(c))))];
 
   const filteredServices = activeCategory === 'All'
     ? services
@@ -529,47 +490,53 @@ export default function CustomerBookingPwaScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularCarouselScroll}>
-              {services.slice(0, 5).map(srv => {
-                const isSelected = selectedServices.some(s => s.id === srv.id);
-                return (
-                  <View key={srv.id} style={styles.popularCardItem}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectedServices([srv]);
-                        setCurrentStep(1);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Image
-                        source={{ uri: srv.image_url || 'https://images.unsplash.com/photo-1557142046-c704a3adf364?w=400&auto=format&fit=crop&q=80' }}
-                        style={styles.popularCardPhoto}
-                      />
-                    </TouchableOpacity>
+            {services.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularCarouselScroll}>
+                {services.slice(0, 5).map(srv => {
+                  const isSelected = selectedServices.some(s => s.id === srv.id);
+                  return (
+                    <View key={srv.id} style={styles.popularCardItem}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedServices([srv]);
+                          setCurrentStep(1);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Image
+                          source={{ uri: srv.image_url || 'https://images.unsplash.com/photo-1557142046-c704a3adf364?w=400&auto=format&fit=crop&q=80' }}
+                          style={styles.popularCardPhoto}
+                        />
+                      </TouchableOpacity>
 
-                    <View style={styles.popularCardBody}>
-                      <Text style={styles.popularCardName} numberOfLines={1}>{srv.name}</Text>
+                      <View style={styles.popularCardBody}>
+                        <Text style={styles.popularCardName} numberOfLines={1}>{srv.name}</Text>
 
-                      <View style={styles.popularCardBottomRow}>
-                        <Text style={styles.popularCardPrice}>RM{srv.price}</Text>
+                        <View style={styles.popularCardBottomRow}>
+                          <Text style={styles.popularCardPrice}>RM{srv.price}</Text>
 
-                        <TouchableOpacity
-                          style={[styles.popularAddCircleBtn, isSelected && styles.popularAddCircleBtnSelected]}
-                          onPress={() => toggleServiceSelection(srv)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons
-                            name={isSelected ? "checkmark" : "add"}
-                            size={20}
-                            color={isSelected ? "#000000" : "#D97706"}
-                          />
-                        </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.popularAddCircleBtn, isSelected && styles.popularAddCircleBtnSelected]}
+                            onPress={() => toggleServiceSelection(srv)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name={isSelected ? "checkmark" : "add"}
+                              size={20}
+                              color={isSelected ? "#000000" : "#D97706"}
+                            />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                <Text style={styles.seeAllText}>No items published yet.</Text>
+              </View>
+            )}
 
           </View>
         )}
@@ -582,7 +549,7 @@ export default function CustomerBookingPwaScreen() {
             
             {/* Horizontal Category Strip */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-              {['All', 'Gelato Scoops', 'Waffles & Pastries', 'Beverages'].map(cat => {
+              {availableCategories.map(cat => {
                 const isActive = activeCategory === cat;
                 return (
                   <TouchableOpacity
@@ -599,8 +566,21 @@ export default function CustomerBookingPwaScreen() {
             </ScrollView>
 
             {/* Service Cards List */}
-            <View style={styles.serviceCardsContainer}>
-              {filteredServices.map(srv => {
+            {services.length === 0 ? (
+              <View style={[styles.whiteServiceCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
+                <Ionicons name="sparkles-outline" size={32} color="#94A3B8" />
+                <Text style={[styles.whiteServiceTitle, { marginTop: 10, textAlign: 'center' }]}>No Services Available</Text>
+                <Text style={[styles.whiteServiceSub, { textAlign: 'center', marginTop: 4 }]}>
+                  This store has not published any services for online booking yet.
+                </Text>
+              </View>
+            ) : filteredServices.length === 0 ? (
+              <View style={[styles.whiteServiceCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
+                <Text style={styles.whiteServiceTitle}>No items in this category</Text>
+              </View>
+            ) : (
+              <View style={styles.serviceCardsContainer}>
+                {filteredServices.map(srv => {
                 const isSelected = selectedServices.some(item => item.id === srv.id);
                 return (
                   <TouchableOpacity
@@ -641,6 +621,7 @@ export default function CustomerBookingPwaScreen() {
                 );
               })}
             </View>
+          )}
 
           </View>
         )}

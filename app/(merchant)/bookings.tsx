@@ -83,8 +83,12 @@ export default function BookingsScreen() {
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const now = new Date();
   const [selectedDateTitle, setSelectedDateTitle] = useState('Today');
-  const [selectedDateSubtitle, setSelectedDateSubtitle] = useState('Sunday, 5 Oct 2026');
+  const [selectedDateSubtitle, setSelectedDateSubtitle] = useState(
+    now.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
+  );
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Services State
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -100,18 +104,18 @@ export default function BookingsScreen() {
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration, setNewServiceDuration] = useState('30');
   const [isOnlineAvailable, setIsOnlineAvailable] = useState(true);
-  const [assignedStaff, setAssignedStaff] = useState<string[]>(['Daniel', 'Sarah']);
+  const [assignedStaff, setAssignedStaff] = useState<string[]>(['Main Provider']);
   const [selectedLocation, setSelectedLocation] = useState('Main Branch');
   const [bufferTime, setBufferTime] = useState('10 minutes');
   const [depositPolicy, setDepositPolicy] = useState('No deposit');
   const [isSavingService, setIsSavingService] = useState(false);
 
   // PWA State & Branding Customizer
-  const [pwaSlug, setPwaSlug] = useState('scoop-creamy');
+  const [pwaSlug, setPwaSlug] = useState('store');
   const [copiedLink, setCopiedLink] = useState(false);
   const [customCoverUrl, setCustomCoverUrl] = useState<string>('https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=800&auto=format&fit=crop&q=80');
   const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
-  const [customTagline, setCustomTagline] = useState<string>('Handcrafted Gelato • Waffles • Desserts');
+  const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
 
   const handleSaveBranding = async () => {
@@ -144,11 +148,18 @@ export default function BookingsScreen() {
         try {
           mRecord = await pb.collection('merchants').getOne(user.merchant_id);
           setMerchantData(mRecord);
-          setPwaSlug(mRecord.pwa_slug || mRecord.store_name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'my-store');
+          const computedSlug = mRecord.pwa_slug || mRecord.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'store';
+          setPwaSlug(computedSlug);
           if (mRecord.cover_url) setCustomCoverUrl(mRecord.cover_url);
           if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
           if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
-        } catch (e) {}
+
+          if (!mRecord.pwa_slug && computedSlug && user.merchant_id) {
+            pb.collection('merchants').update(user.merchant_id, { pwa_slug: computedSlug }).catch(() => {});
+          }
+        } catch (e) {
+          console.warn('Error fetching merchant:', e);
+        }
       }
 
       let planName = 'stand_bundle';
@@ -174,116 +185,40 @@ export default function BookingsScreen() {
       setHasBookingAccess(hasAccess);
 
       if (!mRecord) {
-        setMerchantData({ store_name: 'SCOOP CREAMY' });
-        setPwaSlug('scoop-creamy');
+        setMerchantData({ name: user?.name || 'My Store' });
+        setPwaSlug('store');
       }
 
-      // Fetch bookings
+      // Fetch bookings (live data only, no mock fallback)
       try {
         let bItems: any[] = [];
         if (user?.merchant_id) {
-          const bRes = await pb.collection('service_bookings').getList(1, 50, {
+          const bRes = await pb.collection('service_bookings').getList(1, 100, {
             filter: `merchant = "${user.merchant_id}"`,
             sort: '-booking_date,-start_time'
           });
           bItems = bRes.items;
         }
-
-        if (bItems.length > 0) {
-          setBookings(bItems as any);
-        } else {
-          // Default mock data matching reference design in English
-          setBookings([
-            {
-              id: 'mock-1',
-              customer_name: 'Hafiz Danial',
-              customer_phone: '012-3456789',
-              booking_date: new Date().toISOString().split('T')[0],
-              start_time: '14:30',
-              status: 'arrived',
-              service_name: 'Signature Fade Cut',
-              staff_name: 'Aiman',
-              total_price: 35,
-              notes: 'Taper fade on sides'
-            }
-          ]);
-        }
+        setBookings(bItems as any);
       } catch (bErr) {
-        setBookings([
-          {
-            id: 'mock-1',
-            customer_name: 'Hafiz Danial',
-            customer_phone: '012-3456789',
-            booking_date: new Date().toISOString().split('T')[0],
-            start_time: '14:30',
-            status: 'arrived',
-            service_name: 'Signature Fade Cut',
-            staff_name: 'Aiman',
-            total_price: 35
-          }
-        ]);
+        console.warn('Error fetching bookings:', bErr);
+        setBookings([]);
       }
 
-      // Fetch services
+      // Fetch services (live data only, no mock fallback)
       try {
         let sItems: any[] = [];
         if (user?.merchant_id) {
-          const sRes = await pb.collection('merchant_services').getList(1, 50, {
+          const sRes = await pb.collection('merchant_services').getList(1, 100, {
             filter: `merchant = "${user.merchant_id}"`,
             sort: 'created'
           });
           sItems = sRes.items;
         }
-
-        if (sItems.length > 0) {
-          setServices(sItems as any);
-        } else {
-          setServices([
-            {
-              id: 'srv-1',
-              name: 'Signature Fade Cut',
-              category: 'Haircut',
-              price: 35,
-              duration_minutes: 30,
-              item_type: 'service',
-              is_active: true,
-              image_url: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80'
-            },
-            {
-              id: 'srv-2',
-              name: 'Hair Wash & Scalp Care',
-              category: 'Treatment',
-              price: 20,
-              duration_minutes: 20,
-              item_type: 'service',
-              is_active: true,
-              image_url: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&auto=format&fit=crop&q=80'
-            }
-          ]);
-        }
+        setServices(sItems as any);
       } catch (sErr) {
-        setServices([
-          {
-            id: 'srv-1',
-            name: 'Signature Fade Cut',
-            category: 'Haircut',
-            price: 35,
-            duration_minutes: 30,
-            item_type: 'service',
-            is_active: true,
-            image_url: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80'
-          },
-          {
-            id: 'srv-2',
-            name: 'Hair Wash & Scalp Care',
-            category: 'Treatment',
-            price: 20,
-            duration_minutes: 20,
-            item_type: 'service',
-            is_active: true,
-            image_url: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&auto=format&fit=crop&q=80'
-          }
-        ]);
+        console.warn('Error fetching services:', sErr);
+        setServices([]);
       }
 
     } catch (err) {
@@ -294,15 +229,38 @@ export default function BookingsScreen() {
   };
 
   const handleUpdateStatus = async (bookingId: string, newStatus: any) => {
+    setUpdatingId(bookingId);
     try {
-      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
       if (!bookingId.startsWith('mock-')) {
         await pb.collection('service_bookings').update(bookingId, { status: newStatus });
       }
-      Alert.alert('Status Updated', `Appointment status updated to ${newStatus.toUpperCase()}`);
-    } catch (e) {
-      console.warn(e);
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
+      if (newStatus === 'completed') {
+        Alert.alert('Completed & Stamped! 🎉', 'Customer loyalty stamps credited and digital receipt issued.');
+      } else {
+        Alert.alert('Status Updated', `Appointment marked as ${newStatus.toUpperCase()}`);
+      }
+    } catch (e: any) {
+      console.warn('Status update error:', e);
+      Alert.alert('Error', e?.message || 'Failed to update appointment status.');
+    } finally {
+      setUpdatingId(null);
     }
+  };
+
+  const handleCustomerWhatsApp = (b: BookingItem) => {
+    let rawPhone = (b.customer_phone || '').replace(/[^0-9]/g, '');
+    if (rawPhone.startsWith('0')) {
+      rawPhone = '60' + rawPhone.slice(1);
+    } else if (rawPhone.length > 0 && !rawPhone.startsWith('60')) {
+      rawPhone = '60' + rawPhone;
+    }
+    const storeTitle = merchantData?.name || merchantData?.store_name || user?.name || 'our store';
+    const text = `Hi ${b.customer_name || 'there'}, regarding your booking for ${b.service_name || 'service'} at ${storeTitle} on ${b.booking_date} at ${b.start_time}:`;
+    const waUrl = `https://wa.me/${rawPhone}?text=${encodeURIComponent(text)}`;
+    Linking.openURL(waUrl).catch(() => {
+      Alert.alert('Error', 'Unable to open WhatsApp.');
+    });
   };
 
   const handleCreateService = async () => {
@@ -337,10 +295,14 @@ export default function BookingsScreen() {
             price: priceNum,
             duration_minutes: durNum,
             item_type: addItemType,
-            is_active: true
+            is_active: true,
+            image_url: newService.image_url
           });
           newService.id = rec.id;
-        } catch (pbErr) {}
+        } catch (pbErr: any) {
+          console.warn('Failed to save service in PB:', pbErr);
+          throw pbErr;
+        }
       }
 
       setServices(prev => [newService, ...prev]);
@@ -348,8 +310,8 @@ export default function BookingsScreen() {
       setNewServiceName('');
       setNewServicePrice('');
       Alert.alert('Success', 'New item has been added to catalog.');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to add service.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to add service.');
     } finally {
       setIsSavingService(false);
     }
@@ -365,7 +327,7 @@ export default function BookingsScreen() {
 
   const handleShare = async (platform: string) => {
     const url = `https://risev.app/b/${pwaSlug}`;
-    const text = `Book your appointment with ${merchantData?.store_name || 'our store'} online:\n${url}`;
+    const text = `Book your appointment with ${merchantData?.name || merchantData?.store_name || 'our store'} online:\n${url}`;
 
     if (platform === 'whatsapp') {
       const waUrl = `whatsapp://send?text=${encodeURIComponent(text)}`;
@@ -373,7 +335,7 @@ export default function BookingsScreen() {
         if (supported) {
           Linking.openURL(waUrl);
         } else {
-          Share.share({ message: text });
+          Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
         }
       });
     } else {
@@ -588,109 +550,153 @@ export default function BookingsScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Appointment Card Item */}
-              <View style={styles.appointmentsList}>
-                {filteredBookings.map(b => (
-                  <View key={b.id} style={styles.bookingCardContainer}>
-                    
-                    {/* Time Badge on Left */}
-                    <View style={styles.timeColumn}>
-                      <Text style={styles.timeText}>{b.start_time}</Text>
-                      <Text style={styles.timeSubText}>Today</Text>
-                    </View>
+              {/* Appointment Card Items or Clean Empty State */}
+              {filteredBookings.length > 0 ? (
+                <View style={styles.appointmentsList}>
+                  {filteredBookings.map(b => (
+                    <View key={b.id} style={styles.bookingCardContainer}>
+                      
+                      {/* Time Badge on Left */}
+                      <View style={styles.timeColumn}>
+                        <Text style={styles.timeText}>{b.start_time || '10:00'}</Text>
+                        <Text style={styles.timeSubText}>Today</Text>
+                      </View>
 
-                    {/* Main Booking Card on Right */}
-                    <View style={styles.bookingCardMain}>
-                      <View style={styles.bookingCardHeader}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.customerName}>{b.customer_name}</Text>
-                          <Text style={styles.customerPhone}>📞 {b.customer_phone}</Text>
-                        </View>
-                        <View style={[
-                          styles.statusBadge,
-                          b.status === 'arrived' ? styles.statusBadgeArrived :
-                          b.status === 'completed' ? styles.statusBadgeCompleted : styles.statusBadgeBooked
-                        ]}>
-                          <Text style={[
-                            styles.statusBadgeText,
-                            b.status === 'arrived' && { color: '#15803D' }
+                      {/* Main Booking Card on Right */}
+                      <View style={styles.bookingCardMain}>
+                        <View style={styles.bookingCardHeader}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.customerName}>{b.customer_name || 'Customer'}</Text>
+                            <Text style={styles.customerPhone}>📞 {b.customer_phone}</Text>
+                          </View>
+                          <View style={[
+                            styles.statusBadge,
+                            b.status === 'arrived' ? styles.statusBadgeArrived :
+                            b.status === 'completed' ? styles.statusBadgeCompleted : styles.statusBadgeBooked
                           ]}>
-                            {b.status === 'arrived' ? '● ARRIVED' : b.status === 'completed' ? 'COMPLETED' : 'SCHEDULED'}
-                          </Text>
+                            <Text style={[
+                              styles.statusBadgeText,
+                              b.status === 'arrived' && { color: '#15803D' }
+                            ]}>
+                              {b.status === 'arrived' ? '● ARRIVED' : b.status === 'completed' ? 'COMPLETED' : 'SCHEDULED'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
 
-                      {/* Service & Price Row */}
-                      <View style={styles.serviceMetaBox}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                          <Ionicons name="cut-outline" size={14} color="#000" />
-                          <Text style={styles.serviceNameText}>{b.service_name || 'Signature Fade Cut'}</Text>
+                        {/* Service & Price Row */}
+                        <View style={styles.serviceMetaBox}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <Ionicons name="cut-outline" size={14} color="#000" />
+                            <Text style={styles.serviceNameText}>{b.service_name || 'Service Booking'}</Text>
+                          </View>
+                          <Text style={styles.bookingPriceText}>RM {Number(b.total_price || 0).toFixed(2)}</Text>
                         </View>
-                        <Text style={styles.bookingPriceText}>RM {b.total_price.toFixed(2)}</Text>
-                      </View>
 
-                      {/* Staff & Duration */}
-                      <View style={styles.staffMetaRow}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="person-outline" size={13} color="#64748B" />
-                          <Text style={styles.staffMetaText}>{b.staff_name || 'Aiman'}</Text>
+                        {/* Staff & Duration */}
+                        <View style={styles.staffMetaRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="person-outline" size={13} color="#64748B" />
+                            <Text style={styles.staffMetaText}>{b.staff_name || 'Staff'}</Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="time-outline" size={13} color="#64748B" />
+                            <Text style={styles.staffMetaText}>30 min</Text>
+                          </View>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="time-outline" size={13} color="#64748B" />
-                          <Text style={styles.staffMetaText}>30 min</Text>
-                        </View>
-                      </View>
 
-                      {/* Actions Buttons */}
-                      <View style={styles.bookingActionsRow}>
-                        {b.status === 'arrived' && (
+                        {/* Actions Buttons */}
+                        <View style={styles.bookingActionsRow}>
+                          {b.status === 'arrived' && (
+                            <TouchableOpacity
+                              style={styles.btnPrimaryAction}
+                              onPress={() => handleUpdateStatus(b.id, 'completed')}
+                              disabled={updatingId === b.id}
+                              activeOpacity={0.85}
+                            >
+                              {updatingId === b.id ? (
+                                <ActivityIndicator size="small" color="#000" />
+                              ) : (
+                                <>
+                                  <Ionicons name="checkmark" size={16} color="#000" />
+                                  <Text style={styles.btnPrimaryActionText}>Complete & Stamp</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+
+                          {b.status === 'booked' && (
+                            <TouchableOpacity
+                              style={styles.btnPrimaryAction}
+                              onPress={() => handleUpdateStatus(b.id, 'arrived')}
+                              disabled={updatingId === b.id}
+                              activeOpacity={0.85}
+                            >
+                              {updatingId === b.id ? (
+                                <ActivityIndicator size="small" color="#000" />
+                              ) : (
+                                <>
+                                  <Ionicons name="location" size={16} color="#000" />
+                                  <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+
                           <TouchableOpacity
-                            style={styles.btnPrimaryAction}
-                            onPress={() => handleUpdateStatus(b.id, 'completed')}
+                            style={styles.btnSecondaryAction}
+                            onPress={() => handleCustomerWhatsApp(b)}
                             activeOpacity={0.85}
                           >
-                            <Ionicons name="checkmark" size={16} color="#000" />
-                            <Text style={styles.btnPrimaryActionText}>Complete & Stamp</Text>
+                            <Ionicons name="logo-whatsapp" size={16} color="#000" />
+                            <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
                           </TouchableOpacity>
-                        )}
+                        </View>
 
-                        {b.status === 'booked' && (
-                          <TouchableOpacity
-                            style={styles.btnPrimaryAction}
-                            onPress={() => handleUpdateStatus(b.id, 'arrived')}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="location" size={16} color="#000" />
-                            <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
-                          </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                          style={styles.btnSecondaryAction}
-                          onPress={() => handleShare('whatsapp')}
-                          activeOpacity={0.85}
-                        >
-                          <Ionicons name="logo-whatsapp" size={16} color="#000" />
-                          <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
-                        </TouchableOpacity>
                       </View>
-
                     </View>
-                  </View>
-                ))}
-              </View>
-
-              {/* Next Appointments */}
-              <View style={{ marginTop: 24 }}>
-                <Text style={styles.nextTitle}>Next Appointments</Text>
+                  ))}
+                </View>
+              ) : (
                 <View style={styles.emptyNextCard}>
                   <View style={styles.emptyIconCircle}>
                     <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
                   </View>
-                  <Text style={styles.emptyText}>No upcoming appointments</Text>
-                  <Text style={styles.emptySubtext}>Take a break while waiting for your customers</Text>
+                  <Text style={styles.emptyText}>No appointments booked yet</Text>
+                  <Text style={styles.emptySubtext}>
+                    Share your online booking link with customers to start receiving appointments.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <TouchableOpacity
+                      style={[styles.btnSecondaryAction, { flex: 0, paddingHorizontal: 16 }]}
+                      onPress={handleCopyLink}
+                    >
+                      <Ionicons name="copy-outline" size={14} color="#000" />
+                      <Text style={styles.btnSecondaryActionText}>{copiedLink ? 'Copied!' : 'Copy Link'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btnPrimaryAction, { flex: 0, paddingHorizontal: 16 }]}
+                      onPress={() => router.push(`/b/${pwaSlug}` as any)}
+                    >
+                      <Ionicons name="open-outline" size={14} color="#000" />
+                      <Text style={styles.btnPrimaryActionText}>Preview Page</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              )}
+
+              {/* Next Appointments (when appointments exist) */}
+              {filteredBookings.length > 0 && (
+                <View style={{ marginTop: 24 }}>
+                  <Text style={styles.nextTitle}>Next Appointments</Text>
+                  <View style={styles.emptyNextCard}>
+                    <View style={styles.emptyIconCircle}>
+                      <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
+                    </View>
+                    <Text style={styles.emptyText}>All caught up</Text>
+                    <Text style={styles.emptySubtext}>You have handled all scheduled appointments for today</Text>
+                  </View>
+                </View>
+              )}
 
             </View>
           )}
@@ -737,34 +743,54 @@ export default function BookingsScreen() {
                 ))}
               </View>
 
-              {/* Service Item Cards */}
-              <View style={styles.servicesCatalogList}>
-                {filteredServices.map(s => (
-                  <View key={s.id} style={styles.catalogCard}>
-                    <Image
-                      source={{ uri: s.image_url || 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80' }}
-                      style={styles.catalogThumb}
-                    />
+              {/* Service Item Cards or Clean Empty State */}
+              {filteredServices.length > 0 ? (
+                <View style={styles.servicesCatalogList}>
+                  {filteredServices.map(s => (
+                    <View key={s.id} style={styles.catalogCard}>
+                      <Image
+                        source={{ uri: s.image_url || 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=200&auto=format&fit=crop&q=80' }}
+                        style={styles.catalogThumb}
+                      />
 
-                    <View style={{ flex: 1, justifyContent: 'center' }}>
-                      <Text style={styles.catalogItemTitle}>{s.name}</Text>
-                      <Text style={styles.catalogItemSubtitle}>
-                        {s.category} • ⏱️ {s.duration_minutes > 0 ? `${s.duration_minutes} min` : 'Product'}
-                      </Text>
-                      <Text style={styles.catalogItemPrice}>RM {s.price.toFixed(2)}</Text>
-                    </View>
+                      <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <Text style={styles.catalogItemTitle}>{s.name}</Text>
+                        <Text style={styles.catalogItemSubtitle}>
+                          {s.category} • ⏱️ {s.duration_minutes > 0 ? `${s.duration_minutes} min` : 'Product'}
+                        </Text>
+                        <Text style={styles.catalogItemPrice}>RM {Number(s.price || 0).toFixed(2)}</Text>
+                      </View>
 
-                    <View style={styles.catalogRightWrap}>
-                      <TouchableOpacity style={styles.btnDotsMenu}>
-                        <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
-                      </TouchableOpacity>
-                      <View style={styles.activeBadge}>
-                        <Text style={styles.activeBadgeText}>● Active</Text>
+                      <View style={styles.catalogRightWrap}>
+                        <TouchableOpacity style={styles.btnDotsMenu} onPress={() => Alert.alert('Service', s.name)}>
+                          <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
+                        </TouchableOpacity>
+                        <View style={styles.activeBadge}>
+                          <Text style={styles.activeBadgeText}>● Active</Text>
+                        </View>
                       </View>
                     </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyNextCard}>
+                  <View style={styles.emptyIconCircle}>
+                    <Ionicons name="cut-outline" size={24} color="#94A3B8" />
                   </View>
-                ))}
-              </View>
+                  <Text style={styles.emptyText}>Your service catalog is empty</Text>
+                  <Text style={styles.emptySubtext}>
+                    Add your haircuts, treatments, services, or products so customers can book them online.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.btnPrimaryAction, { marginTop: 16, paddingHorizontal: 20, alignSelf: 'center' }]}
+                    onPress={() => setShowAddServiceModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="add" size={16} color="#000" />
+                    <Text style={styles.btnPrimaryActionText}>+ Add Your First Service</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Tips Box */}
               <View style={styles.tipsCalloutCard}>
@@ -817,11 +843,11 @@ export default function BookingsScreen() {
 
                   <View style={styles.phoneScreenHeader}>
                     <View style={styles.mockupEmblemBox}>
-                      <Text style={{ fontSize: 16 }}>🍦</Text>
+                      <Text style={{ fontSize: 16 }}>✨</Text>
                     </View>
 
-                    <Text style={styles.miniStoreTitle}>{merchantData?.store_name || 'SCOOP CREAMY'}</Text>
-                    <Text style={styles.miniStoreSub}>{customTagline || 'Handcrafted Gelato • Waffles • Desserts'}</Text>
+                    <Text style={styles.miniStoreTitle}>{merchantData?.name || merchantData?.store_name || user?.name || 'My Store'}</Text>
+                    <Text style={styles.miniStoreSub}>{customTagline || merchantData?.subtitle || merchantData?.category || 'Quality Services & Online Booking'}</Text>
 
                     <View style={[styles.miniPilihBtn, { backgroundColor: selectedBrandColor }]}>
                       <Text style={styles.miniPilihBtnText}>📅 Book Appointment</Text>
@@ -829,23 +855,22 @@ export default function BookingsScreen() {
                   </View>
 
                   <View style={styles.phoneScreenContent}>
-                    <View style={styles.miniServiceItem}>
-                      <Ionicons name="ice-cream-outline" size={14} color="#000" />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.miniSrvTitle}>Double Scoop Artisanal Gelato</Text>
-                        <Text style={styles.miniSrvSub}>10 min • RM 18.00</Text>
+                    {services.length > 0 ? (
+                      services.slice(0, 2).map(srv => (
+                        <View key={srv.id} style={styles.miniServiceItem}>
+                          <Ionicons name="cut-outline" size={14} color="#000" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.miniSrvTitle} numberOfLines={1}>{srv.name}</Text>
+                            <Text style={styles.miniSrvSub}>{srv.duration_minutes > 0 ? `${srv.duration_minutes} min` : 'Service'} • RM {Number(srv.price || 0).toFixed(2)}</Text>
+                          </View>
+                          <Text style={{ fontSize: 12, fontWeight: '700' }}>+</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <View style={[styles.miniServiceItem, { justifyContent: 'center' }]}>
+                        <Text style={[styles.miniSrvSub, { textAlign: 'center' }]}>Your items will appear here</Text>
                       </View>
-                      <Text style={{ fontSize: 12, fontWeight: '700' }}>+</Text>
-                    </View>
-
-                    <View style={styles.miniServiceItem}>
-                      <Ionicons name="restaurant-outline" size={14} color="#000" />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.miniSrvTitle}>Signature Belgian Waffle</Text>
-                        <Text style={styles.miniSrvSub}>15 min • RM 24.00</Text>
-                      </View>
-                      <Text style={{ fontSize: 12, fontWeight: '700' }}>+</Text>
-                    </View>
+                    )}
                   </View>
                 </View>
               </View>
