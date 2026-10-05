@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +53,21 @@ function getContrastColor(hexColor?: string | null) {
   if (isNaN(r) || isNaN(g) || isNaN(b)) return '#000000';
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 150 ? '#000000' : '#FFFFFF';
+}
+
+function isObsidianDark(hexColor: string): boolean {
+  if (!hexColor || typeof hexColor !== 'string') return false;
+  let hex = hexColor.trim().replace('#', '');
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  if (hex.length !== 6) return false;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 50;
 }
 
 function isValidImageUri(uri?: string | null) {
@@ -135,10 +151,14 @@ export default function CustomerBookingPwaScreen() {
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Loyalty stamp card state
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
+  const [stampsCount, setStampsCount] = useState(5);
+  const totalStamps = 10;
 
   const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || '#FFC700';
   const contrastColor = getContrastColor(activeBrandColor);
-  const isBrandDark = contrastColor === '#FFFFFF';
+  const isBrandDark = isObsidianDark(activeBrandColor);
   
   const themeStyles = useMemo(() => {
     // 1. Base Adaptive Neumorphic Background Color
@@ -620,20 +640,31 @@ export default function CustomerBookingPwaScreen() {
                 <TouchableOpacity style={styles.circleIconButton} activeOpacity={0.8}>
                   <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity style={styles.circleIconButton} activeOpacity={0.8}>
-                    <Ionicons name="heart-outline" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.circleIconButton} activeOpacity={0.8}>
-                    <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
+
+                {/* Compact Top-Right Stamp Progress Badge (Replaces Love & Share) */}
+                <TouchableOpacity
+                  style={[
+                    styles.topRightStampPill, 
+                    themeStyles.neumorphicCard,
+                    { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }
+                  ]}
+                  onPress={() => setShowLoyaltyModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.topRightGiftBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                    <Ionicons name="gift" size={14} color={themeStyles.activeBtnText} />
+                  </View>
+                  <Text style={[styles.topRightStampText, { color: themeStyles.textPrimaryColor }]}>
+                    <Text style={{ fontWeight: '800' }}>{stampsCount}/{totalStamps}</Text> stamps
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={themeStyles.priceColor} />
+                </TouchableOpacity>
               </View>
             </View>
 
             {/* Brand Card Info (Flat background transition over cover, no top shadow) */}
             <View style={[styles.brandInfoCard, { backgroundColor: themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
-              
+
               {/* Store Title & Subtitle */}
               <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
               <Text style={[styles.brandSubtitleText, { color: themeStyles.textSecondaryColor }]}>{activeTagline}</Text>
@@ -641,8 +672,12 @@ export default function CustomerBookingPwaScreen() {
               {/* Soft Rating Pill Capsule */}
               <View style={[styles.ratingCapsulePill, themeStyles.neumorphicInset]}>
                 <Ionicons name="star" size={24} color="#FFC700" />
-                <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>4.9</Text>
-                <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>(450 reviews)</Text>
+                <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>
+                  {merchant?.rating || '4.9'}
+                </Text>
+                <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>
+                  ({merchant?.reviews_count || '450'} reviews)
+                </Text>
               </View>
 
               {/* Split Meta Location & Operating Hours */}
@@ -652,7 +687,9 @@ export default function CustomerBookingPwaScreen() {
                   <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
                     <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
                   </View>
-                  <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]}>Bangi Sentral</Text>
+                  <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                    {selectedBranch?.name || branches[0]?.name || merchant?.address || 'HQ Store'}
+                  </Text>
                 </View>
 
                 {/* Vertical Divider Line */}
@@ -667,7 +704,9 @@ export default function CustomerBookingPwaScreen() {
                     <View style={styles.openBadgePill}>
                       <Text style={styles.openBadgeText}>Open</Text>
                     </View>
-                    <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>11:00 AM – 11:00 PM</Text>
+                    <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
+                      {merchant?.operating_hours || '11:00 AM – 11:00 PM'}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1130,7 +1169,7 @@ export default function CustomerBookingPwaScreen() {
 
               <View style={[styles.timerCountdownCard, themeStyles.neumorphicInset]}>
                 <Text style={[styles.timerSubText, { color: themeStyles.textSecondaryColor }]}>Your appointment starts in:</Text>
-                <Text style={[styles.timerMainText, { color: activeBrandColor }]}>24 Mins 30 Secs</Text>
+                <Text style={[styles.timerMainText, { color: themeStyles.priceColor }]}>24 Mins 30 Secs</Text>
               </View>
 
               <View style={[styles.boardingInfoGrid, { borderColor: themeStyles.borderColor }]}>
@@ -1171,7 +1210,7 @@ export default function CustomerBookingPwaScreen() {
             {/* PWA Save App Card */}
             <View style={[styles.pwaCardBox, themeStyles.neumorphicCard]}>
               <View style={[styles.pwaIconBox, themeStyles.neumorphicInset]}>
-                <Ionicons name="phone-portrait-outline" size={22} color={activeBrandColor} />
+                <Ionicons name="phone-portrait-outline" size={22} color={themeStyles.priceColor} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>Save {merchant?.store_name || 'Aura Wellness'} App</Text>
@@ -1210,20 +1249,20 @@ export default function CustomerBookingPwaScreen() {
             {currentStep === 1 && (
               <>
                 <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''}</Text>
-                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>RM {calculateTotal().toFixed(2)}</Text>
               </>
             )}
 
             {currentStep === 2 && (
               <>
                 <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedDate}</Text>
-                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>{selectedTime}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>{selectedTime}</Text>
               </>
             )}
 
             {currentStep === 3 && (
               <>
-                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>RM {calculateTotal().toFixed(2)}</Text>
                 <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service • {calculateTotalDuration()} min</Text>
               </>
             )}
@@ -1245,6 +1284,109 @@ export default function CustomerBookingPwaScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Digital Loyalty Card Modal */}
+      <Modal
+        visible={showLoyaltyModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLoyaltyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdropPress}
+            activeOpacity={1}
+            onPress={() => setShowLoyaltyModal(false)}
+          />
+          <View style={[styles.loyaltyCardModalContent, themeStyles.neumorphicCard]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.modalHeaderIconBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                  <Ionicons name="ribbon" size={20} color={themeStyles.activeBtnText} />
+                </View>
+                <View>
+                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>VIP Loyalty Stamp Card</Text>
+                  <Text style={[styles.loyaltyModalSub, { color: themeStyles.textSecondaryColor }]}>{merchant?.store_name || 'Scoop Creamy'} Rewards</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, themeStyles.neumorphicInset]}
+                onPress={() => setShowLoyaltyModal(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={18} color={themeStyles.textPrimaryColor} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Stamp Card Digital Board */}
+            <View style={[styles.loyaltyBoardCard, { backgroundColor: themeStyles.pillBgColor, borderColor: themeStyles.borderColor }]}>
+              
+              {/* Member Tag */}
+              <View style={styles.loyaltyBoardHeader}>
+                <Text style={[styles.loyaltyBoardMemberTag, { color: themeStyles.textSecondaryColor }]}>MEMBER CARD</Text>
+                <Text style={[styles.loyaltyBoardCode, { color: themeStyles.priceColor }]}>#8849-RISEV</Text>
+              </View>
+
+              {/* 10 Stamps Grid (2 rows x 5 columns) */}
+              <View style={styles.stampsGridContainer}>
+                {Array.from({ length: totalStamps }).map((_, index) => {
+                  const stampNum = index + 1;
+                  const isCollected = stampNum <= stampsCount;
+                  const isRewardSlot = stampNum === totalStamps;
+
+                  return (
+                    <View
+                      key={stampNum}
+                      style={[
+                        styles.stampSlotCircle,
+                        isCollected
+                          ? [styles.stampSlotActive, { backgroundColor: themeStyles.activeBtnBg, borderColor: themeStyles.activeBtnBg }]
+                          : [styles.stampSlotInactive, themeStyles.neumorphicInset]
+                      ]}
+                    >
+                      {isCollected ? (
+                        <Ionicons name="checkmark-sharp" size={22} color={themeStyles.activeBtnText} />
+                      ) : isRewardSlot ? (
+                        <Ionicons name="gift-outline" size={20} color={themeStyles.priceColor} />
+                      ) : (
+                        <Text style={[styles.stampSlotNumText, { color: themeStyles.textMutedColor }]}>{stampNum}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Progress Footer */}
+              <View style={styles.loyaltyBoardFooter}>
+                <Ionicons name="sparkles" size={15} color={themeStyles.priceColor} />
+                <Text style={[styles.loyaltyBoardProgressMsg, { color: themeStyles.textPrimaryColor }]}>
+                  {stampsCount} stamps collected • {totalStamps - stampsCount} more for FREE Treat 🎉
+                </Text>
+              </View>
+            </View>
+
+            {/* Cashier Member Scan QR Code Box */}
+            <View style={[styles.loyaltyQrBox, themeStyles.neumorphicInset]}>
+              <Ionicons name="qr-code-outline" size={60} color={themeStyles.textPrimaryColor} />
+              <Text style={[styles.loyaltyQrInstruction, { color: themeStyles.textSecondaryColor }]}>
+                Scan QR at cashier counter to collect stamps upon checkout
+              </Text>
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity
+              style={[styles.btnFullYellowBook, themeStyles.neumorphicActiveBtn, { marginTop: 16 }]}
+              onPress={() => setShowLoyaltyModal(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Loyalty Card</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -2188,5 +2330,186 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
+  },
+
+  // Compact Top-Right Stamp Badge Styles
+  topRightStampPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    zIndex: 10,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    ...(Platform.OS === 'web' ? { boxShadow: 'none' } : {}),
+  },
+  topRightGiftBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topRightStampText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  loyaltyBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  loyaltyGiftBadgeCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loyaltyBannerSubText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  loyaltyBannerTitleText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    marginTop: 1,
+  },
+  loyaltyProgressTrack: {
+    height: 7,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 6,
+    width: '92%',
+  },
+  loyaltyProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  loyaltyBannerRight: {
+    paddingLeft: 10,
+  },
+  loyaltySeeStampsText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+
+  // Digital Loyalty Card Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalBackdropPress: {
+    ...StyleSheet.absoluteFill,
+  },
+  loyaltyCardModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 28,
+    padding: 20,
+    zIndex: 11,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalHeaderIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loyaltyModalTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  loyaltyModalSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loyaltyBoardCard: {
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  loyaltyBoardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  loyaltyBoardMemberTag: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    letterSpacing: 0.8,
+  },
+  loyaltyBoardCode: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  stampsGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 16,
+  },
+  stampSlotCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stampSlotActive: {
+    elevation: 3,
+  },
+  stampSlotInactive: {
+    borderWidth: 1,
+  },
+  stampSlotNumText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  loyaltyBoardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  loyaltyBoardProgressMsg: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    textAlign: 'center',
+  },
+  loyaltyQrBox: {
+    borderRadius: 18,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loyaltyQrInstruction: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
