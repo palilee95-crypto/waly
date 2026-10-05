@@ -148,6 +148,7 @@ export default function BookingsScreen() {
   const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
 
   const handleSaveBranding = async () => {
     setIsSavingBranding(true);
@@ -159,6 +160,7 @@ export default function BookingsScreen() {
           subtitle: customTagline,
         });
       }
+      setPreviewRefreshKey(Date.now());
       Alert.alert('Branding Saved', 'Your live booking PWA has been updated!');
     } catch (e: any) {
       Alert.alert('Branding Updated (Preview)', 'Saved locally for your booking page!');
@@ -1073,63 +1075,80 @@ export default function BookingsScreen() {
                 </Text>
               </View>
 
-              {/* Phone Mockup Card Preview with Dynamic Branding */}
-              <View style={styles.phoneMockupCard}>
-                <View style={styles.phoneFrameGraphic}>
-                  
-                  {/* Hero Cover Banner Image in Mockup */}
-                  <View style={styles.mockupHeroCoverWrapper}>
-                    {customCoverUrl || merchantData?.banner ? (
-                      <Image
-                        source={{
-                          uri: customCoverUrl || (merchantData?.banner ? `${pb.baseUrl}/api/files/merchants/${merchantData.id}/${merchantData.banner}` : '')
-                        }}
-                        style={styles.mockupHeroCoverImg}
-                      />
-                    ) : (
-                      <View style={[styles.mockupHeroCoverImg, { backgroundColor: selectedBrandColor || '#121318', opacity: 0.85 }]} />
-                    )}
-                    <View style={styles.mockupCoverOverlay} />
+              {/* Live Interactive Customer PWA Embed */}
+              <View style={styles.previewContainerCard}>
+                {/* Live Toolbar */}
+                <View style={styles.previewToolbar}>
+                  <View style={styles.previewUrlBadge}>
+                    <Text style={styles.previewLiveDot}>●</Text>
+                    <Text style={styles.previewUrlText} numberOfLines={1}>
+                      /b/{pwaSlug}
+                    </Text>
                   </View>
 
-                  <View style={styles.phoneScreenHeader}>
-                    <View style={styles.mockupEmblemBox}>
-                      {merchantData?.logo ? (
-                        <Image
-                          source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchantData.id}/${merchantData.logo}` }}
-                          style={{ width: 34, height: 34, borderRadius: 17 }}
-                        />
-                      ) : (
-                        <Text style={{ fontSize: 16 }}>✨</Text>
-                      )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TouchableOpacity
+                      style={styles.btnToolbarAction}
+                      onPress={() => setPreviewRefreshKey(Date.now())}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="reload" size={14} color="#0F172A" />
+                      <Text style={styles.btnToolbarActionText}>Reload</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.btnToolbarAction, styles.btnToolbarActionPrimary]}
+                      onPress={() => {
+                        const targetUrl = `/b/${pwaSlug}`;
+                        if (Platform.OS === 'web') {
+                          window.open(targetUrl, '_blank');
+                        } else {
+                          router.push(targetUrl as any);
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="open-outline" size={14} color="#000" />
+                      <Text style={styles.btnToolbarActionPrimaryText}>Open Live ↗</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Device Frame Viewport */}
+                <View style={styles.deviceFrame}>
+                  {/* Speaker Notch */}
+                  <View style={styles.deviceSpeakerBar} />
+
+                  {Platform.OS === 'web' ? (
+                    React.createElement('iframe', {
+                      key: previewRefreshKey,
+                      src: `/b/${pwaSlug}?preview=1&t=${previewRefreshKey}`,
+                      style: {
+                        width: '100%',
+                        height: 640,
+                        border: 'none',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 24,
+                      },
+                      title: 'Live Customer Booking PWA',
+                    })
+                  ) : (
+                    <View style={styles.mobileFallbackPreview}>
+                      <Ionicons name="phone-portrait-outline" size={44} color="#FFC700" />
+                      <Text style={styles.mobileFallbackTitle}>Live Customer PWA</Text>
+                      <Text style={styles.mobileFallbackSub}>
+                        Tap below to test your full booking portal as customers see it.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.btnOpenFallback}
+                        onPress={() => router.push(`/b/${pwaSlug}` as any)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="open-outline" size={15} color="#000" />
+                        <Text style={styles.btnOpenFallbackText}>Launch Booking Flow ➔</Text>
+                      </TouchableOpacity>
                     </View>
-
-                    <Text style={styles.miniStoreTitle}>{merchantData?.name || merchantData?.store_name || user?.name || 'My Store'}</Text>
-                    <Text style={styles.miniStoreSub}>{customTagline || merchantData?.subtitle || merchantData?.category || 'Quality Services & Online Booking'}</Text>
-
-                    <View style={[styles.miniPilihBtn, { backgroundColor: selectedBrandColor }]}>
-                      <Text style={styles.miniPilihBtnText}>📅 Book Appointment</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.phoneScreenContent}>
-                    {services.length > 0 ? (
-                      services.slice(0, 2).map(srv => (
-                        <View key={srv.id} style={styles.miniServiceItem}>
-                          <Ionicons name="cut-outline" size={14} color="#000" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.miniSrvTitle} numberOfLines={1}>{srv.name}</Text>
-                            <Text style={styles.miniSrvSub}>{srv.duration_minutes > 0 ? `${srv.duration_minutes} min` : 'Service'} • RM {Number(srv.price || 0).toFixed(2)}</Text>
-                          </View>
-                          <Text style={{ fontSize: 12, fontWeight: '700' }}>+</Text>
-                        </View>
-                      ))
-                    ) : (
-                      <View style={[styles.miniServiceItem, { justifyContent: 'center' }]}>
-                        <Text style={[styles.miniSrvSub, { textAlign: 'center' }]}>Your items will appear here</Text>
-                      </View>
-                    )}
-                  </View>
+                  )}
                 </View>
               </View>
 
@@ -2708,72 +2727,137 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Phone Mockup Graphic
-  phoneMockupCard: {
+  // Live Interactive PWA Preview Container
+  previewContainerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 20,
-    alignItems: 'center',
+    borderRadius: 24,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  previewToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
     marginBottom: 16,
   },
-  phoneFrameGraphic: {
-    width: 220,
-    backgroundColor: '#121318',
-    borderRadius: 24,
-    padding: 12,
-    borderWidth: 4,
-    borderColor: '#2A2B36',
-  },
-  phoneScreenHeader: {
+  previewUrlBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  miniStoreTitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-  },
-  miniStoreSub: {
-    fontSize: 9,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  miniPilihBtn: {
-    backgroundColor: '#FFC700',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-    marginTop: 8,
-  },
-  miniPilihBtnText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000',
-  },
-  phoneScreenContent: {
-    paddingVertical: 8,
     gap: 6,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    maxWidth: '55%',
   },
-  miniServiceItem: {
+  previewLiveDot: {
+    fontSize: 9,
+    color: '#22C55E',
+  },
+  previewUrlText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  btnToolbarAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  btnToolbarActionText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  btnToolbarActionPrimary: {
+    backgroundColor: '#FFC700',
+  },
+  btnToolbarActionPrimaryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  deviceFrame: {
+    width: '100%',
+    maxWidth: 390,
+    height: 640,
+    backgroundColor: '#0F172A',
+    borderRadius: 32,
+    padding: 6,
+    borderWidth: 4,
+    borderColor: '#1E293B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  deviceSpeakerBar: {
+    width: 60,
+    height: 4,
+    backgroundColor: '#334155',
+    borderRadius: 2,
+    alignSelf: 'center',
+    position: 'absolute',
+    top: 6,
+    zIndex: 10,
+  },
+  mobileFallbackPreview: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  mobileFallbackTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 12,
+  },
+  mobileFallbackSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  btnOpenFallback: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 8,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
   },
-  miniSrvTitle: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000',
-  },
-  miniSrvSub: {
-    fontSize: 8,
-    color: '#64748B',
+  btnOpenFallbackText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
 
   // Official Link Box
