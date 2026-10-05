@@ -201,6 +201,12 @@ export default function CustomerBookingPwaScreen() {
       } : {}),
     };
 
+    // 5. Price & High Contrast Accent Colors
+    // If brand color is dark (e.g. #121318), prices & active buttons use vibrant high contrast gold (#FFC700) so they stand out clearly
+    const activeBtnBg = isBrandDark ? '#FFC700' : activeBrandColor;
+    const activeBtnText = getContrastColor(activeBtnBg);
+    const priceColor = isBrandDark ? '#FFC700' : activeBrandColor;
+
     return {
       baseBgColor,
       textPrimaryColor,
@@ -213,11 +219,18 @@ export default function CustomerBookingPwaScreen() {
       isBrandDark,
       contrastColor,
       activeBrandColor,
+      activeBtnBg,
+      activeBtnText,
+      priceColor,
 
       // Pre-baked Neumorphic Objects & Helpers
       neumorphicCard,
       neumorphicInset,
-      neumorphicActiveBtn,
+      neumorphicActiveBtn: {
+        ...neumorphicActiveBtn,
+        backgroundColor: activeBtnBg,
+        borderColor: activeBtnBg,
+      },
       bg: { backgroundColor: baseBgColor },
       textPrimary: { color: textPrimaryColor },
       textSecondary: { color: textSecondaryColor },
@@ -728,7 +741,7 @@ export default function CustomerBookingPwaScreen() {
                         <Text style={[styles.popularCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>{srv.name}</Text>
 
                         <View style={styles.popularCardBottomRow}>
-                          <Text style={[styles.popularCardPrice, { color: activeBrandColor }]}>RM{srv.price}</Text>
+                          <Text style={[styles.popularCardPrice, { color: themeStyles.priceColor }]}>RM{srv.price}</Text>
 
                           <TouchableOpacity
                             style={[
@@ -741,7 +754,7 @@ export default function CustomerBookingPwaScreen() {
                             <Ionicons
                               name={isSelected ? "checkmark" : "add"}
                               size={20}
-                              color={isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor}
+                              color={isSelected ? themeStyles.activeBtnText : themeStyles.textPrimaryColor}
                             />
                           </TouchableOpacity>
                         </View>
@@ -778,7 +791,7 @@ export default function CustomerBookingPwaScreen() {
                     ]}
                     onPress={() => setActiveCategory(cat)}
                   >
-                    <Text style={[styles.categoryChipText, { color: isActive ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>
+                    <Text style={[styles.categoryChipText, { color: isActive ? themeStyles.activeBtnText : themeStyles.textSecondaryColor }]}>
                       {cat}
                     </Text>
                   </TouchableOpacity>
@@ -830,7 +843,7 @@ export default function CustomerBookingPwaScreen() {
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor }]}>{srv.name}</Text>
-                      {srv.description && (
+                      {Boolean(srv.description) && (
                         <Text style={[styles.whiteServiceSub, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
                           {srv.description}
                         </Text>
@@ -838,7 +851,7 @@ export default function CustomerBookingPwaScreen() {
                       <View style={styles.whiteServiceMetaRow}>
                         <Ionicons name="time-outline" size={13} color={themeStyles.textSecondaryColor} />
                         <Text style={[styles.whiteServiceDuration, { color: themeStyles.textSecondaryColor }]}>{srv.duration_minutes} min</Text>
-                        <Text style={[styles.whiteServicePrice, { color: activeBrandColor }]}>RM{srv.price}</Text>
+                        <Text style={[styles.whiteServicePrice, { color: themeStyles.priceColor }]}>RM{srv.price}</Text>
                       </View>
                     </View>
 
@@ -852,7 +865,7 @@ export default function CustomerBookingPwaScreen() {
                       <Ionicons
                         name={isSelected ? 'checkmark' : 'add'}
                         size={20}
-                        color={isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor}
+                        color={isSelected ? themeStyles.activeBtnText : themeStyles.textPrimaryColor}
                       />
                     </TouchableOpacity>
                   </TouchableOpacity>
