@@ -618,8 +618,8 @@ export default function CustomerBookingPwaScreen() {
               </View>
             </View>
 
-            {/* Brand Card Info with Warm/Dark Adaptive Neumorphism */}
-            <View style={[styles.brandInfoCard, themeStyles.neumorphicCard, { marginTop: -28 }]}>
+            {/* Brand Card Info (Flat background transition over cover, no top shadow) */}
+            <View style={[styles.brandInfoCard, { backgroundColor: themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
               
               {/* Store Title & Subtitle */}
               <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
@@ -1400,11 +1400,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     alignItems: 'center',
-    shadowColor: '#D3CBBD',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
   },
   brandNameText: {
     fontSize: 30,
