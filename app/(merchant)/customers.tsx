@@ -129,11 +129,25 @@ export default function CustomersScreen() {
     }
   };
 
+  const [activePlan, setActivePlan] = useState<string>('stand_bundle');
+
   const fetchMerchant = async () => {
     if (!user?.merchant_id) return;
     try {
       const rec = await pb.collection('merchants').getOne(user.merchant_id);
       setMerchant(rec);
+
+      try {
+        const subs = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}" && (status = "active" || status = "trialing")`,
+          requestKey: null
+        });
+        if (subs.items.length > 0) {
+          setActivePlan(subs.items[0].plan || 'stand_bundle');
+        } else {
+          setActivePlan('stand_bundle');
+        }
+      } catch (sErr) {}
     } catch (e) {
       console.warn("Failed to fetch merchant for customers screen:", e);
     }
@@ -230,6 +244,10 @@ export default function CustomersScreen() {
   const [deleteTxModalVisible, setDeleteTxModalVisible] = useState(false);
   const [txToDelete, setTxToDelete] = useState<any>(null);
   const [isDeletingTx, setIsDeletingTx] = useState(false);
+
+  // Delete Customer Modal State
+  const [deleteCustomerModalVisible, setDeleteCustomerModalVisible] = useState(false);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
 
   const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'Yesterday' | '7Days' | '30Days'>('All');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
@@ -503,6 +521,69 @@ export default function CustomersScreen() {
       Alert.alert('Error', err?.message || 'Failed to delete transaction.');
     } finally {
       setIsDeletingTx(false);
+    }
+  };
+
+  const rawMerchantMeta = merchant?.metadata;
+  const parsedMerchantMeta = parseSafeMetadata(rawMerchantMeta);
+  const standDeletionsUsed = parseInt(parsedMerchantMeta.stand_customer_deletions) || 0;
+  const isStandBundle = activePlan === 'stand_bundle' || activePlan === 'none';
+  const standRemainingDeletions = Math.max(0, 10 - standDeletionsUsed);
+  const isStandDeletionLimitReached = isStandBundle && standDeletionsUsed >= 10;
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!selectedCustomer?.customerId || !user?.merchant_id) return;
+    if (!isOwner) {
+      Alert.alert('Permission Denied', 'Only the store owner can remove customers.');
+      return;
+    }
+
+    const targetCustomerId = selectedCustomer.customerId;
+    const targetCustomerName = selectedCustomer.name;
+
+    setIsDeletingCustomer(true);
+    try {
+      const res = await pb.send<{
+        success: boolean;
+        message: string;
+        is_stand_bundle?: boolean;
+        remaining_deletions?: number;
+        deletions_used?: number;
+      }>('/api/risev/merchant/customer/delete', {
+        method: 'POST',
+        body: { customer_id: targetCustomerId },
+      });
+
+      if (res.is_stand_bundle && res.deletions_used !== undefined) {
+        setMerchant((prev: any) => {
+          if (!prev) return prev;
+          const currMeta = parseSafeMetadata(prev.metadata);
+          return {
+            ...prev,
+            metadata: {
+              ...currMeta,
+              stand_customer_deletions: res.deletions_used,
+            },
+          };
+        });
+      }
+
+      setTransactions((prev) => prev.filter((t) => t.customerId !== targetCustomerId));
+      setCustomerTransactions([]);
+      setCustomerCard(null);
+      setCustomerVouchers([]);
+      setDeleteCustomerModalVisible(false);
+      closeCustomerModal();
+
+      const quotaMsg = res.is_stand_bundle && res.remaining_deletions !== undefined
+        ? ` (${res.remaining_deletions} removal${res.remaining_deletions === 1 ? '' : 's'} remaining on Stand bundle)`
+        : '';
+      Alert.alert('Customer Removed', `${targetCustomerName} has been removed from your store records.${quotaMsg}`);
+    } catch (err: any) {
+      const errMsg = err?.data?.message || err?.message || 'Failed to remove customer.';
+      Alert.alert('Cannot Remove Customer', errMsg);
+    } finally {
+      setIsDeletingCustomer(false);
     }
   };
 
@@ -1790,6 +1871,20 @@ export default function CustomersScreen() {
                   >
                     <Ionicons name="cash" size={14} color="#B45309" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Spend</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      if (!isOwner) {
+                        Alert.alert('Permission Denied', 'Only the store owner can remove customers.');
+                        return;
+                      }
+                      setDeleteCustomerModalVisible(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FEF2F2', borderRadius: 20, borderWidth: 1, borderColor: '#FEE2E2' }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>Remove</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -3292,6 +3387,149 @@ export default function CustomersScreen() {
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Delete Record</Text>
                 )}
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Remove Customer Modal */}
+      <Modal
+        visible={deleteCustomerModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeletingCustomer) setDeleteCustomerModalVisible(false);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: isStandDeletionLimitReached ? '#FEF3C7' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <Ionicons name={isStandDeletionLimitReached ? "lock-closed" : "person-remove"} size={26} color={isStandDeletionLimitReached ? "#D97706" : "#DC2626"} />
+              </View>
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', textAlign: 'center' }}>
+                {isStandDeletionLimitReached ? 'Removal Limit Reached' : 'Remove Customer?'}
+              </Text>
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 4 }}>
+                {isStandDeletionLimitReached
+                  ? 'You have used all 10 free customer removals on the NFC Stand package.'
+                  : "This will remove the customer's stamp card, transactions, and unused vouchers from your store."}
+              </Text>
+            </View>
+
+            {selectedCustomer && (
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 8, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Customer</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                    {selectedCustomer.name}
+                  </Text>
+                </View>
+                {selectedCustomer.customerPhone ? (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Phone</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      {selectedCustomer.customerPhone}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            {/* Quota & Plan Notice */}
+            {isStandBundle ? (
+              <View style={{
+                backgroundColor: isStandDeletionLimitReached ? '#FEF2F2' : '#FFFBEB',
+                borderRadius: 14,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: isStandDeletionLimitReached ? '#FCA5A5' : '#FDE68A',
+                marginBottom: 20
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons
+                    name={isStandDeletionLimitReached ? "alert-circle" : "shield-checkmark"}
+                    size={16}
+                    color={isStandDeletionLimitReached ? "#DC2626" : "#B45309"}
+                  />
+                  <Text style={{
+                    fontSize: 12,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: isStandDeletionLimitReached ? "#DC2626" : "#B45309"
+                  }}>
+                    {isStandDeletionLimitReached
+                      ? 'NFC Stand Cap: 10/10 Used'
+                      : `Stand Bundle: ${standRemainingDeletions} of 10 Removals Left`}
+                  </Text>
+                </View>
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_500Medium',
+                  color: isStandDeletionLimitReached ? "#991B1B" : "#92400E",
+                  lineHeight: 16
+                }}>
+                  {isStandDeletionLimitReached
+                    ? 'To remove more customers and free up slots, upgrade to Starter (RM47/mo) or PRO (RM97/mo) for unlimited customer removals.'
+                    : 'Each customer removed frees up 1 slot in your 500-customer quota. Upgrading to Starter or PRO gives unlimited removals.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{
+                backgroundColor: '#F0FDF4',
+                borderRadius: 14,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: '#BBF7D0',
+                marginBottom: 20
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons name="sparkles" size={16} color="#16A34A" />
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#16A34A' }}>
+                    Unlimited Customer Removals
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#166534', lineHeight: 16 }}>
+                  As an active subscriber ({activePlan.toUpperCase()}), customer removals are completely unlimited and will free up member capacity.
+                </Text>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => setDeleteCustomerModalVisible(false)}
+                disabled={isDeletingCustomer}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              {isStandDeletionLimitReached ? (
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                  onPress={() => {
+                    setDeleteCustomerModalVisible(false);
+                    router.push('/(merchant)/subscription' as any);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="flash" size={14} color="#FFC700" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Upgrade Plan</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={handleConfirmDeleteCustomer}
+                  disabled={isDeletingCustomer}
+                  activeOpacity={0.85}
+                >
+                  {isDeletingCustomer ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Confirm Removal</Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
