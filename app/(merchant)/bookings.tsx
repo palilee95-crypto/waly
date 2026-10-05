@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { useRouter } from 'expo-router';
@@ -718,7 +719,7 @@ export default function BookingsScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Booking & PWA Suite</Text>
+          <Text style={styles.headerTitle}>Smart Booking Management</Text>
           <Text style={styles.headerSubtitle}>Manage appointments, services & booking page</Text>
         </View>
 
@@ -824,47 +825,62 @@ export default function BookingsScreen() {
           {/* ========================================== */}
           {activeTab === 'appointments' && (
             <View>
-              {/* Dark Hero Card */}
-              <View style={styles.darkHeroCard}>
-                <View style={styles.darkHeroHeader}>
+              {/* Yellow Gradient Hero Card */}
+              <LinearGradient colors={['#FFDE59', '#FFC700']} style={styles.yellowHeroCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <View style={styles.yellowHeroHeader}>
                   <View>
-                    <Text style={styles.darkHeroTitle}>{selectedDateTitle}</Text>
-                    <Text style={styles.darkHeroDate}>{selectedDateSubtitle}</Text>
+                    <Text style={styles.yellowHeroTitle}>{selectedDateTitle}</Text>
+                    <Text style={styles.yellowHeroDate}>{selectedDateSubtitle}</Text>
                   </View>
                   <TouchableOpacity
-                    style={styles.btnCalendarView}
+                    style={styles.btnCalendarViewLight}
                     onPress={() => setShowCalendarModal(true)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="calendar-outline" size={13} color="#FFFFFF" />
-                    <Text style={styles.btnCalendarViewText}>View Calendar ›</Text>
+                    <Ionicons name="calendar-outline" size={14} color="#0F172A" />
+                    <Text style={styles.btnCalendarViewTextLight}>View Calendar ›</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* 3 Stat Boxes inside dark hero card */}
-                <View style={styles.darkStatsGrid}>
-                  <View style={[styles.darkStatBox, { borderLeftColor: '#22C55E' }]}>
-                    <Text style={styles.darkStatNum}>{arrivedCount}</Text>
-                    <Text style={styles.darkStatLabel} numberOfLines={2}>
-                      Today's Appointments
+                {/* 3 Stat Boxes */}
+                <View style={styles.glassStatsGrid}>
+                  <View style={[styles.glassStatBox, { borderLeftColor: '#10B981' }]}>
+                    <View style={styles.statBoxTopRow}>
+                      <Text style={styles.glassStatNum}>{arrivedCount}</Text>
+                      <View style={[styles.statIconWrap, { backgroundColor: '#E6F4EA' }]}>
+                        <Ionicons name="calendar" size={14} color="#10B981" />
+                      </View>
+                    </View>
+                    <Text style={styles.glassStatLabel} numberOfLines={2}>
+                      Today's{'\n'}Appointments
                     </Text>
                   </View>
 
-                  <View style={[styles.darkStatBox, { borderLeftColor: '#FFC700' }]}>
-                    <Text style={styles.darkStatNum}>{bookedCount}</Text>
-                    <Text style={styles.darkStatLabel} numberOfLines={2}>
+                  <View style={[styles.glassStatBox, { borderLeftColor: '#F59E0B' }]}>
+                    <View style={styles.statBoxTopRow}>
+                      <Text style={styles.glassStatNum}>{bookedCount}</Text>
+                      <View style={[styles.statIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name="time" size={14} color="#F59E0B" />
+                      </View>
+                    </View>
+                    <Text style={styles.glassStatLabel} numberOfLines={2}>
                       Upcoming
                     </Text>
                   </View>
 
-                  <View style={[styles.darkStatBox, { borderLeftColor: '#38BDF8' }]}>
-                    <Text style={styles.darkStatNum}>{completedCount}</Text>
-                    <Text style={styles.darkStatLabel} numberOfLines={2}>
+                  <View style={[styles.glassStatBox, { borderLeftColor: '#3B82F6' }]}>
+                    <View style={styles.statBoxTopRow}>
+                      <Text style={styles.glassStatNum}>{completedCount}</Text>
+                      <View style={[styles.statIconWrap, { backgroundColor: '#DBEAFE' }]}>
+                        <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
+                      </View>
+                    </View>
+                    <Text style={styles.glassStatLabel} numberOfLines={2}>
                       Completed
                     </Text>
                   </View>
                 </View>
-              </View>
+              </LinearGradient>
 
               {/* Status Filter Chips */}
               <View style={styles.filterPillsRow}>
@@ -2366,73 +2382,95 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
 
-  // Dark Hero Card
-  darkHeroCard: {
-    backgroundColor: '#121318',
+  // Yellow Hero Card
+  yellowHeroCard: {
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#262730',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  darkHeroHeader: {
+  yellowHeroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 18,
   },
-  darkHeroTitle: {
-    fontSize: 22,
+  yellowHeroTitle: {
+    fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
+    color: '#0F172A',
+    letterSpacing: -0.5,
   },
-  darkHeroDate: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 3,
+  yellowHeroDate: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#334155',
+    marginTop: 2,
   },
-  btnCalendarView: {
+  btnCalendarViewLight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1E1F28',
-    borderWidth: 1,
-    borderColor: '#323444',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  btnCalendarViewText: {
+  btnCalendarViewTextLight: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
   },
-  darkStatsGrid: {
+  glassStatsGrid: {
     flexDirection: 'row',
     gap: 10,
   },
-  darkStatBox: {
+  glassStatBox: {
     flex: 1,
-    backgroundColor: '#1A1B24',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 14,
     borderRadius: 16,
     borderLeftWidth: 4,
-    minHeight: 92,
+    minHeight: 96,
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  darkStatNum: {
-    fontSize: 24,
+  statBoxTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  glassStatNum: {
+    fontSize: 26,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: '#0F172A',
   },
-  darkStatLabel: {
+  statIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glassStatLabel: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#94A3B8',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
     lineHeight: 14,
   },
 

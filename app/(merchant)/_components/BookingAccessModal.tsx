@@ -62,7 +62,7 @@ export default function BookingAccessModal({ visible, onClose }: BookingAccessMo
               </View>
 
               <View style={styles.titleRow}>
-                <Text style={styles.title}>Booking & PWA Suite</Text>
+                <Text style={styles.title}>Smart Booking Management</Text>
                 <View style={styles.badgePro}>
                   <Text style={styles.badgeProText}>PRO ADD-ON ⚡</Text>
                 </View>

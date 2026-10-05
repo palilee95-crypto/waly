@@ -612,6 +612,10 @@ export default function NfcLandingScreen() {
   const [approvedStamps, setApprovedStamps] = useState<number | null>(null);
   const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'pairing' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
+  
+  // Digital Receipt state
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
 
   // Loyalty Mode
   const isPointsOnly = program?.enable_stamps === false && program?.enable_points === true;
@@ -712,6 +716,15 @@ export default function NfcLandingScreen() {
   useEffect(() => {
     if (isApproved) {
       setShowBack(true);
+
+      if (claimId) {
+        pb.collection('digital_receipts').getList(1, 1, {
+          filter: `customer_phone = "${phoneInput || user?.phone || ''}" && merchant = "${merchant?.id}"`,
+          sort: '-created'
+        }).then(res => {
+          if (res.items.length > 0) setReceiptData(res.items[0]);
+        }).catch(() => {});
+      }
 
       Animated.sequence([
         Animated.delay(800), // Delay to let flip and stamp ink finish
@@ -2469,17 +2482,51 @@ export default function NfcLandingScreen() {
               )}
 
               {isApproved && (
-                <TouchableOpacity
-                  style={[styles.radarSuccessBtn, { marginTop: 12 }]}
-                  onPress={handleViewStampCard}
-                  activeOpacity={0.88}
-                >
-                  <Ionicons name="card" size={20} color="#0F172A" style={{ marginRight: 8 }} />
-                  <Text style={styles.radarSuccessBtnText}>
-                    {isPointsOnly ? 'View My Points Card' : 'View My Cards'}
-                  </Text>
-                  <Ionicons name="arrow-forward" size={18} color="#0F172A" style={{ marginLeft: 8 }} />
-                </TouchableOpacity>
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 12 }}>
+                  {receiptData && (
+                    <TouchableOpacity 
+                      style={styles.receiptBanner}
+                      onPress={() => setShowReceiptModal(true)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                        <Text style={styles.receiptBannerText}>Pembayaran RM {parseFloat(receiptData.total_amount || 0).toFixed(2)} Berjaya</Text>
+                      </View>
+                      <View style={styles.receiptBannerBtn}>
+                        <Ionicons name="receipt-outline" size={14} color="#0F172A" />
+                        <Text style={styles.receiptBannerBtnText}>Resit</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  <View style={{ flexDirection: 'row', gap: 8, width: '100%', maxWidth: 360, marginTop: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.radarSuccessBtn, { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 0 }]}
+                      onPress={handleViewStampCard}
+                      activeOpacity={0.88}
+                    >
+                      <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
+                        {isPointsOnly ? 'My Points' : 'Kad Saya'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0 }]}
+                      onPress={() => {
+                        if (merchant?.slug) router.push(`/b/${merchant.slug}`);
+                        else router.push(`/b/${merchant?.id}`);
+                      }}
+                      activeOpacity={0.88}
+                    >
+                      <Ionicons name="download-outline" size={18} color={getContrastColor(primaryColor || '#000')} style={{ marginRight: 6 }} />
+                      <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#000'), fontSize: 13 }]}>
+                        Download App
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               )}
             </View>
           )}
@@ -2937,6 +2984,59 @@ export default function NfcLandingScreen() {
           </BlurView>
         </View>
       </Modal>
+
+      {/* Digital Receipt Modal (Bottom Sheet Style) */}
+      {receiptData && (
+        <Modal
+          visible={showReceiptModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowReceiptModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '80%' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Resit Digital</Text>
+                <TouchableOpacity onPress={() => setShowReceiptModal(false)}>
+                  <Ionicons name="close-circle" size={28} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                    <Ionicons name="storefront" size={32} color="#0F172A" />
+                  </View>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', textAlign: 'center' }}>{merchant?.name}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>Resit #: {receiptData.receipt_number || receiptData.id}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>{new Date(receiptData.created).toLocaleString('ms-MY')}</Text>
+                </View>
+
+                <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, marginBottom: 16 }}>
+                  {receiptData.line_items && Array.isArray(receiptData.line_items) ? (
+                    receiptData.line_items.map((item: any, idx: number) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>{item.name}</Text>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>RM {parseFloat(item.price || 0).toFixed(2)}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>Pembayaran Servis</Text>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Jumlah Total</Text>
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -4416,5 +4516,35 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: 'rgba(255, 255, 255, 0.65)',
     textDecorationLine: 'underline',
+  },
+  receiptBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: '100%',
+    maxWidth: 360,
+  },
+  receiptBannerText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  receiptBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  receiptBannerBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
   },
 });

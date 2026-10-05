@@ -1326,8 +1326,8 @@ export default function ProfileScreen() {
 
           <SettingItem
             iconName="calendar-outline"
-            title="Booking & PWA Suite"
-            subtitle="Urus slot temujanji, servis & PWA kedai anda"
+            title="Smart Booking Management"
+            subtitle="Manage appointments, services & customer check-ins"
             iconBgColor="#FFFBEA"
             iconColor="#D97706"
             badgeText="ADD-ON ⚡"

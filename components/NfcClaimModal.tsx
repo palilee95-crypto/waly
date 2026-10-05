@@ -40,6 +40,14 @@ export default function NfcClaimModal() {
   // Booking & Quick Add-on states
   const [activeBooking, setActiveBooking] = useState<any>(null);
   const [quickAddons, setQuickAddons] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
+
+  useEffect(() => {
+    let total = 0;
+    selectedServices.forEach(s => total += s.price);
+    setBillAmount(total.toFixed(2));
+    setStampAmount(String(Math.max(1, Math.floor(total / 10))));
+  }, [selectedServices]);
 
   useEffect(() => {
     if (!merchantId) return;
@@ -68,11 +76,12 @@ export default function NfcClaimModal() {
         if (bRes.items.length > 0) {
           const bk = bRes.items[0];
           setActiveBooking(bk);
-          if (bk.total_price) {
-            setBillAmount(String(bk.total_price));
-          }
+          let basePrice = bk.total_price || 0;
+          let serviceName = bk.items_summary?.[0]?.name || 'Temujanji Servis';
+          setSelectedServices([{ id: 'booking', name: serviceName, price: basePrice, isBooking: true }]);
         } else {
           setActiveBooking(null);
+          setSelectedServices([]);
         }
       } catch (e) {
         setActiveBooking(null);
@@ -166,26 +175,33 @@ export default function NfcClaimModal() {
         },
       });
 
-      // If customer had an active booking, mark completed & create digital receipt
+      // If customer had an active booking, mark completed
       if (activeBooking?.id) {
         try {
           await pb.collection('service_bookings').update(activeBooking.id, {
             status: 'completed'
           });
-
-          await pb.collection('digital_receipts').create({
-            merchant: merchantId,
-            booking: activeBooking.id,
-            customer_phone: claim.customer_phone,
-            receipt_number: `REC-${Date.now().toString().slice(-6)}`,
-            total_amount: bill,
-            payment_method: 'nfc_counter',
-            stamps_earned: stamps,
-            line_items: activeBooking.items_summary || [{ name: 'Service', price: bill }]
-          });
         } catch (bErr) {
           console.warn('Booking reconciliation note:', bErr);
         }
+      }
+
+      // ALWAYS create a digital receipt
+      try {
+        const receiptPayload: any = {
+          merchant: merchantId,
+          customer_phone: claim.customer_phone,
+          receipt_number: `REC-${Date.now().toString().slice(-6)}`,
+          total_amount: bill,
+          payment_method: 'nfc_counter',
+          stamps_earned: stamps,
+          line_items: selectedServices.length > 0 ? selectedServices : [{ name: 'Pembayaran Servis', price: bill }]
+        };
+        if (activeBooking?.id) receiptPayload.booking = activeBooking.id;
+        
+        await pb.collection('digital_receipts').create(receiptPayload);
+      } catch (bErr) {
+        console.warn('Receipt creation note:', bErr);
       }
 
       // Show sleek in-modal success view
@@ -204,6 +220,7 @@ export default function NfcClaimModal() {
     setErrorMsg(null);
     setBillAmount('10');
     setStampAmount('1');
+    setSelectedServices([]);
   };
 
   const handleMinimize = () => {
@@ -341,8 +358,8 @@ export default function NfcClaimModal() {
                       <Ionicons name="wifi" size={22} color={merchantColor} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.title}>NFC Stamp Claim!</Text>
-                      <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
+                      <Text style={styles.title}>{activeBooking ? "Selesaikan Booking" : "Checkout Pelanggan"}</Text>
+                      <Text style={styles.subtitle}>{activeBooking ? "Customer has an active booking today" : "Walk-in checkout via NFC"}</Text>
                     </View>
                     <TouchableOpacity onPress={handleMinimize} style={styles.closeBtn} accessibilityLabel="Minimize">
                       <Ionicons name="close" size={20} color="#64748B" />
@@ -383,15 +400,59 @@ export default function NfcClaimModal() {
                         <Text style={styles.activeBookingTitle}>TEMPAHAN AKTIF DIKESAN</Text>
                       </View>
                       <Text style={styles.activeBookingSubtitle}>
-                        {activeBooking.items_summary?.[0]?.name || 'Temujanji Servis'} • Slot: {activeBooking.start_time || 'Hari Ini'}
+                        Slot: {activeBooking.start_time || 'Hari Ini'}
                       </Text>
                     </View>
                   )}
 
+                  {/* Mini POS Cart View */}
+                  <View style={styles.cartContainer}>
+                    <Text style={styles.quickAddonLabel}>SENARAI SERVIS:</Text>
+                    
+                    {selectedServices.length === 0 ? (
+                      <Text style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium', fontStyle: 'italic', paddingVertical: 8 }}>
+                        Sila pilih servis di bawah...
+                      </Text>
+                    ) : (
+                      selectedServices.map((item, idx) => (
+                        <View key={idx} style={styles.cartItemRow}>
+                          <Text style={styles.cartItemName} numberOfLines={1}>{item.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={styles.cartItemPrice}>RM {parseFloat(item.price || 0).toFixed(2)}</Text>
+                            {!item.isBooking && (
+                              <TouchableOpacity onPress={() => setSelectedServices(prev => prev.filter((_, i) => i !== idx))} style={{ padding: 2 }}>
+                                <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                              </TouchableOpacity>
+                            )}
+                            {item.isBooking && (
+                              <View style={{ padding: 2, width: 20, alignItems: 'center' }}>
+                                <Ionicons name="lock-closed" size={14} color="#CBD5E1" />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      ))
+                    )}
+
+                    <View style={styles.cartDivider} />
+                    
+                    <View style={styles.cartTotalRow}>
+                      <Text style={styles.cartTotalLabel}>Jumlah Perlu Dibayar</Text>
+                      <Text style={styles.cartTotalValue}>RM {parseFloat(billAmount || '0').toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.cartStampRow}>
+                      <Text style={styles.cartStampLabel}>Stamps akan diberi</Text>
+                      <View style={styles.cartStampBadge}>
+                        <Ionicons name="star" size={12} color="#F59E0B" />
+                        <Text style={styles.cartStampValue}>{stampAmount} ⭐</Text>
+                      </View>
+                    </View>
+                  </View>
+
                   {/* Quick Add-On Products Chips */}
                   {quickAddons.length > 0 && (
-                    <View style={{ marginBottom: 12 }}>
-                      <Text style={styles.quickAddonLabel}>+ TAMBAH PRODUK / EXTRA (1-KLIK):</Text>
+                    <View style={{ marginBottom: 20 }}>
+                      <Text style={styles.quickAddonLabel}>+ TAMBAH PRODUK / EXTRA SERVIS:</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
                         <View style={{ flexDirection: 'row', gap: 6 }}>
                           {quickAddons.map((item: any) => (
@@ -399,8 +460,7 @@ export default function NfcClaimModal() {
                               key={item.id}
                               style={styles.quickAddonChip}
                               onPress={() => {
-                                const currentBill = parseFloat(billAmount) || 0;
-                                setBillAmount((currentBill + (item.price || 0)).toFixed(2));
+                                setSelectedServices(prev => [...prev, { id: item.id, name: item.name, price: item.price }]);
                               }}
                             >
                               <Text style={styles.quickAddonChipText}>+ {item.name} (RM {item.price})</Text>
@@ -410,38 +470,6 @@ export default function NfcClaimModal() {
                       </ScrollView>
                     </View>
                   )}
-
-                  {/* Inputs */}
-                  <View style={styles.inputRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
-                      <View style={styles.inputContainer}>
-                        <Ionicons name="cash-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
-                          keyboardType="numeric"
-                          value={billAmount}
-                          onChangeText={setBillAmount}
-                          placeholder="10"
-                          placeholderTextColor="#94A3B8"
-                        />
-                      </View>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
-                      <View style={styles.inputContainer}>
-                        <Ionicons name="star-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
-                          keyboardType="numeric"
-                          value={stampAmount}
-                          onChangeText={setStampAmount}
-                          placeholder="1"
-                          placeholderTextColor="#94A3B8"
-                        />
-                      </View>
-                    </View>
-                  </View>
 
                   {/* Staff Acting Badge */}
                   <View style={styles.staffPillRow}>
@@ -478,7 +506,7 @@ export default function NfcClaimModal() {
                       {isLoading ? (
                         <ActivityIndicator size="small" color={contrastTextColor} />
                       ) : (
-                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps</Text>
+                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Terima Bayaran & Beri Cop</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -924,5 +952,76 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
+  },
+  cartContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cartItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  cartItemName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#1E293B',
+    paddingRight: 10,
+  },
+  cartItemPrice: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  cartDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 12,
+  },
+  cartTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cartTotalLabel: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+  },
+  cartTotalValue: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#1A1400',
+  },
+  cartStampRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cartStampLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  cartStampBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  cartStampValue: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
   },
 });

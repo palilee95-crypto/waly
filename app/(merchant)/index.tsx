@@ -583,13 +583,13 @@ export default function MerchantDashboard() {
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Booking & PWA Suite</Text>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Smart Booking Management</Text>
                 <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
                   <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000' }}>ADD-ON</Text>
                 </View>
               </View>
               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                Urus slot temujanji, servis & semak ketibaan pelanggan
+                Manage appointments, services & customer check-ins
               </Text>
             </View>
           </View>
