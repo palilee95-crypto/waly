@@ -26,6 +26,7 @@ import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 import UpgradeModal from './_components/UpgradeModal';
+import BookingAccessModal from './_components/BookingAccessModal';
 import {
   isPushSupported,
   getPushPermissionStatus,
@@ -143,6 +144,7 @@ export default function ProfileScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [permissionDeniedModalVisible, setPermissionDeniedModalVisible] = useState(false);
   const [deniedFeatureTitle, setDeniedFeatureTitle] = useState('');
+  const [showBookingAccessModal, setShowBookingAccessModal] = useState(false);
 
   // Language & Password modals
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -1330,7 +1332,20 @@ export default function ProfileScreen() {
             iconColor="#D97706"
             badgeText="ADD-ON ⚡"
             badgeColor="#FFC700"
-            onPress={() => router.push('/(merchant)/bookings' as any)}
+            onPress={() => {
+              const plan = (subscription?.plan || '').toLowerCase();
+              const hasBookingAccess = Boolean(
+                plan === 'pro' ||
+                plan === 'business' ||
+                plan === 'enterprise' ||
+                merchant?.has_booking_addon === true
+              );
+              if (hasBookingAccess) {
+                router.push('/(merchant)/bookings' as any);
+              } else {
+                setShowBookingAccessModal(true);
+              }
+            }}
           />
 
           <SettingItem
@@ -2029,6 +2044,12 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Booking & PWA Suite Feature Access Gate Modal */}
+      <BookingAccessModal
+        visible={showBookingAccessModal}
+        onClose={() => setShowBookingAccessModal(false)}
+      />
     </SafeAreaView>
   );
 }

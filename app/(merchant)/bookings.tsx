@@ -24,6 +24,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
+import BookingAccessModal from './_components/BookingAccessModal';
 
 interface BookingItem {
   id: string;
@@ -78,6 +79,7 @@ export default function BookingsScreen() {
   const [merchantData, setMerchantData] = useState<any>(null);
   const [hasBookingAccess, setHasBookingAccess] = useState(true);
   const [currentPlan, setCurrentPlan] = useState('stand_bundle');
+  const [showBookingAccessModal, setShowBookingAccessModal] = useState(false);
 
   // Appointments State
   const [bookings, setBookings] = useState<BookingItem[]>([]);
@@ -434,7 +436,7 @@ export default function BookingsScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => router.push('/(merchant)/subscription' as any)}
+            onPress={() => setShowBookingAccessModal(true)}
             style={{ backgroundColor: '#050505', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}
             activeOpacity={0.85}
           >
@@ -1821,6 +1823,11 @@ export default function BookingsScreen() {
         </View>
       </Modal>
 
+      {/* Booking & PWA Suite Feature Access Gate Modal */}
+      <BookingAccessModal
+        visible={showBookingAccessModal}
+        onClose={() => setShowBookingAccessModal(false)}
+      />
     </SafeAreaView>
   );
 }

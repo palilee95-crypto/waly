@@ -25,6 +25,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import MerchantNoticeCarousel from '@/components/MerchantNoticeCarousel';
+import BookingAccessModal from './_components/BookingAccessModal';
 
 
 const { width } = Dimensions.get('window');
@@ -51,6 +52,7 @@ export default function MerchantDashboard() {
   const [loading, setLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showBookingAccessModal, setShowBookingAccessModal] = useState(false);
   const [pricing, setPricing] = useState({
     base_price_1m: 119,
     discount_3m: 5,
@@ -559,7 +561,20 @@ export default function MerchantDashboard() {
             shadowRadius: 6,
             elevation: 2,
           }}
-          onPress={() => router.push('/(merchant)/bookings' as any)}
+          onPress={() => {
+            const plan = (activeSubscription?.plan || '').toLowerCase();
+            const hasBookingAccess = Boolean(
+              plan === 'pro' ||
+              plan === 'business' ||
+              plan === 'enterprise' ||
+              merchant?.has_booking_addon === true
+            );
+            if (hasBookingAccess) {
+              router.push('/(merchant)/bookings' as any);
+            } else {
+              setShowBookingAccessModal(true);
+            }
+          }}
           activeOpacity={0.85}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
@@ -1043,6 +1058,12 @@ export default function MerchantDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Booking & PWA Suite Feature Access Gate Modal */}
+      <BookingAccessModal
+        visible={showBookingAccessModal}
+        onClose={() => setShowBookingAccessModal(false)}
+      />
     </SafeAreaView>
   );
 }
