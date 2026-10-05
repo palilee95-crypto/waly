@@ -704,20 +704,25 @@ export default function BookingsScreen() {
                   <Text style={styles.emptySubtext}>
                     Share your online booking link with customers to start receiving appointments.
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                  <View style={styles.emptyActionsRow}>
                     <TouchableOpacity
-                      style={[styles.btnSecondaryAction, { flex: 0, paddingHorizontal: 16 }]}
+                      style={styles.btnEmptySecondary}
                       onPress={handleCopyLink}
+                      activeOpacity={0.8}
                     >
-                      <Ionicons name="copy-outline" size={14} color="#000" />
-                      <Text style={styles.btnSecondaryActionText}>{copiedLink ? 'Copied!' : 'Copy Link'}</Text>
+                      <Ionicons name={copiedLink ? "checkmark-circle" : "copy-outline"} size={16} color={copiedLink ? "#16A34A" : "#0F172A"} />
+                      <Text style={[styles.btnEmptySecondaryText, copiedLink && { color: '#16A34A' }]}>
+                        {copiedLink ? 'Copied Link!' : 'Copy Link'}
+                      </Text>
                     </TouchableOpacity>
+
                     <TouchableOpacity
-                      style={[styles.btnPrimaryAction, { flex: 0, paddingHorizontal: 16 }]}
+                      style={styles.btnEmptyPrimary}
                       onPress={() => router.push(`/b/${pwaSlug}` as any)}
+                      activeOpacity={0.85}
                     >
-                      <Ionicons name="open-outline" size={14} color="#000" />
-                      <Text style={styles.btnPrimaryActionText}>Preview Page</Text>
+                      <Ionicons name="open-outline" size={16} color="#000" />
+                      <Text style={styles.btnEmptyPrimaryText}>Preview Page</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -821,12 +826,12 @@ export default function BookingsScreen() {
                     Add your haircuts, treatments, services, or products so customers can book them online.
                   </Text>
                   <TouchableOpacity
-                    style={[styles.btnPrimaryAction, { marginTop: 16, paddingHorizontal: 20, alignSelf: 'center' }]}
+                    style={[styles.btnEmptyPrimary, { marginTop: 16 }]}
                     onPress={() => setShowAddServiceModal(true)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="add" size={16} color="#000" />
-                    <Text style={styles.btnPrimaryActionText}>+ Add Your First Service</Text>
+                    <Ionicons name="add" size={18} color="#000" />
+                    <Text style={styles.btnEmptyPrimaryText}>+ Add Your First Service</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -2238,6 +2243,56 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
     textAlign: 'center',
+  },
+  emptyActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 18,
+    flexWrap: 'wrap',
+  },
+  btnEmptySecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  btnEmptySecondaryText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  btnEmptyPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  btnEmptyPrimaryText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
 
   // FAB Help
