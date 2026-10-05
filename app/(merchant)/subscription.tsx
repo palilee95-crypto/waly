@@ -35,7 +35,7 @@ export default function SubscriptionScreen() {
   const { user, refreshSession, switchRole } = useAuth();
   const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro' | 'enterprise'>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -57,7 +57,7 @@ export default function SubscriptionScreen() {
 
   // Auto-open checkout modal if requested via route params
   useEffect(() => {
-    if (params.plan === 'starter' || params.plan === 'pro' || params.plan === 'enterprise') {
+    if (params.plan === 'starter' || params.plan === 'pro') {
       setSelectedPlan(params.plan);
     }
     if (params.cycle === 'monthly' || params.cycle === 'annually') {
@@ -170,17 +170,11 @@ export default function SubscriptionScreen() {
         originalPrice: billingCycle === 'monthly' ? 'RM 59' : 'RM 49',
         label: 'Starter Plan'
       };
-    } else if (selectedPlan === 'pro') {
+    } else {
       return {
         price: billingCycle === 'monthly' ? 'RM 97' : 'RM 78',
         originalPrice: billingCycle === 'monthly' ? 'RM 129' : 'RM 99',
         label: 'PRO Plan'
-      };
-    } else {
-      return {
-        price: billingCycle === 'monthly' ? 'RM 329' : 'RM 263',
-        originalPrice: billingCycle === 'monthly' ? 'RM 499' : 'RM 399',
-        label: 'Business Plan'
       };
     }
   };
@@ -216,7 +210,7 @@ export default function SubscriptionScreen() {
           'Hingga 5 akaun staf'
         ]
       };
-    } else if (selectedPlan === 'pro') {
+    } else {
       const monthlyRate = isAnnual ? 78 : 97;
       const baseMonthly = isAnnual ? 129 : 129;
       const subtotal = baseMonthly * (isAnnual ? 12 : 1);
@@ -245,35 +239,6 @@ export default function SubscriptionScreen() {
           'Hingga 10 akaun staf'
         ]
       };
-    } else {
-      const monthlyRate = isAnnual ? 263 : 329;
-      const baseMonthly = isAnnual ? 499 : 499;
-      const subtotal = baseMonthly * (isAnnual ? 12 : 1);
-      const total = monthlyRate * (isAnnual ? 12 : 1);
-      const discount = subtotal - total;
-      return {
-        planTitle: 'Business Plan',
-        badgeColor: '#D97706',
-        badgeBg: '#FEF3C7',
-        icon: 'business-outline' as const,
-        monthlyRate,
-        months: isAnnual ? 12 : 1,
-        subtotal,
-        discount,
-        total,
-        periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual - Save 20%)' : '12 Bulan (Tahunan - Jimat 20%)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
-        highlights: locale === 'en' ? [
-          'Everything in PRO included',
-          'Multi-branch outlet management',
-          'Unlimited staff accounts',
-          '24/7 dedicated support'
-        ] : [
-          'Semua ciri dalam PRO',
-          'Sokongan pelbagai cawangan',
-          'Akaun staf tanpa had',
-          'Sokongan akaun 24/7'
-        ]
-      };
     }
   };
 
@@ -294,7 +259,7 @@ export default function SubscriptionScreen() {
       }>('/api/risev/merchant/subscription/checkout', {
         method: 'POST',
         body: {
-          plan: selectedPlan === 'enterprise' ? 'business' : selectedPlan,
+          plan: selectedPlan,
           billing_cycle: billingCycle,
           payment_method: selectedPaymentMethod,
         }
@@ -345,7 +310,7 @@ export default function SubscriptionScreen() {
         '[LOCK] Promotional Broadcasts',
         '[LOCK] Up to 10 staff accounts'
       ];
-    } else if (selectedPlan === 'pro') {
+    } else {
       return [
         'Everything in Starter',
         'Unlimited customer database ♾️',
@@ -355,18 +320,7 @@ export default function SubscriptionScreen() {
         'Pro Sales & Opportunity Analytics',
         'Unlimited active vouchers',
         'Up to 10 staff accounts',
-        'Priority WhatsApp support',
-        '[LOCK] Unlimited (3+) Multi-Branch Engine',
-        '[LOCK] Custom integration & White-label'
-      ];
-    } else {
-      return [
-        'Everything in PRO',
-        'Unlimited staff accounts',
-        'Unlimited (3+) Multi-Branch Engine',
-        'Custom integration & APIs',
-        'Custom branding',
-        '24/7 dedicated account support'
+        'Priority WhatsApp support'
       ];
     }
   };
@@ -554,7 +508,7 @@ export default function SubscriptionScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* 3. Compact Plan Selector (3 Columns Grid) */}
+          {/* 3. Compact Plan Selector (2 Columns Grid) */}
           <Text style={styles.sectionLabel}>Select your plan:</Text>
           <View style={styles.planSelectorRow}>
             {/* Starter Plan */}
@@ -600,27 +554,6 @@ export default function SubscriptionScreen() {
               <Text style={styles.planCardTitle}>PRO</Text>
               <Text style={[styles.planCardPrice, { color: '#050505' }]}>
                 {billingCycle === 'monthly' ? 'RM 97' : 'RM 78'}
-              </Text>
-              <Text style={styles.planCardPeriod}>/mo</Text>
-            </TouchableOpacity>
-
-            {/* Business Plan */}
-            <TouchableOpacity
-              style={[
-                styles.planCard,
-                selectedPlan === 'enterprise' && styles.planCardActive
-              ]}
-              onPress={() => setSelectedPlan('enterprise')}
-              activeOpacity={0.9}
-            >
-              {activeSub?.status === 'active' && (activeSub?.plan === 'enterprise' || activeSub?.plan === 'business') ? (
-                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
-                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
-                </View>
-              ) : null}
-              <Text style={styles.planCardTitle}>Business</Text>
-              <Text style={styles.planCardPrice}>
-                {billingCycle === 'monthly' ? 'RM 329' : 'RM 263'}
               </Text>
               <Text style={styles.planCardPeriod}>/mo</Text>
             </TouchableOpacity>
@@ -704,14 +637,8 @@ export default function SubscriptionScreen() {
                     : isUpgrade
                       ? (selectedPlan === 'pro' 
                           ? (locale === 'en' ? 'Upgrade to PRO (Recommended)' : 'Naik Taraf ke PRO (Disyorkan)')
-                          : selectedPlan === 'enterprise'
-                            ? (locale === 'en' ? 'Upgrade to Business Plan' : 'Naik Taraf ke Pelan Business')
-                            : (locale === 'en' ? 'Subscribe to Starter' : 'Langgan Pelan Starter'))
-                      : (selectedPlan === 'starter'
-                          ? (locale === 'en' ? 'Switch to Starter' : 'Tukar ke Starter')
-                          : selectedPlan === 'pro'
-                            ? (locale === 'en' ? 'Switch to PRO' : 'Tukar ke PRO')
-                            : (locale === 'en' ? 'Switch to Business' : 'Tukar ke Business'))}
+                          : (locale === 'en' ? 'Subscribe to Starter' : 'Langgan Pelan Starter'))
+                      : (locale === 'en' ? 'Switch to Starter' : 'Tukar ke Starter')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -780,20 +707,18 @@ export default function SubscriptionScreen() {
               {(() => {
                 const summary = getOrderSummary();
                 const isPro = selectedPlan === 'pro';
-                const isBusiness = selectedPlan === 'enterprise';
 
                 return (
                   <>
                     <View style={[
                       styles.vipPlanCard,
                       isPro && styles.vipPlanCardPro,
-                      isBusiness && styles.vipPlanCardBusiness,
                     ]}>
                       {/* Top Plan Header */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View style={[styles.vipIconWrap, { backgroundColor: isPro ? 'rgba(99, 102, 241, 0.2)' : isBusiness ? 'rgba(245, 158, 11, 0.2)' : 'rgba(148, 163, 184, 0.2)' }]}>
-                            <Ionicons name={summary.icon} size={20} color={isPro ? '#A5B4FC' : isBusiness ? '#FCD34D' : '#E2E8F0'} />
+                          <View style={[styles.vipIconWrap, { backgroundColor: isPro ? 'rgba(99, 102, 241, 0.2)' : 'rgba(148, 163, 184, 0.2)' }]}>
+                            <Ionicons name={summary.icon} size={20} color={isPro ? '#A5B4FC' : '#E2E8F0'} />
                           </View>
                           <View>
                             <Text style={styles.vipPlanTitle}>{summary.planTitle}</Text>
@@ -1360,14 +1285,15 @@ const styles = StyleSheet.create({
   },
   planSelectorRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginBottom: 20,
   },
   planCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
