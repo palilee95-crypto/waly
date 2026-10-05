@@ -43,6 +43,28 @@ interface StaffItem {
   avatar?: string;
 }
 
+function getContrastColor(hexColor?: string | null) {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length < 7) return '#000000';
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#000000';
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? '#000000' : '#FFFFFF';
+}
+
+function isValidImageUri(uri?: string | null) {
+  if (!uri || typeof uri !== 'string') return false;
+  const trimmed = uri.trim();
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:image/') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('file://')
+  );
+}
+
 export default function CustomerBookingPwaScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
@@ -82,6 +104,11 @@ export default function CustomerBookingPwaScreen() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
 
+  // Live preview override state (when embedded in Merchant Bookings Tab 3 iframe)
+  const [liveBrandColor, setLiveBrandColor] = useState<string | null>(null);
+  const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(null);
+  const [liveTagline, setLiveTagline] = useState<string | null>(null);
+
   // Selection states
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<BranchItem | null>(null);
@@ -106,6 +133,44 @@ export default function CustomerBookingPwaScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 1. Live Preview real-time listener from parent customization panel
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Check sessionStorage for initial sync
+    try {
+      const stored = sessionStorage.getItem(`risev_booking_preview_${slug}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.brandColor) setLiveBrandColor(parsed.brandColor);
+        if (parsed.coverUrl !== undefined) setLiveCoverUrl(parsed.coverUrl);
+        if (parsed.tagline !== undefined) setLiveTagline(parsed.tagline);
+      }
+    } catch (e) {}
+
+    // Listen to real-time postMessage
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'RISEV_BOOKING_PREVIEW_UPDATE') {
+        if (event.data.brandColor) setLiveBrandColor(event.data.brandColor);
+        if (event.data.coverUrl !== undefined) setLiveCoverUrl(event.data.coverUrl);
+        if (event.data.tagline !== undefined) setLiveTagline(event.data.tagline);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Notify parent that iframe is ready to receive state
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'RISEV_BOOKING_PREVIEW_READY' }, '*');
+      }
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [slug]);
 
   useEffect(() => {
     loadMerchantAndData();
@@ -145,13 +210,17 @@ export default function CustomerBookingPwaScreen() {
         return;
       }
 
+      const bannerUrl = mRecord.banner 
+        ? `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`
+        : null;
+
       const normalizedMerchant = {
         ...mRecord,
         store_name: mRecord.name || mRecord.store_name || 'Store',
         subtitle: mRecord.subtitle || mRecord.category || 'Quality Services & Bookings',
         rating: mRecord.rating || '5.0',
         reviews_count: mRecord.reviews_count || '120',
-        cover_url: mRecord.cover_url || (mRecord.banner ? pb.files.getURL(mRecord, mRecord.banner) : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80'),
+        cover_url: bannerUrl || (mRecord.cover_url && isValidImageUri(mRecord.cover_url) ? mRecord.cover_url : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80'),
         logo_url: mRecord.logo_url || (mRecord.logo ? pb.files.getURL(mRecord, mRecord.logo) : null),
         pwa_brand_color: mRecord.pwa_brand_color || '#FFC700',
       };
@@ -363,15 +432,26 @@ export default function CustomerBookingPwaScreen() {
             The booking page for "{slug}" does not exist or may have been renamed.
           </Text>
           <TouchableOpacity
-            style={[styles.btnFullYellowBook, { marginTop: 24, paddingHorizontal: 24 }]}
+            style={[styles.btnFullYellowBook, { backgroundColor: liveBrandColor || merchant?.pwa_brand_color || '#FFC700', marginTop: 24, paddingHorizontal: 24 }]}
             onPress={() => router.push('/')}
           >
-            <Text style={styles.btnFullYellowBookText}>Go to Risev Home</Text>
+            <Text style={[styles.btnFullYellowBookText, { color: getContrastColor(liveBrandColor || merchant?.pwa_brand_color || '#FFC700') }]}>Go to Risev Home</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
+
+  const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || '#FFC700';
+  const activeCoverUrl = (liveCoverUrl !== null && liveCoverUrl !== undefined) 
+    ? liveCoverUrl 
+    : (merchant?.cover_url || 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80');
+  const activeTagline = (liveTagline !== null && liveTagline !== undefined)
+    ? liveTagline
+    : (merchant?.subtitle || 'Quality Services & Bookings');
+  const finalCoverUrl = isValidImageUri(activeCoverUrl)
+    ? activeCoverUrl
+    : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80';
 
   const availableCategories: string[] = ['All', ...Array.from(new Set(services.map(s => s.category).filter((c): c is string => Boolean(c))))];
 
@@ -417,9 +497,7 @@ export default function CustomerBookingPwaScreen() {
             <View style={styles.coverWrapper}>
               <Image
                 source={{
-                  uri: (merchant?.cover_url && merchant.cover_url.startsWith('http'))
-                    ? merchant.cover_url
-                    : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80'
+                  uri: finalCoverUrl
                 }}
                 style={styles.coverImage}
                 resizeMode="cover"
@@ -446,7 +524,7 @@ export default function CustomerBookingPwaScreen() {
               
               {/* Store Title & Subtitle */}
               <Text style={styles.brandNameText}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
-              <Text style={styles.brandSubtitleText}>{merchant?.subtitle || 'Handcrafted Gelato • Waffles • Desserts'}</Text>
+              <Text style={styles.brandSubtitleText}>{activeTagline}</Text>
 
               {/* Soft Golden Rating Pill Capsule */}
               <View style={styles.ratingCapsulePill}>
@@ -488,11 +566,11 @@ export default function CustomerBookingPwaScreen() {
               {/* Quick Action Navigation Bar */}
               <View style={styles.quickNavStrip}>
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, styles.quickNavCircleActive]}>
-                    <Ionicons name="calendar" size={22} color="#0F172A" />
+                  <View style={[styles.quickNavCircle, styles.quickNavCircleActive, { backgroundColor: activeBrandColor }]}>
+                    <Ionicons name="calendar" size={22} color={getContrastColor(activeBrandColor)} />
                   </View>
                   <Text style={styles.quickNavTitleActive}>Book{'\n'}Appointment</Text>
-                  <View style={styles.activeTabIndicatorLine} />
+                  <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
@@ -554,14 +632,17 @@ export default function CustomerBookingPwaScreen() {
                           <Text style={styles.popularCardPrice}>RM{srv.price}</Text>
 
                           <TouchableOpacity
-                            style={[styles.popularAddCircleBtn, isSelected && styles.popularAddCircleBtnSelected]}
+                            style={[
+                              styles.popularAddCircleBtn, 
+                              isSelected && [styles.popularAddCircleBtnSelected, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]
+                            ]}
                             onPress={() => toggleServiceSelection(srv)}
                             activeOpacity={0.8}
                           >
                             <Ionicons
                               name={isSelected ? "checkmark" : "add"}
                               size={20}
-                              color={isSelected ? "#000000" : "#D97706"}
+                              color={isSelected ? getContrastColor(activeBrandColor) : "#D97706"}
                             />
                           </TouchableOpacity>
                         </View>
@@ -592,10 +673,10 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={cat}
-                    style={[styles.categoryChipPill, isActive && styles.categoryChipPillActive]}
+                    style={[styles.categoryChipPill, isActive && [styles.categoryChipPillActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
                     onPress={() => setActiveCategory(cat)}
                   >
-                    <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
+                    <Text style={[styles.categoryChipText, isActive && [styles.categoryChipTextActive, { color: getContrastColor(activeBrandColor) }]]}>
                       {cat}
                     </Text>
                   </TouchableOpacity>
@@ -656,13 +737,16 @@ export default function CustomerBookingPwaScreen() {
                     </View>
 
                     <TouchableOpacity
-                      style={[styles.circleAddBtn, isSelected && styles.circleAddBtnSelected]}
+                      style={[
+                        styles.circleAddBtn, 
+                        isSelected && [styles.circleAddBtnSelected, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]
+                      ]}
                       onPress={() => toggleServiceSelection(srv)}
                     >
                       <Ionicons
                         name={isSelected ? 'checkmark' : 'add'}
                         size={20}
-                        color={isSelected ? '#FFFFFF' : '#000000'}
+                        color={isSelected ? getContrastColor(activeBrandColor) : '#000000'}
                       />
                     </TouchableOpacity>
                   </TouchableOpacity>
@@ -766,15 +850,15 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={dt.iso}
-                    style={[styles.dayColumnCard, isSelected && styles.dayColumnCardActive]}
+                    style={[styles.dayColumnCard, isSelected && [styles.dayColumnCardActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
                     onPress={() => {
                       setSelectedIsoDate(dt.iso);
                       setSelectedDate(dt.full);
                     }}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.dayNameText, isSelected && styles.dayNameTextActive]}>{dt.day}</Text>
-                    <Text style={[styles.dayNumText, isSelected && styles.dayNumTextActive]}>{dt.num}</Text>
+                    <Text style={[styles.dayNameText, isSelected && [styles.dayNameTextActive, { color: getContrastColor(activeBrandColor) }]]}>{dt.day}</Text>
+                    <Text style={[styles.dayNumText, isSelected && [styles.dayNumTextActive, { color: getContrastColor(activeBrandColor) }]]}>{dt.num}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -809,11 +893,11 @@ export default function CustomerBookingPwaScreen() {
                 return (
                   <TouchableOpacity
                     key={tm}
-                    style={[styles.timeSlotGridPill, isSelected && styles.timeSlotGridPillActive]}
+                    style={[styles.timeSlotGridPill, isSelected && [styles.timeSlotGridPillActive, { backgroundColor: activeBrandColor, borderColor: activeBrandColor }]]}
                     onPress={() => setSelectedTime(tm)}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.timeSlotGridText, isSelected && styles.timeSlotGridTextActive]}>
+                    <Text style={[styles.timeSlotGridText, isSelected && [styles.timeSlotGridTextActive, { color: getContrastColor(activeBrandColor) }]]}>
                       {tm}
                     </Text>
                   </TouchableOpacity>
@@ -939,12 +1023,12 @@ export default function CustomerBookingPwaScreen() {
               </Text>
 
               <TouchableOpacity
-                style={[styles.btnArrivedAction, hasArrived && { backgroundColor: '#22C55E' }]}
+                style={[styles.btnArrivedAction, { backgroundColor: hasArrived ? '#22C55E' : activeBrandColor }]}
                 onPress={handleArrived}
                 activeOpacity={0.85}
               >
-                <Ionicons name="location" size={18} color={hasArrived ? '#FFFFFF' : '#000000'} />
-                <Text style={[styles.btnArrivedTextLabel, hasArrived && { color: '#FFFFFF' }]}>
+                <Ionicons name="location" size={18} color={hasArrived ? '#FFFFFF' : getContrastColor(activeBrandColor)} />
+                <Text style={[styles.btnArrivedTextLabel, { color: hasArrived ? '#FFFFFF' : getContrastColor(activeBrandColor) }]}>
                   {hasArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
                 </Text>
               </TouchableOpacity>
@@ -952,8 +1036,8 @@ export default function CustomerBookingPwaScreen() {
 
             {/* PWA Save App Card */}
             <View style={styles.pwaCardBox}>
-              <View style={styles.pwaIconBox}>
-                <Ionicons name="phone-portrait-outline" size={22} color="#FFC700" />
+              <View style={[styles.pwaIconBox, { backgroundColor: activeBrandColor + '20' }]}>
+                <Ionicons name="phone-portrait-outline" size={22} color={activeBrandColor} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pwaTitleText}>Save {merchant?.store_name || 'Aura Wellness'} App</Text>
@@ -976,11 +1060,11 @@ export default function CustomerBookingPwaScreen() {
       {currentStep === 0 && (
         <View style={styles.floatingBottomProfileContainer}>
           <TouchableOpacity
-            style={styles.btnFullYellowBook}
+            style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor }]}
             onPress={() => setCurrentStep(1)}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnFullYellowBookText}>Book Appointment</Text>
+            <Text style={[styles.btnFullYellowBookText, { color: getContrastColor(activeBrandColor) }]}>Book Appointment</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -992,35 +1076,35 @@ export default function CustomerBookingPwaScreen() {
             {currentStep === 1 && (
               <>
                 <Text style={styles.darkBarMetaLabel}>{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''}</Text>
-                <Text style={styles.darkBarPriceTotal}>RM {calculateTotal().toFixed(2)}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
               </>
             )}
 
             {currentStep === 2 && (
               <>
                 <Text style={styles.darkBarMetaLabel}>{selectedDate}</Text>
-                <Text style={styles.darkBarPriceTotal}>{selectedTime}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>{selectedTime}</Text>
               </>
             )}
 
             {currentStep === 3 && (
               <>
-                <Text style={styles.darkBarPriceTotal}>RM {calculateTotal().toFixed(2)}</Text>
+                <Text style={[styles.darkBarPriceTotal, { color: activeBrandColor }]}>RM {calculateTotal().toFixed(2)}</Text>
                 <Text style={styles.darkBarMetaLabel}>{selectedServices.length} service • {calculateTotalDuration()} min</Text>
               </>
             )}
           </View>
 
           <TouchableOpacity
-            style={styles.btnYellowContinue}
+            style={[styles.btnYellowContinue, { backgroundColor: activeBrandColor }]}
             onPress={handleNextStep}
             disabled={isSubmitting}
             activeOpacity={0.85}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#000000" />
+              <ActivityIndicator color={getContrastColor(activeBrandColor)} />
             ) : (
-              <Text style={styles.btnYellowContinueText}>
+              <Text style={[styles.btnYellowContinueText, { color: getContrastColor(activeBrandColor) }]}>
                 {currentStep === 3 ? 'Confirm & Book 🚀' : 'Continue ➔'}
               </Text>
             )}

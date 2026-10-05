@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -144,6 +144,49 @@ export default function BookingsScreen() {
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
+  const iframeRef = useRef<any>(null);
+
+  // Broadcast preview updates in real-time to the embedded iframe device frame
+  const broadcastPreviewUpdate = (override?: { brandColor?: string; coverUrl?: string | null; tagline?: string }) => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const colorToSend = override?.brandColor !== undefined ? override.brandColor : selectedBrandColor;
+    const coverToSend = override?.coverUrl !== undefined ? override.coverUrl : (bannerPreview || customCoverUrl);
+    const taglineToSend = override?.tagline !== undefined ? override.tagline : customTagline;
+
+    const payload = {
+      type: 'RISEV_BOOKING_PREVIEW_UPDATE',
+      brandColor: colorToSend,
+      coverUrl: coverToSend,
+      tagline: taglineToSend,
+    };
+
+    try {
+      if (pwaSlug) {
+        sessionStorage.setItem(`risev_booking_preview_${pwaSlug}`, JSON.stringify(payload));
+      }
+    } catch (e) {}
+
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(payload, '*');
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    broadcastPreviewUpdate();
+  }, [selectedBrandColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const handleParentMsg = (evt: MessageEvent) => {
+      if (evt.data?.type === 'RISEV_BOOKING_PREVIEW_READY') {
+        broadcastPreviewUpdate();
+      }
+    };
+    window.addEventListener('message', handleParentMsg);
+    return () => window.removeEventListener('message', handleParentMsg);
+  }, [selectedBrandColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
 
   const handlePickBanner = async () => {
     if (Platform.OS === 'web') {
@@ -160,6 +203,7 @@ export default function BookingsScreen() {
               const res = event.target?.result as string;
               setBannerPreview(res);
               setCustomCoverUrl(res);
+              broadcastPreviewUpdate({ coverUrl: res });
             };
             reader.readAsDataURL(file);
           }
@@ -1190,8 +1234,10 @@ export default function BookingsScreen() {
 
                   {Platform.OS === 'web' ? (
                     React.createElement('iframe', {
+                      ref: iframeRef,
                       key: previewRefreshKey,
                       src: `/b/${pwaSlug}?preview=1&t=${previewRefreshKey}`,
+                      onLoad: () => broadcastPreviewUpdate(),
                       style: {
                         width: '100%',
                         height: 640,
@@ -1241,7 +1287,10 @@ export default function BookingsScreen() {
                           { backgroundColor: p.bg, borderColor: p.border },
                           isSelected && styles.paletteChipSelected
                         ]}
-                        onPress={() => setSelectedBrandColor(p.primary)}
+                        onPress={() => {
+                          setSelectedBrandColor(p.primary);
+                          broadcastPreviewUpdate({ brandColor: p.primary });
+                        }}
                         activeOpacity={0.8}
                       >
                         <View style={[styles.paletteDot, { backgroundColor: p.primary }]} />
@@ -1266,6 +1315,9 @@ export default function BookingsScreen() {
                       let formatted = val.trim();
                       if (formatted && !formatted.startsWith('#')) formatted = '#' + formatted;
                       setSelectedBrandColor(formatted);
+                      if (formatted.length === 7) {
+                        broadcastPreviewUpdate({ brandColor: formatted });
+                      }
                     }}
                     maxLength={7}
                     autoCapitalize="characters"
@@ -1299,6 +1351,7 @@ export default function BookingsScreen() {
                             setBannerPreview(null);
                             setBannerFile(null);
                             setCustomCoverUrl('');
+                            broadcastPreviewUpdate({ coverUrl: '' });
                           }}
                           activeOpacity={0.8}
                         >
@@ -1329,7 +1382,10 @@ export default function BookingsScreen() {
                     style={styles.taglineTextInput}
                     placeholder="e.g. Handcrafted Gelato • Waffles • Desserts"
                     value={customTagline}
-                    onChangeText={setCustomTagline}
+                    onChangeText={(val) => {
+                      setCustomTagline(val);
+                      broadcastPreviewUpdate({ tagline: val });
+                    }}
                   />
                 </View>
 
