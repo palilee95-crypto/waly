@@ -142,26 +142,7 @@ export default function UpgradeModal({ visible, onClose }: UpgradeModalProps) {
                   <View style={styles.checkWrap}>
                     <Ionicons name="checkmark" size={12} color="#FFC700" />
                   </View>
-                  <Text style={styles.featureText}>Up to 2 store outlets (1 HQ + 1 Branch)</Text>
-                </View>
-
-                <View style={styles.featureRow}>
-                  <View style={styles.checkWrap}>
-                    <Ionicons name="checkmark" size={12} color="#FFC700" />
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-                    <Text style={styles.featureText}>Official Meta WhatsApp Automation</Text>
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaBadgeText}>META API</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.featureRow}>
-                  <View style={styles.checkWrap}>
-                    <Ionicons name="checkmark" size={12} color="#FFC700" />
-                  </View>
-                  <Text style={styles.featureText}>Promotional WhatsApp Broadcasts</Text>
+                  <Text style={styles.featureText}>Up to 5 store outlets (1 HQ + 4 Branches)</Text>
                 </View>
 
                 <View style={styles.featureRow}>

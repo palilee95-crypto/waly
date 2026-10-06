@@ -229,13 +229,13 @@ export default function SubscriptionScreen() {
         periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual - Save 20%)' : '12 Bulan (Tahunan - Jimat 20%)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
         highlights: locale === 'en' ? [
           'Unlimited customer database ♾️',
-          'Official Meta WhatsApp Automation',
-          'Promotional WhatsApp Broadcasts',
+          'Up to 5 store outlets (1 HQ + 4 Branches)',
+          'Pro Sales & Opportunity Analytics',
           'Up to 10 staff accounts'
         ] : [
           'Database pelanggan tanpa had ♾️',
-          'Automasi Rasmi Meta WhatsApp',
-          'Pemasaran Broadcast WhatsApp',
+          'Hingga 5 outlet (1 HQ + 4 Cawangan)',
+          'Analitik Jualan & Peluang Pro',
           'Hingga 10 akaun staf'
         ]
       };
@@ -305,18 +305,15 @@ export default function SubscriptionScreen() {
         'Up to 5 staff accounts',
         'Email support',
         '[LOCK] Unlimited Customer Database',
-        '[LOCK] Official Meta WhatsApp Automation',
-        '[LOCK] 1 Extra Branch (1 HQ + 1 Branch)',
-        '[LOCK] Promotional Broadcasts',
+        '[LOCK] 4 Extra Branches (1 HQ + 4 Branches)',
+        '[LOCK] Pro Sales & Opportunity Analytics',
         '[LOCK] Up to 10 staff accounts'
       ];
     } else {
       return [
         'Everything in Starter',
         'Unlimited customer database ♾️',
-        'Up to 2 store outlets (1 HQ + 1 Branch)',
-        'Official Meta WhatsApp Automation',
-        'Promotional WhatsApp Broadcasts',
+        'Up to 5 store outlets (1 HQ + 4 Branches)',
         'Pro Sales & Opportunity Analytics',
         'Unlimited active vouchers',
         'Up to 10 staff accounts',

@@ -70,9 +70,9 @@ export default function BranchesScreen() {
   const isBusinessPlan = subPlan === 'business' || subPlan === 'enterprise';
   const isProPlan = subPlan === 'pro';
   // Starter / Stand Bundle / None: 1 (HQ only)
-  // PRO: 2 (1 HQ + 1 Branch)
+  // PRO: 5 (1 HQ + 4 Branches)
   // Business / Enterprise: Unlimited
-  const maxAllowedBranches = isBusinessPlan ? 999 : (isProPlan ? 2 : 1);
+  const maxAllowedBranches = isBusinessPlan ? 999 : (isProPlan ? 5 : 1);
 
   // Form states
   const [name, setName] = useState('');
@@ -1196,8 +1196,8 @@ export default function BranchesScreen() {
               {/* Title */}
               <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', textAlign: 'center', marginBottom: 8 }}>
                 {isProPlan 
-                  ? (locale === 'en' ? 'Unlock 3+ Multi-Branches' : 'Buka 3+ Cawangan')
-                  : (locale === 'en' ? 'Unlock Extra Branch (1 HQ + 1 Branch)' : 'Buka Cawangan Tambahan (1 HQ + 1 Cawangan)')}
+                  ? (locale === 'en' ? 'Unlock 6+ Multi-Branches' : 'Buka 6+ Cawangan')
+                  : (locale === 'en' ? 'Unlock Extra Branches (1 HQ + 4 Branches)' : 'Buka Cawangan Tambahan (1 HQ + 4 Cawangan)')}
               </Text>
 
               {/* Subtitle */}
@@ -1207,8 +1207,8 @@ export default function BranchesScreen() {
                     ? 'Upgrade to Business Plan to manage unlimited branch locations and outlets.'
                     : 'Naik taraf ke Pelan Business untuk mengurus cawangan tanpa had.')
                   : (locale === 'en'
-                    ? 'Upgrade to PRO Plan to unlock 1 extra store branch (1 HQ + 1 Branch).'
-                    : 'Naik taraf ke Pelan PRO untuk membuka 1 cawangan tambahan (1 HQ + 1 Cawangan).')}
+                    ? 'Upgrade to PRO Plan to unlock 4 extra store branches (1 HQ + 4 Branches).'
+                    : 'Naik taraf ke Pelan PRO untuk membuka 4 cawangan tambahan (1 HQ + 4 Cawangan).')}
               </Text>
 
               {/* Feature Points */}
@@ -1219,12 +1219,12 @@ export default function BranchesScreen() {
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
                       {isProPlan 
                         ? (locale === 'en' ? 'Unlimited Branches' : 'Cawangan Tanpa Had')
-                        : (locale === 'en' ? '1 Extra Branch Included' : '1 Cawangan Tambahan Termasuk')}
+                        : (locale === 'en' ? '4 Extra Branches Included' : '4 Cawangan Tambahan Termasuk')}
                     </Text>
                     <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
                       {isProPlan
                         ? (locale === 'en' ? 'Register and manage all your outlets' : 'Daftar & urus semua outlet anda')
-                        : (locale === 'en' ? 'Total 2 outlets (1 HQ + 1 Branch)' : 'Jumlah 2 outlet (1 HQ + 1 Cawangan)')}
+                        : (locale === 'en' ? 'Total 5 outlets (1 HQ + 4 Branches)' : 'Jumlah 5 outlet (1 HQ + 4 Cawangan)')}
                     </Text>
                   </View>
                 </View>
