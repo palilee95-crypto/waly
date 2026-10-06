@@ -133,6 +133,10 @@ export default function BookingsScreen() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [serviceFilter, setServiceFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
+  const [selectedActionService, setSelectedActionService] = useState<ServiceItem | null>(null);
+  const [showServiceActionModal, setShowServiceActionModal] = useState(false);
+  const [isDeletingService, setIsDeletingService] = useState(false);
   
   // Add Item Wizard State (Step 1, 2, 3)
   const [addModalStep, setAddModalStep] = useState<1 | 2 | 3>(1);
@@ -570,6 +574,7 @@ export default function BookingsScreen() {
   };
 
   const handleOpenAddService = () => {
+    setEditingService(null);
     setAddModalStep(1);
     setAddItemType('service');
     setPhotoUri(null);
@@ -588,8 +593,82 @@ export default function BookingsScreen() {
     setShowAddServiceModal(true);
   };
 
+  const handleOpenEditService = (s: ServiceItem) => {
+    setEditingService(s);
+    setAddItemType(s.item_type || 'service');
+    setPhotoUri(s.image_url || null);
+    setPhotoFile(null);
+    setNewServiceName(s.name);
+    setNewServiceCategory(s.category || 'Haircut');
+    setNewServicePrice(String(s.price || ''));
+    setNewServiceDuration(String(s.duration_minutes || '30'));
+    setIsOnlineAvailable(s.is_active !== false);
+    const primaryStaff = user?.name || merchantData?.name || 'Owner';
+    setAssignedStaff([primaryStaff]);
+    const defaultLoc = branchesList.length > 0
+      ? branchesList[0].name
+      : `${merchantData?.name || user?.name || 'Store'} (HQ)`;
+    setSelectedLocation(defaultLoc);
+    setAddModalStep(2); // Jump straight to basic info for editing
+    setShowAddServiceModal(true);
+    setShowServiceActionModal(false);
+  };
+
+  const handleOpenServiceActions = (s: ServiceItem) => {
+    setSelectedActionService(s);
+    setShowServiceActionModal(true);
+  };
+
+  const handleToggleServiceStatus = async (service: ServiceItem) => {
+    const nextStatus = !service.is_active;
+    try {
+      if (user?.merchant_id && !service.id.startsWith('srv-')) {
+        await pb.collection('merchant_services').update(service.id, { is_active: nextStatus });
+      }
+      setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: nextStatus } : s));
+      setShowServiceActionModal(false);
+      Alert.alert('Status Updated', `"${service.name}" is now ${nextStatus ? 'Active' : 'Inactive'}.`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update status.');
+    }
+  };
+
+  const handleDeleteService = (service: ServiceItem) => {
+    const doDelete = async () => {
+      setIsDeletingService(true);
+      try {
+        if (user?.merchant_id && !service.id.startsWith('srv-')) {
+          await pb.collection('merchant_services').delete(service.id);
+        }
+        setServices(prev => prev.filter(s => s.id !== service.id));
+        setShowServiceActionModal(false);
+        Alert.alert('Deleted', `"${service.name}" was removed from your catalog.`);
+      } catch (err: any) {
+        Alert.alert('Error', err?.message || 'Failed to delete service.');
+      } finally {
+        setIsDeletingService(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete "${service.name}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Service',
+        `Are you sure you want to delete "${service.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: doDelete }
+        ]
+      );
+    }
+  };
+
   const handleCloseAddService = () => {
     setShowAddServiceModal(false);
+    setEditingService(null);
     setAddModalStep(1);
     setPhotoUri(null);
     setPhotoFile(null);
@@ -647,7 +726,7 @@ export default function BookingsScreen() {
     }
   };
 
-  const handleCreateService = async (): Promise<boolean> => {
+  const handleSaveService = async (): Promise<boolean> => {
     if (!newServiceName.trim()) {
       Alert.alert('Missing Details', 'Service name is required.');
       return false;
@@ -663,6 +742,80 @@ export default function BookingsScreen() {
       
       let finalImageUrl = photoUri || '';
 
+      if (editingService) {
+        // UPDATE EXISTING SERVICE
+        const updatedService: ServiceItem = {
+          ...editingService,
+          name: newServiceName.trim(),
+          category: newServiceCategory,
+          price: priceNum,
+          duration_minutes: durNum,
+          item_type: addItemType,
+          is_active: isOnlineAvailable,
+          image_url: finalImageUrl
+        };
+
+        if (user?.merchant_id && !editingService.id.startsWith('srv-')) {
+          const matchingBranch = branchesList.find(b => b.name === selectedLocation);
+          try {
+            const formData = new FormData();
+            formData.append('name', newServiceName.trim());
+            formData.append('category', newServiceCategory);
+            formData.append('price', String(priceNum));
+            formData.append('duration_minutes', String(durNum));
+            formData.append('item_type', addItemType);
+            formData.append('is_active', String(isOnlineAvailable));
+            if (matchingBranch?.id) {
+              formData.append('branch', matchingBranch.id);
+            }
+            if (photoFile) {
+              formData.append('image', photoFile);
+            } else if (photoUri && !photoUri.startsWith('data:') && !photoUri.startsWith('http')) {
+              formData.append('image_url', photoUri);
+            }
+
+            const rec = await pb.collection('merchant_services').update(editingService.id, formData);
+            if (rec.image) {
+              finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+              updatedService.image_url = finalImageUrl;
+            } else if (rec.image_url) {
+              finalImageUrl = rec.image_url;
+              updatedService.image_url = finalImageUrl;
+            }
+          } catch (pbErr: any) {
+            console.warn('FormData update failed, trying fallback JSON:', pbErr);
+            try {
+              const rec = await pb.collection('merchant_services').update(editingService.id, {
+                name: newServiceName.trim(),
+                category: newServiceCategory,
+                price: priceNum,
+                duration_minutes: durNum,
+                item_type: addItemType,
+                is_active: isOnlineAvailable,
+                image_url: photoUri || ''
+              });
+              if (rec.image_url) updatedService.image_url = rec.image_url;
+            } catch (jsonErr: any) {
+              console.warn('Fallback JSON update failed, trying basic fields:', jsonErr);
+              await pb.collection('merchant_services').update(editingService.id, {
+                name: newServiceName.trim(),
+                category: newServiceCategory,
+                price: priceNum,
+                duration_minutes: durNum,
+                item_type: addItemType,
+                is_active: isOnlineAvailable
+              });
+            }
+          }
+        }
+
+        setServices(prev => prev.map(s => s.id === editingService.id ? updatedService : s));
+        handleCloseAddService();
+        Alert.alert('Saved ✨', `"${updatedService.name}" updated successfully.`);
+        return true;
+      }
+
+      // CREATE NEW SERVICE
       const newService: ServiceItem = {
         id: `srv-${Date.now()}`,
         name: newServiceName.trim(),
@@ -747,6 +900,8 @@ export default function BookingsScreen() {
       setIsSavingService(false);
     }
   };
+
+  const handleCreateService = handleSaveService;
 
   const handleCopyLink = () => {
     const url = `https://risev.app/b/${pwaSlug}`;
@@ -1198,7 +1353,12 @@ export default function BookingsScreen() {
               {filteredServices.length > 0 ? (
                 <View style={styles.servicesCatalogList}>
                   {filteredServices.map(s => (
-                    <View key={s.id} style={styles.catalogCard}>
+                    <TouchableOpacity 
+                      key={s.id} 
+                      style={styles.catalogCard}
+                      onPress={() => handleOpenEditService(s)}
+                      activeOpacity={0.92}
+                    >
                       {s.image_url ? (
                         <Image
                           source={{ uri: s.image_url }}
@@ -1223,14 +1383,24 @@ export default function BookingsScreen() {
                       </View>
 
                       <View style={styles.catalogRightWrap}>
-                        <TouchableOpacity style={styles.btnDotsMenu} onPress={() => Alert.alert('Service', s.name)}>
+                        <TouchableOpacity 
+                          style={styles.btnDotsMenu} 
+                          onPress={(e: any) => {
+                            if (e?.stopPropagation) e.stopPropagation();
+                            handleOpenServiceActions(s);
+                          }}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                          activeOpacity={0.7}
+                        >
                           <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
                         </TouchableOpacity>
-                        <View style={styles.activeBadge}>
-                          <Text style={styles.activeBadgeText}>● Active</Text>
+                        <View style={[styles.activeBadge, !s.is_active && { backgroundColor: '#F1F5F9' }]}>
+                          <Text style={[styles.activeBadgeText, !s.is_active && { color: '#64748B' }]}>
+                            {s.is_active ? '● Active' : '○ Inactive'}
+                          </Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               ) : (
@@ -1859,7 +2029,7 @@ export default function BookingsScreen() {
               <View>
                 <View style={styles.wizardHeaderRow}>
                   <View>
-                    <Text style={styles.wizardMainTitle}>Add Item</Text>
+                    <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Item' : 'Add Item'}</Text>
                     <Text style={styles.wizardSubTitle}>What would you like to add?</Text>
                   </View>
                   <TouchableOpacity
@@ -1956,13 +2126,24 @@ export default function BookingsScreen() {
                 
                 {/* Header */}
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity onPress={() => setAddModalStep(1)} style={styles.btnBackWizard}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      if (editingService) {
+                        handleCloseAddService();
+                      } else {
+                        setAddModalStep(1);
+                      }
+                    }} 
+                    style={styles.btnBackWizard}
+                  >
                     <Ionicons name="arrow-back" size={20} color="#050505" />
                   </TouchableOpacity>
 
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.wizardMainTitle}>New Service</Text>
-                    <Text style={styles.wizardStepIndicatorText}>Step 1 of 2 • Basic Info</Text>
+                    <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Service' : 'New Service'}</Text>
+                    <Text style={styles.wizardStepIndicatorText}>
+                      {editingService ? 'Edit Details • Basic Info' : 'Step 1 of 2 • Basic Info'}
+                    </Text>
                   </View>
 
                   <TouchableOpacity onPress={handleCloseAddService} style={styles.btnCloseWizard}>
@@ -2124,7 +2305,9 @@ export default function BookingsScreen() {
                     {isSavingService ? (
                       <ActivityIndicator color="#000" />
                     ) : (
-                      <Text style={[styles.btnWizardPrimaryText, { color: '#0F172A' }]}>Quick Save</Text>
+                      <Text style={[styles.btnWizardPrimaryText, { color: '#0F172A' }]}>
+                        {editingService ? 'Save Changes' : 'Quick Save'}
+                      </Text>
                     )}
                   </TouchableOpacity>
 
@@ -2151,8 +2334,10 @@ export default function BookingsScreen() {
                   </TouchableOpacity>
 
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.wizardMainTitle}>More Settings</Text>
-                    <Text style={styles.wizardStepIndicatorText}>Step 2 of 2 • Optional</Text>
+                    <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Service' : 'More Settings'}</Text>
+                    <Text style={styles.wizardStepIndicatorText}>
+                      {editingService ? 'Edit Details • Settings' : 'Step 2 of 2 • Optional'}
+                    </Text>
                   </View>
 
                   <TouchableOpacity onPress={handleCloseAddService} style={styles.btnCloseWizard}>
@@ -2388,7 +2573,9 @@ export default function BookingsScreen() {
                   {isSavingService ? (
                     <ActivityIndicator color="#000" />
                   ) : (
-                    <Text style={styles.btnWizardPrimaryText}>Create Service ➔</Text>
+                    <Text style={styles.btnWizardPrimaryText}>
+                      {editingService ? 'Save Changes ➔' : 'Create Service ➔'}
+                    </Text>
                   )}
                 </TouchableOpacity>
 
@@ -2397,6 +2584,117 @@ export default function BookingsScreen() {
 
           </View>
         </View>
+      </Modal>
+
+      {/* Service Item Actions Bottom Sheet / Modal */}
+      <Modal visible={showServiceActionModal} animationType="fade" transparent={true} onRequestClose={() => setShowServiceActionModal(false)}>
+        <TouchableOpacity 
+          style={styles.actionSheetOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowServiceActionModal(false)}
+        >
+          <TouchableOpacity style={styles.actionSheetCard} activeOpacity={1} onPress={(e: any) => { if (e?.stopPropagation) e.stopPropagation(); }}>
+            <View style={styles.actionSheetDragIndicator} />
+
+            {selectedActionService && (
+              <>
+                <View style={styles.actionSheetHeader}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={styles.actionSheetTitle} numberOfLines={1}>{selectedActionService.name}</Text>
+                    <Text style={styles.actionSheetSubtitle}>
+                      {selectedActionService.category} • RM {Number(selectedActionService.price || 0).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={[styles.activeBadge, !selectedActionService.is_active && { backgroundColor: '#F1F5F9' }]}>
+                    <Text style={[styles.activeBadgeText, !selectedActionService.is_active && { color: '#64748B' }]}>
+                      {selectedActionService.is_active ? '● Active' : '○ Inactive'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Option 1: Edit Details */}
+                <TouchableOpacity
+                  style={styles.actionSheetItem}
+                  onPress={() => {
+                    if (selectedActionService) {
+                      handleOpenEditService(selectedActionService);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionSheetIconBox, { backgroundColor: '#FEF9C3' }]}>
+                    <Ionicons name="create-outline" size={20} color="#CA8A04" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.actionSheetItemTitle}>Edit Service</Text>
+                    <Text style={styles.actionSheetItemSub}>Modify title, pricing, category or duration</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {/* Option 2: Toggle Active Status */}
+                <TouchableOpacity
+                  style={styles.actionSheetItem}
+                  onPress={() => {
+                    if (selectedActionService) {
+                      handleToggleServiceStatus(selectedActionService);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionSheetIconBox, { backgroundColor: selectedActionService.is_active ? '#FEE2E2' : '#DCFCE7' }]}>
+                    <Ionicons 
+                      name={selectedActionService.is_active ? "eye-off-outline" : "eye-outline"} 
+                      size={20} 
+                      color={selectedActionService.is_active ? "#DC2626" : "#16A34A"} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.actionSheetItemTitle}>
+                      {selectedActionService.is_active ? 'Set as Inactive' : 'Set as Active'}
+                    </Text>
+                    <Text style={styles.actionSheetItemSub}>
+                      {selectedActionService.is_active ? 'Hide from online booking storefront' : 'Make available for customer bookings'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {/* Option 3: Delete Service */}
+                <TouchableOpacity
+                  style={styles.actionSheetItem}
+                  onPress={() => {
+                    if (selectedActionService) {
+                      handleDeleteService(selectedActionService);
+                    }
+                  }}
+                  disabled={isDeletingService}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionSheetIconBox, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="trash-outline" size={20} color="#DC2626" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.actionSheetItemTitle, { color: '#DC2626' }]}>
+                      {isDeletingService ? 'Deleting...' : 'Delete Service'}
+                    </Text>
+                    <Text style={styles.actionSheetItemSub}>Permanently delete this service from catalog</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {/* Cancel Button */}
+                <TouchableOpacity
+                  style={styles.actionSheetCancelBtn}
+                  onPress={() => setShowServiceActionModal(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionSheetCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* View Calendar Modal */}
@@ -4427,5 +4725,96 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
+  },
+
+  // Service Action Sheet Modal
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  actionSheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    width: '100%',
+    maxWidth: 520,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  actionSheetDragIndicator: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  actionSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 10,
+  },
+  actionSheetTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  actionSheetSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  actionSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    gap: 12,
+    marginBottom: 4,
+  },
+  actionSheetIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetItemTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  actionSheetItemSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  actionSheetCancelBtn: {
+    marginTop: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
   },
 });
