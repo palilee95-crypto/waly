@@ -1361,25 +1361,6 @@ export default function ProfileScreen() {
           />
 
           <SettingItem
-            iconName="logo-whatsapp"
-            title="WhatsApp Cloud API"
-            subtitle={metaConfigId ? `Connected to ${metaPhone}` : "Link your Meta WABA to run auto-campaigns"}
-            iconBgColor="#E8F5E9"
-            iconColor="#4CAF50"
-            isPro={isOwner}
-            isLocked={!isOwner && !staffPermissions?.can_view_marketing}
-            onPress={(!isOwner && !staffPermissions?.can_view_marketing)
-              ? () => handleLockedItemPress('WhatsApp Cloud API')
-              : () => {
-                if (user?.merchant_status !== 'active') {
-                  router.push('/(merchant)/subscription' as any);
-                } else {
-                  handleOpenMetaSetup();
-                }
-              }}
-          />
-
-          <SettingItem
             iconName="school-outline"
             title={locale === 'en' ? 'Risev Academy & Video Guides' : 'Pusat Tutorial & Video Panduan'}
             subtitle={locale === 'en' ? 'Step-by-step video tutorials on stand setup & counter SOP' : 'Video panduan langkah demi langkah setup stand & SOP kaunter'}
