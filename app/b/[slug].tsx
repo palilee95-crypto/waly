@@ -88,6 +88,40 @@ function isValidImageUri(uri?: string | null) {
   );
 }
 
+const ALL_TIME_SLOTS = [
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM'
+];
+
+function parseSlotToMinutes(slot: string): number {
+  if (!slot || typeof slot !== 'string') return 0;
+  const [timePart, modifier] = slot.split(' ');
+  if (!timePart) return 0;
+  let [hours, minutes] = timePart.split(':').map(Number);
+  if (modifier === 'PM' && hours < 12) hours += 12;
+  if (modifier === 'AM' && hours === 12) hours = 0;
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function isSlotInPast(slot: string, selectedIsoDate: string): boolean {
+  if (!slot) return false;
+  const now = new Date();
+  const todayIso = now.toISOString().split('T')[0];
+  if (selectedIsoDate < todayIso) return true;
+  if (selectedIsoDate > todayIso) return false;
+  // If today: check against current time
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return parseSlotToMinutes(slot) <= currentMinutes;
+}
+
+function getPeriodForSlot(slot: string): 'Morning' | 'Afternoon' | 'Evening' {
+  const mins = parseSlotToMinutes(slot);
+  if (mins < 12 * 60) return 'Morning';
+  if (mins < 17 * 60) return 'Afternoon';
+  return 'Evening';
+}
+
 export default function CustomerBookingPwaScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
@@ -147,33 +181,46 @@ export default function CustomerBookingPwaScreen() {
     const d = new Date();
     return `${d.toLocaleDateString('en-US', { weekday: 'short' })}, ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })} ${d.getFullYear()}`;
   });
-  const [selectedTimePeriod, setSelectedTimePeriod] = useState<'Morning' | 'Afternoon' | 'Evening'>('Morning');
-  const [selectedTime, setSelectedTime] = useState<string>('11:00 AM');
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<'Morning' | 'Afternoon' | 'Evening'>(() => {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const firstValid = ALL_TIME_SLOTS.find(s => !isSlotInPast(s, todayIso));
+    return firstValid ? getPeriodForSlot(firstValid) : 'Morning';
+  });
+  const [selectedTime, setSelectedTime] = useState<string>(() => {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const firstValid = ALL_TIME_SLOTS.find(s => !isSlotInPast(s, todayIso));
+    return firstValid || '09:00 AM';
+  });
 
   // Compute actual earliest available slot for the selected date
   const earliestAvailableSlot = useMemo(() => {
-    const allSlots = [
-      ...(timeSlotsByPeriod.Morning || []),
-      ...(timeSlotsByPeriod.Afternoon || []),
-      ...(timeSlotsByPeriod.Evening || []),
-    ];
-    const todayIso = new Date().toISOString().split('T')[0];
-    if (selectedIsoDate === todayIso) {
-      const now = new Date();
-      const currentHours = now.getHours();
-      const currentMinutes = now.getMinutes();
+    const firstValid = ALL_TIME_SLOTS.find(slot => !isSlotInPast(slot, selectedIsoDate));
+    return firstValid || 'Closed today';
+  }, [selectedIsoDate]);
 
-      const futureSlot = allSlots.find(slot => {
-        const [timePart, modifier] = slot.split(' ');
-        let [hours, minutes] = timePart.split(':').map(Number);
-        if (modifier === 'PM' && hours < 12) hours += 12;
-        if (modifier === 'AM' && hours === 12) hours = 0;
-        return hours > currentHours || (hours === currentHours && minutes > currentMinutes);
-      });
-      return futureSlot || allSlots[0] || '09:00 AM';
+  // Handle date selection with auto-alignment of valid time period and slot
+  const handleDateSelect = (iso: string, full: string) => {
+    setSelectedIsoDate(iso);
+    setSelectedDate(full);
+
+    const firstValid = ALL_TIME_SLOTS.find(s => !isSlotInPast(s, iso));
+    if (firstValid) {
+      const currentPeriodSlots = timeSlotsByPeriod[selectedTimePeriod] || [];
+      const hasValidSlotInCurrentPeriod = currentPeriodSlots.some(s => !isSlotInPast(s, iso));
+      if (!hasValidSlotInCurrentPeriod) {
+        setSelectedTimePeriod(getPeriodForSlot(firstValid));
+        setSelectedTime(firstValid);
+      } else if (isSlotInPast(selectedTime, iso)) {
+        const nextInPeriod = currentPeriodSlots.find(s => !isSlotInPast(s, iso));
+        if (nextInPeriod) {
+          setSelectedTime(nextInPeriod);
+        } else {
+          setSelectedTime(firstValid);
+          setSelectedTimePeriod(getPeriodForSlot(firstValid));
+        }
+      }
     }
-    return allSlots[0] || '09:00 AM';
-  }, [selectedIsoDate, timeSlotsByPeriod]);
+  };
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
@@ -608,6 +655,10 @@ export default function CustomerBookingPwaScreen() {
       }
       setCurrentStep(2);
     } else if (currentStep === 2) {
+      if (isSlotInPast(selectedTime, selectedIsoDate)) {
+        Alert.alert('Slot Unavailable', 'The selected time slot has already passed. Please choose an upcoming time or another date.');
+        return;
+      }
       setCurrentStep(3);
     } else if (currentStep === 3) {
       if (!customerName.trim() || !customerPhone.trim()) {
@@ -1271,10 +1322,7 @@ export default function CustomerBookingPwaScreen() {
                       styles.dayColumnCard,
                       isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
                     ]}
-                    onPress={() => {
-                      setSelectedIsoDate(dt.iso);
-                      setSelectedDate(dt.full);
-                    }}
+                    onPress={() => handleDateSelect(dt.iso, dt.full)}
                     activeOpacity={0.85}
                   >
                     <Text style={[styles.dayNameText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>{dt.day}</Text>
@@ -1287,49 +1335,97 @@ export default function CustomerBookingPwaScreen() {
             {/* Time Period Filter Segment */}
             <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Time</Text>
             <View style={[styles.periodSegmentTrack, themeStyles.neumorphicInset]}>
-              {(['Morning', 'Afternoon', 'Evening'] as const).map(p => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.periodSegmentPill,
-                    selectedTimePeriod === p ? themeStyles.neumorphicActiveBtn : null
-                  ]}
-                  onPress={() => {
-                    setSelectedTimePeriod(p);
-                    const slots = timeSlotsByPeriod[p] || [];
-                    if (!slots.includes(selectedTime) && slots.length > 0) {
-                      setSelectedTime(slots[0]);
-                    }
-                  }}
-                >
-                  <Text style={[styles.periodSegmentText, { color: selectedTimePeriod === p ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>
-                    {p}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {(['Morning', 'Afternoon', 'Evening'] as const).map(p => {
+                const pSlots = timeSlotsByPeriod[p] || [];
+                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate));
+                const isSelectedPeriod = selectedTimePeriod === p;
+                return (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.periodSegmentPill,
+                      isSelectedPeriod ? themeStyles.neumorphicActiveBtn : null,
+                      isAllPast && !isSelectedPeriod ? { opacity: 0.45 } : null
+                    ]}
+                    onPress={() => {
+                      setSelectedTimePeriod(p);
+                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate));
+                      if (validInPeriod.length > 0 && !validInPeriod.includes(selectedTime)) {
+                        setSelectedTime(validInPeriod[0]);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.periodSegmentText,
+                      {
+                        color: isSelectedPeriod
+                          ? themeStyles.contrastColor
+                          : (isAllPast ? themeStyles.textMutedColor : themeStyles.textSecondaryColor)
+                      }
+                    ]}>
+                      {p}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* 3-Column Time Slot Grid */}
             <View style={styles.timeSlotsGrid}>
               {(timeSlotsByPeriod[selectedTimePeriod] || []).map(tm => {
-                const isSelected = selectedTime === tm;
+                const isPast = isSlotInPast(tm, selectedIsoDate);
+                const isSelected = selectedTime === tm && !isPast;
                 return (
                   <TouchableOpacity
                     key={tm}
+                    disabled={isPast}
                     style={[
                       styles.timeSlotGridPill,
-                      isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
+                      isSelected
+                        ? themeStyles.neumorphicActiveBtn
+                        : isPast
+                        ? [themeStyles.neumorphicInset, { opacity: 0.35 }]
+                        : themeStyles.neumorphicInset
                     ]}
                     onPress={() => setSelectedTime(tm)}
-                    activeOpacity={0.85}
+                    activeOpacity={isPast ? 1 : 0.85}
                   >
-                    <Text style={[styles.timeSlotGridText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor }]}>
+                    <Text
+                      style={[
+                        styles.timeSlotGridText,
+                        {
+                          color: isSelected
+                            ? themeStyles.contrastColor
+                            : isPast
+                            ? themeStyles.textMutedColor
+                            : themeStyles.textPrimaryColor,
+                          textDecorationLine: isPast ? 'line-through' : 'none'
+                        }
+                      ]}
+                    >
                       {tm}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+
+            {/* Informational notice if all slots in the current period or day have passed */}
+            {ALL_TIME_SLOTS.every(s => isSlotInPast(s, selectedIsoDate)) ? (
+              <View style={[styles.allDayPastBanner, themeStyles.neumorphicInset]}>
+                <Ionicons name="time-outline" size={18} color="#EF4444" />
+                <Text style={{ fontSize: 13, color: themeStyles.textPrimaryColor, marginLeft: 8, fontWeight: '600', flex: 1 }}>
+                  All appointment slots for today have ended. Please choose another date above.
+                </Text>
+              </View>
+            ) : (timeSlotsByPeriod[selectedTimePeriod] || []).every(s => isSlotInPast(s, selectedIsoDate)) ? (
+              <View style={[styles.allDayPastBanner, themeStyles.neumorphicInset]}>
+                <Ionicons name="time-outline" size={16} color={themeStyles.textSecondaryColor} />
+                <Text style={{ fontSize: 13, color: themeStyles.textSecondaryColor, marginLeft: 8, fontWeight: '500' }}>
+                  All {selectedTimePeriod.toLowerCase()} slots have passed for today. Please select an upcoming period above.
+                </Text>
+              </View>
+            ) : null}
 
           </View>
         )}
@@ -2256,6 +2352,13 @@ const styles = StyleSheet.create({
   },
   timeSlotGridTextActive: {
     color: '#000000',
+  },
+  allDayPastBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    marginTop: 14,
   },
 
   // Form Inputs (Step 3)

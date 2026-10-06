@@ -58,8 +58,9 @@ export default function MerchantNoticeCarousel({
       image: require('@/assets/images/banner_pro_plan.png'),
       cardBg: '#FFEA79',
       cardBorder: '#FCD34D',
+      isComingSoon: true,
       onPress: () => {
-        if (onOpenUpgrade) onOpenUpgrade();
+        // Coming soon - disabled
       },
     },
     {
@@ -177,9 +178,22 @@ export default function MerchantNoticeCarousel({
         >
           <Image
             source={currentSlide.image}
-            style={styles.bannerImage}
+            style={[
+              styles.bannerImage,
+              currentSlide.isComingSoon && styles.blurredBannerImage,
+            ]}
+            blurRadius={currentSlide.isComingSoon ? (Platform.OS === 'web' ? 8 : 10) : 0}
             resizeMode="cover"
           />
+
+          {currentSlide.isComingSoon && (
+            <View style={styles.comingSoonOverlay}>
+              <View style={styles.comingSoonPill}>
+                <View style={styles.comingSoonDot} />
+                <Text style={styles.comingSoonPillText}>COMING SOON</Text>
+              </View>
+            </View>
+          )}
         </Animated.View>
 
         {/* Floating Overlay Pagination Dots */}
@@ -375,6 +389,50 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 24,
+  },
+  blurredBannerImage: {
+    ...(Platform.OS === 'web'
+      ? ({ filter: 'blur(7px)', transform: 'scale(1.04)' } as any)
+      : {}),
+    opacity: 0.88,
+  },
+  comingSoonOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    ...(Platform.OS === 'web'
+      ? ({ backdropFilter: 'blur(2px)' } as any)
+      : {}),
+  },
+  comingSoonPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  comingSoonDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFC700',
+  },
+  comingSoonPillText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 1.1,
   },
 
   /* Pagination Row Overlay */
