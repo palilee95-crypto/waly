@@ -50,7 +50,10 @@ export default function MerchantNoticeCarousel({
       image: require('@/assets/images/banner_free_quota.png'),
       cardBg: '#FFEA79',
       cardBorder: '#FDE047',
-      onPress: () => setShowFreeQuotaModal(true),
+      isComingSoon: true,
+      onPress: () => {
+        // Coming soon - disabled
+      },
     },
     {
       id: 'promo',
@@ -69,7 +72,10 @@ export default function MerchantNoticeCarousel({
       image: require('@/assets/images/banner_nfc_alerts.png'),
       cardBg: '#FFEA79',
       cardBorder: '#BAE6FD',
-      onPress: () => setShowUpdateModal(true),
+      isComingSoon: true,
+      onPress: () => {
+        // Coming soon - disabled
+      },
     },
   ];
 
