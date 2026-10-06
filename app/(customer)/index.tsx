@@ -246,18 +246,44 @@ export default function CustomerDashboard() {
   const fetchUpcomingAppointments = async () => {
     if (!user) return;
     try {
+      // 1. Try dedicated endpoint first (runs server-side with full access)
+      try {
+        const phoneParam = encodeURIComponent(user.phone || '');
+        const res: any = await pb.send(`/api/risev/customer/active-booking?phone=${phoneParam}`, {
+          method: 'GET',
+          requestKey: null
+        });
+        if (res && res.booking) {
+          setUpcomingBooking(res.booking);
+          setHasMarkedArrived(res.booking.status === 'arrived');
+          return;
+        }
+      } catch (endpointErr) {
+        // Fall back to collection getList below
+      }
+
       const todayIso = new Date().toISOString().split('T')[0];
       const filterConditions = [];
       if (user.id) filterConditions.push(`customer = '${user.id}'`);
-      if (user.phone) filterConditions.push(`customer_phone = '${user.phone}'`);
+      if (user.phone) {
+        filterConditions.push(`customer_phone = '${user.phone}'`);
+        const clean = user.phone.replace(/[^\d]/g, '');
+        if (clean.startsWith('60')) {
+          filterConditions.push(`customer_phone = '0${clean.slice(2)}'`);
+          filterConditions.push(`customer_phone = '+${clean}'`);
+        } else if (clean.startsWith('0')) {
+          filterConditions.push(`customer_phone = '+60${clean.slice(1)}'`);
+        }
+      }
 
       let savedPhone = null;
       try { savedPhone = await AsyncStorage.getItem('risev_cust_phone'); } catch (e) {}
-      if (savedPhone && !filterConditions.includes(`customer_phone = '${savedPhone}'`)) {
+      if (savedPhone) {
         filterConditions.push(`customer_phone = '${savedPhone}'`);
       }
       
-      const userFilter = filterConditions.length > 0 ? `(${filterConditions.join(' || ')})` : `customer = '${user.id}'`;
+      const uniqueFilters = Array.from(new Set(filterConditions));
+      const userFilter = uniqueFilters.length > 0 ? `(${uniqueFilters.join(' || ')})` : `customer = '${user.id}'`;
       const fullFilter = `${userFilter} && (status = 'booked' || status = 'arrived') && booking_date >= '${todayIso}'`;
 
       const res = await pb.collection('service_bookings').getList(1, 1, {
@@ -275,6 +301,7 @@ export default function CustomerDashboard() {
         setUpcomingBooking(null);
       }
     } catch (err) {
+      console.warn('Failed to fetch upcoming appointment:', err);
       setUpcomingBooking(null);
     }
   };
