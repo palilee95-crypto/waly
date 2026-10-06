@@ -47,7 +47,15 @@ interface StaffItem {
   name: string;
   role_title?: string;
   avatar?: string;
+  photo?: string;
+  role?: string;
 }
+
+const FALLBACK_STAFF: StaffItem[] = [
+  { id: 'mock1', name: 'Amir', role_title: 'Senior Barber', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80' },
+  { id: 'mock2', name: 'Danish', role_title: 'Barber / Stylist', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80' },
+  { id: 'mock3', name: 'Hafiz', role_title: 'Master Barber', photo: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80' },
+];
 
 function getContrastColor(hexColor?: string | null) {
   if (!hexColor || !hexColor.startsWith('#') || hexColor.length < 7) return '#000000';
@@ -126,6 +134,11 @@ export default function CustomerBookingPwaScreen() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
 
+  // Fallback to demo barbers if merchant has no configured staff
+  const displayStaffList = useMemo(() => {
+    return staffList && staffList.length > 0 ? staffList : FALLBACK_STAFF;
+  }, [staffList]);
+
   // Live preview override state (when embedded in Merchant Bookings Tab 3 iframe)
   const [liveBrandColor, setLiveBrandColor] = useState<string | null>(null);
   const [liveBgColor, setLiveBgColor] = useState<string | null>(null);
@@ -147,6 +160,31 @@ export default function CustomerBookingPwaScreen() {
   });
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<'Morning' | 'Afternoon' | 'Evening'>('Morning');
   const [selectedTime, setSelectedTime] = useState<string>('11:00 AM');
+
+  // Compute actual earliest available slot for the selected date
+  const earliestAvailableSlot = useMemo(() => {
+    const allSlots = [
+      ...(timeSlotsByPeriod.Morning || []),
+      ...(timeSlotsByPeriod.Afternoon || []),
+      ...(timeSlotsByPeriod.Evening || []),
+    ];
+    const todayIso = new Date().toISOString().split('T')[0];
+    if (selectedIsoDate === todayIso) {
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+
+      const futureSlot = allSlots.find(slot => {
+        const [timePart, modifier] = slot.split(' ');
+        let [hours, minutes] = timePart.split(':').map(Number);
+        if (modifier === 'PM' && hours < 12) hours += 12;
+        if (modifier === 'AM' && hours === 12) hours = 0;
+        return hours > currentHours || (hours === currentHours && minutes > currentMinutes);
+      });
+      return futureSlot || allSlots[0] || '09:00 AM';
+    }
+    return allSlots[0] || '09:00 AM';
+  }, [selectedIsoDate, timeSlotsByPeriod]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
@@ -504,26 +542,18 @@ export default function CustomerBookingPwaScreen() {
 
       // Fetch staff (live active staff only)
       try {
-        const stRes = await pb.collection('merchant_staff').getList(1, 10, {
+        const stRes = await pb.collection('merchant_staff').getList(1, 20, {
           filter: `merchant = "${mRecord.id}" && is_active = true`
         });
         if (stRes.items.length > 0) {
-          setStaffList([
-            { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' },
-            ...(stRes.items as any)
-          ]);
+          setStaffList(stRes.items as any);
         } else {
-          setStaffList([
-            { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' }
-          ]);
+          setStaffList([]);
         }
-        setSelectedStaff({ id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' });
       } catch (stErr) {
-        setStaffList([
-          { id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' }
-        ]);
-        setSelectedStaff({ id: 'any', name: 'Any Available Provider', role_title: 'First Available Slot' });
+        setStaffList([]);
       }
+      setSelectedStaff(null);
 
     } catch (err) {
       console.warn('Load PWA err:', err);
@@ -605,13 +635,13 @@ export default function CustomerBookingPwaScreen() {
         const bookingPayload = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
-          staff: (selectedStaff?.id && selectedStaff.id !== 'any') ? selectedStaff.id : null,
+          staff: (selectedStaff?.id && selectedStaff.id !== 'any' && !selectedStaff.id.startsWith('mock')) ? selectedStaff.id : null,
           customer_name: customerName,
           customer_phone: customerPhone,
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
           start_time: selectedTime,
           service_name: selectedServices.map(s => s.name).join(', '),
-          staff_name: selectedStaff?.name || 'Any Provider',
+          staff_name: selectedStaff?.name || 'Any Available',
           total_price: totalPrice,
           items_summary: selectedServices.map(s => ({ name: s.name, price: s.price })),
           notes: customerNotes,
@@ -1120,7 +1150,7 @@ export default function CustomerBookingPwaScreen() {
                 <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
                 <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>Select who you'd like for your appointment.</Text>
               </View>
-              {staffList.length > 3 && (
+              {displayStaffList.length > 3 && (
                 <TouchableOpacity
                   style={[styles.btnSeeAllStaff, themeStyles.neumorphicInset]}
                   onPress={() => setShowStaffPicker(!showStaffPicker)}
@@ -1135,7 +1165,7 @@ export default function CustomerBookingPwaScreen() {
             {/* Horizontal Scrollable Staff Cards Grid */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffCardsScroll}>
               
-              {/* Card 1: Any Available Card */}
+              {/* Card 1: Single Any Available Card */}
               <TouchableOpacity
                 style={[
                   styles.staffCardItem,
@@ -1170,105 +1200,64 @@ export default function CustomerBookingPwaScreen() {
                     <Ionicons name="flash" size={12} color="#EF4444" />
                     <View style={{ marginLeft: 4 }}>
                       <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>Earliest slot</Text>
-                      <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{selectedTime || '09:00 AM'}</Text>
+                      <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{earliestAvailableSlot}</Text>
                     </View>
                   </View>
                 </View>
               </TouchableOpacity>
 
               {/* Individual Staff Cards */}
-              {staffList.length > 0 ? (
-                staffList.map((st, idx) => {
-                  const isSelected = selectedStaff?.id === st.id;
-                  const nextSlotTimes = ['09:30 AM', '10:00 AM', '11:00 AM', '02:00 PM'];
-                  const nextSlot = nextSlotTimes[idx % nextSlotTimes.length];
+              {displayStaffList.map((st) => {
+                const isSelected = selectedStaff?.id === st.id;
+                const avatarUri = st.avatar
+                  ? pb.files.getURL(st, st.avatar)
+                  : ((st as any).photo || null);
 
-                  return (
-                    <TouchableOpacity
-                      key={st.id}
-                      style={[
-                        styles.staffCardItem,
-                        isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
-                      ]}
-                      onPress={() => setSelectedStaff(st)}
-                      activeOpacity={0.85}
-                    >
-                      {/* Active Checkmark Badge */}
-                      {isSelected && (
-                        <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
-                          <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
-                        </View>
-                      )}
-
-                      {/* Staff Avatar Photo / Placeholder (Full Bleed Edge-to-Edge) */}
-                      {st.avatar ? (
-                        <Image source={{ uri: pb.files.getURL(st, st.avatar) }} style={styles.staffAvatarThumb} resizeMode="cover" />
-                      ) : (
-                        <View style={[styles.staffAvatarThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
-                          <Ionicons name="person" size={32} color={themeStyles.textMutedColor} />
-                        </View>
-                      )}
-
-                      <View style={styles.staffCardBody}>
-                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                          {st.name}
-                        </Text>
-                        <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                          {st.role_title || 'Specialist'}
-                        </Text>
-
-                        {/* Next Slot Green Pill */}
-                        <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
-                          <View style={styles.greenDotPulse} />
-                          <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>Next: {nextSlot}</Text>
-                        </View>
+                return (
+                  <TouchableOpacity
+                    key={st.id}
+                    style={[
+                      styles.staffCardItem,
+                      isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                    ]}
+                    onPress={() => setSelectedStaff(st)}
+                    activeOpacity={0.85}
+                  >
+                    {/* Active Checkmark Badge */}
+                    {isSelected && (
+                      <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                        <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
                       </View>
-                    </TouchableOpacity>
-                  );
-                })
-              ) : (
-                /* Mock Staff Fallbacks with Barber Portrait Photos */
-                [
-                  { id: 'mock1', name: 'Amir', role: 'Senior Barber', slot: '09:30 AM', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80' },
-                  { id: 'mock2', name: 'Danish', role: 'Barber / Stylist', slot: '10:00 AM', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80' },
-                  { id: 'mock3', name: 'Hafiz', role: 'Master Barber', slot: '11:00 AM', photo: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80' },
-                ].map((st) => {
-                  const isSelected = selectedStaff?.name === st.name;
-                  return (
-                    <TouchableOpacity
-                      key={st.id}
-                      style={[
-                        styles.staffCardItem,
-                        isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
-                      ]}
-                      onPress={() => setSelectedStaff({ id: st.id, name: st.name, role_title: st.role } as any)}
-                      activeOpacity={0.85}
-                    >
-                      {isSelected && (
-                        <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
-                          <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
-                        </View>
-                      )}
+                    )}
 
-                      <Image source={{ uri: st.photo }} style={styles.staffAvatarThumb} resizeMode="cover" />
-
-                      <View style={styles.staffCardBody}>
-                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                          {st.name}
-                        </Text>
-                        <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                          {st.role}
-                        </Text>
-
-                        <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
-                          <View style={styles.greenDotPulse} />
-                          <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>Next: {st.slot}</Text>
-                        </View>
+                    {/* Staff Avatar Photo / Placeholder (Full Bleed Edge-to-Edge) */}
+                    {avatarUri ? (
+                      <Image source={{ uri: avatarUri }} style={styles.staffAvatarThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.staffAvatarThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="person" size={32} color={themeStyles.textMutedColor} />
                       </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
+                    )}
+
+                    <View style={styles.staffCardBody}>
+                      <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                        {st.name}
+                      </Text>
+                      <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
+                        {st.role_title || (st as any).role || 'Specialist'}
+                      </Text>
+
+                      {/* Status / Availability Pill */}
+                      <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
+                        <View style={styles.greenDotPulse} />
+                        <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>
+                          Available today
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
             {/* Date Picker Header */}
@@ -1416,7 +1405,7 @@ export default function CustomerBookingPwaScreen() {
               </View>
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
-                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Available'}</Text>
               </View>
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Date & Time:</Text>
