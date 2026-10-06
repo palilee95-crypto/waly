@@ -14,6 +14,7 @@ import {
   Image,
   Switch
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
@@ -56,6 +57,9 @@ interface StaffMember {
   email: string;
   avatar: string;
   role: string;
+  role_title?: string;
+  merchant_staff_id?: string;
+  avatar_url?: string;
   branch_name?: string;
   stamps_issued?: number;
   vouchers_redeemed?: number;
@@ -86,6 +90,15 @@ export default function StaffManagementScreen() {
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [activeTab, setActiveTab] = useState<'members' | 'performance' | 'settings'>('members');
+
+  // Edit Staff Profile & Photo State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editRoleTitle, setEditRoleTitle] = useState('');
+  const [editAvatarUri, setEditAvatarUri] = useState<string | null>(null);
+  const [editAvatarFile, setEditAvatarFile] = useState<any>(null);
+  const [isSavingStaff, setIsSavingStaff] = useState(false);
 
   // Performance State
   const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
@@ -160,7 +173,7 @@ export default function StaffManagementScreen() {
         }
       }
 
-      // Fetch branches
+      // Fetch branches and merchant_staff for booking synchronization
       if (user?.merchant_id) {
         const branches = await pb.collection('branches').getFullList({
           filter: `merchant = "${user.merchant_id}"`,
@@ -171,6 +184,59 @@ export default function StaffManagementScreen() {
           setBranchList(['All Branches (HQ)', ...branches.map((b: any) => b.name)]);
         } else {
           setBranchList(['All Branches (HQ)']);
+        }
+
+        try {
+          const msList = await pb.collection('merchant_staff').getFullList({
+            filter: `merchant = "${user.merchant_id}"`,
+            requestKey: null
+          });
+
+          setStaff(prevStaff => {
+            const enriched = (prevStaff || []).map((s: StaffMember) => {
+              const matchedMs = msList.find((ms: any) =>
+                (ms.user && ms.user === s.id) ||
+                (ms.phone && s.phone && ms.phone.replace(/\D/g, '') === s.phone.replace(/\D/g, '')) ||
+                (ms.name && s.name && ms.name.toLowerCase().trim() === s.name.toLowerCase().trim())
+              );
+              if (matchedMs) {
+                return {
+                  ...s,
+                  merchant_staff_id: matchedMs.id,
+                  role_title: matchedMs.role_title || s.role_title || 'Provider',
+                  avatar: matchedMs.avatar || s.avatar,
+                  avatar_url: matchedMs.avatar ? `${pb.baseUrl}/api/files/merchant_staff/${matchedMs.id}/${matchedMs.avatar}` : undefined,
+                };
+              }
+              return s;
+            });
+
+            msList.forEach((ms: any) => {
+              const exists = enriched.some((e: any) => e.merchant_staff_id === ms.id || (e.id && e.id === ms.user));
+              if (!exists) {
+                enriched.push({
+                  id: ms.user || `ms_${ms.id}`,
+                  name: ms.name,
+                  phone: ms.phone || '',
+                  email: '',
+                  avatar: ms.avatar || '',
+                  avatar_url: ms.avatar ? `${pb.baseUrl}/api/files/merchant_staff/${ms.id}/${ms.avatar}` : undefined,
+                  role: 'staff',
+                  role_title: ms.role_title || 'Provider',
+                  merchant_staff_id: ms.id,
+                  branch_name: 'All Branches (HQ)',
+                  stamps_issued: 0,
+                  vouchers_redeemed: 0,
+                  customers_served: 0,
+                  sales_volume: 0,
+                });
+              }
+            });
+
+            return enriched;
+          });
+        } catch (msErr) {
+          console.warn("Failed to enrich merchant_staff:", msErr);
         }
       }
     } catch (err: any) {
@@ -448,10 +514,133 @@ export default function StaffManagementScreen() {
   };
 
   const getAvatarUrl = (member: StaffMember) => {
+    if (member.avatar_url) return member.avatar_url;
     if (member.avatar) {
+      if (member.avatar.startsWith('http://') || member.avatar.startsWith('https://') || member.avatar.startsWith('blob:') || member.avatar.startsWith('data:')) {
+        return member.avatar;
+      }
+      if (member.merchant_staff_id) {
+        return `${pb.baseUrl}/api/files/merchant_staff/${member.merchant_staff_id}/${member.avatar}`;
+      }
       return `${pb.baseUrl}/api/files/users/${member.id}/${member.avatar}`;
     }
     return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.name)}`;
+  };
+
+  const handleOpenEditStaff = (member: StaffMember) => {
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditRoleTitle(member.role_title || 'Provider');
+    setEditAvatarUri(getAvatarUrl(member));
+    setEditAvatarFile(null);
+    setEditModalVisible(true);
+  };
+
+  const handlePickPhoto = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/webp';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            setEditAvatarFile(file);
+            const objectUrl = URL.createObjectURL(file);
+            setEditAvatarUri(objectUrl);
+          }
+        };
+        input.click();
+      } catch (e) {
+        console.warn('Web file picker error:', e);
+      }
+    } else {
+      try {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          setEditAvatarUri(asset.uri);
+          setEditAvatarFile({
+            uri: asset.uri,
+            name: `staff_${Date.now()}.jpg`,
+            type: 'image/jpeg'
+          });
+        }
+      } catch (err: any) {
+        Alert.alert('Error', 'Failed to pick image from library.');
+      }
+    }
+  };
+
+  const handleSaveStaffEdit = async () => {
+    if (!editingMember || !user?.merchant_id) return;
+    setIsSavingStaff(true);
+    try {
+      const formData = new FormData();
+      formData.append('merchant', user.merchant_id);
+      formData.append('name', editName.trim() || editingMember.name);
+      formData.append('role_title', editRoleTitle.trim() || 'Provider');
+      if (editingMember.phone) {
+        formData.append('phone', editingMember.phone);
+      }
+      formData.append('is_active', 'true');
+      if (editingMember.id && !editingMember.id.startsWith('ms_')) {
+        formData.append('user', editingMember.id);
+      }
+      if (editAvatarFile) {
+        formData.append('avatar', editAvatarFile as any);
+      }
+
+      let targetMsId = editingMember.merchant_staff_id;
+      if (!targetMsId && !editingMember.id.startsWith('ms_')) {
+        try {
+          const existing = await pb.collection('merchant_staff').getFirstListItem(
+            `merchant = "${user.merchant_id}" && (user = "${editingMember.id}" || phone = "${editingMember.phone}" || name = "${editingMember.name}")`,
+            { requestKey: null }
+          );
+          targetMsId = existing.id;
+        } catch (e) {}
+      }
+
+      if (targetMsId) {
+        await pb.collection('merchant_staff').update(targetMsId, formData, { requestKey: null });
+      } else {
+        await pb.collection('merchant_staff').create(formData, { requestKey: null });
+      }
+
+      // Also update user record name & avatar if possible
+      if (editingMember.id && !editingMember.id.startsWith('ms_')) {
+        try {
+          const uForm = new FormData();
+          if (editName.trim()) uForm.append('name', editName.trim());
+          if (editAvatarFile) uForm.append('avatar', editAvatarFile as any);
+          await pb.collection('users').update(editingMember.id, uForm, { requestKey: null });
+        } catch (uErr) {}
+      }
+
+      Alert.alert(
+        locale === 'en' ? 'Success' : 'Berjaya',
+        locale === 'en' ? 'Staff profile updated and synced with booking!' : 'Profil staf dikemaskini dan diselaraskan dengan tempahan!'
+      );
+      setEditModalVisible(false);
+      fetchStaff();
+    } catch (err: any) {
+      console.warn('Failed to save staff edit:', err);
+      Alert.alert('Error', err?.message || 'Failed to update staff profile.');
+    } finally {
+      setIsSavingStaff(false);
+    }
   };
 
   return (
@@ -598,7 +787,16 @@ export default function StaffManagementScreen() {
               <View style={styles.staffList}>
                 {staff.map((member) => (
                   <View key={member.id} style={styles.staffItem}>
-                    <Image source={{ uri: getAvatarUrl(member) }} style={styles.avatar} />
+                    <TouchableOpacity
+                      onPress={() => handleOpenEditStaff(member)}
+                      style={{ position: 'relative' }}
+                      activeOpacity={0.8}
+                    >
+                      <Image source={{ uri: getAvatarUrl(member) }} style={styles.avatar} />
+                      <View style={styles.cameraBadge}>
+                        <Ionicons name="camera" size={11} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
                     <View style={styles.staffInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <Text style={styles.staffName}>{member.name}</Text>
@@ -607,16 +805,26 @@ export default function StaffManagementScreen() {
                           <Text style={styles.staffBranchBadgeText}>{member.branch_name || 'Main HQ'}</Text>
                         </View>
                       </View>
+                      <Text style={styles.staffRoleText}>{member.role_title || 'Provider'}</Text>
                       <Text style={styles.staffPhone}>{member.phone}</Text>
                       {member.email ? <Text style={styles.staffEmail}>{member.email}</Text> : null}
                     </View>
-                    <TouchableOpacity
-                      style={styles.removeBtn}
-                      onPress={() => handleOpenRemoveConfirm(member)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        onPress={() => handleOpenEditStaff(member)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="create-outline" size={18} color="#0F172A" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeBtn}
+                        onPress={() => handleOpenRemoveConfirm(member)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -1376,6 +1584,127 @@ export default function StaffManagementScreen() {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <Text style={styles.modalConfirmText}>{locale === 'en' ? 'Remove' : 'Alih Keluar'}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Staff Profile & Picture Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isSavingStaff && setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 440, padding: 24 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>
+                {locale === 'en' ? 'Edit Staff Profile' : 'Kemaskini Profil Staf'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                disabled={isSavingStaff}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Avatar Upload Preview Section */}
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <TouchableOpacity
+                onPress={handlePickPhoto}
+                activeOpacity={0.8}
+                style={{ position: 'relative' }}
+              >
+                <Image
+                  source={{ uri: editAvatarUri || (editingMember ? getAvatarUrl(editingMember) : '') }}
+                  style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#F1F5F9' }}
+                />
+                <View style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  backgroundColor: '#050505',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF'
+                }}>
+                  <Ionicons name="camera" size={14} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handlePickPhoto}
+                style={{ marginTop: 8 }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#D97706' }}>
+                  {locale === 'en' ? 'Upload Photo' : 'Muat Naik Gambar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Form Fields */}
+            <View style={{ width: '100%', gap: 14 }}>
+              <View>
+                <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'FULL NAME' : 'NAMA PENUH'}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="e.g. Amir"
+                  placeholderTextColor="#94A3B8"
+                  {...Platform.select({
+                    web: { outlineStyle: 'none' } as any,
+                  })}
+                />
+              </View>
+
+              <View>
+                <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'DESIGNATION / ROLE TITLE' : 'JAWATAN / PERANAN'}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editRoleTitle}
+                  onChangeText={setEditRoleTitle}
+                  placeholder="e.g. Senior Barber, Stylist"
+                  placeholderTextColor="#94A3B8"
+                  {...Platform.select({
+                    web: { outlineStyle: 'none' } as any,
+                  })}
+                />
+                <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                  {locale === 'en' ? 'Displayed on customer appointment booking cards.' : 'Dipaparkan pada kad tempahan temu janji pelanggan.'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.modalActionsRow, { marginTop: 20 }]}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setEditModalVisible(false)}
+                disabled={isSavingStaff}
+              >
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#050505' }]}
+                onPress={handleSaveStaffEdit}
+                disabled={isSavingStaff}
+              >
+                {isSavingStaff ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>
+                    {locale === 'en' ? 'Save & Sync' : 'Simpan'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2520,5 +2849,32 @@ const styles = StyleSheet.create({
   },
   thresholdChipTextActive: {
     color: '#FFFFFF',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: 12,
+    backgroundColor: '#050505',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  staffRoleText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#D97706',
+    marginBottom: 2,
+  },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

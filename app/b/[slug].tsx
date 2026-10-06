@@ -51,12 +51,6 @@ interface StaffItem {
   role?: string;
 }
 
-const FALLBACK_STAFF: StaffItem[] = [
-  { id: 'mock1', name: 'Amir', role_title: 'Senior Barber', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mock2', name: 'Danish', role_title: 'Barber / Stylist', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mock3', name: 'Hafiz', role_title: 'Master Barber', photo: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80' },
-];
-
 function getContrastColor(hexColor?: string | null) {
   if (!hexColor || !hexColor.startsWith('#') || hexColor.length < 7) return '#000000';
   const r = parseInt(hexColor.slice(1, 3), 16);
@@ -133,11 +127,6 @@ export default function CustomerBookingPwaScreen() {
   const [branches, setBranches] = useState<BranchItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
-
-  // Fallback to demo barbers if merchant has no configured staff
-  const displayStaffList = useMemo(() => {
-    return staffList && staffList.length > 0 ? staffList : FALLBACK_STAFF;
-  }, [staffList]);
 
   // Live preview override state (when embedded in Merchant Bookings Tab 3 iframe)
   const [liveBrandColor, setLiveBrandColor] = useState<string | null>(null);
@@ -635,13 +624,13 @@ export default function CustomerBookingPwaScreen() {
         const bookingPayload = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
-          staff: (selectedStaff?.id && selectedStaff.id !== 'any' && !selectedStaff.id.startsWith('mock')) ? selectedStaff.id : null,
+          staff: selectedStaff?.id ? selectedStaff.id : null,
           customer_name: customerName,
           customer_phone: customerPhone,
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
           start_time: selectedTime,
           service_name: selectedServices.map(s => s.name).join(', '),
-          staff_name: selectedStaff?.name || 'Any Available',
+          staff_name: selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'),
           total_price: totalPrice,
           items_summary: selectedServices.map(s => ({ name: s.name, price: s.price })),
           notes: customerNotes,
@@ -1148,9 +1137,11 @@ export default function CustomerBookingPwaScreen() {
             <View style={styles.staffHeaderRow}>
               <View>
                 <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
-                <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>Select who you'd like for your appointment.</Text>
+                <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>
+                  {staffList.length === 0 ? 'Appointment will be handled by store team.' : "Select who you'd like for your appointment."}
+                </Text>
               </View>
-              {displayStaffList.length > 3 && (
+              {staffList.length > 3 && (
                 <TouchableOpacity
                   style={[styles.btnSeeAllStaff, themeStyles.neumorphicInset]}
                   onPress={() => setShowStaffPicker(!showStaffPicker)}
@@ -1165,7 +1156,7 @@ export default function CustomerBookingPwaScreen() {
             {/* Horizontal Scrollable Staff Cards Grid */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffCardsScroll}>
               
-              {/* Card 1: Single Any Available Card */}
+              {/* Card 1: Any Available / Store Team Card */}
               <TouchableOpacity
                 style={[
                   styles.staffCardItem,
@@ -1189,10 +1180,10 @@ export default function CustomerBookingPwaScreen() {
                 {/* Inner Content Body */}
                 <View style={styles.staffCardBody}>
                   <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                    Any Available
+                    {staffList.length === 0 ? 'Store Team' : 'Any Available'}
                   </Text>
                   <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                    First available staff
+                    {staffList.length === 0 ? 'First available staff' : 'First available staff'}
                   </Text>
 
                   {/* Earliest Slot Pill */}
@@ -1206,8 +1197,8 @@ export default function CustomerBookingPwaScreen() {
                 </View>
               </TouchableOpacity>
 
-              {/* Individual Staff Cards */}
-              {displayStaffList.map((st) => {
+              {/* Individual Real Staff Cards (only renders if merchant has staff) */}
+              {staffList.map((st) => {
                 const isSelected = selectedStaff?.id === st.id;
                 const avatarUri = st.avatar
                   ? pb.files.getURL(st, st.avatar)
@@ -1405,7 +1396,9 @@ export default function CustomerBookingPwaScreen() {
               </View>
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
-                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Available'}</Text>
+                <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>
+                  {selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available')}
+                </Text>
               </View>
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Date & Time:</Text>
