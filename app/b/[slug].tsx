@@ -228,6 +228,7 @@ export default function CustomerBookingPwaScreen() {
 
   // Post-booking state
   const [createdBooking, setCreatedBooking] = useState<any>(null);
+  const [existingBooking, setExistingBooking] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -667,6 +668,34 @@ export default function CustomerBookingPwaScreen() {
       }
       setSelectedStaff(null);
 
+      // Check if customer already has an active booking for this merchant
+      try {
+        const activePhone = user?.phone || (pb.authStore?.model as any)?.phone;
+        const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
+        const phoneToQuery = activePhone || savedPhone;
+
+        if (phoneToQuery && mRecord?.id) {
+          const digits = phoneToQuery.replace(/[^\d]/g, '');
+          const plusPhone = digits.startsWith('60') ? `+${digits}` : `+60${digits.replace(/^0/, '')}`;
+          const localPhone = digits.startsWith('60') ? `0${digits.slice(2)}` : digits;
+
+          const filterQuery = `merchant = "${mRecord.id}" && (customer_phone = "${plusPhone}" || customer_phone = "${phoneToQuery}" || customer_phone = "${localPhone}") && (status = "booked" || status = "arrived")`;
+          const bkRes = await pb.collection('service_bookings').getList(1, 1, {
+            filter: filterQuery,
+            sort: '-created',
+            requestKey: null
+          });
+
+          if (bkRes.items.length > 0) {
+            setExistingBooking(bkRes.items[0]);
+          } else {
+            setExistingBooking(null);
+          }
+        }
+      } catch (bkErr) {
+        setExistingBooking(null);
+      }
+
     } catch (err) {
       console.warn('Load PWA err:', err);
     } finally {
@@ -969,6 +998,65 @@ export default function CustomerBookingPwaScreen() {
                   ({merchant?.reviews_count || '450'} reviews)
                 </Text>
               </View>
+
+              {/* Active Booking Banner (if customer already has an appointment booked here) */}
+              {existingBooking && (
+                <TouchableOpacity
+                  style={[themeStyles.neumorphicCard, {
+                    backgroundColor: '#FFFBEA',
+                    borderColor: '#FFE38F',
+                    borderWidth: 1.5,
+                    borderRadius: 18,
+                    padding: 14,
+                    marginTop: 14,
+                    marginBottom: 4,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    width: '100%',
+                  }]}
+                  onPress={() => {
+                    setCreatedBooking(existingBooking);
+                    setCurrentStep(4);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: '#FFC700',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="calendar" size={18} color="#1A1400" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', letterSpacing: 0.5 }}>
+                        YOU HAVE A BOOKING HERE
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 1 }} numberOfLines={1}>
+                        {existingBooking.booking_date} @ {existingBooking.start_time}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{
+                    backgroundColor: '#FFC700',
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>View Pass</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#1A1400" />
+                  </View>
+                </TouchableOpacity>
+              )}
 
               {/* PRO Plan Specific Elements: Split Meta Location & Operating Hours + Quick Action Bar */}
               {isPro ? (

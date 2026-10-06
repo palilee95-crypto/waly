@@ -131,6 +131,13 @@ export default function CustomerDashboard() {
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
+  // Upcoming Service Appointment State
+  const [upcomingBooking, setUpcomingBooking] = useState<any>(null);
+  const [bookingCountdown, setBookingCountdown] = useState<string>('');
+  const [appointmentPassModalVisible, setAppointmentPassModalVisible] = useState(false);
+  const [hasMarkedArrived, setHasMarkedArrived] = useState(false);
+  const [markingArrivedLoading, setMarkingArrivedLoading] = useState(false);
+
   const fetchNotifications = async () => {
     // Notifications collection was removed in backend cleanup migration
     setNotificationsList([]);
@@ -236,30 +243,148 @@ export default function CustomerDashboard() {
     }
   };
 
+  const fetchUpcomingAppointments = async () => {
+    if (!user) return;
+    try {
+      const todayIso = new Date().toISOString().split('T')[0];
+      const filterConditions = [];
+      if (user.id) filterConditions.push(`customer = '${user.id}'`);
+      if (user.phone) filterConditions.push(`customer_phone = '${user.phone}'`);
+
+      let savedPhone = null;
+      try { savedPhone = await AsyncStorage.getItem('risev_cust_phone'); } catch (e) {}
+      if (savedPhone && !filterConditions.includes(`customer_phone = '${savedPhone}'`)) {
+        filterConditions.push(`customer_phone = '${savedPhone}'`);
+      }
+      
+      const userFilter = filterConditions.length > 0 ? `(${filterConditions.join(' || ')})` : `customer = '${user.id}'`;
+      const fullFilter = `${userFilter} && (status = 'booked' || status = 'arrived') && booking_date >= '${todayIso}'`;
+
+      const res = await pb.collection('service_bookings').getList(1, 1, {
+        filter: fullFilter,
+        sort: 'booking_date,start_time',
+        expand: 'merchant,branch,staff',
+        requestKey: null
+      });
+
+      if (res.items.length > 0) {
+        const item = res.items[0];
+        setUpcomingBooking(item);
+        setHasMarkedArrived(item.status === 'arrived');
+      } else {
+        setUpcomingBooking(null);
+      }
+    } catch (err) {
+      setUpcomingBooking(null);
+    }
+  };
+
+  const handleMarkArrived = async () => {
+    if (!upcomingBooking?.id) return;
+    try {
+      setMarkingArrivedLoading(true);
+      await pb.collection('service_bookings').update(upcomingBooking.id, {
+        status: 'arrived'
+      });
+      setHasMarkedArrived(true);
+      setUpcomingBooking((prev: any) => prev ? { ...prev, status: 'arrived' } : null);
+      Alert.alert('Arrival Confirmed! 📍', 'The store counter has been notified of your arrival.');
+    } catch (err: any) {
+      console.warn('Arrival update err:', err);
+      Alert.alert('Notice', 'Could not update arrival status right now. Please inform the store staff at the counter.');
+    } finally {
+      setMarkingArrivedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!upcomingBooking) {
+      setBookingCountdown('');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const bDate = upcomingBooking.booking_date;
+      const bTime = upcomingBooking.start_time;
+      if (!bDate || !bTime) return;
+
+      const parts = bDate.split('-');
+      if (parts.length !== 3) return;
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+
+      const tParts = bTime.trim().split(' ');
+      let [h, min] = (tParts[0] || '0:0').split(':').map(Number);
+      const mod = tParts[1] ? tParts[1].toUpperCase() : null;
+      if (mod === 'PM' && h < 12) h += 12;
+      if (mod === 'AM' && h === 12) h = 0;
+
+      const target = new Date(y, m, d, h || 0, min || 0, 0, 0);
+      const diffMs = target.getTime() - Date.now();
+
+      if (diffMs <= 0) {
+        const pastMins = Math.floor(Math.abs(diffMs) / 60000);
+        if (pastMins < 60) {
+          setBookingCountdown('Happening Now');
+        } else {
+          setBookingCountdown('Ongoing');
+        }
+        return;
+      }
+
+      const totalSecs = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSecs / 86400);
+      const hours = Math.floor((totalSecs % 86400) / 3600);
+      const mins = Math.floor((totalSecs % 3600) / 60);
+
+      if (days > 0) {
+        setBookingCountdown(`Starts in ${days}d ${hours}h`);
+      } else if (hours > 0) {
+        setBookingCountdown(`Starts in ${hours}h ${mins}m`);
+      } else {
+        setBookingCountdown(`Starts in ${mins}m`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 10000);
+    return () => clearInterval(interval);
+  }, [upcomingBooking]);
+
   useEffect(() => {
     if (!user) return;
 
     setUnreadCount(0);
 
     fetchLoyaltyCards();
+    fetchUpcomingAppointments();
 
-    // Listen to real-time updates on loyalty_cards
-    pb.collection('loyalty_cards').subscribe('*', (e) => {
+    // Listen to real-time updates on loyalty_cards and service_bookings
+    pb.collection('loyalty_cards').subscribe('*', () => {
       fetchLoyaltyCards();
     }, {
       filter: `customer = '${user.id}'`
     });
 
+    try {
+      pb.collection('service_bookings').subscribe('*', () => {
+        fetchUpcomingAppointments();
+      });
+    } catch (e) {}
+
     return () => {
       pb.collection('loyalty_cards').unsubscribe('*');
+      try { pb.collection('service_bookings').unsubscribe('*'); } catch (e) {}
     };
   }, [user]);
 
-  // Refresh pinned cards whenever the screen comes into focus
+  // Refresh pinned cards & upcoming bookings whenever the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (user) {
         fetchLoyaltyCards();
+        fetchUpcomingAppointments();
       }
     }, [user])
   );
@@ -776,6 +901,202 @@ export default function CustomerDashboard() {
             </View>
           </View>
 
+          {/* 📅 UPCOMING APPOINTMENT CARD (Matches Home Page Colors) */}
+          {upcomingBooking && (
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              padding: 18,
+              marginBottom: 16,
+              borderWidth: 1.5,
+              borderColor: '#FFE38F',
+              shadowColor: 'rgba(185, 172, 154, 0.45)',
+              shadowOffset: { width: 4, height: 8 },
+              shadowOpacity: 0.3,
+              shadowRadius: 14,
+              elevation: 5,
+              overflow: 'hidden',
+              position: 'relative',
+              ...(Platform.OS === 'web' ? {
+                boxShadow: '8px 8px 24px rgba(185, 172, 154, 0.25), -6px -6px 18px #ffffff',
+              } : {}),
+            }}>
+              {/* Decorative Warm Golden Ambient Glow in Top-Right Corner */}
+              <View style={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 90,
+                height: 90,
+                borderRadius: 45,
+                backgroundColor: 'rgba(255, 199, 0, 0.12)',
+              }} />
+
+              {/* Top Row: Category Badge & Countdown Pill */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#1A1400',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 12,
+                  gap: 6,
+                }}>
+                  <Ionicons name="calendar" size={12} color="#FFC700" />
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5 }}>
+                    UPCOMING APPOINTMENT
+                  </Text>
+                </View>
+
+                {bookingCountdown ? (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#FFF8E6',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#FFE38F',
+                    gap: 5,
+                  }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: hasMarkedArrived ? '#16A34A' : '#EAB308' }} />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>
+                      {hasMarkedArrived ? 'Arrived at Store' : bookingCountdown}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Merchant & Service Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                {upcomingBooking.expand?.merchant?.logo ? (
+                  <Image
+                    source={{ uri: `${pb.baseUrl}/api/files/merchants/${upcomingBooking.expand.merchant.id}/${upcomingBooking.expand.merchant.logo}` }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: '#FFF5D6',
+                      borderWidth: 1,
+                      borderColor: '#FFE38F',
+                    }}
+                  />
+                ) : (
+                  <View style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: '#FFC700',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: '#FFE38F',
+                  }}>
+                    <Ionicons name="storefront-outline" size={20} color="#1A1400" />
+                  </View>
+                )}
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }} numberOfLines={1}>
+                    {upcomingBooking.expand?.merchant?.name || upcomingBooking.customer_name || 'Store Appointment'}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 1 }} numberOfLines={1}>
+                    {(() => {
+                      let items = upcomingBooking.items_summary;
+                      if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch (e) { items = []; }
+                      }
+                      if (Array.isArray(items) && items.length > 0) {
+                        return items.map((it: any) => it.name).join(', ');
+                      }
+                      return 'Service Appointment';
+                    })()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Recessed Slot Time & Branch Inset Pod */}
+              <View style={{
+                backgroundColor: '#FFFBEA',
+                borderRadius: 16,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: '#FFE38F',
+                marginBottom: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                ...(Platform.OS === 'web' ? {
+                  boxShadow: 'inset 2px 2px 5px rgba(185, 172, 154, 0.2), inset -2px -2px 5px #ffffff',
+                } : {}),
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="time-outline" size={18} color="#806400" />
+                  <View>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>
+                      SCHEDULED SLOT
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>
+                      {upcomingBooking.booking_date} @ {upcomingBooking.start_time}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>
+                    LOCATION
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
+                    {upcomingBooking.expand?.branch?.name || (upcomingBooking.expand?.merchant?.name ? `${upcomingBooking.expand.merchant.name} (HQ)` : 'Main Store')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Action Buttons Row */}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                    borderRadius: 16,
+                    paddingVertical: 13,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    shadowColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 4,
+                    ...(Platform.OS === 'web' ? {
+                      boxShadow: hasMarkedArrived
+                        ? '3px 4px 12px rgba(34, 197, 94, 0.4)'
+                        : '3px 4px 12px rgba(255, 199, 0, 0.4)',
+                    } : {}),
+                  }}
+                  onPress={() => setAppointmentPassModalVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name={hasMarkedArrived ? 'checkmark-circle' : 'qr-code-outline'}
+                    size={17}
+                    color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'}
+                  />
+                  <Text style={{
+                    fontSize: 13,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: hasMarkedArrived ? '#FFFFFF' : '#1A1400',
+                  }}>
+                    {hasMarkedArrived ? 'Arrival Confirmed ✓' : 'View Pass & Check In ➔'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Neumorphic 2X STAMPS Promo Banner */}
           <View style={{ 
             backgroundColor: '#16171D', 
@@ -1213,6 +1534,169 @@ export default function CustomerDashboard() {
             <Text style={[styles.scanNotice, { color: '#64748B' }]}>
               Present this card to the store staff to collect stamps or redeem reward vouchers.
             </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Appointment Pass Pop-up Modal */}
+      <Modal
+        visible={appointmentPassModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAppointmentPassModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: '#FFFFFF', 
+            maxWidth: 420, 
+            padding: 22, 
+            borderRadius: 28,
+            borderWidth: 1.5,
+            borderColor: '#FFE38F',
+            shadowColor: '#FFC700',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.25,
+            shadowRadius: 24,
+            elevation: 10,
+          }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: hasMarkedArrived ? '#DCFCE7' : '#FEF3C7',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 16,
+                gap: 6
+              }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: hasMarkedArrived ? '#16A34A' : '#D97706' }} />
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: hasMarkedArrived ? '#15803D' : '#B45309' }}>
+                  {hasMarkedArrived ? 'ARRIVAL CONFIRMED' : 'BOOKING CONFIRMED'}
+                </Text>
+              </View>
+
+              <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', alignSelf: 'flex-start', marginBottom: 14 }}>
+              Appointment Pass
+            </Text>
+
+            {/* Countdown Box */}
+            <View style={{
+              backgroundColor: '#FFFBEA',
+              borderWidth: 1,
+              borderColor: '#FFE38F',
+              borderRadius: 18,
+              padding: 14,
+              alignItems: 'center',
+              width: '100%',
+              marginBottom: 16,
+              ...(Platform.OS === 'web' ? {
+                boxShadow: 'inset 2px 2px 5px rgba(185, 172, 154, 0.2), inset -2px -2px 5px #ffffff',
+              } : {})
+            }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>
+                {hasMarkedArrived ? 'Arrival Status:' : 'Your appointment starts in:'}
+              </Text>
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginTop: 4 }}>
+                {hasMarkedArrived ? 'Checked In at Store' : (bookingCountdown || 'Starting Soon')}
+              </Text>
+            </View>
+
+            {/* Details Grid */}
+            <View style={{
+              borderTopWidth: 1,
+              borderBottomWidth: 1,
+              borderColor: '#F1F5F9',
+              paddingVertical: 14,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              rowGap: 12,
+              width: '100%',
+              marginBottom: 16
+            }}>
+              <View style={{ width: '50%' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Service</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
+                  {(() => {
+                    let items = upcomingBooking?.items_summary;
+                    if (typeof items === 'string') {
+                      try { items = JSON.parse(items); } catch (e) { items = []; }
+                    }
+                    if (Array.isArray(items) && items.length > 0) {
+                      return items.map((it: any) => it.name).join(', ');
+                    }
+                    return 'Service Appointment';
+                  })()}
+                </Text>
+              </View>
+
+              <View style={{ width: '50%' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Provider</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
+                  {upcomingBooking?.expand?.staff?.name || 'Any Provider'}
+                </Text>
+              </View>
+
+              <View style={{ width: '50%' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Slot Time</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
+                  {upcomingBooking?.booking_date} @ {upcomingBooking?.start_time}
+                </Text>
+              </View>
+
+              <View style={{ width: '50%' }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Branch</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
+                  {upcomingBooking?.expand?.branch?.name || (upcomingBooking?.expand?.merchant?.name ? `${upcomingBooking.expand.merchant.name} (HQ)` : 'Main Store')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Arrived Action */}
+            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
+              Tap the button below as soon as you step inside the store:
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                backgroundColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                borderRadius: 16,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                shadowColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.35,
+                shadowRadius: 8,
+                elevation: 4
+              }}
+              onPress={handleMarkArrived}
+              disabled={hasMarkedArrived || markingArrivedLoading}
+              activeOpacity={0.85}
+            >
+              {markingArrivedLoading ? (
+                <ActivityIndicator color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
+              ) : (
+                <>
+                  <Ionicons name="location" size={18} color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
+                  <Text style={{
+                    fontSize: 14,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: hasMarkedArrived ? '#FFFFFF' : '#1A1400'
+                  }}>
+                    {hasMarkedArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
