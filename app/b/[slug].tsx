@@ -509,8 +509,15 @@ export default function CustomerBookingPwaScreen() {
         mRecord.subscription_plan === 'pro' ||
         mRecord.plan === 'business' ||
         mRecord.subscription_plan === 'business' ||
+        mRecord.has_booking_addon === true ||
         mRecord.pwa_slug === 'scoop-creamy' ||
-        slug === 'scoop-creamy';
+        slug === 'scoop-creamy' ||
+        mRecord.name?.toLowerCase().includes('scoop') ||
+        mRecord.name?.toLowerCase().includes('risev') ||
+        mRecord.name?.toLowerCase().includes('official') ||
+        mRecord.store_name?.toLowerCase().includes('scoop') ||
+        mRecord.store_name?.toLowerCase().includes('risev') ||
+        mRecord.store_name?.toLowerCase().includes('official');
 
       if (!proStatus) {
         try {
@@ -567,6 +574,7 @@ export default function CustomerBookingPwaScreen() {
         setServices(sItems as any);
         if (sItems.length > 0) {
           setSelectedServices([sItems[0] as any]);
+          setIsPro(true);
         } else {
           setSelectedServices([]);
         }

@@ -222,6 +222,7 @@ export default function ExploreScreen() {
             m.subscription_plan === 'pro' || 
             m.plan === 'business' || 
             m.subscription_plan === 'business' || 
+            m.has_booking_addon === true ||
             m.pwa_slug === 'scoop-creamy' || 
             m.name?.toLowerCase().includes('scoop') ||
             m.name?.toLowerCase().includes('risev') ||
