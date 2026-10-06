@@ -958,11 +958,12 @@ export default function CustomerBookingPwaScreen() {
                 /* Non-PRO / Starter Plan: Clean Action CTA Button */
                 <View style={{ marginTop: 16, width: '100%' }}>
                   <TouchableOpacity
-                    style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor, paddingVertical: 14 }]}
-                    onPress={() => setCurrentStep(1)}
+                    style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
+                    onPress={() => setShowLoyaltyModal(true)}
                     activeOpacity={0.85}
                   >
-                    <Text style={[styles.btnFullYellowBookText, { color: contrastColor, fontSize: 16 }]}>Book Appointment</Text>
+                    <Ionicons name="gift-outline" size={18} color={contrastColor} style={{ marginRight: 6 }} />
+                    <Text style={[styles.btnFullYellowBookText, { color: contrastColor, fontSize: 16 }]}>View Digital Stamp Card</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1580,8 +1581,8 @@ export default function CustomerBookingPwaScreen() {
 
       </ScrollView>
 
-      {/* Screen 0 Floating Yellow Button */}
-      {currentStep === 0 && (
+      {/* Screen 0 Floating Yellow Button (PRO Plan Only) */}
+      {currentStep === 0 && isPro && (
         <View style={[styles.floatingBottomProfileContainer, { backgroundColor: themeStyles.baseBgColor, borderTopColor: themeStyles.borderColor }]}>
           <TouchableOpacity
             style={[styles.btnFullYellowBook, themeStyles.neumorphicActiveBtn]}

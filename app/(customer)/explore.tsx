@@ -142,9 +142,25 @@ export default function ExploreScreen() {
   const [merchantLocation, setMerchantLocation] = useState<any>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const handleOpenMerchantDetails = (item: MerchantItem) => {
-    const targetSlug = item.slug || item.id;
-    router.push(`/b/${targetSlug}`);
+  const handleOpenMerchantDetails = async (item: MerchantItem) => {
+    if (item.isPro) {
+      const targetSlug = item.slug || item.id;
+      router.push(`/b/${targetSlug}`);
+      return;
+    }
+
+    setSelectedMerchant(item);
+    setMerchantModalVisible(true);
+    setFetchingLocation(true);
+    setMerchantLocation(null);
+    try {
+      const loc = await pb.collection('store_locations').getFirstListItem(`merchant = "${item.id}"`, { requestKey: null });
+      setMerchantLocation(loc);
+    } catch (e: any) {
+      if (!e?.isAbort) console.warn("Failed to fetch store location details:", e);
+    } finally {
+      setFetchingLocation(false);
+    }
   };
 
   const fetchExploreData = async () => {
@@ -996,6 +1012,33 @@ export default function ExploreScreen() {
               )}
 
               <View style={[styles.modalDivider, { marginHorizontal: 24 }]} />
+
+              {/* Loyalty Reward Card */}
+              {selectedMerchant && (
+                <View style={[styles.detailCard, { marginHorizontal: 24 }]}>
+                  <View style={styles.detailCardHeader}>
+                    <Ionicons name="gift-outline" size={20} color="#000000" />
+                    <Text style={styles.detailCardTitle}>Loyalty Program</Text>
+                  </View>
+                  <Text style={styles.detailCardText}>
+                    {selectedMerchant.stampsRule}
+                  </Text>
+                  <View style={styles.progressRow}>
+                    <Text style={styles.progressLabel}>My Progress</Text>
+                    <Text style={styles.progressCount}>
+                      {selectedMerchant.collectedStamps}/{selectedMerchant.totalStamps} Stamps
+                    </Text>
+                  </View>
+                  <View style={styles.barContainer}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        { width: `${Math.min(100, (selectedMerchant.collectedStamps / Math.max(1, selectedMerchant.totalStamps)) * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
 
               {/* Contact Card */}
               <View style={[styles.detailCard, { marginHorizontal: 24 }]}>
