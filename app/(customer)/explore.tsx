@@ -142,13 +142,7 @@ export default function ExploreScreen() {
   const [merchantLocation, setMerchantLocation] = useState<any>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const handleOpenMerchantDetails = async (item: MerchantItem) => {
-    if (item.isPro) {
-      const targetSlug = item.slug || item.id;
-      router.push(`/b/${targetSlug}`);
-      return;
-    }
-
+  const openRewardModal = async (item: MerchantItem) => {
     setSelectedMerchant(item);
     setMerchantModalVisible(true);
     setFetchingLocation(true);
@@ -161,6 +155,16 @@ export default function ExploreScreen() {
     } finally {
       setFetchingLocation(false);
     }
+  };
+
+  const handleOpenMerchantDetails = async (item: MerchantItem) => {
+    if (item.isPro) {
+      const targetSlug = item.slug || item.id;
+      router.push(`/b/${targetSlug}`);
+      return;
+    }
+
+    openRewardModal(item);
   };
 
   const fetchExploreData = async () => {
@@ -854,7 +858,8 @@ export default function ExploreScreen() {
                       <TouchableOpacity
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleOpenMerchantDetails(item);
+                          const targetSlug = item.slug || item.id;
+                          router.push(`/b/${targetSlug}`);
                         }}
                         activeOpacity={0.88}
                         style={{
@@ -883,7 +888,7 @@ export default function ExploreScreen() {
                       <TouchableOpacity
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleOpenMerchantDetails(item);
+                          openRewardModal(item);
                         }}
                         activeOpacity={0.88}
                         style={{
@@ -1038,6 +1043,39 @@ export default function ExploreScreen() {
                       ]}
                     />
                   </View>
+                </View>
+              )}
+
+              {/* Book Appointment CTA in Modal (if merchant is Pro) */}
+              {selectedMerchant?.isPro && (
+                <View style={{ marginHorizontal: 24, marginBottom: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setMerchantModalVisible(false);
+                      const targetSlug = selectedMerchant.slug || selectedMerchant.id;
+                      router.push(`/b/${targetSlug}`);
+                    }}
+                    activeOpacity={0.88}
+                    style={{
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: selectedMerchant.brandColor || '#FFC700',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      shadowColor: '#D97706',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 5,
+                      elevation: 3,
+                    }}
+                  >
+                    <Ionicons name="calendar" size={16} color={getContrastColor(selectedMerchant.brandColor)} />
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: getContrastColor(selectedMerchant.brandColor) }}>
+                      Book Appointment Online
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
