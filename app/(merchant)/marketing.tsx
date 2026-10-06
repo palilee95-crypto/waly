@@ -120,7 +120,19 @@ export default function MarketingScreen() {
   const [expiryFocused, setExpiryFocused] = useState(false);
   const [rewardFocused, setRewardFocused] = useState(false);
 
-  const [subTab, setSubTab] = useState<'campaigns' | 'blast' | 'followup' | 'templates'>('campaigns');
+  const [mainTab, setMainTab] = useState<'promo' | 'whatsapp'>('promo');
+  const [whatsappSubTab, setWhatsappSubTab] = useState<'blast' | 'followup' | 'templates'>('blast');
+  const [subTab, _setSubTabState] = useState<'campaigns' | 'blast' | 'followup' | 'templates'>('campaigns');
+
+  const setSubTab = (tab: 'campaigns' | 'blast' | 'followup' | 'templates') => {
+    _setSubTabState(tab);
+    if (tab === 'campaigns') {
+      setMainTab('promo');
+    } else {
+      setMainTab('whatsapp');
+      setWhatsappSubTab(tab);
+    }
+  };
   const [campaignsList, setCampaignsList] = useState<any[]>([]);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
@@ -1151,47 +1163,57 @@ export default function MarketingScreen() {
             />
           </View>
 
-        {/* Sub-tab Selection Row */}
+        {/* Main Marketing Category Row */}
         <View style={styles.subTabContainer}>
           <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'campaigns' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('campaigns')}
+            style={[styles.subTabButton, mainTab === 'promo' && styles.subTabButtonActive]}
+            onPress={() => {
+              setMainTab('promo');
+              _setSubTabState('campaigns');
+            }}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'campaigns' && styles.subTabTextActive]} numberOfLines={1}>
+            <Text style={[styles.subTabText, mainTab === 'promo' && styles.subTabTextActive]} numberOfLines={1}>
               Promo
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'blast' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('blast')}
+            style={[
+              styles.subTabButton, 
+              mainTab === 'whatsapp' && styles.subTabButtonActive, 
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }
+            ]}
+            onPress={() => {
+              setMainTab('whatsapp');
+              _setSubTabState(whatsappSubTab);
+            }}
             activeOpacity={0.8}
           >
-            <Text style={[styles.subTabText, subTab === 'blast' && styles.subTabTextActive]} numberOfLines={1}>
-              Blast
+            <Ionicons name="logo-whatsapp" size={15} color={mainTab === 'whatsapp' ? '#050505' : '#22C55E'} />
+            <Text style={[styles.subTabText, mainTab === 'whatsapp' && styles.subTabTextActive]} numberOfLines={1}>
+              WhatsApp
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'followup' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('followup')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.subTabText, subTab === 'followup' && styles.subTabTextActive]} numberOfLines={1}>
-              Follow Up
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.subTabButton, subTab === 'templates' && styles.subTabButtonActive]}
-            onPress={() => setSubTab('templates')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.subTabText, subTab === 'templates' && styles.subTabTextActive]} numberOfLines={1}>
-              Templates
-            </Text>
+            <View style={{
+              backgroundColor: mainTab === 'whatsapp' ? 'rgba(0,0,0,0.2)' : 'rgba(255, 199, 0, 0.15)',
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: mainTab === 'whatsapp' ? 'rgba(0,0,0,0.1)' : 'rgba(255, 199, 0, 0.3)'
+            }}>
+              <Text style={{
+                fontSize: 9,
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: mainTab === 'whatsapp' ? '#050505' : '#FFC700',
+                letterSpacing: 0.5
+              }}>
+                SOON
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
-        {subTab === 'campaigns' && (
+        {mainTab === 'promo' && (
           <View style={styles.campaignsContent}>
             {/* Header row with a Create Button */}
             <View style={styles.campHeaderRow}>
@@ -1358,7 +1380,59 @@ export default function MarketingScreen() {
           </View>
         )}
 
-        {subTab === 'blast' && (
+        {mainTab === 'whatsapp' && (
+          <View style={{ width: '100%', position: 'relative' }}>
+            {/* WhatsApp Sub-Tabs Bar: Blast | Follow Up | Templates */}
+            <View style={styles.whatsappSubTabBar}>
+              <TouchableOpacity
+                style={[styles.whatsappSubTabBtn, whatsappSubTab === 'blast' && styles.whatsappSubTabBtnActive]}
+                onPress={() => {
+                  setWhatsappSubTab('blast');
+                  _setSubTabState('blast');
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.whatsappSubTabText, whatsappSubTab === 'blast' && styles.whatsappSubTabTextActive]}>
+                  Blast
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.whatsappSubTabBtn, whatsappSubTab === 'followup' && styles.whatsappSubTabBtnActive]}
+                onPress={() => {
+                  setWhatsappSubTab('followup');
+                  _setSubTabState('followup');
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.whatsappSubTabText, whatsappSubTab === 'followup' && styles.whatsappSubTabTextActive]}>
+                  Follow Up
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.whatsappSubTabBtn, whatsappSubTab === 'templates' && styles.whatsappSubTabBtnActive]}
+                onPress={() => {
+                  setWhatsappSubTab('templates');
+                  _setSubTabState('templates');
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.whatsappSubTabText, whatsappSubTab === 'templates' && styles.whatsappSubTabTextActive]}>
+                  Templates
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Container for Preview with Frosted COMING SOON Overlay */}
+            <View style={{ position: 'relative', width: '100%', minHeight: 520, borderRadius: 24, overflow: 'hidden' }}>
+              {/* Blurred underlying preview */}
+              <View
+                pointerEvents="none"
+                style={{
+                  opacity: 0.22,
+                  ...(Platform.OS === 'web' ? ({ filter: 'blur(10px)', userSelect: 'none' } as any) : {}),
+                }}
+              >
+                {whatsappSubTab === 'blast' && (
           <View style={styles.broadcastContent}>
             <View style={{ width: '100%' }}>
                   
@@ -2159,7 +2233,7 @@ export default function MarketingScreen() {
         </View>
       )}
 
-        {subTab === 'followup' && (
+        {whatsappSubTab === 'followup' && (
           <View style={styles.broadcastContent}>
             <View style={{ width: '100%' }}>
               <SmartFollowUp styles={styles} Alert={Alert} />
@@ -2167,16 +2241,57 @@ export default function MarketingScreen() {
           </View>
         )}
 
-        {subTab === 'templates' && (
+        {whatsappSubTab === 'templates' && (
           <View style={styles.campaignsContent}>
             <TemplateStudio 
               onSelectTemplateForBroadcast={(tpl: WhatsAppTemplate) => {
                 setBTitle(tpl.headerText || tpl.name);
                 setBMessage(tpl.bodyText);
                 setBSendWhatsApp(true);
-                setSubTab('blast');
+                setWhatsappSubTab('blast');
+                _setSubTabState('blast');
               }}
             />
+          </View>
+        )}
+              </View>
+
+              {/* Centered Frosted Glass COMING SOON Overlay */}
+              <View style={styles.whatsappComingSoonOverlay}>
+                <View style={styles.whatsappComingSoonCard}>
+                  <View style={styles.whatsappIconCircle}>
+                    <Ionicons name="logo-whatsapp" size={34} color="#22C55E" />
+                  </View>
+
+                  <View style={styles.comingSoonBadgePill}>
+                    <View style={styles.comingSoonAmberDot} />
+                    <Text style={styles.comingSoonBadgeText}>COMING SOON</Text>
+                  </View>
+
+                  <Text style={styles.whatsappComingSoonTitle}>
+                    WhatsApp Business Suite
+                  </Text>
+                  <Text style={styles.whatsappComingSoonDesc}>
+                    Meta Cloud API broadcast blasts, automated smart follow-up sequences, and custom template studio are launching in the upcoming release.
+                  </Text>
+
+                  <View style={styles.whatsappFeatureTagsRow}>
+                    <View style={styles.whatsappFeatureTag}>
+                      <Ionicons name="paper-plane-outline" size={13} color="#FFC700" />
+                      <Text style={styles.whatsappFeatureTagText}>Blast Broadcasts</Text>
+                    </View>
+                    <View style={styles.whatsappFeatureTag}>
+                      <Ionicons name="repeat-outline" size={13} color="#FFC700" />
+                      <Text style={styles.whatsappFeatureTagText}>Smart Follow-Ups</Text>
+                    </View>
+                    <View style={styles.whatsappFeatureTag}>
+                      <Ionicons name="document-text-outline" size={13} color="#FFC700" />
+                      <Text style={styles.whatsappFeatureTagText}>WABA Templates</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
           </View>
         )}
         </View>
@@ -3539,6 +3654,133 @@ const styles = StyleSheet.create({
     color: '#050505',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 12,
+  },
+  whatsappSubTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#111111',
+    borderRadius: 100,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
+  },
+  whatsappSubTabBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 100,
+  },
+  whatsappSubTabBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  whatsappSubTabText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  whatsappSubTabTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  whatsappComingSoonOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(5, 5, 5, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 24,
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as any) : {}),
+  },
+  whatsappComingSoonCard: {
+    backgroundColor: '#121318',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    maxWidth: 440,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  whatsappIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  comingSoonBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 199, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 0, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+    marginBottom: 12,
+  },
+  comingSoonAmberDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFC700',
+  },
+  comingSoonBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 1,
+  },
+  whatsappComingSoonTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  whatsappComingSoonDesc: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  whatsappFeatureTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  whatsappFeatureTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  whatsappFeatureTagText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#E2E8F0',
   },
 
   // Campaigns content styles
