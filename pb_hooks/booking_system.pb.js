@@ -7,6 +7,7 @@
 // 4. End-of-service loyalty auto-sync (transactions, stamps, points, voucher unlock, and digital receipt generation)
 
 const pushNotify = require(`${__hooks}/push_notify.js`);
+const bookingHelper = require(`${__hooks}/booking_helper.js`);
 
 // Helper: Convert time string ("11:00 AM", "14:30") to minutes from midnight
 function parseTimeToMinutes(tStr) {
@@ -168,14 +169,20 @@ onRecordCreate((e) => {
   const rawPhone = rec.getString("customer_phone");
   const customerName = (rec.getString("customer_name") || "Customer").trim();
 
+  // Helper bindings (safe against Goja context scoping)
+  const fnNormalizePhone = (typeof bookingHelper !== "undefined" && bookingHelper.normalizePhone) ? bookingHelper.normalizePhone : normalizePhone;
+  const fnEnsureCustomer = (typeof bookingHelper !== "undefined" && bookingHelper.ensureCustomerAndLoyaltyCard) ? bookingHelper.ensureCustomerAndLoyaltyCard : ensureCustomerAndLoyaltyCard;
+  const fnParseTimeToMinutes = (typeof bookingHelper !== "undefined" && bookingHelper.parseTimeToMinutes) ? bookingHelper.parseTimeToMinutes : parseTimeToMinutes;
+  const fnFormatMinutesToTime = (typeof bookingHelper !== "undefined" && bookingHelper.formatMinutesToTime) ? bookingHelper.formatMinutesToTime : formatMinutesToTime;
+
   // 1. Phone standardization
-  const cleanPhone = normalizePhone(rawPhone);
+  const cleanPhone = fnNormalizePhone(rawPhone);
   if (cleanPhone) {
     rec.set("customer_phone", cleanPhone);
   }
 
   // 2. Ensure customer account in users collection
-  const customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
+  const customer = fnEnsureCustomer(cleanPhone, customerName, merchantId);
   if (customer) {
     rec.set("customer", customer.id);
   }
@@ -194,13 +201,13 @@ onRecordCreate((e) => {
     if (sumDur > 0) totalDurationMinutes = sumDur;
   }
 
-  const startMins = parseTimeToMinutes(startTimeStr);
+  const startMins = fnParseTimeToMinutes(startTimeStr);
   const bufferMinutes = 10; // Option B: 10-minute turnaround buffer
   const slotEndMins = startMins + totalDurationMinutes + bufferMinutes;
   const actualServiceEndMins = startMins + totalDurationMinutes;
 
   if (!rec.getString("end_time")) {
-    rec.set("end_time", formatMinutesToTime(actualServiceEndMins));
+    rec.set("end_time", fnFormatMinutesToTime(actualServiceEndMins));
   }
 
   // 4. Overlap & Double-booking validation (if a specific staff member is assigned)
@@ -218,8 +225,8 @@ onRecordCreate((e) => {
         const existing = activeBookings[i];
         if (existing.id === rec.id) continue;
 
-        const exStartMins = parseTimeToMinutes(existing.getString("start_time"));
-        let exEndMins = parseTimeToMinutes(existing.getString("end_time"));
+        const exStartMins = fnParseTimeToMinutes(existing.getString("start_time"));
+        let exEndMins = fnParseTimeToMinutes(existing.getString("end_time"));
         // Add 10-min buffer to existing appointment slot
         if (exEndMins <= exStartMins) exEndMins = exStartMins + 30;
         const exSlotEndMins = exEndMins + bufferMinutes;
@@ -227,7 +234,7 @@ onRecordCreate((e) => {
         // Overlap test
         if (startMins < exSlotEndMins && slotEndMins > exStartMins) {
           throw new BadRequestError(
-            `Selected staff member already has an appointment from ${formatMinutesToTime(exStartMins)} to ${formatMinutesToTime(exSlotEndMins)} (including a 10-minute buffer). Please select another time slot or staff member.`
+            `Selected staff member already has an appointment from ${fnFormatMinutesToTime(exStartMins)} to ${fnFormatMinutesToTime(exSlotEndMins)} (including a 10-minute buffer). Please select another time slot or staff member.`
           );
         }
       }
@@ -326,8 +333,10 @@ onRecordUpdate((e) => {
       }
 
       if (!customer) {
-        const cleanPhone = normalizePhone(rec.getString("customer_phone"));
-        customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
+        const fnNormalizePhone = (typeof bookingHelper !== "undefined" && bookingHelper.normalizePhone) ? bookingHelper.normalizePhone : normalizePhone;
+        const fnEnsureCustomer = (typeof bookingHelper !== "undefined" && bookingHelper.ensureCustomerAndLoyaltyCard) ? bookingHelper.ensureCustomerAndLoyaltyCard : ensureCustomerAndLoyaltyCard;
+        const cleanPhone = fnNormalizePhone(rec.getString("customer_phone"));
+        customer = fnEnsureCustomer(cleanPhone, customerName, merchantId);
       }
 
       if (customer && merchantId) {

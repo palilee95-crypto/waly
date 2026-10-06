@@ -680,7 +680,15 @@ export default function CustomerBookingPwaScreen() {
         await AsyncStorage.setItem('risev_cust_phone', customerPhone);
 
         const totalPrice = calculateTotal();
-        const bookingPayload = {
+        const serviceNameStr = selectedServices.map(s => s.name).join(', ');
+        const staffNameStr = selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available');
+        const itemsSummaryData = selectedServices.map(s => ({
+          name: s.name,
+          price: s.price,
+          duration_minutes: s.duration_minutes || 30
+        }));
+
+        const payloadToSave = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
           staff: selectedStaff?.id ? selectedStaff.id : null,
@@ -688,10 +696,8 @@ export default function CustomerBookingPwaScreen() {
           customer_phone: customerPhone,
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
           start_time: selectedTime,
-          service_name: selectedServices.map(s => s.name).join(', '),
-          staff_name: selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'),
           total_price: totalPrice,
-          items_summary: selectedServices.map(s => ({ name: s.name, price: s.price })),
+          items_summary: itemsSummaryData,
           notes: customerNotes,
           status: 'booked'
         };
@@ -699,16 +705,19 @@ export default function CustomerBookingPwaScreen() {
         let newRec: any = null;
         if (merchant?.id && !merchant.id.startsWith('demo-')) {
           try {
-            newRec = await pb.collection('service_bookings').create(bookingPayload);
+            newRec = await pb.collection('service_bookings').create(payloadToSave);
           } catch (pbErr: any) {
             console.warn('Booking create err:', pbErr);
             throw pbErr;
           }
         }
 
-        setCreatedBooking(newRec || {
-          id: `BK-${Math.floor(100000 + Math.random() * 900000)}`,
-          ...bookingPayload
+        setCreatedBooking({
+          ...(newRec || {}),
+          id: newRec?.id || `BK-${Math.floor(100000 + Math.random() * 900000)}`,
+          service_name: serviceNameStr,
+          staff_name: staffNameStr,
+          ...payloadToSave
         });
 
         showToast('Booking Confirmed! 🎉');
