@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -49,6 +50,27 @@ interface StaffItem {
   avatar?: string;
   photo?: string;
   role?: string;
+}
+
+function formatUpcomingDate(dateStr?: string) {
+  if (!dateStr) return 'Thu, 8 Oct 2026';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
 }
 
 function getContrastColor(hexColor?: string | null) {
@@ -999,61 +1021,64 @@ export default function CustomerBookingPwaScreen() {
                 </Text>
               </View>
 
-              {/* Active Booking Banner (if customer already has an appointment booked here) */}
+              {/* Active Booking Ticket Stub Banner (if customer already has an appointment booked here) */}
               {existingBooking && (
                 <TouchableOpacity
-                  style={[themeStyles.neumorphicCard, {
-                    backgroundColor: '#FFFBEA',
-                    borderColor: '#FFE38F',
-                    borderWidth: 1.5,
-                    borderRadius: 18,
-                    padding: 14,
-                    marginTop: 14,
-                    marginBottom: 4,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    width: '100%',
-                  }]}
+                  style={styles.upcomingTicketCard}
                   onPress={() => {
                     setCreatedBooking(existingBooking);
                     setCurrentStep(4);
                   }}
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <View style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: '#FFC700',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Ionicons name="calendar" size={18} color="#1A1400" />
+                  {/* Left Notch Cutout */}
+                  <View style={styles.ticketNotchLeft} />
+                  {/* Right Notch Cutout */}
+                  <View style={styles.ticketNotchRight} />
+
+                  {/* Left Main Information Column */}
+                  <View style={styles.ticketLeftInfoCol}>
+                    {/* Icon Box with Green Check Badge */}
+                    <View style={styles.ticketIconContainer}>
+                      <Ionicons name="calendar-outline" size={22} color="#000000" />
+                      <View style={styles.ticketCheckBadge}>
+                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', letterSpacing: 0.5 }}>
-                        YOU HAVE A BOOKING HERE
+
+                    {/* Text Details */}
+                    <View style={{ flex: 1, paddingRight: 4 }}>
+                      <Text style={styles.ticketHeaderTagline}>
+                        UPCOMING APPOINTMENT
                       </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 1 }} numberOfLines={1}>
-                        {existingBooking.booking_date} @ {existingBooking.start_time}
+                      <Text style={styles.ticketDateMainText} numberOfLines={1}>
+                        {formatUpcomingDate(existingBooking.booking_date)}
                       </Text>
+                      <Text style={styles.ticketTimeSubText} numberOfLines={1}>
+                        {existingBooking.start_time || '03:30 PM'}
+                      </Text>
+                      <View style={styles.ticketBranchRow}>
+                        <Ionicons name="location" size={12} color="#64748B" />
+                        <Text style={styles.ticketBranchText} numberOfLines={1}>
+                          {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Risev Official Merchant (HQ)'))}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
-                  <View style={{
-                    backgroundColor: '#FFC700',
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 12,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>View Pass</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#1A1400" />
+                  {/* Perforated Vertical Dotted Tear Line */}
+                  <View style={styles.ticketDashedVerticalLine} />
+
+                  {/* Right Action Stub */}
+                  <View style={styles.ticketRightStubCol}>
+                    <View style={styles.ticketPassChipTag}>
+                      <Text style={styles.ticketPassChipText}>BOOKING PASS</Text>
+                    </View>
+
+                    <View style={styles.ticketViewPassButton}>
+                      <Text style={styles.ticketViewPassBtnText}>View Pass</Text>
+                      <Ionicons name="chevron-forward" size={14} color="#000000" />
+                    </View>
                   </View>
                 </TouchableOpacity>
               )}
@@ -1684,79 +1709,232 @@ export default function CustomerBookingPwaScreen() {
         {/* ======================================================== */}
         {currentStep === 4 && (
           <View style={styles.stepContainer}>
-            <View style={[styles.ticketCardBoarding, themeStyles.neumorphicCard]}>
-              <View style={styles.ticketGreenBadge}>
-                <View style={styles.pulseDotGreen} />
-                <Text style={styles.ticketBadgeGreenText}>BOOKING CONFIRMED</Text>
-              </View>
-
-              <Text style={[styles.boardingPassTitle, { color: themeStyles.textPrimaryColor }]}>Appointment Pass</Text>
-
-              <View style={[styles.timerCountdownCard, themeStyles.neumorphicInset]}>
-                <Text style={[styles.timerSubText, { color: themeStyles.textSecondaryColor }]}>{countdownSubText}</Text>
-                <Text style={[styles.timerMainText, { color: themeStyles.priceColor }]}>{countdownText}</Text>
-              </View>
-
-              <View style={[styles.boardingInfoGrid, { borderColor: themeStyles.borderColor }]}>
-                <View style={styles.boardingGridCell}>
-                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Service</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
-                    {selectedServices.map(s => s.name).join(', ') || createdBooking?.service_name || 'Service'}
-                  </Text>
-                </View>
-                <View style={styles.boardingGridCell}>
-                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Provider</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
-                    {selectedStaff?.name || createdBooking?.staff_name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Provider')}
-                  </Text>
-                </View>
-                <View style={styles.boardingGridCell}>
-                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Slot Time</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
-                    {createdBooking?.booking_date && createdBooking?.start_time
-                      ? `${selectedDate} @ ${createdBooking.start_time}`
-                      : `${selectedDate} @ ${selectedTime}`}
-                  </Text>
-                </View>
-                <View style={styles.boardingGridCell}>
-                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Branch</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
-                    {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Main Store'))}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={[styles.arrivedInstructionText, { color: themeStyles.textSecondaryColor }]}>
-                Tap the button below as soon as you step inside the store:
-              </Text>
-
+            {/* Top Navigation Row (Back & Options) */}
+            <View style={styles.passHeaderNavRow}>
               <TouchableOpacity
-                style={[styles.btnArrivedAction, hasArrived ? { backgroundColor: '#22C55E' } : themeStyles.neumorphicActiveBtn]}
-                onPress={handleArrived}
-                activeOpacity={0.85}
+                style={styles.passNavCircleBtn}
+                onPress={() => setCurrentStep(0)}
+                activeOpacity={0.8}
               >
-                <Ionicons name="location" size={18} color={hasArrived ? '#FFFFFF' : themeStyles.contrastColor} />
-                <Text style={[styles.btnArrivedTextLabel, { color: hasArrived ? '#FFFFFF' : themeStyles.contrastColor }]}>
-                  {hasArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
-                </Text>
+                <Ionicons name="chevron-back" size={20} color="#0F172A" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.passNavCircleBtn}
+                onPress={() => showToast('Share or Save Pass')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#0F172A" />
               </TouchableOpacity>
             </View>
 
-            {/* PWA Save App Card */}
+            {/* Header Title & 3D Graphic Hero Section */}
+            <View style={styles.passHeroHeaderRow}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <View style={styles.ticketGreenBadge}>
+                  <View style={styles.pulseDotGreen} />
+                  <Text style={styles.ticketBadgeGreenText}>BOOKING CONFIRMED</Text>
+                </View>
+                <Text style={[styles.boardingPassTitle, { color: themeStyles.textPrimaryColor }]}>
+                  Appointment Pass
+                </Text>
+                <Text style={[styles.boardingPassSubTitle, { color: themeStyles.textSecondaryColor }]}>
+                  Your appointment is ready.
+                </Text>
+              </View>
+
+              {/* 3D Calendar Graphic Illustration */}
+              <View style={styles.calendarGraphicContainer}>
+                <View style={styles.calendarGraphicSunburst}>
+                  <Text style={{ fontSize: 16 }}>✨</Text>
+                </View>
+                <View style={styles.calendarGraphicCardBox}>
+                  <View style={styles.calendarGraphicTopBar}>
+                    <View style={styles.calendarRingBinding} />
+                    <View style={styles.calendarRingBinding} />
+                  </View>
+                  <View style={styles.calendarGraphicBody} />
+                  <View style={styles.calendarGraphicBadgeCheck}>
+                    <Ionicons name="checkmark" size={16} color="#000000" />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Main Appointment Card Container */}
+            <View style={[styles.passMainCard, themeStyles.neumorphicCard]}>
+              {/* Service Item Row */}
+              <View style={styles.passServiceSectionRow}>
+                <View style={styles.passServiceIconYellowBox}>
+                  <Ionicons name="cut" size={22} color="#854D0E" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Service</Text>
+                  <Text style={[styles.passServiceTitleText, { color: themeStyles.textPrimaryColor }]} numberOfLines={2}>
+                    {selectedServices.map(s => s.name).join(', ') || createdBooking?.service_name || 'Fade Cut'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.passCardDividerLine} />
+
+              {/* Date & Time + Countdown Row */}
+              <View style={styles.passDateTimeCountdownRow}>
+                {/* Date & Time */}
+                <View style={styles.passDateColGroup}>
+                  <View style={styles.passIconGreyBox}>
+                    <Ionicons name="calendar-outline" size={20} color="#334155" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Date & Time</Text>
+                    <Text style={[styles.passValBoldText, { color: themeStyles.textPrimaryColor }]}>
+                      {createdBooking?.booking_date
+                        ? `${selectedDate}`
+                        : selectedDate}
+                    </Text>
+                    <Text style={[styles.passValBoldText, { color: themeStyles.textPrimaryColor }]}>
+                      {createdBooking?.start_time || selectedTime}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Starts In Yellow Countdown Pill */}
+                <View style={styles.passCountdownPillBox}>
+                  <View style={styles.passClockYellowCircle}>
+                    <Ionicons name="time-outline" size={18} color="#78350F" />
+                  </View>
+                  <View>
+                    <Text style={styles.passCountdownPillLabel}>Starts in</Text>
+                    <Text style={styles.passCountdownPillVal}>{countdownText}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.passCardDividerLine} />
+
+              {/* Provider & Branch Split Row */}
+              <View style={styles.passProviderBranchSplitRow}>
+                {/* Provider */}
+                <View style={styles.passProviderColGroup}>
+                  <View style={styles.passIconGreyBox}>
+                    <Ionicons name="person-outline" size={20} color="#334155" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Provider</Text>
+                    <Text style={[styles.passValBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                      {selectedStaff?.name || createdBooking?.staff_name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Provider')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Vertical Divider */}
+                <View style={styles.passVerticalDividerLine} />
+
+                {/* Branch */}
+                <TouchableOpacity
+                  style={styles.passBranchColGroup}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    const branch = selectedBranch || (branches.length > 0 ? branches[0] : null);
+                    if (branch?.google_maps_url) {
+                      Linking.openURL(branch.google_maps_url);
+                    } else {
+                      showToast(branch?.name || merchant?.store_name || 'Main Store');
+                    }
+                  }}
+                >
+                  <View style={styles.passIconGreyBox}>
+                    <Ionicons name="storefront-outline" size={19} color="#334155" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Branch</Text>
+                    <Text style={[styles.passValBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={2}>
+                      {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Risev Official Merchant (HQ)'))}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" style={{ marginLeft: 2 }} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Stepper Progress Bar Pill */}
+            <View style={styles.passStepperBarCard}>
+              {/* Step 1: Booked */}
+              <View style={styles.stepperItemCol}>
+                <View style={styles.stepperCircleCompleted}>
+                  <Ionicons name="checkmark" size={15} color="#000000" />
+                </View>
+                <Text style={styles.stepperLabelCompleted}>Booked</Text>
+              </View>
+
+              {/* Connecting Line 1-2 */}
+              <View style={[styles.stepperLineTrack, { backgroundColor: '#FFC700' }]} />
+
+              {/* Step 2: Arrive */}
+              <View style={styles.stepperItemCol}>
+                <View style={[styles.stepperCircleActive, hasArrived && styles.stepperCircleCompleted]}>
+                  <Ionicons name={hasArrived ? "checkmark" : "location"} size={14} color="#000000" />
+                </View>
+                <Text style={[styles.stepperLabelActive, hasArrived && styles.stepperLabelCompleted]}>Arrive</Text>
+              </View>
+
+              {/* Connecting Line 2-3 */}
+              <View style={[styles.stepperLineTrack, { backgroundColor: hasArrived ? '#FFC700' : '#E2E8F0' }]} />
+
+              {/* Step 3: Service */}
+              <View style={styles.stepperItemCol}>
+                <View style={styles.stepperCircleMuted}>
+                  <Ionicons name="cut-outline" size={14} color="#94A3B8" />
+                </View>
+                <Text style={styles.stepperLabelMuted}>Service</Text>
+              </View>
+            </View>
+
+            {/* Primary Action Button: I HAVE ARRIVED */}
+            <TouchableOpacity
+              onPress={handleArrived}
+              activeOpacity={0.88}
+              style={styles.btnArrivedGradientTouchable}
+            >
+              <LinearGradient
+                colors={hasArrived ? ['#22C55E', '#16A34A'] : ['#FFE033', '#FFB800']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.btnArrivedGradientContainer}
+              >
+                <View style={[styles.btnArrivedPinCircleBox, hasArrived && { backgroundColor: '#FFFFFF' }]}>
+                  <Ionicons name="location" size={18} color={hasArrived ? '#16A34A' : '#FACC15'} />
+                </View>
+                <Text style={[styles.btnArrivedGradientTextTitle, hasArrived && { color: '#FFFFFF' }]}>
+                  {hasArrived ? '✓ ARRIVAL CONFIRMED' : 'I HAVE ARRIVED'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color={hasArrived ? '#FFFFFF' : '#000000'} />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Instruction Subtext below button */}
+            <Text style={[styles.arrivedInstructionSubtext, { color: themeStyles.textSecondaryColor }]}>
+              Tap the button below as soon as you step inside the store.
+            </Text>
+
+            {/* Save Merchant App PWA Card */}
             <View style={[styles.pwaCardBox, themeStyles.neumorphicCard]}>
-              <View style={[styles.pwaIconBox, themeStyles.neumorphicInset]}>
-                <Ionicons name="phone-portrait-outline" size={22} color={themeStyles.priceColor} />
+              <View style={styles.pwaIconBoxYellow}>
+                <Ionicons name="phone-portrait-outline" size={22} color="#854D0E" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>Save {merchant?.store_name || 'Aura Wellness'} App</Text>
-                <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>Get instant slot reminders & fast re-booking</Text>
+                <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>
+                  Save {merchant?.store_name || 'Risev Official Merchant'} App
+                </Text>
+                <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
+                  Get instant slot reminders & fast re-booking
+                </Text>
               </View>
               <TouchableOpacity
-                style={[styles.btnInstallPwa, themeStyles.neumorphicActiveBtn, { paddingHorizontal: 14, paddingVertical: 7 }]}
+                style={styles.btnInstallPwaYellowPill}
                 onPress={() => showToast('Tap Share ➔ Add to Home Screen')}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.btnInstallPwaText, { color: themeStyles.contrastColor }]}>Install</Text>
+                <Text style={styles.btnInstallPwaTextBlack}>Install</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2596,7 +2774,469 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
 
-  // Pass (Step 4)
+  // Upcoming Appointment Ticket Stub Banner (Matching Image 2)
+  upcomingTicketCard: {
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1.5,
+    borderColor: '#F3EBE0',
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  ticketNotchLeft: {
+    position: 'absolute',
+    left: -10,
+    top: '50%',
+    marginTop: -10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1.5,
+    borderColor: '#F3EBE0',
+    zIndex: 10,
+  },
+  ticketNotchRight: {
+    position: 'absolute',
+    right: -10,
+    top: '50%',
+    marginTop: -10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1.5,
+    borderColor: '#F3EBE0',
+    zIndex: 10,
+  },
+  ticketLeftInfoCol: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ticketIconContainer: {
+    position: 'relative',
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ticketCheckBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  ticketHeaderTagline: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  ticketDateMainText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    lineHeight: 18,
+  },
+  ticketTimeSubText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    lineHeight: 16,
+  },
+  ticketBranchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  ticketBranchText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  ticketDashedVerticalLine: {
+    width: 1,
+    height: 54,
+    borderLeftWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#E8DED1',
+    marginHorizontal: 10,
+  },
+  ticketRightStubCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  ticketPassChipTag: {
+    backgroundColor: '#FEF9C3',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  ticketPassChipText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#854D0E',
+    letterSpacing: 0.5,
+  },
+  ticketViewPassButton: {
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  ticketViewPassBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+
+  // Pass (Step 4) - Redesigned matching Image 2
+  passHeaderNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  passNavCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  passHeroHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  boardingPassSubTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  calendarGraphicContainer: {
+    position: 'relative',
+    width: 68,
+    height: 68,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarGraphicSunburst: {
+    position: 'absolute',
+    top: -10,
+    right: -4,
+    zIndex: 2,
+  },
+  calendarGraphicCardBox: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#FEF08A',
+    shadowColor: '#FACC15',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+    transform: [{ rotate: '6deg' }],
+    padding: 4,
+  },
+  calendarGraphicTopBar: {
+    height: 12,
+    backgroundColor: '#FEF08A',
+    borderRadius: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 6,
+  },
+  calendarRingBinding: {
+    width: 4,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: '#EAB308',
+    marginTop: -3,
+  },
+  calendarGraphicBody: {
+    flex: 1,
+    backgroundColor: '#FFFBEA',
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  calendarGraphicBadgeCheck: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  passMainCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    marginBottom: 16,
+  },
+  passServiceSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  passServiceIconYellowBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: '#FEF9C3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passServiceTitleText: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  passCardDividerLine: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 14,
+  },
+  passDateTimeCountdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  passDateColGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1.1,
+  },
+  passIconGreyBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passValBoldText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  passCountdownPillBox: {
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1,
+    borderColor: '#FEF08A',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  passClockYellowCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FEF08A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passCountdownPillLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#854D0E',
+  },
+  passCountdownPillVal: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#D97706',
+  },
+  passProviderBranchSplitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passProviderColGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  passVerticalDividerLine: {
+    width: 1,
+    height: 34,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 10,
+  },
+  passBranchColGroup: {
+    flex: 1.15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  passStepperBarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  stepperItemCol: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  stepperCircleCompleted: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperLabelCompleted: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  stepperLineTrack: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    marginHorizontal: 8,
+  },
+  stepperCircleActive: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFC700',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  stepperLabelActive: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  stepperCircleMuted: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperLabelMuted: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  btnArrivedGradientTouchable: {
+    borderRadius: 30,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  btnArrivedGradientContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+  },
+  btnArrivedPinCircleBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnArrivedGradientTextTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  arrivedInstructionSubtext: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
   ticketCardBoarding: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
@@ -2627,75 +3267,16 @@ const styles = StyleSheet.create({
     color: '#15803D',
   },
   boardingPassTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
-    marginBottom: 14,
-  },
-  timerCountdownCard: {
-    backgroundColor: '#FFFBEA',
-    borderWidth: 1,
-    borderColor: '#FFC700',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  timerSubText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-  },
-  timerMainText: {
-    fontSize: 17,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    marginTop: 2,
-  },
-  boardingInfoGrid: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 14,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 12,
-    marginBottom: 16,
-  },
-  boardingGridCell: {
-    width: '50%',
+    marginBottom: 2,
   },
   cellLabelText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     marginBottom: 2,
-  },
-  cellValueText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
-  },
-  arrivedInstructionText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  btnArrivedAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FFC700',
-    paddingVertical: 15,
-    borderRadius: 16,
-  },
-  btnArrivedTextLabel: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
   },
   pwaCardBox: {
     flexDirection: 'row',
@@ -2708,11 +3289,11 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 16,
   },
-  pwaIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#FFFBEA',
+  pwaIconBoxYellow: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FEF9C3',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2727,16 +3308,16 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 1,
   },
-  btnInstallPwa: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 10,
+  btnInstallPwaYellowPill: {
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
-  btnInstallPwaText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+  btnInstallPwaTextBlack: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
 
   // Floating Bottom Yellow CTA (Screen 0)

@@ -762,90 +762,316 @@
       padding: 16px;
     }
 
-    .pass-card {
+    /* New Pass Styles (Image 2 Redesign) */
+    .pass-nav-circle-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
       background: #FFFFFF;
-      border: 1.5px solid var(--risev-border);
-      border-radius: 22px;
-      padding: 20px;
-    }
-
-    .pass-badge {
-      display: inline-flex;
+      border: 1px solid #E2E8F0;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      background: #DCFCE7;
-      padding: 4px 10px;
-      border-radius: 8px;
-      font-size: 10px;
-      font-weight: 800;
-      color: #15803D;
-      margin-bottom: 12px;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      color: #0F172A;
     }
 
-    .pass-badge-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 3px;
-      background: #16A34A;
-    }
-
-    .pass-title {
-      font-size: 20px;
+    .pass-hero-title {
+      font-size: 26px;
       font-weight: 800;
       color: #0F172A;
-      margin-bottom: 14px;
+      margin-top: 2px;
+      line-height: 1.2;
     }
 
-    .countdown-banner {
-      background: var(--risev-yellow-light);
-      border: 1px solid var(--risev-yellow);
-      border-radius: 14px;
-      padding: 12px;
-      text-align: center;
-      margin-bottom: 16px;
-    }
-
-    .countdown-banner span {
-      font-size: 11px;
+    .pass-hero-subtitle {
+      font-size: 14px;
       color: #64748B;
-      display: block;
+      margin-top: 2px;
+      font-weight: 500;
     }
 
-    .countdown-banner strong {
-      font-size: 17px;
+    .pass-calendar-graphic {
+      position: relative;
+      width: 64px;
+      height: 64px;
+    }
+
+    .pass-calendar-graphic .sunburst {
+      position: absolute;
+      top: -8px;
+      right: -4px;
+      font-size: 16px;
+      z-index: 2;
+    }
+
+    .pass-calendar-graphic .calendar-box {
+      width: 52px;
+      height: 52px;
+      background: #FFFFFF;
+      border-radius: 14px;
+      border: 2px solid #FEF08A;
+      box-shadow: 0 8px 16px rgba(250, 204, 21, 0.25);
+      transform: rotate(6deg);
+      padding: 4px;
+      position: relative;
+    }
+
+    .pass-calendar-graphic .cal-header {
+      height: 12px;
+      background: #FEF08A;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-around;
+      padding: 0 6px;
+    }
+
+    .pass-calendar-graphic .cal-ring {
+      width: 4px;
+      height: 8px;
+      border-radius: 2px;
+      background: #EAB308;
+      margin-top: -3px;
+    }
+
+    .pass-calendar-graphic .cal-body {
+      height: 28px;
+      background: #FFFBEA;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+
+    .pass-calendar-graphic .cal-check {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 11px;
+      background: #FACC15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
       font-weight: 800;
       color: #000000;
-      margin-top: 2px;
-      display: block;
+      border: 1.5px solid #FFFFFF;
     }
 
-    .pass-grid {
-      border-top: 1px solid var(--risev-border);
-      border-bottom: 1px solid var(--risev-border);
-      padding: 14px 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+    .pass-main-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
       margin-bottom: 16px;
     }
 
-    .pass-grid-item .lbl { font-size: 11px; color: #64748B; }
-    .pass-grid-item .val { font-size: 13px; font-weight: 700; color: #0F172A; margin-top: 2px; }
+    .pass-service-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
 
-    .btn-arrived-action {
-      width: 100%;
-      padding: 14px;
-      background: var(--risev-yellow);
-      border: none;
+    .pass-service-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 15px;
+      background: #FEF9C3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .pass-lbl { font-size: 11px; color: #64748B; font-weight: 500; }
+    .pass-service-name { font-size: 18px; font-weight: 800; color: #0F172A; margin-top: 1px; }
+
+    .pass-divider {
+      height: 1px;
+      background: #F1F5F9;
+      margin: 14px 0;
+    }
+
+    .pass-datetime-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pass-icon-grey {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      background: #F8FAFC;
+      border: 1px solid #F1F5F9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .pass-val-bold { font-size: 13px; font-weight: 700; color: #0F172A; }
+
+    .pass-countdown-pill {
+      background: #FFFBEA;
+      border: 1px solid #FEF08A;
       border-radius: 16px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pass-clock-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 15px;
+      background: #FEF08A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 14px;
+    }
+
+    .pass-pill-lbl { font-size: 10px; color: #854D0E; font-weight: 500; }
+    .pass-pill-val { font-size: 13px; font-weight: 800; color: #D97706; }
+
+    .pass-provider-branch-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .pass-vdivider {
+      width: 1px;
+      height: 34px;
+      background: #E2E8F0;
+      margin: 0 10px;
+    }
+
+    .pass-stepper-bar {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 30px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+
+    .stepper-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stepper-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .stepper-circle.completed { background: #FFC700; color: #000; }
+    .stepper-circle.active { background: #FFC700; color: #000; box-shadow: 0 0 10px rgba(255, 199, 0, 0.5); }
+    .stepper-circle.muted { background: #F1F5F9; color: #94A3B8; }
+
+    .stepper-lbl { font-size: 11px; }
+    .stepper-lbl.completed { font-weight: 700; color: #0F172A; }
+    .stepper-lbl.active { font-weight: 800; color: #000000; }
+    .stepper-lbl.muted { font-weight: 500; color: #94A3B8; }
+
+    .stepper-line {
+      flex: 1;
+      height: 3px;
+      background: #E2E8F0;
+      border-radius: 2px;
+      margin: 0 8px;
+    }
+    .stepper-line.active { background: #FFC700; }
+
+    .btn-arrived-gradient {
+      width: 100%;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #FFE033 0%, #FFB800 100%);
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
       font-weight: 800;
       color: #000000;
       cursor: pointer;
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-arrived-pin {
+      width: 34px;
+      height: 34px;
+      border-radius: 17px;
+      background: #000000;
+      display: flex;
+      align-items: center;
       justify-content: center;
-      gap: 8px;
+      font-size: 14px;
+    }
+
+    .btn-arrived-arrow {
+      font-size: 18px;
+    }
+
+    .arrived-subtext {
+      font-size: 12px;
+      color: #64748B;
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 16px;
+    }
+
+    .pwa-install-box {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .pwa-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: #FEF9C3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .pwa-title { font-size: 13px; font-weight: 700; color: #0F172A; }
+    .pwa-sub { font-size: 11px; color: #64748B; margin-top: 1px; }
+
+    .btn-install-yellow {
+      background: #FFC700;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #000000;
+      cursor: pointer;
     }
 
     /* Sticky Dark Action Bar */
@@ -890,10 +1116,151 @@
       background: var(--risev-yellow);
       border: none;
       border-radius: 16px;
+    /* Upcoming Ticket Stub Banner CSS (Matching Image 2) */
+    .upcoming-ticket-stub {
+      background: #FAF7F2;
+      border: 1.5px solid #F3EBE0;
+      border-radius: 22px;
+      padding: 14px 16px;
+      margin: 14px 16px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+
+    .ticket-notch-left {
+      position: absolute;
+      left: -10px;
+      top: 50%;
+      margin-top: -10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: #FAF8F5;
+      border: 1.5px solid #F3EBE0;
+      z-index: 5;
+    }
+
+    .ticket-notch-right {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      margin-top: -10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: #FAF8F5;
+      border: 1.5px solid #F3EBE0;
+      z-index: 5;
+    }
+
+    .ticket-left-info {
+      flex: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ticket-icon-box {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: #FEF3C7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .ticket-check-dot {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      background: #16A34A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #FFFFFF;
+      border: 1.5px solid #FFFFFF;
+    }
+
+    .ticket-tagline {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #64748B;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .ticket-date-title {
       font-size: 15px;
+      font-weight: 800;
+      color: #0F172A;
+      line-height: 1.2;
+    }
+
+    .ticket-time-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.2;
+    }
+
+    .ticket-loc-row {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748B;
+      margin-top: 4px;
+    }
+
+    .ticket-v-line {
+      width: 1px;
+      height: 54px;
+      border-left: 1.5px dashed #E8DED1;
+      margin: 0 10px;
+    }
+
+    .ticket-right-stub {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .ticket-pass-badge {
+      background: #FEF9C3;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 9px;
+      font-weight: 800;
+      color: #854D0E;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-ticket-view-pass {
+      background: #FFC700;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
       font-weight: 800;
       color: #000000;
       cursor: pointer;
+      box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
     }
   </style>
 </head>
@@ -964,6 +1331,35 @@
             <span>•</span>
             <span class="tag-chip-sm">Artisanal</span>
             <span class="tag-chip-sm">Dine-In</span>
+          </div>
+
+          <!-- Upcoming Appointment Ticket Stub (Image 2 Redesign) -->
+          <div class="upcoming-ticket-stub" onclick="switchStep(4)">
+            <div class="ticket-notch-left"></div>
+            <div class="ticket-notch-right"></div>
+            
+            <div class="ticket-left-info">
+              <div class="ticket-icon-box">
+                📅
+                <div class="ticket-check-dot">✓</div>
+              </div>
+              <div>
+                <div class="ticket-tagline">UPCOMING APPOINTMENT</div>
+                <div class="ticket-date-title">Thu, 8 Oct 2026</div>
+                <div class="ticket-time-title">03:30 PM</div>
+                <div class="ticket-loc-row">📍 Risev Official Merchant (HQ)</div>
+              </div>
+            </div>
+
+            <div class="ticket-v-line"></div>
+
+            <div class="ticket-right-stub">
+              <div class="ticket-pass-badge">BOOKING PASS</div>
+              <button class="btn-ticket-view-pass">
+                <span>View Pass</span>
+                <span>›</span>
+              </button>
+            </div>
           </div>
 
           <div class="profile-tabs-strip">
@@ -1174,41 +1570,136 @@
       <!-- =================================================== -->
       <div id="step-4" class="step-pane">
         <div class="pass-container">
-          <div class="pass-card">
-            <div class="pass-badge">
-              <div class="pass-badge-dot"></div>
-              <span>BOOKING CONFIRMED</span>
-            </div>
-            <div class="pass-title">Appointment Pass</div>
-
-            <div class="countdown-banner">
-              <span>Your appointment starts in:</span>
-              <strong>24 Mins 30 Secs</strong>
-            </div>
-
-            <div class="pass-grid">
-              <div class="pass-grid-item">
-                <div class="lbl">Service</div>
-                <div class="val">Double Scoop Artisanal Gelato</div>
-              </div>
-              <div class="pass-grid-item">
-                <div class="lbl">Provider</div>
-                <div class="val">Any Provider</div>
-              </div>
-              <div class="pass-grid-item">
-                <div class="lbl">Slot Time</div>
-                <div class="val">Tue, 5 Oct @ 11:00 AM</div>
-              </div>
-              <div class="pass-grid-item">
-                <div class="lbl">Branch</div>
-                <div class="val">Bangi Sentral</div>
-              </div>
-            </div>
-
-            <button class="btn-arrived-action" onclick="alert('Arrival confirmed!')">
-              📍 I HAVE ARRIVED
+          <!-- Top Header Nav Row -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <button class="pass-nav-circle-btn" onclick="switchStep(0)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="pass-nav-circle-btn" onclick="alert('Options')">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
             </button>
           </div>
+
+          <!-- Header Hero Title & 3D Illustration -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <div class="pass-badge">
+                <div class="pass-badge-dot"></div>
+                <span>BOOKING CONFIRMED</span>
+              </div>
+              <div class="pass-hero-title">Appointment Pass</div>
+              <div class="pass-hero-subtitle">Your appointment is ready.</div>
+            </div>
+            <!-- 3D Calendar Graphic -->
+            <div class="pass-calendar-graphic">
+              <div class="sunburst">✨</div>
+              <div class="calendar-box">
+                <div class="cal-header">
+                  <div class="cal-ring"></div>
+                  <div class="cal-ring"></div>
+                </div>
+                <div class="cal-body"></div>
+                <div class="cal-check">✓</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Appointment Card -->
+          <div class="pass-main-card">
+            <!-- Service Row -->
+            <div class="pass-service-row">
+              <div class="pass-service-icon">✂️</div>
+              <div>
+                <div class="pass-lbl">Service</div>
+                <div class="pass-service-name">Fade Cut</div>
+              </div>
+            </div>
+
+            <div class="pass-divider"></div>
+
+            <!-- Date & Time + Countdown Row -->
+            <div class="pass-datetime-row">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="pass-icon-grey">📅</div>
+                <div>
+                  <div class="pass-lbl">Date & Time</div>
+                  <div class="pass-val-bold">Thu, 8 Oct 2026</div>
+                  <div class="pass-val-bold">03:30 PM</div>
+                </div>
+              </div>
+              <div class="pass-countdown-pill">
+                <div class="pass-clock-icon">⏰</div>
+                <div>
+                  <div class="pass-pill-lbl">Starts in</div>
+                  <div class="pass-pill-val">24 Mins 30 Secs</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pass-divider"></div>
+
+            <!-- Provider & Branch Row -->
+            <div class="pass-provider-branch-row">
+              <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                <div class="pass-icon-grey">👤</div>
+                <div>
+                  <div class="pass-lbl">Provider</div>
+                  <div class="pass-val-bold">Any Provider</div>
+                </div>
+              </div>
+
+              <div class="pass-vdivider"></div>
+
+              <div style="flex: 1.2; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="pass-icon-grey">🏪</div>
+                  <div>
+                    <div class="pass-lbl">Branch</div>
+                    <div class="pass-val-bold">Risev Official Merchant (HQ)</div>
+                  </div>
+                </div>
+                <span style="color: #94A3B8; font-weight: 700; font-size: 16px;">›</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stepper Progress Bar Pill -->
+          <div class="pass-stepper-bar">
+            <div class="stepper-step">
+              <div class="stepper-circle completed">✓</div>
+              <div class="stepper-lbl completed">Booked</div>
+            </div>
+            <div class="stepper-line active"></div>
+            <div class="stepper-step">
+              <div class="stepper-circle active">📍</div>
+              <div class="stepper-lbl active">Arrive</div>
+            </div>
+            <div class="stepper-line"></div>
+            <div class="stepper-step">
+              <div class="stepper-circle muted">✂️</div>
+              <div class="stepper-lbl muted">Service</div>
+            </div>
+          </div>
+
+          <!-- Primary Action Button: I HAVE ARRIVED -->
+          <button class="btn-arrived-gradient" onclick="alert('Arrival confirmed!')">
+            <div class="btn-arrived-pin">📍</div>
+            <span style="letter-spacing: 0.5px;">I HAVE ARRIVED</span>
+            <div class="btn-arrived-arrow">➔</div>
+          </button>
+
+          <div class="arrived-subtext">Tap the button below as soon as you step inside the store.</div>
+
+          <!-- Save App PWA Box -->
+          <div class="pwa-install-box">
+            <div class="pwa-icon">📱</div>
+            <div style="flex: 1;">
+              <div class="pwa-title">Save Risev Official Merchant App</div>
+              <div class="pwa-sub">Get instant slot reminders & fast re-booking</div>
+            </div>
+            <button class="btn-install-yellow" onclick="alert('Add to Home Screen')">Install</button>
+          </div>
+
         </div>
       </div>
 
