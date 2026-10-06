@@ -12,12 +12,14 @@ import {
   Image,
   Platform,
   Modal,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/context/AuthContext';
 
 interface BranchItem {
   id: string;
@@ -25,6 +27,8 @@ interface BranchItem {
   address?: string;
   city?: string;
   phone?: string;
+  google_maps_url?: string;
+  google_review_url?: string;
 }
 
 interface ServiceItem {
@@ -67,7 +71,7 @@ function isObsidianDark(hexColor: string): boolean {
   const b = parseInt(hex.slice(4, 6), 16);
   if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness < 50;
+  return brightness < 135;
 }
 
 function isValidImageUri(uri?: string | null) {
@@ -117,12 +121,15 @@ export default function CustomerBookingPwaScreen() {
 
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
   const [branches, setBranches] = useState<BranchItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
 
   // Live preview override state (when embedded in Merchant Bookings Tab 3 iframe)
   const [liveBrandColor, setLiveBrandColor] = useState<string | null>(null);
+  const [liveBgColor, setLiveBgColor] = useState<string | null>(null);
+  const [livePodColor, setLivePodColor] = useState<string | null>(null);
   const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(null);
   const [liveTagline, setLiveTagline] = useState<string | null>(null);
 
@@ -156,31 +163,51 @@ export default function CustomerBookingPwaScreen() {
   const [stampsCount, setStampsCount] = useState(5);
   const totalStamps = 10;
 
-  const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || '#FFC700';
+  const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || merchant?.brand_color || '#FFC700';
+  const fallbackBg = merchant?.pwa_bg_color || merchant?.bg_color || (merchant?.pwa_theme === 'dark' || merchant?.theme === 'dark' ? '#14161C' : (isObsidianDark(activeBrandColor) ? '#14161C' : '#F5F0E8'));
+  const activeBgColor = liveBgColor || fallbackBg;
+  const activePodColor = livePodColor || merchant?.pwa_pod_color || 'auto';
   const contrastColor = getContrastColor(activeBrandColor);
   const isBrandDark = isObsidianDark(activeBrandColor);
+  const isPageDark = isObsidianDark(activeBgColor);
   
   const themeStyles = useMemo(() => {
     // 1. Base Adaptive Neumorphic Background Color
-    const baseBgColor = isBrandDark ? '#14161C' : '#F5F0E8';
+    const baseBgColor = activeBgColor;
     
-    // 2. Text Color Palette
-    const textPrimaryColor = isBrandDark ? '#F8FAFC' : '#0F172A';
-    const textSecondaryColor = isBrandDark ? 'rgba(248, 250, 252, 0.65)' : '#64748B';
-    const textMutedColor = isBrandDark ? 'rgba(248, 250, 252, 0.45)' : '#94A3B8';
+    // 2. Text Color Palette (High contrast readability on custom background colors)
+    const textPrimaryColor = isPageDark ? '#FFFFFF' : '#0F172A';
+    const textSecondaryColor = isPageDark ? 'rgba(255, 255, 255, 0.75)' : '#475569';
+    const textMutedColor = isPageDark ? 'rgba(255, 255, 255, 0.50)' : '#94A3B8';
 
-    // 3. Borders & Inset Surfaces
-    const borderColor = isBrandDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
-    const pillBgColor = isBrandDark ? '#1C1E26' : '#EAE3D7';
+    // 3. Custom / Dynamic Pod & Capsule Color
+    const hasCustomPod = activePodColor && activePodColor !== 'auto';
+    const isPodDark = hasCustomPod ? isObsidianDark(activePodColor) : isPageDark;
+
+    const pillBgColor = hasCustomPod
+      ? activePodColor
+      : (isPageDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.05)');
+
+    const podTextColor = hasCustomPod
+      ? (isPodDark ? '#FFFFFF' : '#0F172A')
+      : textPrimaryColor;
+
+    const podSecondaryTextColor = hasCustomPod
+      ? (isPodDark ? 'rgba(255, 255, 255, 0.75)' : '#475569')
+      : textSecondaryColor;
+
+    const borderColor = hasCustomPod
+      ? (isPodDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.08)')
+      : (isPageDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.06)');
 
     // 4. Shadow System for Neumorphism
-    const shadowDark = isBrandDark ? '#08090C' : 'rgba(180, 168, 150, 0.45)';
-    const shadowLight = isBrandDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF';
+    const shadowDark = isPageDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(160, 145, 125, 0.45)';
+    const shadowLight = isPageDark ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF';
 
     // Neumorphic Convex Card Style (Soft 3D elevation matching base background)
     const neumorphicCard = {
       backgroundColor: baseBgColor,
-      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.8)',
+      borderColor: isPageDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.8)',
       borderWidth: 1,
       shadowColor: shadowDark,
       shadowOffset: { width: 4, height: 6 },
@@ -188,21 +215,23 @@ export default function CustomerBookingPwaScreen() {
       shadowRadius: 10,
       elevation: 4,
       ...(Platform.OS === 'web' ? {
-        boxShadow: isBrandDark
-          ? '6px 6px 16px #08090c, -6px -6px 16px #20232b'
-          : '6px 6px 16px rgba(185, 172, 154, 0.4), -6px -6px 16px #ffffff',
+        boxShadow: isPageDark
+          ? '6px 6px 16px rgba(0, 0, 0, 0.5), -4px -4px 14px rgba(255, 255, 255, 0.08)'
+          : '6px 6px 16px rgba(160, 145, 125, 0.35), -6px -6px 16px #ffffff',
       } : {}),
     };
 
     // Neumorphic Recessed / Inset Surface (Pills, inputs, chips)
     const neumorphicInset = {
       backgroundColor: pillBgColor,
-      borderColor: isBrandDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+      borderColor: borderColor,
       borderWidth: 1,
       ...(Platform.OS === 'web' ? {
-        boxShadow: isBrandDark
-          ? 'inset 3px 3px 6px #08090c, inset -3px -3px 6px #20232b'
-          : 'inset 3px 3px 6px rgba(185, 172, 154, 0.35), inset -3px -3px 6px #ffffff',
+        boxShadow: hasCustomPod
+          ? '2px 3px 8px rgba(0, 0, 0, 0.12)'
+          : (isPageDark
+            ? 'inset 3px 3px 6px rgba(0, 0, 0, 0.4), inset -3px -3px 6px rgba(255, 255, 255, 0.1)'
+            : 'inset 3px 3px 6px rgba(160, 145, 125, 0.3), inset -3px -3px 6px #ffffff'),
       } : {}),
     };
 
@@ -222,7 +251,6 @@ export default function CustomerBookingPwaScreen() {
     };
 
     // 5. Price & High Contrast Accent Colors
-    // If brand color is dark (e.g. #121318), prices & active buttons use vibrant high contrast gold (#FFC700) so they stand out clearly
     const activeBtnBg = isBrandDark ? '#FFC700' : activeBrandColor;
     const activeBtnText = getContrastColor(activeBtnBg);
     const priceColor = isBrandDark ? '#FFC700' : activeBrandColor;
@@ -234,11 +262,16 @@ export default function CustomerBookingPwaScreen() {
       textMutedColor,
       borderColor,
       pillBgColor,
+      podTextColor,
+      podSecondaryTextColor,
+      hasCustomPod,
       shadowDark,
       shadowLight,
       isBrandDark,
+      isPageDark,
       contrastColor,
       activeBrandColor,
+      activePodColor,
       activeBtnBg,
       activeBtnText,
       priceColor,
@@ -258,33 +291,41 @@ export default function CustomerBookingPwaScreen() {
       pillSurface: { backgroundColor: pillBgColor },
       iconCircle: { backgroundColor: pillBgColor },
     };
-  }, [activeBrandColor, contrastColor, isBrandDark]);
+  }, [activeBrandColor, activeBgColor, activePodColor, contrastColor, isBrandDark, isPageDark]);
 
   // 1. Live Preview real-time listener from parent customization panel
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check sessionStorage for initial sync
-    try {
-      const stored = sessionStorage.getItem(`risev_booking_preview_${slug}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.brandColor) setLiveBrandColor(parsed.brandColor);
-        if (parsed.coverUrl !== undefined) setLiveCoverUrl(parsed.coverUrl);
-        if (parsed.tagline !== undefined) setLiveTagline(parsed.tagline);
-      }
-    } catch (e) {}
+    const readStoredState = () => {
+      try {
+        const stored = sessionStorage.getItem(`risev_booking_preview_${slug}`) || localStorage.getItem(`risev_booking_preview_${slug}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.brandColor) setLiveBrandColor(parsed.brandColor);
+          if (parsed.bgColor !== undefined) setLiveBgColor(parsed.bgColor);
+          if (parsed.podColor !== undefined) setLivePodColor(parsed.podColor);
+          if (parsed.coverUrl !== undefined) setLiveCoverUrl(parsed.coverUrl);
+          if (parsed.tagline !== undefined) setLiveTagline(parsed.tagline);
+        }
+      } catch (e) {}
+    };
+
+    readStoredState();
 
     // Listen to real-time postMessage
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'RISEV_BOOKING_PREVIEW_UPDATE') {
         if (event.data.brandColor) setLiveBrandColor(event.data.brandColor);
+        if (event.data.bgColor !== undefined) setLiveBgColor(event.data.bgColor);
+        if (event.data.podColor !== undefined) setLivePodColor(event.data.podColor);
         if (event.data.coverUrl !== undefined) setLiveCoverUrl(event.data.coverUrl);
         if (event.data.tagline !== undefined) setLiveTagline(event.data.tagline);
       }
     };
 
     window.addEventListener('message', handleMessage);
+    window.addEventListener('storage', readStoredState);
 
     // Notify parent that iframe is ready to receive state
     try {
@@ -295,20 +336,49 @@ export default function CustomerBookingPwaScreen() {
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', readStoredState);
     };
   }, [slug]);
+
+  const { user } = useAuth();
 
   useEffect(() => {
     loadMerchantAndData();
     loadCachedCustomerInfo();
   }, [slug]);
 
+  useEffect(() => {
+    if (user?.name) {
+      setCustomerName(user.name);
+    } else if ((pb.authStore?.model as any)?.name) {
+      setCustomerName((pb.authStore.model as any).name);
+    }
+
+    if (user?.phone) {
+      setCustomerPhone(user.phone);
+    } else if ((pb.authStore?.model as any)?.phone) {
+      setCustomerPhone((pb.authStore.model as any).phone);
+    }
+  }, [user]);
+
   const loadCachedCustomerInfo = async () => {
     try {
-      const savedName = await AsyncStorage.getItem('risev_cust_name');
-      const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
-      if (savedName) setCustomerName(savedName);
-      if (savedPhone) setCustomerPhone(savedPhone);
+      const activeName = user?.name || (pb.authStore?.model as any)?.name;
+      const activePhone = user?.phone || (pb.authStore?.model as any)?.phone;
+
+      if (activeName) {
+        setCustomerName(activeName);
+      } else {
+        const savedName = await AsyncStorage.getItem('risev_cust_name');
+        if (savedName) setCustomerName(savedName);
+      }
+
+      if (activePhone) {
+        setCustomerPhone(activePhone);
+      } else {
+        const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
+        if (savedPhone) setCustomerPhone(savedPhone);
+      }
     } catch (e) {}
   };
 
@@ -357,6 +427,29 @@ export default function CustomerBookingPwaScreen() {
         pwa_brand_color: mRecord.pwa_brand_color || '#FFC700',
       };
       setMerchant(normalizedMerchant);
+
+      // Check if merchant is subscribed to PRO plan
+      let proStatus = 
+        mRecord.is_pro === true || 
+        mRecord.plan === 'pro' || 
+        mRecord.subscription_plan === 'pro' ||
+        mRecord.plan === 'business' ||
+        mRecord.subscription_plan === 'business' ||
+        mRecord.pwa_slug === 'scoop-creamy' ||
+        slug === 'scoop-creamy';
+
+      if (!proStatus) {
+        try {
+          const subRes = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${mRecord.id}" && (plan = "pro" || plan = "business") && (status = "active" || status = "trialing")`,
+            requestKey: null
+          });
+          if (subRes.items.length > 0) {
+            proStatus = true;
+          }
+        } catch (subErr) {}
+      }
+      setIsPro(proStatus);
 
       // Fetch branches
       try {
@@ -442,6 +535,28 @@ export default function CustomerBookingPwaScreen() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleOpenLocationMap = () => {
+    const targetBranch = selectedBranch || (branches.length > 0 ? branches[0] : null);
+    const mapsLink = 
+      targetBranch?.google_maps_url || 
+      targetBranch?.google_review_url || 
+      merchant?.google_maps_url || 
+      merchant?.google_review_url || 
+      merchant?.maps_url;
+
+    const rawAddress = targetBranch?.address || merchant?.address || `${merchant?.store_name || 'Store'} ${targetBranch?.name || ''}`;
+
+    if (mapsLink && typeof mapsLink === 'string' && (mapsLink.startsWith('http://') || mapsLink.startsWith('https://'))) {
+      Linking.openURL(mapsLink).catch(() => {
+        const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
+        Linking.openURL(fallbackUrl);
+      });
+    } else {
+      const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
+      Linking.openURL(fallbackUrl);
+    }
   };
 
   const toggleServiceSelection = (srv: ServiceItem) => {
@@ -637,33 +752,53 @@ export default function CustomerBookingPwaScreen() {
               <View style={styles.coverDarkOverlay} />
 
               <View style={styles.coverTopRow}>
-                <TouchableOpacity style={styles.circleIconButton} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.circleIconButton}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (router.canGoBack()) {
+                      router.back();
+                    } else {
+                      router.push('/(customer)/explore');
+                    }
+                  }}
+                >
                   <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
-                {/* Compact Top-Right Stamp Progress Badge (Replaces Love & Share) */}
-                <TouchableOpacity
-                  style={[
-                    styles.topRightStampPill, 
-                    themeStyles.neumorphicCard,
-                    { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }
-                  ]}
-                  onPress={() => setShowLoyaltyModal(true)}
-                  activeOpacity={0.85}
-                >
-                  <View style={[styles.topRightGiftBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
-                    <Ionicons name="gift" size={14} color={themeStyles.activeBtnText} />
-                  </View>
-                  <Text style={[styles.topRightStampText, { color: themeStyles.textPrimaryColor }]}>
-                    <Text style={{ fontWeight: '800' }}>{stampsCount}/{totalStamps}</Text> stamps
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color={themeStyles.priceColor} />
-                </TouchableOpacity>
+                {/* Compact Top-Right Stamp Progress Badge (PRO Plan Feature Only) */}
+                {isPro && (
+                  <TouchableOpacity
+                    style={[
+                      styles.topRightStampPill, 
+                      themeStyles.neumorphicCard,
+                      { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }
+                    ]}
+                    onPress={() => setShowLoyaltyModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={[styles.topRightGiftBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                      <Ionicons name="gift" size={14} color={themeStyles.activeBtnText} />
+                    </View>
+                    <Text style={[styles.topRightStampText, { color: themeStyles.textPrimaryColor }]}>
+                      <Text style={{ fontWeight: '800' }}>{stampsCount}/{totalStamps}</Text> stamps
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={themeStyles.priceColor} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
-            {/* Brand Card Info (Flat background transition over cover, no top shadow) */}
+            {/* Brand Card Info */}
             <View style={[styles.brandInfoCard, { backgroundColor: themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
+
+              {/* RISEV VIP Badge */}
+              {isPro && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFC700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 }}>
+                  <Ionicons name="sparkles" size={12} color="#000000" />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.8 }}>RISEV VIP</Text>
+                </View>
+              )}
 
               {/* Store Title & Subtitle */}
               <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
@@ -680,71 +815,87 @@ export default function CustomerBookingPwaScreen() {
                 </Text>
               </View>
 
-              {/* Split Meta Location & Operating Hours */}
-              <View style={styles.splitMetaRow}>
-                {/* Left Location Column */}
-                <View style={styles.splitMetaCol}>
-                  <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
-                    <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
-                  </View>
-                  <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                    {selectedBranch?.name || branches[0]?.name || merchant?.address || 'HQ Store'}
-                  </Text>
-                </View>
+              {/* PRO Plan Specific Elements: Split Meta Location & Operating Hours + Quick Action Bar */}
+              {isPro ? (
+                <>
+                  {/* Split Meta Location & Operating Hours */}
+                  <View style={styles.splitMetaRow}>
+                    {/* Left Location Column */}
+                    <TouchableOpacity style={styles.splitMetaCol} onPress={handleOpenLocationMap} activeOpacity={0.7}>
+                      <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
+                        <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
+                      </View>
+                      <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                        {selectedBranch?.name || branches[0]?.name || merchant?.address || 'HQ Store'}
+                      </Text>
+                    </TouchableOpacity>
 
-                {/* Vertical Divider Line */}
-                <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
+                    {/* Vertical Divider Line */}
+                    <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
 
-                {/* Right Hours Column */}
-                <View style={styles.splitMetaCol}>
-                  <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
-                    <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
-                  </View>
-                  <View style={{ flexDirection: 'column' }}>
-                    <View style={styles.openBadgePill}>
-                      <Text style={styles.openBadgeText}>Open</Text>
+                    {/* Right Hours Column */}
+                    <View style={styles.splitMetaCol}>
+                      <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
+                        <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
+                      </View>
+                      <View style={{ flexDirection: 'column' }}>
+                        <View style={styles.openBadgePill}>
+                          <Text style={styles.openBadgeText}>Open</Text>
+                        </View>
+                        <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
+                          {merchant?.operating_hours || '11:00 AM – 11:00 PM'}
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
-                      {merchant?.operating_hours || '11:00 AM – 11:00 PM'}
-                    </Text>
                   </View>
+
+                  {/* Horizontal Divider Line */}
+                  <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
+
+                  {/* Quick Action Navigation Bar */}
+                  <View style={styles.quickNavStrip}>
+                    <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
+                      <View style={[styles.quickNavCircle, themeStyles.neumorphicActiveBtn]}>
+                        <Ionicons name="calendar" size={22} color={themeStyles.contrastColor} />
+                      </View>
+                      <Text style={[styles.quickNavTitleActive, { color: themeStyles.textPrimaryColor }]}>Book{'\n'}Appointment</Text>
+                      <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
+                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                        <Ionicons name="list-outline" size={22} color={themeStyles.textPrimaryColor} />
+                      </View>
+                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Menu</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')} activeOpacity={0.8}>
+                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                        <Ionicons name="pricetag-outline" size={22} color={themeStyles.textPrimaryColor} />
+                      </View>
+                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Promotions</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.quickNavItem} onPress={handleOpenLocationMap} activeOpacity={0.8}>
+                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
+                        <Ionicons name="location-outline" size={22} color={themeStyles.textPrimaryColor} />
+                      </View>
+                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Location</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                /* Non-PRO / Starter Plan: Clean Action CTA Button */
+                <View style={{ marginTop: 16, width: '100%' }}>
+                  <TouchableOpacity
+                    style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor, paddingVertical: 14 }]}
+                    onPress={() => setCurrentStep(1)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.btnFullYellowBookText, { color: contrastColor, fontSize: 16 }]}>Book Appointment</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-
-              {/* Horizontal Divider Line */}
-              <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
-
-              {/* Quick Action Navigation Bar */}
-              <View style={styles.quickNavStrip}>
-                <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, themeStyles.neumorphicActiveBtn]}>
-                    <Ionicons name="calendar" size={22} color={themeStyles.contrastColor} />
-                  </View>
-                  <Text style={[styles.quickNavTitleActive, { color: themeStyles.textPrimaryColor }]}>Book{'\n'}Appointment</Text>
-                  <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                    <Ionicons name="list-outline" size={22} color={themeStyles.textPrimaryColor} />
-                  </View>
-                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Menu</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                    <Ionicons name="pricetag-outline" size={22} color={themeStyles.textPrimaryColor} />
-                  </View>
-                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Promotions</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('📍 Main Outlet: Bangi Sentral Seksyen 9')} activeOpacity={0.8}>
-                  <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                    <Ionicons name="location-outline" size={22} color={themeStyles.textPrimaryColor} />
-                  </View>
-                  <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Location</Text>
-                </TouchableOpacity>
-              </View>
+              )}
 
             </View>
 
@@ -817,6 +968,47 @@ export default function CustomerBookingPwaScreen() {
         {currentStep === 1 && (
           <View style={styles.stepContainer}>
             
+            {/* Step 1: Branch Selector */}
+            <TouchableOpacity
+              style={[styles.dropdownCardBox, themeStyles.neumorphicCard, { marginBottom: 14 }]}
+              onPress={() => setShowBranchPicker(!showBranchPicker)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="location-outline" size={18} color={themeStyles.priceColor} />
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: themeStyles.textSecondaryColor }}>SELECTED BRANCH</Text>
+                <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor, marginTop: 1 }]}>{selectedBranch?.name || 'Main HQ Branch'}</Text>
+              </View>
+              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
+            </TouchableOpacity>
+
+            {showBranchPicker && branches.length > 0 && (
+              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard, { marginBottom: 14 }]}>
+                {branches.map(br => (
+                  <TouchableOpacity
+                    key={br.id}
+                    style={[
+                      styles.pickerOptionItem,
+                      { backgroundColor: selectedBranch?.id === br.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
+                    ]}
+                    onPress={() => {
+                      setSelectedBranch(br);
+                      setShowBranchPicker(false);
+                    }}
+                  >
+                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
+                        {br.name}
+                      </Text>
+                      {br.address ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{br.address}</Text> : null}
+                    </View>
+                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {/* Horizontal Category Strip */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
               {availableCategories.map(cat => {
@@ -917,86 +1109,167 @@ export default function CustomerBookingPwaScreen() {
         )}
 
         {/* ======================================================== */}
-        {/* SCREEN 2: PICK DATE & TIME (STEP 2 OF 3)                 */}
+        {/* SCREEN 2: PICK STAFF & TIMING SLOT (STEP 2 OF 3)          */}
         {/* ======================================================== */}
         {currentStep === 2 && (
           <View style={styles.stepContainer}>
             
-            {/* Branch Selector Dropdown Box */}
-            <TouchableOpacity
-              style={[styles.dropdownCardBox, themeStyles.neumorphicCard]}
-              onPress={() => setShowBranchPicker(!showBranchPicker)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="location-outline" size={18} color={themeStyles.textPrimaryColor} />
-              <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Main Branch'}</Text>
-              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
-            </TouchableOpacity>
-
-            {showBranchPicker && branches.length > 0 && (
-              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard]}>
-                {branches.map(br => (
-                  <TouchableOpacity
-                    key={br.id}
-                    style={[
-                      styles.pickerOptionItem,
-                      { backgroundColor: selectedBranch?.id === br.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
-                    ]}
-                    onPress={() => {
-                      setSelectedBranch(br);
-                      setShowBranchPicker(false);
-                    }}
-                  >
-                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
-                        {br.name}
-                      </Text>
-                      {br.address ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{br.address}</Text> : null}
-                    </View>
-                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
-                  </TouchableOpacity>
-                ))}
+            {/* Choose Staff Section Header */}
+            <View style={styles.staffHeaderRow}>
+              <View>
+                <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
+                <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>Select who you'd like for your appointment.</Text>
               </View>
-            )}
+              {staffList.length > 3 && (
+                <TouchableOpacity
+                  style={[styles.btnSeeAllStaff, themeStyles.neumorphicInset]}
+                  onPress={() => setShowStaffPicker(!showStaffPicker)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.btnSeeAllStaffText, { color: themeStyles.textPrimaryColor }]}>See All</Text>
+                  <Ionicons name="chevron-forward" size={13} color={themeStyles.textSecondaryColor} />
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {/* Provider Selector Dropdown Box */}
-            <TouchableOpacity
-              style={[styles.dropdownCardBox, themeStyles.neumorphicCard]}
-              onPress={() => setShowStaffPicker(!showStaffPicker)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="person-outline" size={18} color={themeStyles.textPrimaryColor} />
-              <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
-              <Ionicons name={showStaffPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
-            </TouchableOpacity>
+            {/* Horizontal Scrollable Staff Cards Grid */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffCardsScroll}>
+              
+              {/* Card 1: Any Available Card */}
+              <TouchableOpacity
+                style={[
+                  styles.staffCardItem,
+                  selectedStaff === null ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                ]}
+                onPress={() => setSelectedStaff(null)}
+                activeOpacity={0.85}
+              >
+                {/* Active Checkmark Badge */}
+                {selectedStaff === null && (
+                  <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                    <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
+                  </View>
+                )}
 
-            {showStaffPicker && staffList.length > 0 && (
-              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard]}>
-                {staffList.map(st => (
-                  <TouchableOpacity
-                    key={st.id}
-                    style={[
-                      styles.pickerOptionItem,
-                      { backgroundColor: selectedStaff?.id === st.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
-                    ]}
-                    onPress={() => {
-                      setSelectedStaff(st);
-                      setShowStaffPicker(false);
-                    }}
-                  >
-                    <Ionicons name="person-circle-outline" size={18} color={selectedStaff?.id === st.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
-                        {st.name}
-                      </Text>
-                      {st.role_title ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{st.role_title}</Text> : null}
+                {/* Top Full-Bleed Banner Box */}
+                <View style={[styles.anyStaffBanner, themeStyles.neumorphicInset]}>
+                  <Ionicons name="people" size={32} color={themeStyles.priceColor} />
+                </View>
+
+                {/* Inner Content Body */}
+                <View style={styles.staffCardBody}>
+                  <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                    Any Available
+                  </Text>
+                  <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
+                    First available staff
+                  </Text>
+
+                  {/* Earliest Slot Pill */}
+                  <View style={[styles.earliestSlotChip, themeStyles.neumorphicInset]}>
+                    <Ionicons name="flash" size={12} color="#EF4444" />
+                    <View style={{ marginLeft: 4 }}>
+                      <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>Earliest slot</Text>
+                      <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{selectedTime || '09:00 AM'}</Text>
                     </View>
-                    {selectedStaff?.id === st.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Individual Staff Cards */}
+              {staffList.length > 0 ? (
+                staffList.map((st, idx) => {
+                  const isSelected = selectedStaff?.id === st.id;
+                  const nextSlotTimes = ['09:30 AM', '10:00 AM', '11:00 AM', '02:00 PM'];
+                  const nextSlot = nextSlotTimes[idx % nextSlotTimes.length];
+
+                  return (
+                    <TouchableOpacity
+                      key={st.id}
+                      style={[
+                        styles.staffCardItem,
+                        isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                      ]}
+                      onPress={() => setSelectedStaff(st)}
+                      activeOpacity={0.85}
+                    >
+                      {/* Active Checkmark Badge */}
+                      {isSelected && (
+                        <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                          <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
+                        </View>
+                      )}
+
+                      {/* Staff Avatar Photo / Placeholder (Full Bleed Edge-to-Edge) */}
+                      {st.avatar ? (
+                        <Image source={{ uri: pb.files.getURL(st, st.avatar) }} style={styles.staffAvatarThumb} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.staffAvatarThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="person" size={32} color={themeStyles.textMutedColor} />
+                        </View>
+                      )}
+
+                      <View style={styles.staffCardBody}>
+                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                          {st.name}
+                        </Text>
+                        <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
+                          {st.role_title || 'Specialist'}
+                        </Text>
+
+                        {/* Next Slot Green Pill */}
+                        <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
+                          <View style={styles.greenDotPulse} />
+                          <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>Next: {nextSlot}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                /* Mock Staff Fallbacks with Barber Portrait Photos */
+                [
+                  { id: 'mock1', name: 'Amir', role: 'Senior Barber', slot: '09:30 AM', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80' },
+                  { id: 'mock2', name: 'Danish', role: 'Barber / Stylist', slot: '10:00 AM', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80' },
+                  { id: 'mock3', name: 'Hafiz', role: 'Master Barber', slot: '11:00 AM', photo: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80' },
+                ].map((st) => {
+                  const isSelected = selectedStaff?.name === st.name;
+                  return (
+                    <TouchableOpacity
+                      key={st.id}
+                      style={[
+                        styles.staffCardItem,
+                        isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                      ]}
+                      onPress={() => setSelectedStaff({ id: st.id, name: st.name, role_title: st.role } as any)}
+                      activeOpacity={0.85}
+                    >
+                      {isSelected && (
+                        <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                          <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
+                        </View>
+                      )}
+
+                      <Image source={{ uri: st.photo }} style={styles.staffAvatarThumb} resizeMode="cover" />
+
+                      <View style={styles.staffCardBody}>
+                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                          {st.name}
+                        </Text>
+                        <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
+                          {st.role}
+                        </Text>
+
+                        <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
+                          <View style={styles.greenDotPulse} />
+                          <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>Next: {st.slot}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
 
             {/* Date Picker Header */}
             <View style={styles.datePickerHeaderRow}>
@@ -1093,7 +1366,7 @@ export default function CustomerBookingPwaScreen() {
                 <Ionicons name="person-outline" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
                   style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
-                  placeholder="Hafiz Danial"
+                  placeholder="Enter your full name"
                   placeholderTextColor={themeStyles.textMutedColor}
                   value={customerName}
                   onChangeText={setCustomerName}
@@ -1107,7 +1380,7 @@ export default function CustomerBookingPwaScreen() {
                 <Ionicons name="logo-whatsapp" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
                   style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
-                  placeholder="0123456789"
+                  placeholder="e.g. 0123456789"
                   placeholderTextColor={themeStyles.textMutedColor}
                   keyboardType="phone-pad"
                   value={customerPhone}
@@ -1298,7 +1571,7 @@ export default function CustomerBookingPwaScreen() {
             activeOpacity={1}
             onPress={() => setShowLoyaltyModal(false)}
           />
-          <View style={[styles.loyaltyCardModalContent, themeStyles.neumorphicCard]}>
+          <View style={[styles.loyaltyCardModalContent, themeStyles.neumorphicCard, { boxShadow: 'none', shadowColor: 'transparent', shadowOpacity: 0, shadowRadius: 0, elevation: 0 }]}>
             {/* Modal Header */}
             <View style={styles.modalHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1578,18 +1851,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
     paddingHorizontal: 22,
     paddingVertical: 10,
     borderRadius: 30,
     marginBottom: 20,
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
   },
   ratingCapsuleNum: {
     fontSize: 16,
@@ -1619,16 +1884,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 3,
   },
   locationBoldText: {
     fontSize: 14,
@@ -1683,17 +1940,9 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#F5F0E8',
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 5,
   },
   quickNavCircleActive: {
     backgroundColor: '#FFC700',
@@ -1752,16 +2001,8 @@ const styles = StyleSheet.create({
   },
   popularCardItem: {
     width: 155,
-    backgroundColor: '#F5F0E8',
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
     overflow: 'hidden',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
   },
   popularCardPhoto: {
     width: '100%',
@@ -1791,16 +2032,8 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#F5F0E8',
-    borderWidth: 1,
-    borderColor: '#FAF6F0',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 2, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
   },
   popularAddCircleBtnSelected: {
     backgroundColor: '#FFC700',
@@ -1816,15 +2049,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
-    backgroundColor: '#F5F0E8',
     marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
   },
   categoryChipPillActive: {
     backgroundColor: '#FFC700',
@@ -1851,21 +2076,13 @@ const styles = StyleSheet.create({
   whiteServiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F0E8',
     borderRadius: 22,
     padding: 14,
     gap: 12,
-    borderWidth: 1.5,
-    borderColor: '#FAF6F0',
-    shadowColor: '#C8BEAE',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   whiteServiceCardSelected: {
     borderColor: '#FFC700',
-    backgroundColor: '#FFFBEA',
+    backgroundColor: 'rgba(255, 199, 0, 0.15)',
     shadowColor: '#F59E0B',
     shadowOpacity: 0.35,
   },
@@ -1918,9 +2135,6 @@ const styles = StyleSheet.create({
   dropdownCardBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1934,10 +2148,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pickerOptionsContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 8,
     marginBottom: 14,
     marginTop: -4,
@@ -1949,7 +2160,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
     gap: 10,
   },
   pickerOptionItemActive: {
@@ -1991,9 +2201,6 @@ const styles = StyleSheet.create({
     width: 50,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
     marginRight: 8,
     gap: 4,
@@ -2023,7 +2230,6 @@ const styles = StyleSheet.create({
   // Period Segment & Time Grid
   periodSegmentTrack: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
     borderRadius: 14,
     padding: 3,
     marginTop: 10,
@@ -2053,9 +2259,6 @@ const styles = StyleSheet.create({
   },
   timeSlotGridPill: {
     width: (Dimensions.get('window').width - 48) / 3,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -2086,9 +2289,6 @@ const styles = StyleSheet.create({
   inputWithIconBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -2101,9 +2301,6 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   summaryRecapCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 18,
     padding: 16,
     marginTop: 10,
@@ -2414,6 +2611,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 20,
     zIndex: 11,
+    boxShadow: 'none',
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -2444,8 +2646,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loyaltyBoardCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     marginBottom: 16,
   },
@@ -2453,12 +2655,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   loyaltyBoardMemberTag: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    letterSpacing: 0.8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 1.2,
   },
   loyaltyBoardCode: {
     fontSize: 12,
@@ -2468,18 +2670,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 16,
+    rowGap: 14,
+    marginBottom: 18,
   },
   stampSlotCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: '17%',
+    aspectRatio: 1,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stampSlotActive: {
-    elevation: 3,
+    elevation: 2,
   },
   stampSlotInactive: {
     borderWidth: 1,
@@ -2493,11 +2695,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 4,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   loyaltyBoardProgressMsg: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans_700Bold',
     textAlign: 'center',
   },
   loyaltyQrBox: {
@@ -2512,4 +2716,135 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+
+  // Staff Cards Carousel Styles
+  staffHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  staffSectionTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    lineHeight: 22,
+  },
+  staffSectionSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginTop: 2,
+  },
+  btnSeeAllStaff: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  btnSeeAllStaffText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  staffCardsScroll: {
+    paddingVertical: 8,
+    marginBottom: 16,
+    overflow: 'visible',
+  },
+  staffCardItem: {
+    width: 155,
+    borderRadius: 20,
+    marginRight: 12,
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: 245,
+  },
+  staffCardSelected: {
+    borderWidth: 2,
+  },
+  staffCheckmarkBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  anyStaffBanner: {
+    width: '100%',
+    height: 135,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffAvatarThumb: {
+    width: '100%',
+    height: 135,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  staffCardBody: {
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  staffCardName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  staffCardRole: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  earliestSlotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    width: '100%',
+    marginTop: 4,
+  },
+  earliestLabelText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    lineHeight: 11,
+  },
+  earliestTimeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    lineHeight: 13,
+  },
+  nextSlotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    width: '100%',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 4,
+  },
+  greenDotPulse: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#16A34A',
+  },
+  nextSlotText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 });
+

@@ -533,7 +533,21 @@ export default function CustomerDashboard() {
             {/* Header Content */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
               <View>
-                <Image source={{ uri: avatarUrl }} style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#FFFFFF', marginBottom: 16 }} />
+                <View style={{ 
+                  shadowColor: '#B38B00', 
+                  shadowOffset: { width: 3, height: 6 }, 
+                  shadowOpacity: 0.25, 
+                  shadowRadius: 10, 
+                  elevation: 5,
+                  alignSelf: 'flex-start',
+                  marginBottom: 16,
+                  borderRadius: 34,
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                  ...(Platform.OS === 'web' ? { boxShadow: '4px 6px 14px rgba(179, 139, 0, 0.35), -3px -3px 8px #ffffff' } : {})
+                }}>
+                  <Image source={{ uri: avatarUrl }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+                </View>
                 <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400', marginBottom: 2 }}>{getGreeting()} 🖐</Text>
                 <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', lineHeight: 36, letterSpacing: -1 }}>
                   Welcome back,{'\n'}{user?.name ? user.name.split(' ')[0] : 'Fazli'}
@@ -545,48 +559,127 @@ export default function CustomerDashboard() {
               </View>
             </View>
 
-            {/* Unified Full-Width Reward Card */}
-            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, shadowColor: '#B38B00', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 4 }}>
+            {/* Unified Neumorphic Full-Width Reward Card */}
+            <View style={{ 
+              backgroundColor: '#FFFFFF', 
+              borderRadius: 24, 
+              padding: 18, 
+              shadowColor: 'rgba(185, 172, 154, 0.45)', 
+              shadowOffset: { width: 6, height: 10 }, 
+              shadowOpacity: 0.35, 
+              shadowRadius: 16, 
+              elevation: 6,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.9)',
+              ...(Platform.OS === 'web' ? { boxShadow: '8px 8px 24px rgba(185, 172, 154, 0.35), -8px -8px 24px #ffffff' } : {})
+            }}>
               {/* Header Row: Title & Total Stamps Badge */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
                   {highestCard?.logo ? (
                     <Image 
                       source={{ uri: highestCard.logo }} 
-                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF5D6', flexShrink: 0 }} 
+                      style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 20, 
+                        backgroundColor: '#FFF5D6', 
+                        flexShrink: 0,
+                        borderWidth: 1,
+                        borderColor: '#FFE38F',
+                        shadowColor: 'rgba(0,0,0,0.1)',
+                        shadowOffset: { width: 2, height: 3 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4
+                      }} 
                     />
                   ) : (
-                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE38F', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Ionicons name="gift-outline" size={18} color="#806400" />
+                    <View style={{ 
+                      width: 40, 
+                      height: 40, 
+                      borderRadius: 20, 
+                      backgroundColor: '#FFE38F', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      flexShrink: 0,
+                      shadowColor: '#B38B00',
+                      shadowOffset: { width: 2, height: 3 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 4
+                    }}>
+                      <Ionicons name="gift-outline" size={20} color="#806400" />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
                       {highestCard ? highestCard.merchantName : 'Next Reward'}
                     </Text>
                     {highestCard ? (
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400', marginTop: 1 }} numberOfLines={1}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400', marginTop: 1 }} numberOfLines={1}>
                         {highestCard.rewardName}
                       </Text>
                     ) : null}
                   </View>
                 </View>
                 
-                {/* Sleek Total Stamps Badge */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1400', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 }}>
-                  <Ionicons name="star" size={12} color="#FFC700" />
+                {/* Neumorphic Inset Total Stamps Badge */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  backgroundColor: '#1A1400', 
+                  paddingHorizontal: 12, 
+                  paddingVertical: 7, 
+                  borderRadius: 14, 
+                  gap: 6,
+                  borderWidth: 1,
+                  borderColor: '#332700',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 2, height: 4 },
+                  shadowOpacity: 0.35,
+                  elevation: 4,
+                  ...(Platform.OS === 'web' ? { boxShadow: 'inset 2px 2px 5px rgba(0,0,0,0.6), 3px 3px 8px rgba(0,0,0,0.15)' } : {})
+                }}>
+                  <Ionicons name="star" size={13} color="#FFC700" />
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
                     Total: {loyaltyCards.reduce((acc, curr) => acc + curr.collectedStamps, 0)}
                   </Text>
                 </View>
               </View>
               
-              {/* Progress Bar */}
-              <View style={{ flexDirection: 'row', gap: 4, marginBottom: 16 }}>
+              {/* Recessed Neumorphic Progress Bar Track */}
+              <View style={{ 
+                flexDirection: 'row', 
+                gap: 5, 
+                marginBottom: 16,
+                padding: 4,
+                backgroundColor: '#FFF8E6',
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(185, 172, 154, 0.25)',
+                ...(Platform.OS === 'web' ? { boxShadow: 'inset 2px 2px 5px rgba(185, 172, 154, 0.3), inset -2px -2px 5px #ffffff' } : {})
+              }}>
                 {progressArray.map((isFilled, index) => (
-                  <View key={index} style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: isFilled ? '#FFC700' : '#FFF1C5' }} />
+                  <View 
+                    key={index} 
+                    style={{ 
+                      flex: 1, 
+                      height: 10, 
+                      borderRadius: 5, 
+                      backgroundColor: isFilled ? '#FFC700' : 'rgba(255, 227, 143, 0.35)',
+                      shadowColor: isFilled ? '#FFC700' : 'transparent',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.4,
+                      shadowRadius: 4,
+                      ...(Platform.OS === 'web' ? {
+                        boxShadow: isFilled 
+                          ? '2px 2px 6px rgba(255, 199, 0, 0.45), inset -1px -1px 2px rgba(0,0,0,0.1)' 
+                          : 'inset 1px 1px 3px rgba(185, 172, 154, 0.2)'
+                      } : {})
+                    }} 
+                  />
                 ))}
               </View>
+
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -0.5 }}>
@@ -597,9 +690,24 @@ export default function CustomerDashboard() {
                   </Text>
                 </View>
 
-                {/* Integrated View Card Button */}
+                {/* Integrated Neumorphic View Card Button */}
                 <TouchableOpacity 
-                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEA', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#FFE38F' }}
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    backgroundColor: '#FFFBEA', 
+                    paddingHorizontal: 16, 
+                    paddingVertical: 10, 
+                    borderRadius: 16, 
+                    borderWidth: 1, 
+                    borderColor: '#FFE38F',
+                    shadowColor: 'rgba(185, 172, 154, 0.35)',
+                    shadowOffset: { width: 3, height: 5 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 3,
+                    ...(Platform.OS === 'web' ? { boxShadow: '4px 4px 10px rgba(185, 172, 154, 0.25), -3px -3px 8px #ffffff' } : {})
+                  }}
                   onPress={() => {
                     if (highestCard) {
                       setSelectedCard(highestCard);
@@ -613,7 +721,7 @@ export default function CustomerDashboard() {
                 </TouchableOpacity>
               </View>
 
-              {/* ⚡ QUICK ACTIONS ROW (INSIDE CARD) ⚡ */}
+              {/* ⚡ QUICK ACTIONS ROW (NEUMORPHIC DUAL BUTTONS) ⚡ */}
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 18, paddingTop: 18, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                 {/* My QR Button */}
                 <TouchableOpacity 
@@ -624,8 +732,14 @@ export default function CustomerDashboard() {
                     justifyContent: 'center', 
                     backgroundColor: '#1A1400', 
                     borderRadius: 16, 
-                    paddingVertical: 12, 
-                    gap: 8
+                    paddingVertical: 13, 
+                    gap: 8,
+                    shadowColor: '#1A1400',
+                    shadowOffset: { width: 4, height: 6 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 10,
+                    elevation: 5,
+                    ...(Platform.OS === 'web' ? { boxShadow: '5px 5px 14px rgba(26, 20, 0, 0.45), -4px -4px 10px rgba(255, 255, 255, 0.8)' } : {})
                   }}
                   onPress={() => setQrModalVisible(true)}
                   activeOpacity={0.8}
@@ -643,8 +757,14 @@ export default function CustomerDashboard() {
                     justifyContent: 'center', 
                     backgroundColor: '#111111', 
                     borderRadius: 16, 
-                    paddingVertical: 12, 
-                    gap: 8
+                    paddingVertical: 13, 
+                    gap: 8,
+                    shadowColor: '#111111',
+                    shadowOffset: { width: 4, height: 6 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 10,
+                    elevation: 5,
+                    ...(Platform.OS === 'web' ? { boxShadow: '5px 5px 14px rgba(17, 17, 17, 0.45), -4px -4px 10px rgba(255, 255, 255, 0.8)' } : {})
                   }}
                   onPress={() => router.push('/(customer)/vouchers')}
                   activeOpacity={0.8}
@@ -656,12 +776,43 @@ export default function CustomerDashboard() {
             </View>
           </View>
 
-          {/* Promo Banner inside Supercard (moved outside/below) */}
-          <View style={{ backgroundColor: '#1A1400', borderRadius: 24, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#1A1400', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6, overflow: 'hidden', marginBottom: 20 }}>
+          {/* Neumorphic 2X STAMPS Promo Banner */}
+          <View style={{ 
+            backgroundColor: '#16171D', 
+            borderRadius: 24, 
+            padding: 16, 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            shadowColor: '#000000', 
+            shadowOffset: { width: 6, height: 10 }, 
+            shadowOpacity: 0.45, 
+            shadowRadius: 16, 
+            elevation: 6, 
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            overflow: 'hidden', 
+            marginBottom: 20,
+            ...(Platform.OS === 'web' ? { boxShadow: '8px 8px 24px rgba(8, 9, 12, 0.6), -6px -6px 18px rgba(255, 255, 255, 0.7)' } : {})
+          }}>
             <View style={{ position: 'absolute', right: -20, top: -20, width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.1)', borderStyle: 'dashed' }} />
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFC700', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF1C5', shadowColor: '#FFC700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 }}>
+              <View style={{ 
+                width: 56, 
+                height: 56, 
+                borderRadius: 28, 
+                backgroundColor: '#FFC700', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                borderWidth: 2, 
+                borderColor: '#FFF1C5', 
+                shadowColor: '#FFC700', 
+                shadowOffset: { width: 0, height: 4 }, 
+                shadowOpacity: 0.5, 
+                shadowRadius: 10,
+                elevation: 4
+              }}>
                 <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#E6B300', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFD352' }}>
                   <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>2x</Text>
                 </View>
@@ -675,7 +826,24 @@ export default function CustomerDashboard() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={{ backgroundColor: '#FFC700', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => router.push('/(customer)/explore')}>
+            <TouchableOpacity 
+              style={{ 
+                backgroundColor: '#FFC700', 
+                paddingHorizontal: 14, 
+                paddingVertical: 10, 
+                borderRadius: 16, 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                gap: 4,
+                shadowColor: '#FFC700',
+                shadowOffset: { width: 3, height: 5 },
+                shadowOpacity: 0.4,
+                shadowRadius: 8,
+                elevation: 4,
+                ...(Platform.OS === 'web' ? { boxShadow: '4px 4px 12px rgba(255, 199, 0, 0.45), -3px -3px 8px rgba(255, 255, 255, 0.2)' } : {})
+              }} 
+              onPress={() => router.push('/(customer)/explore')}
+            >
               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }}>Collect Now</Text>
               <Ionicons name="chevron-forward" size={12} color="#1A1400" />
             </TouchableOpacity>

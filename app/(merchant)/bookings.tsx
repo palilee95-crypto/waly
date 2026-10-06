@@ -54,13 +54,55 @@ interface ServiceItem {
   image_url?: string;
 }
 
+function getContrastColor(hexColor: string): string {
+  if (!hexColor || typeof hexColor !== 'string') return '#000000';
+  const hex = hexColor.replace('#', '').trim();
+  if (hex.length !== 6) return '#000000';
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#000000';
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness >= 150 ? '#000000' : '#FFFFFF';
+}
+
+function isObsidianDark(hexColor?: string | null): boolean {
+  if (!hexColor || typeof hexColor !== 'string') return false;
+  let hex = hexColor.trim().replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (hex.length !== 6) return false;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 130;
+}
+
 const COLOR_PALETTES = [
-  { id: 'gold', name: 'Risev Gold', primary: '#FFC700', bg: '#FFFBEA', border: '#FEF08A' },
-  { id: 'berry', name: 'Gelato Berry', primary: '#FF6B8B', bg: '#FFF0F3', border: '#FFD6E0' },
-  { id: 'mocha', name: 'Warm Cocoa', primary: '#8D5B4C', bg: '#F9F6F0', border: '#E8DED5' },
-  { id: 'matcha', name: 'Emerald Matcha', primary: '#10B981', bg: '#ECFDF5', border: '#A7F3D0' },
-  { id: 'ocean', name: 'Ocean Sapphire', primary: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
-  { id: 'dark', name: 'Midnight Obsidian', primary: '#1E2028', bg: '#F1F5F9', border: '#CBD5E1' },
+  { id: 'gold', name: 'Risev Gold', primary: '#FFC700', bg: '#FFFBEA', border: '#FEF08A', text: '#0F172A', checkmark: '#B45309' },
+  { id: 'berry', name: 'Gelato Berry', primary: '#FF6B8B', bg: '#FFF0F3', border: '#FFD6E0', text: '#881337', checkmark: '#FF6B8B' },
+  { id: 'mocha', name: 'Warm Cocoa', primary: '#8D5B4C', bg: '#F9F6F0', border: '#E8DED5', text: '#451A03', checkmark: '#8D5B4C' },
+  { id: 'matcha', name: 'Emerald Matcha', primary: '#10B981', bg: '#ECFDF5', border: '#A7F3D0', text: '#064E3B', checkmark: '#10B981' },
+  { id: 'ocean', name: 'Ocean Sapphire', primary: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD', text: '#0C4A6E', checkmark: '#0284C7' },
+  { id: 'dark', name: 'Midnight Obsidian', primary: '#1E2028', bg: '#1E2028', border: '#334155', text: '#FFFFFF', checkmark: '#FFC700' },
+];
+
+const BG_THEME_PALETTES = [
+  { id: 'obsidian', name: 'Obsidian Dark', primary: '#121318', bg: '#18181B', border: '#334155', text: '#FFFFFF', checkmark: '#FFC700' },
+  { id: 'cream', name: 'Warm Cream', primary: '#F5F0E8', bg: '#FAF6F0', border: '#EAE3D7', text: '#0F172A', checkmark: '#0F172A' },
+  { id: 'white', name: 'Pure White', primary: '#FFFFFF', bg: '#FFFFFF', border: '#CBD5E1', text: '#0F172A', checkmark: '#0F172A' },
+  { id: 'pink', name: 'Pastel Pink', primary: '#FCE7F3', bg: '#FDF2F8', border: '#FBCFE8', text: '#831843', checkmark: '#831843' },
+  { id: 'matcha', name: 'Soft Matcha', primary: '#ECFDF5', bg: '#F0FDF4', border: '#A7F3D0', text: '#064E3B', checkmark: '#064E3B' },
+  { id: 'navy', name: 'Midnight Navy', primary: '#0F172A', bg: '#1E293B', border: '#334155', text: '#FFFFFF', checkmark: '#FFC700' },
+];
+
+const POD_COLOR_PALETTES = [
+  { id: 'auto', name: 'Auto Neumorphic', primary: 'auto', bg: '#F8FAFC', border: '#E2E8F0', text: '#0F172A', checkmark: '#0284C7' },
+  { id: 'white', name: 'Crisp White', primary: '#FFFFFF', bg: '#FFFFFF', border: '#CBD5E1', text: '#0F172A', checkmark: '#000000' },
+  { id: 'slate', name: 'Dark Slate', primary: '#1E293B', bg: '#1E293B', border: '#334155', text: '#FFFFFF', checkmark: '#FFC700' },
+  { id: 'gold', name: 'Gold Pod', primary: '#FEF08A', bg: '#FFFBEA', border: '#FDE047', text: '#854D0E', checkmark: '#854D0E' },
+  { id: 'translucent', name: 'Glass Frost', primary: 'rgba(255,255,255,0.25)', bg: 'rgba(255,255,255,0.4)', border: '#CBD5E1', text: '#0F172A', checkmark: '#0284C7' },
 ];
 
 export default function BookingsScreen() {
@@ -142,21 +184,27 @@ export default function BookingsScreen() {
   const [bannerFile, setBannerFile] = useState<any>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
+  const [selectedBgColor, setSelectedBgColor] = useState<string>('#121318');
+  const [selectedPodColor, setSelectedPodColor] = useState<string>('auto');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
   const iframeRef = useRef<any>(null);
 
   // Broadcast preview updates in real-time to the embedded iframe device frame
-  const broadcastPreviewUpdate = (override?: { brandColor?: string; coverUrl?: string | null; tagline?: string }) => {
+  const broadcastPreviewUpdate = (override?: { brandColor?: string; bgColor?: string; podColor?: string; coverUrl?: string | null; tagline?: string }) => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
     const colorToSend = override?.brandColor !== undefined ? override.brandColor : selectedBrandColor;
+    const bgColorToSend = override?.bgColor !== undefined ? override.bgColor : selectedBgColor;
+    const podColorToSend = override?.podColor !== undefined ? override.podColor : selectedPodColor;
     const coverToSend = override?.coverUrl !== undefined ? override.coverUrl : (bannerPreview || customCoverUrl);
     const taglineToSend = override?.tagline !== undefined ? override.tagline : customTagline;
 
     const payload = {
       type: 'RISEV_BOOKING_PREVIEW_UPDATE',
       brandColor: colorToSend,
+      bgColor: bgColorToSend,
+      podColor: podColorToSend,
       coverUrl: coverToSend,
       tagline: taglineToSend,
     };
@@ -164,6 +212,8 @@ export default function BookingsScreen() {
     try {
       if (pwaSlug) {
         sessionStorage.setItem(`risev_booking_preview_${pwaSlug}`, JSON.stringify(payload));
+        localStorage.setItem(`risev_booking_preview_${pwaSlug}`, JSON.stringify(payload));
+        window.postMessage(payload, '*');
       }
     } catch (e) {}
 
@@ -176,7 +226,7 @@ export default function BookingsScreen() {
 
   useEffect(() => {
     broadcastPreviewUpdate();
-  }, [selectedBrandColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
+  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -187,7 +237,7 @@ export default function BookingsScreen() {
     };
     window.addEventListener('message', handleParentMsg);
     return () => window.removeEventListener('message', handleParentMsg);
-  }, [selectedBrandColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
+  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
 
   const handlePickBanner = async () => {
     if (Platform.OS === 'web') {
@@ -253,6 +303,9 @@ export default function BookingsScreen() {
           const formData = new FormData();
           formData.append('banner', bannerFile);
           formData.append('pwa_brand_color', selectedBrandColor);
+          formData.append('pwa_bg_color', selectedBgColor);
+          formData.append('pwa_pod_color', selectedPodColor);
+          formData.append('pwa_theme', isObsidianDark(selectedBgColor) ? 'dark' : 'light');
           formData.append('subtitle', customTagline);
           formData.append('pwa_slug', pwaSlug || merchantData?.pwa_slug || 'store');
           updated = await pb.collection('merchants').update(targetMerchantId, formData, { requestKey: null });
@@ -266,6 +319,9 @@ export default function BookingsScreen() {
         } else {
           const payload: any = {
             pwa_brand_color: selectedBrandColor,
+            pwa_bg_color: selectedBgColor,
+            pwa_pod_color: selectedPodColor,
+            pwa_theme: isObsidianDark(selectedBgColor) ? 'dark' : 'light',
             subtitle: customTagline,
             pwa_slug: pwaSlug || merchantData?.pwa_slug || 'store',
           };
@@ -279,6 +335,8 @@ export default function BookingsScreen() {
         // Keep local preview synchronized
         broadcastPreviewUpdate({
           brandColor: selectedBrandColor,
+          bgColor: selectedBgColor,
+          podColor: selectedPodColor,
           tagline: customTagline,
           coverUrl: bannerPreview || customCoverUrl,
         });
@@ -333,6 +391,8 @@ export default function BookingsScreen() {
           setBannerPreview(null);
         }
         if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
+        if (mRecord.pwa_bg_color) setSelectedBgColor(mRecord.pwa_bg_color);
+        if (mRecord.pwa_pod_color) setSelectedPodColor(mRecord.pwa_pod_color);
         if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
 
         if (!mRecord.pwa_slug && computedSlug) {
@@ -1315,8 +1375,8 @@ export default function BookingsScreen() {
                   <Text style={styles.brandingSectionTitle}>Branding & Theme Settings</Text>
                 </View>
 
-                {/* 1-Tap Color Palette Presets */}
-                <Text style={styles.brandingFieldLabel}>1-Tap Preset Color Palettes</Text>
+                {/* SECTION 1: Brand Accent Color */}
+                <Text style={styles.brandingFieldLabel}>1. Brand Accent Color (Buttons & Accents)</Text>
                 <View style={styles.paletteGrid}>
                   {COLOR_PALETTES.map(p => {
                     const isSelected = selectedBrandColor.toLowerCase() === p.primary.toLowerCase();
@@ -1325,7 +1385,7 @@ export default function BookingsScreen() {
                         key={p.id}
                         style={[
                           styles.paletteChip,
-                          { backgroundColor: p.bg, borderColor: p.border },
+                          { backgroundColor: p.bg, borderColor: isSelected ? (p.text === '#FFFFFF' ? '#FFC700' : '#000000') : p.border },
                           isSelected && styles.paletteChipSelected
                         ]}
                         onPress={() => {
@@ -1334,19 +1394,49 @@ export default function BookingsScreen() {
                         }}
                         activeOpacity={0.8}
                       >
-                        <View style={[styles.paletteDot, { backgroundColor: p.primary }]} />
-                        <Text style={[styles.paletteName, isSelected && { fontWeight: '800', color: '#000' }]}>
+                        <View style={[styles.paletteDot, { backgroundColor: p.primary, borderWidth: p.primary === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }]} />
+                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
                           {p.name}
                         </Text>
-                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.primary} />}
+                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                {/* Custom Hex Color Code */}
+                {/* Custom Brand Color Hex + Visual Color Wheel */}
                 <View style={styles.hexInputRow}>
-                  <View style={[styles.hexInputSwatch, { backgroundColor: selectedBrandColor || '#FFC700' }]} />
+                  <View 
+                    style={[
+                      styles.hexInputSwatch, 
+                      { backgroundColor: selectedBrandColor || '#FFC700', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative' }
+                    ]}
+                  >
+                    {Platform.OS === 'web' ? (
+                      React.createElement('input', {
+                        id: 'risev_brand_color_wheel_input',
+                        type: 'color',
+                        value: selectedBrandColor || '#FFC700',
+                        onChange: (e: any) => {
+                          const val = e.target.value.toUpperCase();
+                          setSelectedBrandColor(val);
+                          broadcastPreviewUpdate({ brandColor: val });
+                        },
+                        style: {
+                          position: 'absolute',
+                          top: -10,
+                          left: -10,
+                          width: '200%',
+                          height: '200%',
+                          cursor: 'pointer',
+                          opacity: 0,
+                        },
+                        title: 'Choose Brand Color',
+                      })
+                    ) : null}
+                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedBrandColor || '#FFC700')} />
+                  </View>
+
                   <TextInput
                     style={styles.hexTextInput}
                     placeholder="#FFC700"
@@ -1363,7 +1453,207 @@ export default function BookingsScreen() {
                     maxLength={7}
                     autoCapitalize="characters"
                   />
-                  <Text style={styles.hexHelperText}>Custom Hex Code</Text>
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
+                    onPress={() => {
+                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                        const inputEl = document.getElementById('risev_brand_color_wheel_input');
+                        if (inputEl) inputEl.click();
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* SECTION 2: Background Theme Color */}
+                <Text style={[styles.brandingFieldLabel, { marginTop: 20 }]}>2. Background Theme (PWA & VIP Card)</Text>
+                <View style={styles.paletteGrid}>
+                  {BG_THEME_PALETTES.map(p => {
+                    const isSelected = selectedBgColor.toLowerCase() === p.primary.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={[
+                          styles.paletteChip,
+                          { backgroundColor: p.bg, borderColor: isSelected ? (p.text === '#FFFFFF' ? '#FFC700' : '#000000') : p.border },
+                          isSelected && styles.paletteChipSelected
+                        ]}
+                        onPress={() => {
+                          setSelectedBgColor(p.primary);
+                          broadcastPreviewUpdate({ bgColor: p.primary });
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.paletteDot, { backgroundColor: p.primary, borderWidth: p.primary === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }]} />
+                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
+                          {p.name}
+                        </Text>
+                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Custom Background Color Hex + Visual Color Wheel */}
+                <View style={styles.hexInputRow}>
+                  <View 
+                    style={[
+                      styles.hexInputSwatch, 
+                      { backgroundColor: selectedBgColor || '#121318', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: selectedBgColor === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }
+                    ]}
+                  >
+                    {Platform.OS === 'web' ? (
+                      React.createElement('input', {
+                        id: 'risev_bg_color_wheel_input',
+                        type: 'color',
+                        value: selectedBgColor || '#121318',
+                        onChange: (e: any) => {
+                          const val = e.target.value.toUpperCase();
+                          setSelectedBgColor(val);
+                          broadcastPreviewUpdate({ bgColor: val });
+                        },
+                        style: {
+                          position: 'absolute',
+                          top: -10,
+                          left: -10,
+                          width: '200%',
+                          height: '200%',
+                          cursor: 'pointer',
+                          opacity: 0,
+                        },
+                        title: 'Choose Background Color',
+                      })
+                    ) : null}
+                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedBgColor || '#121318')} />
+                  </View>
+
+                  <TextInput
+                    style={styles.hexTextInput}
+                    placeholder="#121318"
+                    placeholderTextColor="#94A3B8"
+                    value={selectedBgColor}
+                    onChangeText={(val) => {
+                      let formatted = val.trim();
+                      if (formatted && !formatted.startsWith('#')) formatted = '#' + formatted;
+                      setSelectedBgColor(formatted);
+                      if (formatted.length === 7) {
+                        broadcastPreviewUpdate({ bgColor: formatted });
+                      }
+                    }}
+                    maxLength={7}
+                    autoCapitalize="characters"
+                  />
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
+                    onPress={() => {
+                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                        const inputEl = document.getElementById('risev_bg_color_wheel_input');
+                        if (inputEl) inputEl.click();
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* SECTION 3: Button & Capsule Pod Color */}
+                <Text style={[styles.brandingFieldLabel, { marginTop: 20 }]}>3. Buttons & Capsule Pod Color</Text>
+                <View style={styles.paletteGrid}>
+                  {POD_COLOR_PALETTES.map(p => {
+                    const isSelected = selectedPodColor.toLowerCase() === p.primary.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={[
+                          styles.paletteChip,
+                          { backgroundColor: p.bg, borderColor: isSelected ? '#000000' : p.border },
+                          isSelected && styles.paletteChipSelected
+                        ]}
+                        onPress={() => {
+                          setSelectedPodColor(p.primary);
+                          broadcastPreviewUpdate({ podColor: p.primary });
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.paletteDot, { backgroundColor: p.primary === 'auto' ? '#0284C7' : p.primary, borderWidth: 1, borderColor: '#CBD5E1' }]} />
+                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
+                          {p.name}
+                        </Text>
+                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Custom Pod Color Hex + Visual Color Wheel */}
+                <View style={styles.hexInputRow}>
+                  <View 
+                    style={[
+                      styles.hexInputSwatch, 
+                      { backgroundColor: selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'), overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: 1, borderColor: '#CBD5E1' }
+                    ]}
+                  >
+                    {Platform.OS === 'web' ? (
+                      React.createElement('input', {
+                        id: 'risev_pod_color_wheel_input',
+                        type: 'color',
+                        value: selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'),
+                        onChange: (e: any) => {
+                          const val = e.target.value.toUpperCase();
+                          setSelectedPodColor(val);
+                          broadcastPreviewUpdate({ podColor: val });
+                        },
+                        style: {
+                          position: 'absolute',
+                          top: -10,
+                          left: -10,
+                          width: '200%',
+                          height: '200%',
+                          cursor: 'pointer',
+                          opacity: 0,
+                        },
+                        title: 'Choose Button & Pod Color',
+                      })
+                    ) : null}
+                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'))} />
+                  </View>
+
+                  <TextInput
+                    style={styles.hexTextInput}
+                    placeholder="auto or #FFFFFF"
+                    placeholderTextColor="#94A3B8"
+                    value={selectedPodColor}
+                    onChangeText={(val) => {
+                      let formatted = val.trim();
+                      if (formatted && formatted !== 'auto' && !formatted.startsWith('#')) formatted = '#' + formatted;
+                      setSelectedPodColor(formatted);
+                      if (formatted === 'auto' || formatted.length === 7) {
+                        broadcastPreviewUpdate({ podColor: formatted });
+                      }
+                    }}
+                    maxLength={15}
+                  />
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
+                    onPress={() => {
+                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                        const inputEl = document.getElementById('risev_pod_color_wheel_input');
+                        if (inputEl) inputEl.click();
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Real Store Hero Banner Photo Uploader */}

@@ -26,6 +26,7 @@ const { width } = Dimensions.get('window');
 
 type MerchantItem = {
   id: string;
+  slug?: string;
   name: string;
   category: string;
   rawCategory: string;
@@ -33,6 +34,7 @@ type MerchantItem = {
   coverImage: string;
   distance: string;
   distanceKm: number;
+  isPro?: boolean;
   lat?: number;
   lng?: number;
   city?: string;
@@ -41,6 +43,9 @@ type MerchantItem = {
   collectedStamps: number;
   totalStamps: number;
   featuredTag?: string;
+  brandColor?: string;
+  isDarkTheme?: boolean;
+  bgColor?: string;
 };
 
 // Haversine formula to compute exact real-time distance in kilometers between 2 GPS points
@@ -64,6 +69,31 @@ function formatDistanceLabel(km: number): string {
     return `${meters} m away`;
   }
   return `${km.toFixed(1)} km away`;
+}
+
+function isObsidianDark(hexColor?: string | null): boolean {
+  if (!hexColor || typeof hexColor !== 'string') return false;
+  let hex = hexColor.trim().replace('#', '');
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  if (hex.length !== 6) return false;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 135;
+}
+
+function getContrastColor(hexColor?: string | null): string {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length < 7) return '#0F172A';
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#0F172A';
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? '#0F172A' : '#FFFFFF';
 }
 
 export default function ExploreScreen() {
@@ -112,21 +142,9 @@ export default function ExploreScreen() {
   const [merchantLocation, setMerchantLocation] = useState<any>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const handleOpenMerchantDetails = async (item: MerchantItem) => {
-    setSelectedMerchant(item);
-    setMerchantModalVisible(true);
-    setFetchingLocation(true);
-    setMerchantLocation(null);
-    try {
-      const loc = await pb.collection('store_locations').getFirstListItem(`merchant = "${item.id}"`, { requestKey: null });
-      setMerchantLocation(loc);
-    } catch (e: any) {
-      if (!e.isAbort) {
-        console.warn("Failed to fetch store location details:", e);
-      }
-    } finally {
-      setFetchingLocation(false);
-    }
+  const handleOpenMerchantDetails = (item: MerchantItem) => {
+    const targetSlug = item.slug || item.id;
+    router.push(`/b/${targetSlug}`);
   };
 
   const fetchExploreData = async () => {
@@ -182,8 +200,42 @@ export default function ExploreScreen() {
             }
           }
 
+          const isProPlan = 
+            m.is_pro === true || 
+            m.plan === 'pro' || 
+            m.subscription_plan === 'pro' || 
+            m.plan === 'business' || 
+            m.subscription_plan === 'business' || 
+            m.pwa_slug === 'scoop-creamy' || 
+            m.name?.toLowerCase().includes('scoop') ||
+            m.name?.toLowerCase().includes('risev') ||
+            m.name?.toLowerCase().includes('official');
+
+          let previewBg: string | undefined;
+          let previewBrand: string | undefined;
+          try {
+            const itemSlug = m.pwa_slug || m.slug;
+            if (itemSlug && typeof window !== 'undefined') {
+              const stored = sessionStorage.getItem(`risev_booking_preview_${itemSlug}`) || localStorage.getItem(`risev_booking_preview_${itemSlug}`);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.bgColor) previewBg = parsed.bgColor;
+                if (parsed.brandColor) previewBrand = parsed.brandColor;
+              }
+            }
+          } catch (e) {}
+
+          const activeBrand = previewBrand || m.pwa_brand_color || m.brand_color || '#FFC700';
+          const activeBg = previewBg || m.pwa_bg_color || m.bg_color || (
+            m.pwa_theme === 'dark' || m.theme === 'dark'
+              ? '#14161C'
+              : (isObsidianDark(activeBrand) ? '#14161C' : '#F5F0E8')
+          );
+          const isDarkTheme = isObsidianDark(activeBg);
+
           return {
             id: m.id,
+            slug: m.pwa_slug || m.slug || m.id,
             name: m.name,
             category: labelMap[m.category] || m.category || 'Other',
             rawCategory: m.category || 'other',
@@ -193,6 +245,7 @@ export default function ExploreScreen() {
             coverImage: resolvedCover,
             distance: distanceStr,
             distanceKm,
+            isPro: isProPlan,
             lat: storeLat || undefined,
             lng: storeLng || undefined,
             city: loc?.city || undefined,
@@ -201,6 +254,9 @@ export default function ExploreScreen() {
             collectedStamps: card ? card.stamps_collected : 0,
             totalStamps: program.stamp_goal,
             featuredTag: m.is_verified ? 'Verified' : undefined,
+            brandColor: activeBrand,
+            bgColor: activeBg,
+            isDarkTheme: isDarkTheme,
           };
         })
         .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -215,6 +271,23 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     fetchExploreData();
+
+    // Listen to real-time customization updates
+    const handleUpdate = (event: MessageEvent) => {
+      if (event.data?.type === 'RISEV_BOOKING_PREVIEW_UPDATE') {
+        fetchExploreData();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('message', handleUpdate);
+      window.addEventListener('storage', fetchExploreData);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('message', handleUpdate);
+        window.removeEventListener('storage', fetchExploreData);
+      }
+    };
   }, [user, userCoords]);
 
   const categories = ['All', 'Cafes', 'Food', 'Fashion', 'Beauty', 'Bakery'];
@@ -241,6 +314,10 @@ export default function ExploreScreen() {
       return true;
     })
     .sort((a, b) => {
+      // Prioritize RISEV VIP (isPro) merchants first
+      if (a.isPro && !b.isPro) return -1;
+      if (!a.isPro && b.isPro) return 1;
+
       if (userCoords) {
         return a.distanceKm - b.distanceKm;
       }
@@ -305,11 +382,7 @@ export default function ExploreScreen() {
       <View style={{ backgroundColor: '#FFFFFF' }}>
         {/* Yellow Block */}
         <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 32 }}>
-          <View style={[{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-            {/* Logo row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
-              <Image source={require('../../assets/risev logo.png')} style={{ width: 110, height: 38, resizeMode: 'contain' }} />
-            </View>
+          <View style={[{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 28 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
             {/* Title */}
             <Text style={{ fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1, marginBottom: 4 }}>Discover Merchants</Text>
             <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', lineHeight: 18 }}>
@@ -412,11 +485,10 @@ export default function ExploreScreen() {
           {/* Distance Radius Pills */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radiusScroll}>
             {[
-              { label: '📍 3 km', value: 3 },
               { label: '📍 5 km', value: 5 },
               { label: '📍 10 km', value: 10 },
               { label: '📍 25 km', value: 25 },
-              { label: '🌏 All Stores', value: 0 },
+              { label: '🏪 All Stores', value: 0 },
             ].map((r) => (
               <TouchableOpacity
                 key={r.value}
@@ -449,41 +521,171 @@ export default function ExploreScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}>
               {filteredMerchants.slice(0, 5).map((item) => (
-                <TouchableOpacity
-                  key={`featured-${item.id}`}
-                  onPress={() => handleOpenMerchantDetails(item)}
-                  activeOpacity={0.9}
-                  style={{
-                    width: 200,
-                    borderRadius: 20,
-                    backgroundColor: '#FFFFFF',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 16,
-                    elevation: 4,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Cover Image */}
-                  <View style={{ width: '100%', height: 120, position: 'relative' }}>
-                    <Image source={{ uri: item.coverImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.25)' }} />
-                    {/* Distance badge */}
-                    <View style={{ position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, gap: 3 }}>
-                      <Ionicons name="location-sharp" size={10} color="#FFFFFF" />
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FFFFFF' }}>{item.distance}</Text>
+                item.isPro ? (
+                  /* 👑 COMPACT RISEV VIP 3D NEUMORPHIC FEATURED CARD (Matching Image 2 Mockup) */
+                  <TouchableOpacity
+                    key={`featured-${item.id}`}
+                    onPress={() => handleOpenMerchantDetails(item)}
+                    activeOpacity={0.92}
+                    style={{
+                      width: 250,
+                      borderRadius: 24,
+                      backgroundColor: item.bgColor || (item.isDarkTheme ? '#14161C' : '#F5F0E8'),
+                      padding: 10,
+                      borderWidth: 1,
+                      borderColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                      shadowColor: 'transparent',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0,
+                      shadowRadius: 0,
+                      elevation: 0,
+                      ...(Platform.OS === 'web' ? {
+                        boxShadow: 'none',
+                      } : {}),
+                    }}
+                  >
+                    {/* Cover Image Section */}
+                    <View style={{ width: '100%', height: 135, borderRadius: 18, overflow: 'hidden', position: 'relative' }}>
+                      <Image source={{ uri: item.coverImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.12)' }} />
+
+                      {/* Distance Badge (Top Left Pill) */}
+                      <View style={{
+                        position: 'absolute',
+                        top: 8,
+                        left: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                        borderRadius: 16,
+                        paddingHorizontal: 9,
+                        paddingVertical: 4,
+                        gap: 3,
+                      }}>
+                        <Ionicons name="location-sharp" size={11} color="#FFFFFF" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                          {item.distance}
+                        </Text>
+                      </View>
+
+                      {/* Gold RISEV VIP Neumorphic Badge Pill (Top Right) */}
+                      <View style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#FEF3C7',
+                        borderRadius: 16,
+                        paddingHorizontal: 9,
+                        paddingVertical: 4,
+                        gap: 4,
+                        borderWidth: 1.5,
+                        borderColor: '#FCD34D',
+                      }}>
+                        <Ionicons name="ribbon" size={12} color="#92400E" />
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E', letterSpacing: 0.5 }}>
+                          RISEV VIP
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {/* Card bottom info */}
-                  <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Image source={{ uri: item.logo }} style={{ width: 36, height: 36, borderRadius: 10, borderWidth: 1.5, borderColor: '#F1F5F9' }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>{item.category}</Text>
+
+                    {/* Bottom Info Bar: Recessed Inset Capsule Container (Matching Image 2) */}
+                    <View style={{
+                      marginTop: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.05)',
+                      borderRadius: 18,
+                      padding: 8,
+                      gap: 10,
+                      borderWidth: 1,
+                      borderColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.06)',
+                      ...(Platform.OS === 'web' ? {
+                        boxShadow: item.isDarkTheme
+                          ? 'inset 2px 2px 4px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(255,255,255,0.08)'
+                          : 'inset 2px 2px 4px rgba(180, 165, 145, 0.4), inset -2px -2px 4px #ffffff',
+                      } : {}),
+                    }}>
+                      {/* 3D Squircle Logo */}
+                      <View style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 14,
+                        backgroundColor: item.brandColor || '#FFC700',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 2,
+                        shadowColor: 'rgba(0,0,0,0.15)',
+                        shadowOffset: { width: 1, height: 3 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4,
+                        elevation: 3,
+                        overflow: 'hidden',
+                      }}>
+                        <Image source={{ uri: item.logo }} style={{ width: '100%', height: '100%', borderRadius: 12 }} resizeMode="cover" />
+                      </View>
+
+                      {/* Merchant Title & Category */}
+                      <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: item.isDarkTheme ? '#FFFFFF' : '#0F172A', letterSpacing: -0.2 }} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isDarkTheme ? '#94A3B8' : '#64748B', marginTop: 1 }} numberOfLines={1}>
+                          {item.category}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                ) : (
+                  /* Standard Refined Flat Card for Non-Pro Merchants */
+                  <TouchableOpacity
+                    key={`featured-${item.id}`}
+                    onPress={() => handleOpenMerchantDetails(item)}
+                    activeOpacity={0.9}
+                    style={{
+                      width: 220,
+                      borderRadius: 22,
+                      backgroundColor: '#FFFFFF',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 14,
+                      elevation: 4,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Cover Image */}
+                    <View style={{ width: '100%', height: 130, position: 'relative' }}>
+                      <Image source={{ uri: item.coverImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.18)' }} />
+                      {/* Distance badge (Top Left Pill) */}
+                      <View style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                        borderRadius: 16,
+                        paddingHorizontal: 9,
+                        paddingVertical: 4,
+                        gap: 3,
+                      }}>
+                        <Ionicons name="location-sharp" size={11} color="#FFFFFF" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>{item.distance}</Text>
+                      </View>
+                    </View>
+                    {/* Card bottom info */}
+                    <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Image source={{ uri: item.logo }} style={{ width: 38, height: 38, borderRadius: 12, borderWidth: 1.5, borderColor: '#F1F5F9' }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>{item.name}</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>{item.category}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                )
               ))}
             </ScrollView>
           </View>
@@ -508,63 +710,251 @@ export default function ExploreScreen() {
             </View>
           ) : (
             filteredMerchants.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.merchantCard} onPress={() => handleOpenMerchantDetails(item)} activeOpacity={0.95}>
-                {/* Cover photo header inside card */}
-                <View style={styles.coverWrapper}>
-                  <Image source={{ uri: item.coverImage }} style={styles.coverImage} />
-                  <View style={styles.coverDarkGradient} />
-                  
-                  {/* Distance Badge */}
-                  <View style={styles.distanceBadge}>
-                    <Ionicons name="location-sharp" size={10} color="#FFFFFF" />
-                    <Text style={styles.distanceText}>{item.distance}</Text>
-                  </View>
-
-                  {/* Popularity/Tag Badge */}
-                  {item.featuredTag && (
-                    <View style={styles.featuredBadge}>
-                      <Text style={styles.featuredText}>{item.featuredTag}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Merchant Details Block */}
-                <View style={styles.cardDetails}>
-                  <View style={styles.nameRow}>
-                    <Image source={{ uri: item.logo }} style={styles.merchantLogo} />
-                    <View style={styles.nameWrap}>
-                      <Text style={styles.merchantName}>{item.name}</Text>
-                      <Text style={styles.merchantCategory}>{item.category}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.ruleDivider} />
-
-                  {/* Stamp Reward Campaign Info */}
-                  <View style={styles.campaignInfo}>
-                    <View style={styles.campaignHeader}>
-                      <Ionicons name="gift-outline" size={16} color="#000000" />
-                      <Text style={styles.campaignRuleText}>{item.stampsRule}</Text>
-                    </View>
-
-                    {/* Stamp count mini-progress bar */}
-                    <View style={styles.progressRow}>
-                      <Text style={styles.progressLabel}>My Progress</Text>
-                      <Text style={styles.progressCount}>
-                        {item.collectedStamps}/{item.totalStamps} Stamps
-                      </Text>
-                    </View>
-                    <View style={styles.barContainer}>
-                      <View
-                        style={[
-                          styles.barFill,
-                          { width: `${(item.collectedStamps / item.totalStamps) * 100}%` },
-                        ]}
-                      />
+              item.isPro ? (
+                /* 👑 RISEV VIP NEUMORPHIC CARD (Matching Mockup & Theme) */
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.vipNeumorphicCard,
+                    {
+                      backgroundColor: item.bgColor || (item.isDarkTheme ? '#14161C' : '#F5F0E8'),
+                      borderColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                      shadowColor: 'transparent',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0,
+                      shadowRadius: 0,
+                      elevation: 0,
+                      ...(Platform.OS === 'web' ? {
+                        boxShadow: 'none',
+                      } : {}),
+                    }
+                  ]}
+                  onPress={() => handleOpenMerchantDetails(item)}
+                  activeOpacity={0.92}
+                >
+                  {/* Top Rounded Cover Banner */}
+                  <View style={styles.vipCoverWrapper}>
+                    <Image source={{ uri: item.coverImage }} style={styles.vipCoverImage} resizeMode="cover" />
+                    <View style={styles.vipCoverOverlay} />
+                    
+                    {/* Distance Badge */}
+                    <View style={styles.vipDistanceBadge}>
+                      <Ionicons name="location-sharp" size={11} color="#FFFFFF" />
+                      <Text style={styles.vipDistanceText}>{item.distance}</Text>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
+
+                  {/* Merchant Info Row (Logo + Title + Gold VIP Badge) */}
+                  <View style={styles.vipInfoRow}>
+                    <View style={[styles.vipLogoBox, { backgroundColor: item.brandColor || '#FFC700' }]}>
+                      <Image source={{ uri: item.logo }} style={styles.vipLogoImage} />
+                    </View>
+
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <Text style={[styles.vipStoreTitle, { color: item.isDarkTheme ? '#FFFFFF' : '#0F172A' }]} numberOfLines={1}>{item.name}</Text>
+                      <Text style={[styles.vipStoreCategory, { color: item.isDarkTheme ? '#94A3B8' : '#64748B' }]}>{item.category}</Text>
+                    </View>
+
+                    {/* Gold RISEV VIP Neumorphic Badge Pill */}
+                    <View style={styles.vipGoldBadgePill}>
+                      <Ionicons name="ribbon" size={14} color="#B45309" />
+                      <Text style={styles.vipGoldBadgeText}>RISEV VIP</Text>
+                    </View>
+                  </View>
+
+                  {/* Recessed Inset Stamp Campaign Card */}
+                  <View style={[
+                    styles.vipInsetCard,
+                    {
+                      backgroundColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.05)',
+                      borderColor: item.isDarkTheme ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.06)',
+                      ...(Platform.OS === 'web' ? {
+                        boxShadow: item.isDarkTheme
+                          ? 'inset 2px 2px 5px rgba(0,0,0,0.4), inset -2px -2px 5px rgba(255,255,255,0.08)'
+                          : 'inset 2px 2px 5px rgba(180, 165, 145, 0.4), inset -2px -2px 5px #ffffff',
+                      } : {}),
+                    }
+                  ]}>
+                    {/* Reward Title Header */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <View style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 14,
+                        backgroundColor: item.isDarkTheme ? '#334155' : '#FEF08A',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: 'rgba(0,0,0,0.08)',
+                        shadowOffset: { width: 1, height: 2 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 3,
+                      }}>
+                        <Ionicons name="gift" size={18} color={item.isDarkTheme ? '#FFD700' : '#0F172A'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: item.isDarkTheme ? '#FFFFFF' : '#0F172A' }} numberOfLines={1}>
+                          {item.stampsRule.replace(/Complete \d+ stamps for /, '') || 'FREE Special Treat'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: item.isDarkTheme ? '#94A3B8' : '#64748B' }}>
+                          Complete {item.totalStamps || 10} stamps
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 3D Capsule Progress Bar & Stamp Count */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <View style={{
+                        flex: 1,
+                        height: 14,
+                        borderRadius: 10,
+                        backgroundColor: item.isDarkTheme ? '#18181B' : '#DCD5C9',
+                        overflow: 'hidden',
+                        marginRight: 10,
+                        borderWidth: 1,
+                        borderColor: item.isDarkTheme ? '#334155' : '#D4C9B8',
+                      }}>
+                        <View style={{
+                          width: `${Math.min(100, Math.max(10, ((item.collectedStamps || 8) / (item.totalStamps || 10)) * 100))}%`,
+                          height: '100%',
+                          backgroundColor: item.brandColor || '#FFC700',
+                          borderRadius: 10,
+                        }} />
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: item.isDarkTheme ? '#FFFFFF' : '#0F172A' }}>
+                          {item.collectedStamps || 8}/{item.totalStamps || 10}
+                        </Text>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_600SemiBold', color: item.isDarkTheme ? '#94A3B8' : '#64748B', marginTop: -2 }}>
+                          {Math.max(0, (item.totalStamps || 10) - (item.collectedStamps || 8))} more to unlock reward
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Action Buttons Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {/* Book Appointment (Primary VIP CTA) */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleOpenMerchantDetails(item);
+                        }}
+                        activeOpacity={0.88}
+                        style={{
+                          flex: 1.25,
+                          height: 42,
+                          borderRadius: 22,
+                          backgroundColor: item.brandColor || '#FFC700',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          shadowColor: '#D97706',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 6,
+                          elevation: 4,
+                        }}
+                      >
+                        <Ionicons name="calendar" size={15} color={getContrastColor(item.brandColor)} />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: getContrastColor(item.brandColor) }}>
+                          Book Appointment
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* View Reward (Secondary CTA) */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleOpenMerchantDetails(item);
+                        }}
+                        activeOpacity={0.88}
+                        style={{
+                          flex: 1,
+                          height: 42,
+                          borderRadius: 22,
+                          backgroundColor: item.isDarkTheme ? '#18181B' : '#FFFFFF',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 4,
+                          borderWidth: item.isDarkTheme ? 1 : 0,
+                          borderColor: item.isDarkTheme ? '#334155' : 'transparent',
+                          shadowColor: item.isDarkTheme ? 'rgba(0,0,0,0.5)' : 'rgba(180, 165, 145, 0.4)',
+                          shadowOffset: { width: 0, height: 3 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 5,
+                          elevation: 3,
+                        }}
+                      >
+                        <Ionicons name="document-text-outline" size={14} color={item.isDarkTheme ? '#FFFFFF' : '#0F172A'} />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: item.isDarkTheme ? '#FFFFFF' : '#0F172A' }}>
+                          View Reward
+                        </Text>
+                        <Ionicons name="chevron-forward" size={12} color={item.isDarkTheme ? '#FFFFFF' : '#0F172A'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                /* REGULAR MERCHANT FLAT CARD */
+                <TouchableOpacity key={item.id} style={styles.merchantCard} onPress={() => handleOpenMerchantDetails(item)} activeOpacity={0.95}>
+                  {/* Cover photo header inside card */}
+                  <View style={styles.coverWrapper}>
+                    <Image source={{ uri: item.coverImage }} style={styles.coverImage} />
+                    <View style={styles.coverDarkGradient} />
+                    
+                    {/* Distance Badge */}
+                    <View style={styles.distanceBadge}>
+                      <Ionicons name="location-sharp" size={10} color="#FFFFFF" />
+                      <Text style={styles.distanceText}>{item.distance}</Text>
+                    </View>
+
+                    {item.featuredTag && (
+                      <View style={styles.featuredBadge}>
+                        <Text style={styles.featuredText}>{item.featuredTag}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Merchant Details Block */}
+                  <View style={styles.cardDetails}>
+                    <View style={styles.nameRow}>
+                      <Image source={{ uri: item.logo }} style={styles.merchantLogo} />
+                      <View style={styles.nameWrap}>
+                        <Text style={styles.merchantName}>{item.name}</Text>
+                        <Text style={styles.merchantCategory}>{item.category}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.ruleDivider} />
+
+                    {/* Stamp Reward Campaign Info */}
+                    <View style={styles.campaignInfo}>
+                      <View style={styles.campaignHeader}>
+                        <Ionicons name="gift-outline" size={16} color="#000000" />
+                        <Text style={styles.campaignRuleText}>{item.stampsRule}</Text>
+                      </View>
+
+                      {/* Stamp count mini-progress bar */}
+                      <View style={styles.progressRow}>
+                        <Text style={styles.progressLabel}>My Progress</Text>
+                        <Text style={styles.progressCount}>
+                          {item.collectedStamps}/{item.totalStamps} Stamps
+                        </Text>
+                      </View>
+                      <View style={styles.barContainer}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { width: `${(item.collectedStamps / item.totalStamps) * 100}%` },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
             ))
           )}
         </View>
@@ -927,6 +1317,24 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
+  vipBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  vipBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
   cardDetails: {
     padding: 16,
     gap: 12,
@@ -1278,5 +1686,213 @@ const styles = StyleSheet.create({
   radiusPillTextActive: {
     color: '#FFFFFF',
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  /* 👑 RISEV VIP Neumorphic Card Styles */
+  vipNeumorphicCard: {
+    backgroundColor: '#F5F0E8',
+    borderRadius: 28,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FAF6F0',
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    ...(Platform.OS === 'web' ? {
+      boxShadow: 'none',
+    } : {}),
+  },
+  vipCoverWrapper: {
+    width: '100%',
+    height: 145,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  vipCoverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  vipCoverOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+  },
+  vipDistanceBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  vipDistanceText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  vipInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 14,
+    gap: 12,
+  },
+  vipLogoBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 3,
+    shadowColor: 'rgba(0,0,0,0.1)',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  vipLogoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 15,
+  },
+  vipStoreTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  vipStoreCategory: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  vipGoldBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5D6',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 5,
+  },
+  vipGoldBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+    letterSpacing: 0.5,
+  },
+  vipInsetCard: {
+    backgroundColor: '#EAE3D7',
+    borderRadius: 22,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    ...(Platform.OS === 'web' ? {
+      boxShadow: 'inset 3px 3px 6px rgba(185, 172, 154, 0.35), inset -3px -3px 6px #ffffff',
+    } : {}),
+  },
+  vipRewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  vipGiftCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFF5D6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  vipRewardTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  vipRewardSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  vipArrowCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F5F0E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  vipStampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  vipStarsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  vipStarCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vipStarActive: {
+    backgroundColor: '#FFC700',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  vipStarInactive: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  vipStampDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginHorizontal: 10,
+  },
+  vipStampCountWrap: {
+    alignItems: 'center',
+  },
+  vipStampCountNum: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    lineHeight: 17,
+  },
+  vipStampCountLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
 });
