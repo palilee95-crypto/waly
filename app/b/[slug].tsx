@@ -237,6 +237,74 @@ export default function CustomerBookingPwaScreen() {
   const [stampsCount, setStampsCount] = useState(5);
   const totalStamps = 10;
 
+  // Dynamic countdown timer for Step 4 appointment pass
+  const [countdownText, setCountdownText] = useState<string>('Calculating...');
+  const [countdownSubText, setCountdownSubText] = useState<string>('Your appointment starts in:');
+
+  useEffect(() => {
+    if (currentStep !== 4) return;
+
+    const updateCountdown = () => {
+      const targetIso = createdBooking?.booking_date || selectedIsoDate;
+      const targetTimeStr = createdBooking?.start_time || selectedTime;
+
+      if (!targetIso || !targetTimeStr) {
+        setCountdownText('Upcoming');
+        setCountdownSubText('Your appointment is scheduled');
+        return;
+      }
+
+      const parts = targetIso.split('-');
+      if (parts.length !== 3) {
+        setCountdownText('Upcoming');
+        return;
+      }
+
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+
+      const totalMins = parseSlotToMinutes(targetTimeStr);
+      const targetHours = Math.floor(totalMins / 60);
+      const targetMinutes = totalMins % 60;
+      const targetDate = new Date(y, m, d, targetHours, targetMinutes, 0, 0);
+
+      const diffMs = targetDate.getTime() - Date.now();
+
+      if (diffMs <= 0) {
+        const pastMins = Math.floor(Math.abs(diffMs) / 60000);
+        if (pastMins < 60) {
+          setCountdownSubText('Current appointment status:');
+          setCountdownText('Happening Now');
+        } else {
+          setCountdownSubText('Current appointment status:');
+          setCountdownText('Appointment Started');
+        }
+        return;
+      }
+
+      setCountdownSubText('Your appointment starts in:');
+
+      const totalSecs = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSecs / 86400);
+      const hours = Math.floor((totalSecs % 86400) / 3600);
+      const mins = Math.floor((totalSecs % 3600) / 60);
+      const secs = totalSecs % 60;
+
+      if (days > 0) {
+        setCountdownText(`${days}d ${hours}h ${mins}m ${secs}s`);
+      } else if (hours > 0) {
+        setCountdownText(`${hours} Hr${hours > 1 ? 's' : ''} ${mins} Min${mins !== 1 ? 's' : ''} ${secs} Secs`);
+      } else {
+        setCountdownText(`${mins} Min${mins !== 1 ? 's' : ''} ${secs} Secs`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [currentStep, createdBooking, selectedIsoDate, selectedTime]);
+
   const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || merchant?.brand_color || '#FFC700';
   const fallbackBg = merchant?.pwa_bg_color || merchant?.bg_color || (merchant?.pwa_theme === 'dark' || merchant?.theme === 'dark' ? '#14161C' : (isObsidianDark(activeBrandColor) ? '#14161C' : '#F5F0E8'));
   const activeBgColor = liveBgColor || fallbackBg;
@@ -1537,26 +1605,36 @@ export default function CustomerBookingPwaScreen() {
               <Text style={[styles.boardingPassTitle, { color: themeStyles.textPrimaryColor }]}>Appointment Pass</Text>
 
               <View style={[styles.timerCountdownCard, themeStyles.neumorphicInset]}>
-                <Text style={[styles.timerSubText, { color: themeStyles.textSecondaryColor }]}>Your appointment starts in:</Text>
-                <Text style={[styles.timerMainText, { color: themeStyles.priceColor }]}>24 Mins 30 Secs</Text>
+                <Text style={[styles.timerSubText, { color: themeStyles.textSecondaryColor }]}>{countdownSubText}</Text>
+                <Text style={[styles.timerMainText, { color: themeStyles.priceColor }]}>{countdownText}</Text>
               </View>
 
               <View style={[styles.boardingInfoGrid, { borderColor: themeStyles.borderColor }]}>
                 <View style={styles.boardingGridCell}>
                   <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Service</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedServices[0]?.name || 'Signature Massage'}</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
+                    {selectedServices.map(s => s.name).join(', ') || createdBooking?.service_name || 'Service'}
+                  </Text>
                 </View>
                 <View style={styles.boardingGridCell}>
                   <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Provider</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedStaff?.name || 'Any Provider'}</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
+                    {selectedStaff?.name || createdBooking?.staff_name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Provider')}
+                  </Text>
                 </View>
                 <View style={styles.boardingGridCell}>
                   <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Slot Time</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedDate} @ {selectedTime}</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
+                    {createdBooking?.booking_date && createdBooking?.start_time
+                      ? `${selectedDate} @ ${createdBooking.start_time}`
+                      : `${selectedDate} @ ${selectedTime}`}
+                  </Text>
                 </View>
                 <View style={styles.boardingGridCell}>
                   <Text style={[styles.cellLabelText, { color: themeStyles.textSecondaryColor }]}>Branch</Text>
-                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
+                  <Text style={[styles.cellValueText, { color: themeStyles.textPrimaryColor }]}>
+                    {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Main Store'))}
+                  </Text>
                 </View>
               </View>
 
