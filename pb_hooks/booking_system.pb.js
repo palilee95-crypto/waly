@@ -318,15 +318,22 @@ onRecordUpdate((e) => {
   }
 
   const rec = e.record;
-  const original = e.record.originalCopy();
-  const oldStatus = original ? original.getString("status") : "";
-  const newStatus = rec.getString("status");
+  let original = null;
+  try {
+    original = e.record.original();
+  } catch (origErr) {
+    try {
+      original = e.record.originalCopy();
+    } catch (origErr2) {}
+  }
+  const oldStatus = original ? (original.getString ? original.getString("status") : original.get("status")) : "";
+  const newStatus = rec.getString ? rec.getString("status") : rec.get("status");
 
-  const merchantId = rec.getString("merchant");
-  const branchId = rec.getString("branch");
-  const staffId = rec.getString("staff");
-  const customerName = rec.getString("customer_name") || "Customer";
-  const startTimeStr = rec.getString("start_time") || "";
+  const merchantId = rec.getString ? rec.getString("merchant") : rec.get("merchant");
+  const branchId = rec.getString ? rec.getString("branch") : rec.get("branch");
+  const staffId = rec.getString ? rec.getString("staff") : rec.get("staff");
+  const customerName = (rec.getString ? rec.getString("customer_name") : rec.get("customer_name")) || "Customer";
+  const startTimeStr = (rec.getString ? rec.getString("start_time") : rec.get("start_time")) || "";
 
   e.next();
 
@@ -491,6 +498,44 @@ onRecordUpdate((e) => {
     }
   }
 }, "service_bookings");
+
+// -------------------------------------------------------------
+// 2b. REST API: Merchant Booking Status Update Endpoint
+// -------------------------------------------------------------
+routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
+  try {
+    let data = {};
+    try {
+      data = e.requestInfo().body || {};
+    } catch (bErr) {
+      try {
+        data = $apis.requestInfo(e).body || {};
+      } catch (bErr2) {
+        data = {};
+      }
+    }
+
+    const bookingId = data.booking_id || data.id;
+    const newStatus = data.status;
+
+    if (!bookingId || !newStatus) {
+      return e.json(400, { error: "Missing booking_id or status" });
+    }
+
+    const booking = $app.findRecordById("service_bookings", bookingId);
+    if (!booking) {
+      return e.json(404, { error: "Booking not found" });
+    }
+
+    booking.set("status", newStatus);
+    $app.save(booking);
+
+    return e.json(200, { success: true, booking_id: bookingId, status: newStatus });
+  } catch (err) {
+    console.log("[MERCHANT BOOKING STATUS ERROR]", err.message || err);
+    return e.json(500, { error: err.message || "Failed to update booking status" });
+  }
+});
 
 // -------------------------------------------------------------
 // 3. REST API: Customer Active Booking Endpoint

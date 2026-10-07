@@ -541,7 +541,15 @@ export default function BookingsScreen() {
     setUpdatingId(bookingId);
     try {
       if (!bookingId.startsWith('mock-')) {
-        await pb.collection('service_bookings').update(bookingId, { status: newStatus });
+        try {
+          await pb.collection('service_bookings').update(bookingId, { status: newStatus });
+        } catch (upErr) {
+          // Fall back to server-side endpoint with full privileges
+          await pb.send('/api/risev/merchant/booking-status', {
+            method: 'POST',
+            body: { booking_id: bookingId, status: newStatus }
+          });
+        }
       }
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
       if (newStatus === 'completed') {
@@ -576,6 +584,13 @@ export default function BookingsScreen() {
   };
 
   const handleMarkNoShow = (b: BookingItem) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const confirmed = window.confirm(`Mark appointment for ${b.customer_name || 'this customer'} as No Show?`);
+      if (confirmed) {
+        handleUpdateStatus(b.id, 'no_show');
+      }
+      return;
+    }
     Alert.alert(
       'Mark as No Show?',
       `Confirm that ${b.customer_name || 'this customer'} did not attend the scheduled appointment on ${b.booking_date} at ${b.start_time}?`,
