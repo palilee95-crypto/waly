@@ -168,6 +168,8 @@ export default function CustomerDashboard() {
   const [appointmentPassModalVisible, setAppointmentPassModalVisible] = useState(false);
   const [hasMarkedArrived, setHasMarkedArrived] = useState(false);
   const [markingArrivedLoading, setMarkingArrivedLoading] = useState(false);
+  const [isBookingMissed, setIsBookingMissed] = useState(false);
+  const [dismissedBookingId, setDismissedBookingId] = useState<string | null>(null);
 
   const fetchNotifications = async () => {
     // Notifications collection was removed in backend cleanup migration
@@ -285,6 +287,12 @@ export default function CustomerDashboard() {
           requestKey: null
         });
         if (res && res.booking) {
+          try {
+            const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${res.booking.id}`);
+            if (isDismissed === 'true') {
+              setDismissedBookingId(res.booking.id);
+            }
+          } catch (e) {}
           setUpcomingBooking(res.booking);
           setHasMarkedArrived(res.booking.status === 'arrived');
           return;
@@ -315,7 +323,7 @@ export default function CustomerDashboard() {
       
       const uniqueFilters = Array.from(new Set(filterConditions));
       const userFilter = uniqueFilters.length > 0 ? `(${uniqueFilters.join(' || ')})` : `customer = '${user.id}'`;
-      const fullFilter = `${userFilter} && (status = 'booked' || status = 'arrived') && booking_date >= '${todayIso}'`;
+      const fullFilter = `${userFilter} && (status = 'booked' || status = 'arrived' || (status = 'no_show' && booking_date = '${todayIso}')) && booking_date >= '${todayIso}'`;
 
       const res = await pb.collection('service_bookings').getList(1, 1, {
         filter: fullFilter,
@@ -326,6 +334,12 @@ export default function CustomerDashboard() {
 
       if (res.items.length > 0) {
         const item = res.items[0];
+        try {
+          const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${item.id}`);
+          if (isDismissed === 'true') {
+            setDismissedBookingId(item.id);
+          }
+        } catch (e) {}
         setUpcomingBooking(item);
         setHasMarkedArrived(item.status === 'arrived');
       } else {
@@ -355,13 +369,43 @@ export default function CustomerDashboard() {
     }
   };
 
+  const handleRescheduleBooking = () => {
+    const slug = upcomingBooking?.expand?.merchant?.pwa_slug || upcomingBooking?.merchant_pwa_slug;
+    setAppointmentPassModalVisible(false);
+    if (slug) {
+      router.push(`/b/${slug}` as any);
+    } else {
+      router.push('/(customer)/explore' as any);
+    }
+  };
+
+  const handleDismissMissedBooking = async () => {
+    if (upcomingBooking?.id) {
+      const bId = upcomingBooking.id;
+      setDismissedBookingId(bId);
+      try {
+        await AsyncStorage.setItem(`risev_dismissed_booking_${bId}`, 'true');
+      } catch (e) {
+        console.warn('Failed to persist dismissed booking:', e);
+      }
+    }
+    setAppointmentPassModalVisible(false);
+  };
+
   useEffect(() => {
     if (!upcomingBooking) {
       setBookingCountdown('');
+      setIsBookingMissed(false);
       return;
     }
 
     const updateCountdown = () => {
+      if (upcomingBooking.status === 'no_show') {
+        setIsBookingMissed(true);
+        setBookingCountdown('Missed Slot');
+        return;
+      }
+
       const bDate = upcomingBooking.booking_date;
       const bTime = upcomingBooking.start_time;
       if (!bDate || !bTime) return;
@@ -383,14 +427,21 @@ export default function CustomerDashboard() {
 
       if (diffMs <= 0) {
         const pastMins = Math.floor(Math.abs(diffMs) / 60000);
-        if (pastMins < 60) {
+        if (upcomingBooking.status === 'arrived') {
+          setIsBookingMissed(false);
+          setBookingCountdown(pastMins < 60 ? 'Happening Now' : 'Ongoing');
+        } else if (pastMins < 60) {
+          setIsBookingMissed(false);
           setBookingCountdown('Happening Now');
         } else {
-          setBookingCountdown('Ongoing');
+          // Overdue slot with no check-in (> 60m)
+          setIsBookingMissed(true);
+          setBookingCountdown('Missed Slot');
         }
         return;
       }
 
+      setIsBookingMissed(false);
       const totalSecs = Math.floor(diffMs / 1000);
       const days = Math.floor(totalSecs / 86400);
       const hours = Math.floor((totalSecs % 86400) / 3600);
@@ -1548,15 +1599,24 @@ export default function CustomerDashboard() {
               <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: hasMarkedArrived ? '#DCFCE7' : '#FEF3C7',
+                backgroundColor: isBookingMissed ? '#FEE2E2' : (hasMarkedArrived ? '#DCFCE7' : '#FEF3C7'),
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 borderRadius: 16,
                 gap: 6
               }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: hasMarkedArrived ? '#16A34A' : '#D97706' }} />
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: hasMarkedArrived ? '#15803D' : '#B45309' }}>
-                  {hasMarkedArrived ? 'ARRIVAL CONFIRMED' : 'BOOKING CONFIRMED'}
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: isBookingMissed ? '#DC2626' : (hasMarkedArrived ? '#16A34A' : '#D97706')
+                }} />
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: isBookingMissed ? '#DC2626' : (hasMarkedArrived ? '#15803D' : '#B45309')
+                }}>
+                  {isBookingMissed ? 'SLOT MISSED' : (hasMarkedArrived ? 'ARRIVAL CONFIRMED' : 'BOOKING CONFIRMED')}
                 </Text>
               </View>
 
@@ -1569,25 +1629,27 @@ export default function CustomerDashboard() {
               Appointment Pass
             </Text>
 
-            {/* Countdown Box */}
+            {/* Countdown / Status Box */}
             <View style={{
-              backgroundColor: '#FFFBEA',
+              backgroundColor: isBookingMissed ? '#FEF2F2' : '#FFFBEA',
               borderWidth: 1,
-              borderColor: '#FFE38F',
+              borderColor: isBookingMissed ? '#FECACA' : '#FFE38F',
               borderRadius: 18,
               padding: 14,
               alignItems: 'center',
               width: '100%',
               marginBottom: 16,
               ...(Platform.OS === 'web' ? {
-                boxShadow: 'inset 2px 2px 5px rgba(185, 172, 154, 0.2), inset -2px -2px 5px #ffffff',
+                boxShadow: isBookingMissed
+                  ? 'inset 2px 2px 5px rgba(239, 68, 68, 0.1), inset -2px -2px 5px #ffffff'
+                  : 'inset 2px 2px 5px rgba(185, 172, 154, 0.2), inset -2px -2px 5px #ffffff',
               } : {})
             }}>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400' }}>
-                {hasMarkedArrived ? 'Arrival Status:' : 'Your appointment starts in:'}
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: isBookingMissed ? '#DC2626' : '#806400' }}>
+                {isBookingMissed ? 'Appointment Status:' : (hasMarkedArrived ? 'Arrival Status:' : 'Your appointment starts in:')}
               </Text>
-              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', marginTop: 4 }}>
-                {hasMarkedArrived ? 'Checked In at Store' : (bookingCountdown || 'Starting Soon')}
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isBookingMissed ? '#DC2626' : '#1A1400', marginTop: 4 }}>
+                {isBookingMissed ? 'Missed Appointment' : (hasMarkedArrived ? 'Checked In at Store' : (bookingCountdown || 'Starting Soon'))}
               </Text>
             </View>
 
@@ -1628,7 +1690,13 @@ export default function CustomerDashboard() {
 
               <View style={{ width: '50%' }}>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Slot Time</Text>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
+                <Text style={{
+                  fontSize: 13,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: isBookingMissed ? '#64748B' : '#1A1400',
+                  marginTop: 2,
+                  textDecorationLine: isBookingMissed ? 'line-through' : 'none'
+                }}>
                   {upcomingBooking?.booking_date} @ {upcomingBooking?.start_time}
                 </Text>
               </View>
@@ -1641,46 +1709,100 @@ export default function CustomerDashboard() {
               </View>
             </View>
 
-            {/* Arrived Action */}
-            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
-              Tap the button below as soon as you step inside the store:
-            </Text>
+            {/* Bottom Actions */}
+            {isBookingMissed ? (
+              <View style={{ width: '100%', gap: 10 }}>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
+                  This slot has passed. Would you like to choose another time?
+                </Text>
 
-            <TouchableOpacity
-              style={{
-                width: '100%',
-                backgroundColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
-                borderRadius: 16,
-                paddingVertical: 14,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                shadowColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.35,
-                shadowRadius: 8,
-                elevation: 4
-              }}
-              onPress={handleMarkArrived}
-              disabled={hasMarkedArrived || markingArrivedLoading}
-              activeOpacity={0.85}
-            >
-              {markingArrivedLoading ? (
-                <ActivityIndicator color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
-              ) : (
-                <>
-                  <Ionicons name="location" size={18} color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
+                <TouchableOpacity
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#0F172A',
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    shadowColor: '#0F172A',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }}
+                  onPress={handleRescheduleBooking}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
                   <Text style={{
                     fontSize: 14,
                     fontFamily: 'PlusJakartaSans_800ExtraBold',
-                    color: hasMarkedArrived ? '#FFFFFF' : '#1A1400'
+                    color: '#FFFFFF'
                   }}>
-                    {hasMarkedArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
+                    Reschedule Appointment ➔
                   </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    width: '100%',
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={handleDismissMissedBooking}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                    Dismiss This Pass
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
+                  Tap the button below as soon as you step inside the store:
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    width: '100%',
+                    backgroundColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    shadowColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }}
+                  onPress={handleMarkArrived}
+                  disabled={hasMarkedArrived || markingArrivedLoading}
+                  activeOpacity={0.85}
+                >
+                  {markingArrivedLoading ? (
+                    <ActivityIndicator color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
+                  ) : (
+                    <>
+                      <Ionicons name="location" size={18} color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
+                      <Text style={{
+                        fontSize: 14,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: hasMarkedArrived ? '#FFFFFF' : '#1A1400'
+                      }}>
+                        {hasMarkedArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
