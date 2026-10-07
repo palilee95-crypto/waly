@@ -495,14 +495,26 @@ onRecordUpdate((e) => {
 // -------------------------------------------------------------
 // 3. REST API: Customer Active Booking Endpoint
 // -------------------------------------------------------------
-routerAdd("GET", "/api/risev/customer/active-booking", (c) => {
+routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
   try {
-    const authRecord = c.get("authRecord");
-    const queryPhone = c.queryParam("phone") || (authRecord ? authRecord.getString("phone") : "");
+    let query = {};
+    try {
+      query = e.requestInfo().query || {};
+    } catch (qErr) {
+      try {
+        query = $apis.requestInfo(e).query || {};
+      } catch (qErr2) {
+        query = {};
+      }
+    }
+
+    const authRecord = e.auth;
+    const rawPhone = query.phone || query.p || (authRecord ? authRecord.getString("phone") : "");
+    const queryPhone = ("" + rawPhone).trim();
     const customerId = authRecord ? authRecord.id : "";
 
     if (!queryPhone && !customerId) {
-      return c.json(200, { booking: null });
+      return e.json(200, { booking: null });
     }
 
     const cleanDigits = ("" + queryPhone).replace(/[^\d]/g, "");
@@ -593,9 +605,10 @@ routerAdd("GET", "/api/risev/customer/active-booking", (c) => {
       }
     };
 
-    return c.json(200, { booking: payload });
+    return e.json(200, { booking: payload });
   } catch (err) {
-    return c.json(500, { error: err.message || err });
+    console.log("[ACTIVE BOOKING ERROR]", err.message || err);
+    return e.json(500, { error: err.message || ("" + err) });
   }
 });
 
