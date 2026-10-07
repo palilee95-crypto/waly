@@ -6,21 +6,6 @@
 // 3. Web Push dispatch to merchant & assigned staff on new booking and customer arrival
 // 4. End-of-service loyalty auto-sync (transactions, stamps, points, voucher unlock, and digital receipt generation)
 
-// Ensure customer access rules on service_bookings collection
-try {
-  var bkgCol = $app.findCollectionByNameOrId("service_bookings");
-  var desiredRule = "customer = @request.auth.id || customer_phone = @request.auth.phone || merchant.owner = @request.auth.id || (merchant.id = @request.auth.merchant_id && @request.auth.merchant_id != '')";
-  if (bkgCol.listRule !== desiredRule) {
-    bkgCol.listRule = desiredRule;
-    bkgCol.viewRule = desiredRule;
-    bkgCol.updateRule = desiredRule;
-    $app.save(bkgCol);
-    console.log("[BOOKING HOOK] Updated service_bookings rules for customers");
-  }
-} catch (ruleInitErr) {
-  console.log("[BOOKING RULE INIT ERROR]", ruleInitErr.message || ruleInitErr);
-}
-
 // -------------------------------------------------------------
 // 1. ON RECORD CREATE: Validate slot, link customer, push notify
 // -------------------------------------------------------------
