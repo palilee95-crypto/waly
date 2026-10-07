@@ -937,6 +937,17 @@ export default function NfcLandingScreen() {
     });
   };
 
+  const handleNavigateToBooking = () => {
+    if (!bookingSlug) return;
+    const phone = (phoneInput || user?.phone || '').trim();
+    const name = (nameInput || user?.name || '').trim();
+    const q = new URLSearchParams();
+    if (phone) q.append('phone', phone);
+    if (name) q.append('name', name);
+    const qs = q.toString();
+    router.push(`/b/${bookingSlug}${qs ? `?${qs}` : ''}` as any);
+  };
+
   const handleSendWhatsapp = async () => {
     if (claimId) {
       try {
@@ -2494,7 +2505,7 @@ export default function NfcLandingScreen() {
                   {/* Pre-Claim Appointment Booking Link */}
                   {canBookAppointment && bookingSlug && (
                     <TouchableOpacity
-                      onPress={() => router.push(`/b/${bookingSlug}` as any)}
+                      onPress={handleNavigateToBooking}
                       activeOpacity={0.7}
                       style={styles.nfcBookAppointmentLink}
                     >
@@ -2578,7 +2589,7 @@ export default function NfcLandingScreen() {
                     {canBookAppointment && bookingSlug ? (
                       <TouchableOpacity
                         style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#10B981', marginTop: 0 }]}
-                        onPress={() => router.push(`/b/${bookingSlug}` as any)}
+                        onPress={handleNavigateToBooking}
                         activeOpacity={0.88}
                       >
                         <Ionicons name="calendar" size={17} color={getContrastColor(primaryColor || '#10B981')} style={{ marginRight: 6 }} />

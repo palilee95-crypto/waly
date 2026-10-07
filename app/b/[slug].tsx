@@ -146,7 +146,7 @@ function getPeriodForSlot(slot: string): 'Morning' | 'Afternoon' | 'Evening' {
 }
 
 export default function CustomerBookingPwaScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, phone: queryPhone, name: queryName } = useLocalSearchParams<{ slug: string; phone?: string; name?: string }>();
   const router = useRouter();
 
   // Dynamic upcoming dates from today
@@ -562,35 +562,50 @@ export default function CustomerBookingPwaScreen() {
   useEffect(() => {
     loadMerchantAndData();
     loadCachedCustomerInfo();
-  }, [slug]);
+  }, [slug, queryPhone, queryName]);
 
   useEffect(() => {
-    if (user?.name) {
+    const qName = (typeof queryName === 'string' ? queryName : '').trim();
+    const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
+
+    if (qName) {
+      setCustomerName(qName);
+    } else if (user?.name) {
       setCustomerName(user.name);
     } else if ((pb.authStore?.model as any)?.name) {
       setCustomerName((pb.authStore.model as any).name);
     }
 
-    if (user?.phone) {
+    if (qPhone) {
+      setCustomerPhone(qPhone);
+    } else if (user?.phone) {
       setCustomerPhone(user.phone);
     } else if ((pb.authStore?.model as any)?.phone) {
       setCustomerPhone((pb.authStore.model as any).phone);
     }
-  }, [user]);
+  }, [user, queryName, queryPhone]);
 
   const loadCachedCustomerInfo = async () => {
     try {
+      const qName = (typeof queryName === 'string' ? queryName : '').trim();
+      const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
       const activeName = user?.name || (pb.authStore?.model as any)?.name;
       const activePhone = user?.phone || (pb.authStore?.model as any)?.phone;
 
-      if (activeName) {
+      if (qName) {
+        setCustomerName(qName);
+        AsyncStorage.setItem('risev_cust_name', qName).catch(() => {});
+      } else if (activeName) {
         setCustomerName(activeName);
       } else {
         const savedName = await AsyncStorage.getItem('risev_cust_name');
         if (savedName) setCustomerName(savedName);
       }
 
-      if (activePhone) {
+      if (qPhone) {
+        setCustomerPhone(qPhone);
+        AsyncStorage.setItem('risev_cust_phone', qPhone).catch(() => {});
+      } else if (activePhone) {
         setCustomerPhone(activePhone);
       } else {
         const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
