@@ -24,8 +24,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
-import MerchantNoticeCarousel from '@/components/MerchantNoticeCarousel';
 import BookingAccessModal from './_components/BookingAccessModal';
+import SmartBookingBanner from '@/components/SmartBookingBanner';
 
 
 const { width } = Dimensions.get('window');
@@ -445,7 +445,7 @@ export default function MerchantDashboard() {
         <PushNotificationPrompt merchantId={user?.merchant_id} branchId={user?.branch} />
 
         {/* Unified Floating Analytics Card */}
-        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 8 }}>
+        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 0 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
             {/* Stamps / Points Awarded */}
             <View style={{ flex: 1, paddingRight: 12, justifyContent: 'center' }}>
@@ -544,57 +544,28 @@ export default function MerchantDashboard() {
         </View>
 
         {/* 📅 Booking & Appointments Quick Widget */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: 16,
-            padding: 14,
-            marginBottom: 14,
-            borderWidth: 1,
-            borderColor: '#E2E8F0',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
-            elevation: 2,
-          }}
-          onPress={() => {
-            const plan = (activeSubscription?.plan || '').toLowerCase();
-            const hasBookingAccess = Boolean(
-              plan === 'pro' ||
-              plan === 'business' ||
-              plan === 'enterprise' ||
-              merchant?.has_booking_addon === true
-            );
-            if (hasBookingAccess) {
-              router.push('/(merchant)/bookings' as any);
-            } else {
-              setShowBookingAccessModal(true);
-            }
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFBEA', borderWidth: 1, borderColor: '#FFC700', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="calendar" size={22} color="#D97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Smart Booking Management</Text>
-                <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000' }}>ADD-ON</Text>
-                </View>
-              </View>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                Manage appointments, services & customer check-ins
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
+        {(() => {
+          const plan = (activeSubscription?.plan || '').toLowerCase();
+          const hasBookingAccess = Boolean(
+            plan === 'pro' ||
+            plan === 'business' ||
+            plan === 'enterprise' ||
+            merchant?.has_booking_addon === true
+          );
+
+          return (
+            <SmartBookingBanner
+              hasAccess={hasBookingAccess}
+              onPress={() => {
+                if (hasBookingAccess) {
+                  router.push('/(merchant)/bookings' as any);
+                } else {
+                  setShowBookingAccessModal(true);
+                }
+              }}
+            />
+          );
+        })()}
 
         {/* 🎯 Real-time Customer Quota Tracker Card */}
         {(() => {
@@ -691,13 +662,6 @@ export default function MerchantDashboard() {
 
 
 
-
-        {/* 📢 AUTO-ROTATING ANNOUNCEMENT CAROUSEL (Tutorials, Free Quota, Promos, Updates) */}
-        <MerchantNoticeCarousel
-          merchant={merchant}
-          locale={locale}
-          onOpenUpgrade={() => setShowUpgradeModal(true)}
-        />
 
         {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
         <View style={styles.pendingSectionContainer}>
@@ -1063,6 +1027,7 @@ export default function MerchantDashboard() {
       <BookingAccessModal
         visible={showBookingAccessModal}
         onClose={() => setShowBookingAccessModal(false)}
+        merchantName={merchant?.name}
       />
     </SafeAreaView>
   );
