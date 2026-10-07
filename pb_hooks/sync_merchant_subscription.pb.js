@@ -18,6 +18,9 @@ onRecordCreate((e) => {
         if (isProPlan && merchant.getBool('has_booking_addon') !== true) {
           merchant.set('has_booking_addon', true);
           updated = true;
+        } else if (!isProPlan && merchant.getBool('has_booking_addon') === true) {
+          merchant.set('has_booking_addon', false);
+          updated = true;
         }
       }
       if (updated) {
@@ -48,6 +51,9 @@ onRecordUpdate((e) => {
         }
         if (isProPlan && merchant.getBool('has_booking_addon') !== true) {
           merchant.set('has_booking_addon', true);
+          updated = true;
+        } else if (!isProPlan && merchant.getBool('has_booking_addon') === true) {
+          merchant.set('has_booking_addon', false);
           updated = true;
         }
       } else {

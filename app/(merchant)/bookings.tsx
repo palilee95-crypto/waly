@@ -428,6 +428,9 @@ export default function BookingsScreen() {
       }
       setCurrentPlan(planName);
       setHasBookingAccess(hasAccess);
+      if (!hasAccess) {
+        setShowBookingAccessModal(true);
+      }
 
       if (!mRecord) {
         setMerchantData({ name: user?.name || 'My Store' });
@@ -1224,33 +1227,67 @@ export default function BookingsScreen() {
         </View>
       </View>
 
-      {/* Plan Upgrade Banner if not PRO and no Add-on */}
-      {!hasBookingAccess && (
-        <View style={{ marginHorizontal: 20, marginBottom: 14, padding: 14, backgroundColor: '#FFFBEB', borderRadius: 16, borderWidth: 1, borderColor: '#FDE68A', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-              <Ionicons name="sparkles" size={15} color="#D97706" />
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
-                PRO Feature
-              </Text>
+      {!hasBookingAccess ? (
+        <ScrollView contentContainerStyle={styles.lockedPaywallContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.lockedCard}>
+            <View style={styles.lockedIconCircle}>
+              <Ionicons name="lock-closed" size={32} color="#D97706" />
+              <View style={styles.lockedSparkleBadge}>
+                <Ionicons name="sparkles" size={14} color="#000000" />
+              </View>
             </View>
-            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E', lineHeight: 15 }}>
-              The Live Booking Engine & Customer PWA is included with the PRO Plan (RM97/mo). Upgrade to unlock online bookings for your store.
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowBookingAccessModal(true)}
-            style={{ backgroundColor: '#050505', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="flash" size={12} color="#FFC700" />
-            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Upgrade</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {/* Segmented Top Tabs */}
-      <View style={styles.tabBarWrap}>
+            <View style={styles.lockedBadgePro}>
+              <Text style={styles.lockedBadgeProText}>PRO PLAN EXCLUSIVE ⚡</Text>
+            </View>
+
+            <Text style={styles.lockedTitle}>Smart Booking Suite is Locked</Text>
+            <Text style={styles.lockedSubtitle}>
+              Smart Booking Management and your Dedicated Customer Storefront PWA are exclusively included with the Risev PRO Plan (RM97/mo).
+            </Text>
+
+            <View style={styles.lockedFeatureList}>
+              <View style={styles.lockedFeatureRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                <Text style={styles.lockedFeatureText}>24/7 Automated Online Booking Engine</Text>
+              </View>
+              <View style={styles.lockedFeatureRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                <Text style={styles.lockedFeatureText}>Branded Customer Storefront (/b/{pwaSlug || 'your-store'})</Text>
+              </View>
+              <View style={styles.lockedFeatureRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                <Text style={styles.lockedFeatureText}>Staff Scheduling & Service Catalog Management</Text>
+              </View>
+              <View style={styles.lockedFeatureRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                <Text style={styles.lockedFeatureText}>Real-Time WhatsApp Appointment Alerts</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.lockedUpgradeBtn}
+              onPress={() => setShowBookingAccessModal(true)}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="flash" size={18} color="#FFC700" style={{ marginRight: 8 }} />
+              <Text style={styles.lockedUpgradeBtnText}>Upgrade to PRO Plan</Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.lockedBackBtn}
+              onPress={() => handleSmartBack(router, '/(merchant)/profile')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.lockedBackBtnText}>Back to Business Console</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : (
+        <>
+          {/* Segmented Top Tabs */}
+          <View style={styles.tabBarWrap}>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'appointments' && styles.tabItemActive]}
           onPress={() => setActiveTab('appointments')}
@@ -3304,6 +3341,8 @@ export default function BookingsScreen() {
           </View>
         </View>
       </Modal>
+        </>
+      )}
 
       {/* Booking & PWA Suite Feature Access Gate Modal */}
       <BookingAccessModal
@@ -5317,5 +5356,129 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#475569',
+  },
+
+  // Locked Paywall
+  lockedPaywallContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 40,
+  },
+  lockedCard: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  lockedIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  lockedSparkleBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FFC700',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedBadgePro: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: 12,
+  },
+  lockedBadgeProText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  lockedTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  lockedSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  lockedFeatureList: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    marginBottom: 24,
+  },
+  lockedFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  lockedFeatureText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#1E293B',
+    flex: 1,
+  },
+  lockedUpgradeBtn: {
+    width: '100%',
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  lockedUpgradeBtnText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  lockedBackBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  lockedBackBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
 });
