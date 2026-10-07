@@ -128,6 +128,9 @@ export default function BookingsScreen() {
     now.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
   );
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [calMonthDate, setCalMonthDate] = useState<Date>(new Date());
+  const [calViewMode, setCalViewMode] = useState<'day' | 'week' | 'month'>('month');
+  const [selectedCalIsoDate, setSelectedCalIsoDate] = useState<string>(new Date().toISOString().substring(0, 10));
 
   // Services State
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -435,11 +438,28 @@ export default function BookingsScreen() {
       try {
         let bItems: any[] = [];
         if (user?.merchant_id) {
-          const bRes = await pb.collection('service_bookings').getList(1, 100, {
+          const bRes = await pb.collection('service_bookings').getList(1, 500, {
             filter: `merchant = "${user.merchant_id}"`,
-            sort: '-booking_date,-start_time'
+            sort: '-booking_date,-start_time',
+            expand: 'staff'
           });
-          bItems = bRes.items;
+          bItems = bRes.items.map((item: any) => {
+            let sName = item.service_name;
+            if (!sName && item.items_summary) {
+              let its = item.items_summary;
+              if (typeof its === 'string') {
+                try { its = JSON.parse(its); } catch (e) { its = []; }
+              }
+              if (Array.isArray(its) && its.length > 0) {
+                sName = its.map((it: any) => it.name).join(', ');
+              }
+            }
+            return {
+              ...item,
+              service_name: sName || 'Service',
+              staff_name: item.staff_name || item.expand?.staff?.name || 'Staff'
+            };
+          });
         }
         setBookings(bItems as any);
       } catch (bErr) {
@@ -990,6 +1010,181 @@ export default function BookingsScreen() {
   const arrivedCount = bookings.filter(b => b.status === 'arrived').length;
   const bookedCount = bookings.filter(b => b.status === 'booked').length;
   const completedCount = bookings.filter(b => b.status === 'completed').length;
+
+  // Real month calendar days calculation
+  const calendarDays = useMemo(() => {
+    const year = calMonthDate.getFullYear();
+    const month = calMonthDate.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const result: {
+      day: number;
+      isoDate: string;
+      isPrev?: boolean;
+      isNext?: boolean;
+      count: number;
+      hasNoShow: boolean;
+      hasCompleted: boolean;
+      hasUpcoming: boolean;
+      dotColor?: string;
+    }[] = [];
+
+    // Prev month days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = prevMonthDays - i;
+      const prevDate = new Date(year, month - 1, d);
+      const isoDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayBookings = bookings.filter(b => b.booking_date === isoDate);
+      result.push({
+        day: d,
+        isoDate,
+        isPrev: true,
+        count: dayBookings.length,
+        hasNoShow: dayBookings.some(b => b.status === 'no_show'),
+        hasCompleted: dayBookings.some(b => b.status === 'completed'),
+        hasUpcoming: dayBookings.some(b => b.status === 'booked' || b.status === 'arrived'),
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayBookings = bookings.filter(b => b.booking_date === isoDate);
+      const count = dayBookings.length;
+      const hasNoShow = dayBookings.some(b => b.status === 'no_show');
+      const hasCompleted = dayBookings.some(b => b.status === 'completed');
+      const hasUpcoming = dayBookings.some(b => b.status === 'booked' || b.status === 'arrived');
+
+      let dotColor = '#EAB308';
+      if (hasNoShow) {
+        dotColor = '#EF4444'; // Red for missed / no-show
+      } else if (hasCompleted) {
+        dotColor = '#22C55E'; // Green for completed
+      } else if (hasUpcoming) {
+        dotColor = '#3B82F6'; // Blue for booked / arrived
+      }
+
+      result.push({
+        day: d,
+        isoDate,
+        count,
+        hasNoShow,
+        hasCompleted,
+        hasUpcoming,
+        dotColor: count > 0 ? dotColor : undefined,
+      });
+    }
+
+    // Next month days to complete 7-day grid rows
+    const totalCells = result.length;
+    const remaining = (7 - (totalCells % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const nextDate = new Date(year, month + 1, d);
+      const isoDate = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayBookings = bookings.filter(b => b.booking_date === isoDate);
+      result.push({
+        day: d,
+        isoDate,
+        isNext: true,
+        count: dayBookings.length,
+        hasNoShow: dayBookings.some(b => b.status === 'no_show'),
+        hasCompleted: dayBookings.some(b => b.status === 'completed'),
+        hasUpcoming: dayBookings.some(b => b.status === 'booked' || b.status === 'arrived'),
+      });
+    }
+
+    return result;
+  }, [calMonthDate, bookings]);
+
+  // Week days calculation
+  const calendarWeekDays = useMemo(() => {
+    const cur = new Date(selectedCalIsoDate + 'T00:00:00');
+    const dayOfWeek = isNaN(cur.getTime()) ? 0 : cur.getDay(); // 0 = Sun
+    const sun = new Date(cur);
+    sun.setDate(cur.getDate() - dayOfWeek);
+
+    const result = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sun);
+      d.setDate(sun.getDate() + i);
+      const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dayBookings = bookings.filter(b => b.booking_date === isoDate);
+      const count = dayBookings.length;
+      const hasNoShow = dayBookings.some(b => b.status === 'no_show');
+      const hasCompleted = dayBookings.some(b => b.status === 'completed');
+      const hasUpcoming = dayBookings.some(b => b.status === 'booked' || b.status === 'arrived');
+
+      let dotColor = '#EAB308';
+      if (hasNoShow) dotColor = '#EF4444';
+      else if (hasCompleted) dotColor = '#22C55E';
+      else if (hasUpcoming) dotColor = '#3B82F6';
+
+      result.push({
+        day: d.getDate(),
+        isoDate,
+        count,
+        hasNoShow,
+        hasCompleted,
+        hasUpcoming,
+        dotColor: count > 0 ? dotColor : undefined,
+      });
+    }
+    return result;
+  }, [selectedCalIsoDate, bookings]);
+
+  const selectedDayBookings = useMemo(() => {
+    return bookings.filter(b => b.booking_date === selectedCalIsoDate);
+  }, [bookings, selectedCalIsoDate]);
+
+  const handleSelectCalendarDate = (item: { day: number; isoDate: string; isPrev?: boolean; isNext?: boolean }) => {
+    setSelectedCalIsoDate(item.isoDate);
+    const todayIso = new Date().toISOString().substring(0, 10);
+    const dObj = new Date(item.isoDate + 'T00:00:00');
+    if (item.isoDate === todayIso) {
+      setSelectedDateTitle('Today');
+    } else {
+      setSelectedDateTitle(dObj.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' }));
+    }
+    setSelectedDateSubtitle(dObj.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    
+    if (item.isPrev || item.isNext) {
+      setCalMonthDate(new Date(dObj.getFullYear(), dObj.getMonth(), 1));
+    }
+  };
+
+  const handleCalendarNavPrev = () => {
+    if (calViewMode === 'month') {
+      setCalMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    } else if (calViewMode === 'week') {
+      const d = new Date(selectedCalIsoDate + 'T00:00:00');
+      d.setDate(d.getDate() - 7);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      handleSelectCalendarDate({ day: d.getDate(), isoDate: iso });
+    } else {
+      const d = new Date(selectedCalIsoDate + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      handleSelectCalendarDate({ day: d.getDate(), isoDate: iso });
+    }
+  };
+
+  const handleCalendarNavNext = () => {
+    if (calViewMode === 'month') {
+      setCalMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    } else if (calViewMode === 'week') {
+      const d = new Date(selectedCalIsoDate + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      handleSelectCalendarDate({ day: d.getDate(), isoDate: iso });
+    } else {
+      const d = new Date(selectedCalIsoDate + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      handleSelectCalendarDate({ day: d.getDate(), isoDate: iso });
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -2800,164 +2995,291 @@ export default function BookingsScreen() {
               
               {/* Day / Week / Month Switcher Pills */}
               <View style={styles.calTabPillsWrap}>
-                <TouchableOpacity style={styles.calTabPill}>
-                  <Text style={styles.calTabPillText}>Day</Text>
+                <TouchableOpacity
+                  style={[styles.calTabPill, calViewMode === 'day' && styles.calTabPillActive]}
+                  onPress={() => setCalViewMode('day')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.calTabPillText, calViewMode === 'day' && styles.calTabPillTextActive]}>Day</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.calTabPill}>
-                  <Text style={styles.calTabPillText}>Week</Text>
+                <TouchableOpacity
+                  style={[styles.calTabPill, calViewMode === 'week' && styles.calTabPillActive]}
+                  onPress={() => setCalViewMode('week')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.calTabPillText, calViewMode === 'week' && styles.calTabPillTextActive]}>Week</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.calTabPill, styles.calTabPillActive]}>
-                  <Text style={[styles.calTabPillText, styles.calTabPillTextActive]}>Month</Text>
+                <TouchableOpacity
+                  style={[styles.calTabPill, calViewMode === 'month' && styles.calTabPillActive]}
+                  onPress={() => setCalViewMode('month')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.calTabPillText, calViewMode === 'month' && styles.calTabPillTextActive]}>Month</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Month Navigator Header */}
               <View style={styles.monthNavHeader}>
-                <TouchableOpacity style={styles.btnMonthArrow}>
+                <TouchableOpacity onPress={handleCalendarNavPrev} style={styles.btnMonthArrow} activeOpacity={0.7}>
                   <Ionicons name="chevron-back" size={18} color="#050505" />
                 </TouchableOpacity>
-                <Text style={styles.monthTitleText}>October 2026</Text>
-                <TouchableOpacity style={styles.btnMonthArrow}>
+                <Text style={styles.monthTitleText}>
+                  {calViewMode === 'month'
+                    ? calMonthDate.toLocaleDateString('en-MY', { month: 'long', year: 'numeric' })
+                    : selectedDateTitle}
+                </Text>
+                <TouchableOpacity onPress={handleCalendarNavNext} style={styles.btnMonthArrow} activeOpacity={0.7}>
                   <Ionicons name="chevron-forward" size={18} color="#050505" />
                 </TouchableOpacity>
               </View>
 
-              {/* Weekday Headers */}
-              <View style={styles.weekdaysRow}>
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                  <Text key={d} style={styles.weekdayText}>{d}</Text>
-                ))}
-              </View>
+              {/* Weekday Headers (for Month and Week views) */}
+              {calViewMode !== 'day' && (
+                <View style={styles.weekdaysRow}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                    <Text key={d} style={styles.weekdayText}>{d}</Text>
+                  ))}
+                </View>
+              )}
 
               {/* Month Calendar Grid (7 columns) */}
-              <View style={styles.monthGrid}>
-                {/* Previous month light grey days */}
-                {[
-                  { day: 27, count: null, isPrev: true },
-                  { day: 28, count: null, isPrev: true },
-                  { day: 29, count: null, isPrev: true },
-                  { day: 30, count: null, isPrev: true },
-                  
-                  // October dates with counts
-                  { day: 1, count: 3, dotColor: '#3B82F6' },
-                  { day: 2, count: 5, dotColor: '#EAB308' },
-                  { day: 3, count: 2, dotColor: '#22C55E' },
-                  { day: 4, count: 1, dotColor: '#EAB308' },
-                  { day: 5, count: 8, dotColor: '#8B5CF6', isSelected: true },
-                  { day: 6, count: 6, dotColor: '#22C55E' },
-                  { day: 7, count: 4, dotColor: '#EF4444' },
-                  { day: 8, count: 7, dotColor: '#3B82F6' },
-                  { day: 9, count: 3, dotColor: '#22C55E' },
-                  { day: 10, count: 5, dotColor: '#EF4444' },
-                  { day: 11, count: 2, dotColor: '#3B82F6' },
-                  { day: 12, count: 6, dotColor: '#8B5CF6' },
-                  { day: 13, count: 3, dotColor: '#3B82F6' },
-                  { day: 14, count: 8, dotColor: '#EF4444' },
-                  { day: 15, count: 7, dotColor: '#3B82F6' },
-                  { day: 16, count: 4, dotColor: '#8B5CF6' },
-                  { day: 17, count: 1, dotColor: '#EAB308' },
-                  { day: 18, count: 3, dotColor: '#22C55E' },
-                  { day: 19, count: 5, dotColor: '#EAB308' },
-                  { day: 20, count: 2, dotColor: '#8B5CF6' },
-                  { day: 21, count: 4, dotColor: '#3B82F6' },
-                  { day: 22, count: 9, dotColor: '#EF4444' },
-                  { day: 23, count: 6, dotColor: '#22C55E' },
-                  { day: 24, count: 2, dotColor: '#EF4444' },
-                  { day: 25, count: 1, dotColor: '#3B82F6' },
-                  { day: 26, count: 4, dotColor: '#EAB308' },
-                  { day: 27, count: 3, dotColor: '#EAB308' },
-                  { day: 28, count: 5, dotColor: '#EF4444' },
-                  { day: 29, count: 7, dotColor: '#EF4444' },
-                  { day: 30, count: 4, dotColor: '#EF4444' },
-                  { day: 31, count: 2, dotColor: '#8B5CF6' },
-                ].map((item, idx) => {
-                  const isSel = selectedDateTitle.includes(item.day.toString()) || item.isSelected;
-                  return (
-                    <TouchableOpacity
-                      key={idx}
-                      style={[
-                        styles.gridCell,
-                        item.isPrev && styles.gridCellPrev,
-                        isSel && styles.gridCellSelected
-                      ]}
-                      onPress={() => {
-                        if (!item.isPrev) {
-                          setSelectedDateTitle(`${item.day} October 2026`);
-                          setSelectedDateSubtitle(`October ${item.day}, 2026`);
-                        }
-                      }}
-                      disabled={item.isPrev}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[
-                        styles.gridDayNum,
-                        item.isPrev && styles.gridDayNumPrev,
-                        isSel && styles.gridDayNumSelected
-                      ]}>
-                        {item.day}
-                      </Text>
+              {calViewMode === 'month' && (
+                <View style={styles.monthGrid}>
+                  {calendarDays.map((item, idx) => {
+                    const isSel = item.isoDate === selectedCalIsoDate;
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[
+                          styles.gridCell,
+                          (item.isPrev || item.isNext) && styles.gridCellPrev,
+                          isSel && styles.gridCellSelected
+                        ]}
+                        onPress={() => handleSelectCalendarDate(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[
+                          styles.gridDayNum,
+                          (item.isPrev || item.isNext) && styles.gridDayNumPrev,
+                          isSel && styles.gridDayNumSelected
+                        ]}>
+                          {item.day}
+                        </Text>
 
-                      {item.count !== null && (
-                        <View style={styles.gridBadgeRow}>
-                          <View style={[styles.gridDot, { backgroundColor: item.dotColor || '#3B82F6' }]} />
-                          <Text style={[styles.gridCountText, isSel && styles.gridCountTextSelected]}>
-                            {item.count}
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        {item.count > 0 && (
+                          <View style={styles.gridBadgeRow}>
+                            <View style={[styles.gridDot, { backgroundColor: item.dotColor || '#3B82F6' }]} />
+                            <Text style={[styles.gridCountText, isSel && styles.gridCountTextSelected]}>
+                              {item.count}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Week Calendar Row */}
+              {calViewMode === 'week' && (
+                <View style={[styles.monthGrid, { marginBottom: 12 }]}>
+                  {calendarWeekDays.map((item, idx) => {
+                    const isSel = item.isoDate === selectedCalIsoDate;
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[
+                          styles.gridCell,
+                          isSel && styles.gridCellSelected
+                        ]}
+                        onPress={() => handleSelectCalendarDate(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[
+                          styles.gridDayNum,
+                          isSel && styles.gridDayNumSelected
+                        ]}>
+                          {item.day}
+                        </Text>
+
+                        {item.count > 0 && (
+                          <View style={styles.gridBadgeRow}>
+                            <View style={[styles.gridDot, { backgroundColor: item.dotColor || '#3B82F6' }]} />
+                            <Text style={[styles.gridCountText, isSel && styles.gridCountTextSelected]}>
+                              {item.count}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               {/* Selected Day Schedule Title Row */}
               <View style={styles.dayScheduleHeaderRow}>
-                <Text style={styles.dayScheduleTitle}>{selectedDateTitle}</Text>
-                <Text style={styles.dayScheduleSub}>{bookings.length} {bookings.length === 1 ? 'appointment' : 'appointments'}</Text>
+                <View>
+                  <Text style={styles.dayScheduleTitle}>{selectedDateTitle}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 1 }}>
+                    {selectedDateSubtitle}
+                  </Text>
+                </View>
+                <Text style={styles.dayScheduleSub}>
+                  {selectedDayBookings.length} {selectedDayBookings.length === 1 ? 'appointment' : 'appointments'}
+                </Text>
               </View>
 
               {/* Appointment Cards List Below Calendar */}
               <View style={styles.dayApptList}>
-                {bookings.length === 0 ? (
+                {selectedDayBookings.length === 0 ? (
                   <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
                     <Ionicons name="calendar-outline" size={44} color="#CBD5E1" />
                     <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginTop: 12 }}>
-                      No Appointments Found
+                      No Appointments on this Day
                     </Text>
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, textAlign: 'center', paddingHorizontal: 30 }}>
-                      When customers book appointments online or in-store, they will appear right here.
+                      There are no scheduled, completed or missed appointments on {selectedDateTitle}.
                     </Text>
                   </View>
                 ) : (
-                  bookings.map((b) => (
-                    <TouchableOpacity
+                  selectedDayBookings.map((b) => (
+                    <View
                       key={b.id}
-                      style={styles.calApptCard}
-                      onPress={() => handleCustomerWhatsApp(b)}
-                      activeOpacity={0.8}
+                      style={[
+                        styles.calApptCard,
+                        b.status === 'no_show' && { borderColor: '#FECACA', backgroundColor: '#FFF5F5' },
+                        b.status === 'completed' && { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }
+                      ]}
                     >
-                      <View style={styles.calCustAvatarBadge}>
-                        <Text style={styles.calCustAvatarBadgeText}>
-                          {(b.customer_name || 'C').charAt(0).toUpperCase()}
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' }}>
+                        <View style={[
+                          styles.calCustAvatarBadge,
+                          b.status === 'no_show' && { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
+                          b.status === 'completed' && { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }
+                        ]}>
+                          <Text style={[
+                            styles.calCustAvatarBadgeText,
+                            b.status === 'no_show' && { color: '#DC2626' },
+                            b.status === 'completed' && { color: '#15803D' }
+                          ]}>
+                            {(b.customer_name || 'C').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.calApptTime}>{b.start_time || '10:00 AM'} • {b.booking_date}</Text>
+                          <Text style={styles.calCustName}>{b.customer_name || 'Customer'}</Text>
+                          <Text style={styles.calSrvStaff}>
+                            {b.service_name || 'Service'} • {b.staff_name || 'Staff'}
+                            {b.total_price ? ` • RM ${Number(b.total_price).toFixed(2)}` : ''}
+                          </Text>
+                        </View>
+
+                        {/* Status Badge */}
+                        <View style={[
+                          b.status === 'completed' ? styles.badgeArrived :
+                          b.status === 'no_show' ? styles.badgeNoShow :
+                          b.status === 'cancelled' ? styles.badgePending :
+                          styles.badgeConfirmed
+                        ]}>
+                          <Ionicons
+                            name={
+                              b.status === 'completed' ? "checkmark-circle" :
+                              b.status === 'no_show' ? "alert-circle" :
+                              b.status === 'cancelled' ? "close-circle" :
+                              "time"
+                            }
+                            size={12}
+                            color={
+                              b.status === 'completed' ? "#15803D" :
+                              b.status === 'no_show' ? "#DC2626" :
+                              b.status === 'cancelled' ? "#EF4444" :
+                              "#2563EB"
+                            }
+                          />
+                          <Text style={[
+                            b.status === 'completed' ? styles.badgeArrivedText :
+                            b.status === 'no_show' ? styles.badgeNoShowText :
+                            b.status === 'cancelled' ? [styles.badgePendingText, { color: '#EF4444' }] :
+                            styles.badgeConfirmedText
+                          ]}>
+                            {b.status === 'no_show' ? 'NO SHOW' : (b.status || 'booked').toUpperCase()}
+                          </Text>
+                        </View>
+
+                        {/* WhatsApp Icon */}
+                        <TouchableOpacity
+                          onPress={() => b.status === 'no_show' ? handleNoShowWhatsApp(b) : handleCustomerWhatsApp(b)}
+                          style={{ padding: 6, borderRadius: 10, backgroundColor: '#DCFCE7' }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
+                        </TouchableOpacity>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.calApptTime}>{b.start_time || '10:00 AM'} • {b.booking_date}</Text>
-                        <Text style={styles.calCustName}>{b.customer_name || 'Customer'}</Text>
-                        <Text style={styles.calSrvStaff}>{b.service_name || 'Service'} • {b.staff_name || 'Staff'}</Text>
+
+                      {/* Merchant Action Row under each card */}
+                      <View style={styles.calCardActionRow}>
+                        {b.status !== 'completed' && b.status !== 'no_show' && (
+                          <>
+                            <TouchableOpacity
+                              style={styles.btnCalActionComplete}
+                              onPress={() => handleUpdateStatus(b.id, 'completed')}
+                              disabled={updatingId === b.id}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.btnCalActionCompleteText}>
+                                {updatingId === b.id ? 'Updating...' : '✓ Complete & Stamp'}
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.btnCalActionNoShow}
+                              onPress={() => handleMarkNoShow(b)}
+                              disabled={updatingId === b.id}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.btnCalActionNoShowText}>
+                                ✕ Mark No Show
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+
+                        {b.status === 'no_show' && (
+                          <>
+                            <TouchableOpacity
+                              style={styles.btnCalActionReopen}
+                              onPress={() => handleUpdateStatus(b.id, 'booked')}
+                              disabled={updatingId === b.id}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.btnCalActionReopenText}>
+                                ↺ Reopen Booking
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.btnCalActionComplete}
+                              onPress={() => handleNoShowWhatsApp(b)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.btnCalActionCompleteText}>
+                                💬 WhatsApp Reschedule
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+
+                        {b.status === 'completed' && (
+                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                            <Ionicons name="checkmark-done-circle" size={16} color="#15803D" />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#15803D' }}>
+                              Completed & Loyalty Stamped
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                      <View style={b.status === 'completed' ? styles.badgeArrived : b.status === 'cancelled' ? styles.badgePending : styles.badgeConfirmed}>
-                        <Ionicons
-                          name={b.status === 'completed' ? "checkmark-circle" : b.status === 'cancelled' ? "close-circle" : "time"}
-                          size={12}
-                          color={b.status === 'completed' ? "#15803D" : b.status === 'cancelled' ? "#EF4444" : "#2563EB"}
-                        />
-                        <Text style={b.status === 'completed' ? styles.badgeArrivedText : b.status === 'cancelled' ? [styles.badgePendingText, { color: '#EF4444' }] : styles.badgeConfirmedText}>
-                          {(b.status || 'booked').toUpperCase()}
-                        </Text>
-                      </View>
-                      <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-                    </TouchableOpacity>
+                    </View>
                   ))
                 )}
               </View>
@@ -4494,14 +4816,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   calApptCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 10,
+    gap: 6,
   },
   calCustAvatar: {
     width: 44,
@@ -4583,6 +4905,64 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#D97706',
+  },
+  badgeNoShow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  badgeNoShowText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
+  },
+  calCardActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  btnCalActionComplete: {
+    flex: 1,
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnCalActionCompleteText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
+  },
+  btnCalActionNoShow: {
+    flex: 1,
+    backgroundColor: '#FEE2E2',
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnCalActionNoShowText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
+  },
+  btnCalActionReopen: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnCalActionReopenText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
   },
 
   // Branding & Hero Customizer Styles

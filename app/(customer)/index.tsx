@@ -256,6 +256,12 @@ export default function CustomerDashboard() {
           requestKey: null
         });
         if (res && res.booking) {
+          try {
+            const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${res.booking.id}`);
+            if (isDismissed === 'true') {
+              setDismissedBookingId(res.booking.id);
+            }
+          } catch (e) {}
           setUpcomingBooking(res.booking);
           setHasMarkedArrived(res.booking.status === 'arrived');
           return;
@@ -297,6 +303,12 @@ export default function CustomerDashboard() {
 
       if (res.items.length > 0) {
         const item = res.items[0];
+        try {
+          const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${item.id}`);
+          if (isDismissed === 'true') {
+            setDismissedBookingId(item.id);
+          }
+        } catch (e) {}
         setUpcomingBooking(item);
         setHasMarkedArrived(item.status === 'arrived');
       } else {
@@ -336,9 +348,15 @@ export default function CustomerDashboard() {
     }
   };
 
-  const handleDismissMissedBooking = () => {
+  const handleDismissMissedBooking = async () => {
     if (upcomingBooking?.id) {
-      setDismissedBookingId(upcomingBooking.id);
+      const bId = upcomingBooking.id;
+      setDismissedBookingId(bId);
+      try {
+        await AsyncStorage.setItem(`risev_dismissed_booking_${bId}`, 'true');
+      } catch (e) {
+        console.warn('Failed to persist dismissed booking:', e);
+      }
     }
     setAppointmentPassModalVisible(false);
   };
