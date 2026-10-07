@@ -1259,10 +1259,6 @@ export default function BookingsScreen() {
                 <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                 <Text style={styles.lockedFeatureText}>Staff Scheduling & Service Catalog Management</Text>
               </View>
-              <View style={styles.lockedFeatureRow}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.lockedFeatureText}>Real-Time WhatsApp Appointment Alerts</Text>
-              </View>
             </View>
 
             <TouchableOpacity

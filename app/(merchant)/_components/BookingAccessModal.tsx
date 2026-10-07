@@ -69,7 +69,7 @@ export default function BookingAccessModal({ visible, onClose }: BookingAccessMo
               </View>
 
               <Text style={styles.subtitle}>
-                Unlock complete online appointment booking, customized customer PWA & automated WhatsApp alerts.
+                Unlock complete online appointment booking & customized customer storefront PWA.
               </Text>
             </View>
 
@@ -107,18 +107,6 @@ export default function BookingAccessModal({ visible, onClose }: BookingAccessMo
                   <Text style={styles.featureItemTitle}>Staff & Branch Scheduling</Text>
                   <Text style={styles.featureItemDesc}>
                     Assign team members, set buffer times between appointments & deposit rules.
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <View style={[styles.featureIconWrap, { backgroundColor: '#FFFBEB' }]}>
-                  <Ionicons name="logo-whatsapp" size={20} color="#D97706" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.featureItemTitle}>WhatsApp Automation</Text>
-                  <Text style={styles.featureItemDesc}>
-                    Instant booking confirmations, arrival status notifications, and customer reminders.
                   </Text>
                 </View>
               </View>
