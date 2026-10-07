@@ -986,17 +986,69 @@
     .stepper-circle.muted { background: #F1F5F9; color: #94A3B8; }
 
     .stepper-lbl { font-size: 11px; }
-    .stepper-lbl.completed { font-weight: 700; color: #0F172A; }
-    .stepper-lbl.active { font-weight: 800; color: #000000; }
+    .stepper-lbl.completed { font-weight: 700; color: inherit; }
+    .stepper-lbl.active { font-weight: 800; color: inherit; }
     .stepper-lbl.muted { font-weight: 500; color: #94A3B8; }
 
-    .stepper-line {
-      flex: 1;
-      height: 3px;
-      background: #E2E8F0;
-      border-radius: 2px;
-      margin: 0 8px;
+    /* Stepper Radar Beacon & Shimmer Beam Animations */
+    @keyframes radarPulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+      70% {
+        transform: scale(1.8);
+        opacity: 0.35;
+      }
+      100% {
+        transform: scale(2.2);
+        opacity: 0;
+      }
     }
+
+    @keyframes shimmerBeam {
+      0% {
+        transform: translateX(-100%);
+      }
+      100% {
+        transform: translateX(300%);
+      }
+    }
+
+    .radar-beacon-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radar-beacon-ring {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #FFC700;
+      animation: radarPulse 1.8s infinite ease-out;
+      pointer-events: none;
+    }
+
+    .stepper-line.shimmer-active {
+      position: relative;
+      overflow: hidden;
+      background: #FFC700;
+    }
+
+    .stepper-line.shimmer-active::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 50%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+      animation: shimmerBeam 2s infinite ease-in-out;
+    }
+
     .stepper-line.active { background: #FFC700; }
 
     .btn-arrived-gradient {
@@ -1116,20 +1168,25 @@
       background: var(--risev-yellow);
       border: none;
       border-radius: 16px;
-    /* Upcoming Ticket Stub Banner CSS (Matching Image 2) */
+    /* Upcoming Ticket Stub Banner CSS (Solid Brand Color Background - Premium Pass) */
     .upcoming-ticket-stub {
-      background: #FAF7F2;
-      border: 1.5px solid #F3EBE0;
+      background: #FF477E;
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
       border-radius: 22px;
       padding: 14px 16px;
-      margin: 14px 16px 6px;
+      margin: 16px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: relative;
       overflow: hidden;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+      box-shadow: 4px 6px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .upcoming-ticket-stub:active {
+      transform: scale(0.985);
     }
 
     .ticket-notch-left {
@@ -1140,8 +1197,8 @@
       width: 20px;
       height: 20px;
       border-radius: 10px;
-      background: #FAF8F5;
-      border: 1.5px solid #F3EBE0;
+      background: var(--risev-bg-light);
+      border: none;
       z-index: 5;
     }
 
@@ -1153,8 +1210,8 @@
       width: 20px;
       height: 20px;
       border-radius: 10px;
-      background: #FAF8F5;
-      border: 1.5px solid #F3EBE0;
+      background: var(--risev-bg-light);
+      border: none;
       z-index: 5;
     }
 
@@ -1170,11 +1227,14 @@
       width: 46px;
       height: 46px;
       border-radius: 14px;
-      background: #FEF3C7;
+      background: rgba(0, 0, 0, 0.16);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 22px;
+      color: #FFFFFF;
+      box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.25);
     }
 
     .ticket-check-dot {
@@ -1184,7 +1244,7 @@
       width: 18px;
       height: 18px;
       border-radius: 9px;
-      background: #16A34A;
+      background: #10B981;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1192,12 +1252,13 @@
       font-weight: 800;
       color: #FFFFFF;
       border: 1.5px solid #FFFFFF;
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
     }
 
     .ticket-tagline {
       font-size: 9.5px;
       font-weight: 800;
-      color: #64748B;
+      color: rgba(255, 255, 255, 0.85);
       letter-spacing: 0.5px;
       margin-bottom: 2px;
     }
@@ -1205,32 +1266,33 @@
     .ticket-date-title {
       font-size: 15px;
       font-weight: 800;
-      color: #0F172A;
+      color: #FFFFFF;
       line-height: 1.2;
     }
 
     .ticket-time-title {
       font-size: 13px;
       font-weight: 700;
-      color: #0F172A;
+      color: #FFFFFF;
       line-height: 1.2;
     }
 
     .ticket-loc-row {
       font-size: 11px;
       font-weight: 600;
-      color: #64748B;
+      color: rgba(255, 255, 255, 0.9);
       margin-top: 4px;
     }
 
     .ticket-v-line {
       width: 1px;
       height: 54px;
-      border-left: 1.5px dashed #E8DED1;
+      border-left: 1.5px dashed rgba(255, 255, 255, 0.35);
       margin: 0 10px;
     }
 
     .ticket-right-stub {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1239,28 +1301,43 @@
     }
 
     .ticket-pass-badge {
-      background: #FEF9C3;
-      padding: 3px 10px;
+      background: rgba(0, 0, 0, 0.18);
+      padding: 4px 10px;
       border-radius: 12px;
       font-size: 9px;
       font-weight: 800;
-      color: #854D0E;
+      color: #FFFFFF;
       letter-spacing: 0.5px;
+      box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2), inset -2px -2px 4px rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: center;
     }
 
     .btn-ticket-view-pass {
-      background: #FFC700;
-      border: none;
+      background: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.8);
       padding: 8px 14px;
       border-radius: 16px;
       display: flex;
       align-items: center;
+      justify-content: center;
+      align-self: center;
       gap: 4px;
       font-size: 12px;
       font-weight: 800;
       color: #000000;
       cursor: pointer;
-      box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
+      box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .btn-ticket-view-pass:active {
+      transform: scale(0.96);
+      box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
@@ -1363,9 +1440,10 @@
           </div>
 
           <div class="profile-tabs-strip">
-            <button class="prof-tab-btn active">Services</button>
-            <button class="prof-tab-btn">Reviews</button>
-            <button class="prof-tab-btn">About</button>
+            <button class="prof-tab-btn active">Book</button>
+            <button class="prof-tab-btn" onclick="switchStep(1)">Menu</button>
+            <button class="prof-tab-btn">Promotions</button>
+            <button class="prof-tab-btn">Vouchers 🎟️</button>
           </div>
         </div>
 
@@ -1604,63 +1682,60 @@
             </div>
           </div>
 
-          <!-- Main Appointment Card -->
-          <div class="pass-main-card">
-            <!-- Service Row -->
-            <div class="pass-service-row">
-              <div class="pass-service-icon">✂️</div>
-              <div>
-                <div class="pass-lbl">Service</div>
-                <div class="pass-service-name">Fade Cut</div>
+          <!-- Main Appointment Ticket Pass Card (Solid Brand Accent 3D Ticket Stub Design) -->
+          <div class="pass-main-card" style="background: #FF477E; border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 24px; position: relative; overflow: hidden; padding: 16px; margin-bottom: 16px; box-shadow: 4px 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);">
+            <!-- Left Notch Cutout -->
+            <div class="ticket-notch-left" style="background: var(--risev-bg-light); border: none;"></div>
+            <!-- Right Notch Cutout -->
+            <div class="ticket-notch-right" style="background: var(--risev-bg-light); border: none;"></div>
+
+            <!-- Top Tagline & Status Header Row -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <div style="display: flex; align-items: center; gap: 6px; background: rgba(0, 0, 0, 0.22); padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.25);">
+                <span style="font-size: 12px;">📅</span>
+                <span style="font-size: 10px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;">UPCOMING APPOINTMENT</span>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 5px; background: rgba(0, 0, 0, 0.18); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);">
+                <div style="width: 6px; height: 6px; border-radius: 3px; background: #10B981;"></div>
+                <span style="font-size: 10px; font-weight: 700; color: #FFFFFF;">Ongoing</span>
               </div>
             </div>
 
-            <div class="pass-divider"></div>
-
-            <!-- Date & Time + Countdown Row -->
-            <div class="pass-datetime-row">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="pass-icon-grey">📅</div>
-                <div>
-                  <div class="pass-lbl">Date & Time</div>
-                  <div class="pass-val-bold">Thu, 8 Oct 2026</div>
-                  <div class="pass-val-bold">03:30 PM</div>
-                </div>
+            <!-- Store & Service Info Row -->
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+              <div style="width: 44px; height: 44px; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                🏪
               </div>
-              <div class="pass-countdown-pill">
-                <div class="pass-clock-icon">⏰</div>
-                <div>
-                  <div class="pass-pill-lbl">Starts in</div>
-                  <div class="pass-pill-val">24 Mins 30 Secs</div>
-                </div>
+              <div style="flex: 1;">
+                <div style="font-size: 16px; font-weight: 800; color: #FFFFFF;">Risev Official Merchant</div>
+                <div style="font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85);">Fade Cut</div>
               </div>
             </div>
 
-            <div class="pass-divider"></div>
-
-            <!-- Provider & Branch Row -->
-            <div class="pass-provider-branch-row">
-              <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
-                <div class="pass-icon-grey">👤</div>
+            <!-- Inset Recessed Scheduled Slot & Location Pod -->
+            <div style="background: rgba(0, 0, 0, 0.16); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 16px; padding: 12px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.15);">
+              <!-- Scheduled Slot -->
+              <div style="flex: 1.2; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px; color: #FFFFFF;">🕒</span>
                 <div>
-                  <div class="pass-lbl">Provider</div>
-                  <div class="pass-val-bold">Any Provider</div>
+                  <div style="font-size: 9.5px; font-weight: 800; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.5px;">SCHEDULED SLOT</div>
+                  <div style="font-size: 12px; font-weight: 700; color: #FFFFFF;">2026-10-07 @ 09:30 AM</div>
                 </div>
               </div>
 
-              <div class="pass-vdivider"></div>
-
-              <div style="flex: 1.2; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <div class="pass-icon-grey">🏪</div>
-                  <div>
-                    <div class="pass-lbl">Branch</div>
-                    <div class="pass-val-bold">Risev Official Merchant (HQ)</div>
-                  </div>
-                </div>
-                <span style="color: #94A3B8; font-weight: 700; font-size: 16px;">›</span>
+              <!-- Location -->
+              <div style="flex: 1; text-align: right;">
+                <div style="font-size: 9.5px; font-weight: 800; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.5px;">LOCATION</div>
+                <div style="font-size: 11.5px; font-weight: 700; color: #FFFFFF;">Risev Official Merchant (HQ)</div>
               </div>
             </div>
+
+            <!-- Big 3D Popping View Pass & Check In Button -->
+            <button style="width: 100%; background: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.9); border-radius: 18px; padding: 12px 16px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);" onclick="alert('Pass Checked In Successfully!')">
+              <span style="font-size: 18px;">📱</span>
+              <span style="font-size: 14px; font-weight: 800; color: #000000;">View Pass & Check In ➔</span>
+            </button>
           </div>
 
           <!-- Stepper Progress Bar Pill -->
@@ -1669,10 +1744,16 @@
               <div class="stepper-circle completed">✓</div>
               <div class="stepper-lbl completed">Booked</div>
             </div>
-            <div class="stepper-line active"></div>
+            <div class="stepper-line active shimmer-active"></div>
             <div class="stepper-step">
-              <div class="stepper-circle active">📍</div>
-              <div class="stepper-lbl active">Arrive</div>
+              <div class="radar-beacon-wrapper">
+                <div class="radar-beacon-ring"></div>
+                <div class="stepper-circle active">📍</div>
+              </div>
+              <div class="stepper-lbl active" style="display: flex; align-items: center; gap: 3px;">
+                <span style="width: 5px; height: 5px; border-radius: 50%; background: #EF4444; display: inline-block;"></span>
+                <span>Arrive</span>
+              </div>
             </div>
             <div class="stepper-line"></div>
             <div class="stepper-step">
