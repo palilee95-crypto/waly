@@ -35,7 +35,7 @@ interface BookingItem {
   booking_date: string;
   start_time: string;
   end_time?: string;
-  status: 'booked' | 'arrived' | 'in_service' | 'completed' | 'cancelled';
+  status: 'booked' | 'arrived' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   items_summary?: any;
   total_price: number;
   notes?: string;
@@ -526,6 +526,8 @@ export default function BookingsScreen() {
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
       if (newStatus === 'completed') {
         Alert.alert('Completed & Stamped! 🎉', 'Customer loyalty stamps credited and digital receipt issued.');
+      } else if (newStatus === 'no_show') {
+        Alert.alert('Marked as No Show', 'The appointment has been marked as No Show.');
       } else {
         Alert.alert('Status Updated', `Appointment marked as ${newStatus.toUpperCase()}`);
       }
@@ -535,6 +537,46 @@ export default function BookingsScreen() {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleNoShowWhatsApp = (b: BookingItem) => {
+    let rawPhone = (b.customer_phone || '').replace(/[^0-9]/g, '');
+    if (rawPhone.startsWith('0')) {
+      rawPhone = '60' + rawPhone.slice(1);
+    } else if (rawPhone.length > 0 && !rawPhone.startsWith('60')) {
+      rawPhone = '60' + rawPhone;
+    }
+    const storeTitle = merchantData?.name || merchantData?.store_name || user?.name || 'our store';
+    const bookingUrl = pwaSlug ? `https://risev.app/b/${pwaSlug}` : '';
+    const text = `Hi ${b.customer_name || 'there'}, we missed you today for your ${b.service_name || 'appointment'} at ${storeTitle}! Would you like to reschedule for another time? You can pick a new slot here: ${bookingUrl}`;
+    const waUrl = `https://wa.me/${rawPhone}?text=${encodeURIComponent(text)}`;
+    Linking.openURL(waUrl).catch(() => {
+      Alert.alert('Error', 'Unable to open WhatsApp.');
+    });
+  };
+
+  const handleMarkNoShow = (b: BookingItem) => {
+    Alert.alert(
+      'Mark as No Show?',
+      `Confirm that ${b.customer_name || 'this customer'} did not attend the scheduled appointment on ${b.booking_date} at ${b.start_time}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'No Show & WhatsApp',
+          onPress: async () => {
+            await handleUpdateStatus(b.id, 'no_show');
+            handleNoShowWhatsApp(b);
+          }
+        },
+        {
+          text: 'Mark No Show',
+          style: 'destructive',
+          onPress: async () => {
+            await handleUpdateStatus(b.id, 'no_show');
+          }
+        }
+      ]
+    );
   };
 
   const handleCustomerWhatsApp = (b: BookingItem) => {
@@ -931,6 +973,10 @@ export default function BookingsScreen() {
 
   const filteredBookings = bookings.filter(b => {
     if (filterStatus === 'all') return true;
+    if (filterStatus === 'today') {
+      const todayIso = new Date().toISOString().substring(0, 10);
+      return b.booking_date === todayIso;
+    }
     return b.status === filterStatus;
   });
 
@@ -1129,6 +1175,7 @@ export default function BookingsScreen() {
                   { key: 'today', label: 'Today' },
                   { key: 'booked', label: 'Upcoming' },
                   { key: 'completed', label: 'Completed' },
+                  { key: 'no_show', label: 'No Show' },
                 ].map(st => (
                   <TouchableOpacity
                     key={st.key}
@@ -1173,13 +1220,15 @@ export default function BookingsScreen() {
                           <View style={[
                             styles.statusBadge,
                             b.status === 'arrived' ? styles.statusBadgeArrived :
-                            b.status === 'completed' ? styles.statusBadgeCompleted : styles.statusBadgeBooked
+                            b.status === 'completed' ? styles.statusBadgeCompleted :
+                            b.status === 'no_show' ? styles.statusBadgeNoShow : styles.statusBadgeBooked
                           ]}>
                             <Text style={[
                               styles.statusBadgeText,
-                              b.status === 'arrived' && { color: '#15803D' }
+                              b.status === 'arrived' && { color: '#15803D' },
+                              b.status === 'no_show' && { color: '#DC2626' }
                             ]}>
-                              {b.status === 'arrived' ? '● ARRIVED' : b.status === 'completed' ? 'COMPLETED' : 'SCHEDULED'}
+                              {b.status === 'arrived' ? '● ARRIVED' : b.status === 'completed' ? 'COMPLETED' : b.status === 'no_show' ? 'NO SHOW' : 'SCHEDULED'}
                             </Text>
                           </View>
                         </View>
@@ -1226,31 +1275,68 @@ export default function BookingsScreen() {
                           )}
 
                           {b.status === 'booked' && (
-                            <TouchableOpacity
-                              style={styles.btnPrimaryAction}
-                              onPress={() => handleUpdateStatus(b.id, 'arrived')}
-                              disabled={updatingId === b.id}
-                              activeOpacity={0.85}
-                            >
-                              {updatingId === b.id ? (
-                                <ActivityIndicator size="small" color="#000" />
-                              ) : (
-                                <>
-                                  <Ionicons name="location" size={16} color="#000" />
-                                  <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
+                            <>
+                              <TouchableOpacity
+                                style={styles.btnPrimaryAction}
+                                onPress={() => handleUpdateStatus(b.id, 'arrived')}
+                                disabled={updatingId === b.id}
+                                activeOpacity={0.85}
+                              >
+                                {updatingId === b.id ? (
+                                  <ActivityIndicator size="small" color="#000" />
+                                ) : (
+                                  <>
+                                    <Ionicons name="location" size={16} color="#000" />
+                                    <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
+                                  </>
+                                )}
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.btnDangerAction}
+                                onPress={() => handleMarkNoShow(b)}
+                                disabled={updatingId === b.id}
+                                activeOpacity={0.85}
+                              >
+                                <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
+                                <Text style={styles.btnDangerActionText}>No Show</Text>
+                              </TouchableOpacity>
+                            </>
                           )}
 
-                          <TouchableOpacity
-                            style={styles.btnSecondaryAction}
-                            onPress={() => handleCustomerWhatsApp(b)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="logo-whatsapp" size={16} color="#000" />
-                            <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
-                          </TouchableOpacity>
+                          {b.status === 'no_show' && (
+                            <>
+                              <TouchableOpacity
+                                style={[styles.btnSecondaryAction, { flex: 1.5, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}
+                                onPress={() => handleNoShowWhatsApp(b)}
+                                activeOpacity={0.85}
+                              >
+                                <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
+                                <Text style={[styles.btnSecondaryActionText, { color: '#16A34A' }]}>Reschedule WA</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.btnSecondaryAction, { flex: 1 }]}
+                                onPress={() => handleUpdateStatus(b.id, 'booked')}
+                                disabled={updatingId === b.id}
+                                activeOpacity={0.85}
+                              >
+                                <Ionicons name="refresh-outline" size={15} color="#050505" />
+                                <Text style={styles.btnSecondaryActionText}>Reopen</Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+
+                          {b.status !== 'no_show' && (
+                            <TouchableOpacity
+                              style={styles.btnSecondaryAction}
+                              onPress={() => handleCustomerWhatsApp(b)}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="logo-whatsapp" size={16} color="#000" />
+                              <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
 
                       </View>
@@ -3210,6 +3296,9 @@ const styles = StyleSheet.create({
   statusBadgeCompleted: {
     backgroundColor: '#F1F5F9',
   },
+  statusBadgeNoShow: {
+    backgroundColor: '#FEE2E2',
+  },
   statusBadgeText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -3282,6 +3371,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
+  },
+  btnDangerAction: {
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  btnDangerActionText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
   },
 
   // Next Appointments

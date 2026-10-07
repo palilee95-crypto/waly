@@ -6,6 +6,21 @@
 // 3. Web Push dispatch to merchant & assigned staff on new booking and customer arrival
 // 4. End-of-service loyalty auto-sync (transactions, stamps, points, voucher unlock, and digital receipt generation)
 
+// Ensure customer access rules on service_bookings collection
+try {
+  var bkgCol = $app.findCollectionByNameOrId("service_bookings");
+  var desiredRule = "customer = @request.auth.id || customer_phone = @request.auth.phone || merchant.owner = @request.auth.id || (merchant.id = @request.auth.merchant_id && @request.auth.merchant_id != '')";
+  if (bkgCol.listRule !== desiredRule) {
+    bkgCol.listRule = desiredRule;
+    bkgCol.viewRule = desiredRule;
+    bkgCol.updateRule = desiredRule;
+    $app.save(bkgCol);
+    console.log("[BOOKING HOOK] Updated service_bookings rules for customers");
+  }
+} catch (ruleInitErr) {
+  console.log("[BOOKING RULE INIT ERROR]", ruleInitErr.message || ruleInitErr);
+}
+
 // -------------------------------------------------------------
 // 1. ON RECORD CREATE: Validate slot, link customer, push notify
 // -------------------------------------------------------------
@@ -491,3 +506,111 @@ onRecordUpdate((e) => {
     }
   }
 }, "service_bookings");
+
+// -------------------------------------------------------------
+// 3. REST API: Customer Active Booking Endpoint
+// -------------------------------------------------------------
+routerAdd("GET", "/api/risev/customer/active-booking", (c) => {
+  try {
+    const authRecord = c.get("authRecord");
+    const queryPhone = c.queryParam("phone") || (authRecord ? authRecord.getString("phone") : "");
+    const customerId = authRecord ? authRecord.id : "";
+
+    if (!queryPhone && !customerId) {
+      return c.json(200, { booking: null });
+    }
+
+    const cleanDigits = ("" + queryPhone).replace(/[^\d]/g, "");
+    const plusPhone = cleanDigits.startsWith("60") ? "+" + cleanDigits : (cleanDigits ? "+60" + cleanDigits.replace(/^0/, "") : "");
+    const localPhone = cleanDigits.startsWith("60") ? "0" + cleanDigits.slice(2) : cleanDigits;
+
+    let filterParts = [];
+    if (customerId) filterParts.push("customer = '" + customerId + "'");
+    if (plusPhone) filterParts.push("customer_phone = '" + plusPhone + "'");
+    if (localPhone && localPhone !== plusPhone) filterParts.push("customer_phone = '" + localPhone + "'");
+    if (queryPhone && queryPhone !== plusPhone && queryPhone !== localPhone) filterParts.push("customer_phone = '" + queryPhone + "'");
+
+    const todayIso = new Date().toISOString().substring(0, 10);
+    const filterStr = "(" + filterParts.join(" || ") + ") && (status = 'booked' || status = 'arrived' || (status = 'no_show' && booking_date = '" + todayIso + "')) && booking_date >= '" + todayIso + "'";
+
+    const records = $app.findRecordsByFilter("service_bookings", filterStr, "booking_date,start_time", 10, 0);
+    if (!records || records.length === 0) {
+      return c.json(200, { booking: null });
+    }
+
+    // Prioritize upcoming active bookings (booked/arrived) over no_show
+    let rec = records[0];
+    for (let ri = 0; ri < records.length; ri++) {
+      const s = records[ri].getString("status");
+      if (s === "booked" || s === "arrived") {
+        rec = records[ri];
+        break;
+      }
+    }
+    const merchantId = rec.getString("merchant");
+    const branchId = rec.getString("branch");
+    const staffId = rec.getString("staff");
+
+    let merchantData = null;
+    if (merchantId) {
+      try {
+        const m = $app.findRecordById("merchants", merchantId);
+        if (m) {
+          merchantData = {
+            id: m.id,
+            name: m.getString("name"),
+            logo: m.getString("logo"),
+            pwa_slug: m.getString("pwa_slug")
+          };
+        }
+      } catch (e) {}
+    }
+
+    let branchData = null;
+    if (branchId) {
+      try {
+        const b = $app.findRecordById("branches", branchId);
+        if (b) branchData = { id: b.id, name: b.getString("name") };
+      } catch (e) {}
+    }
+
+    let staffData = null;
+    if (staffId) {
+      try {
+        const st = $app.findRecordById("merchant_staff", staffId);
+        if (st) staffData = { id: st.id, name: st.getString("name") };
+      } catch (e) {}
+    }
+
+    let itemsSummary = rec.get("items_summary");
+    if (typeof itemsSummary === "string") {
+      try { itemsSummary = JSON.parse(itemsSummary); } catch (e) {}
+    }
+
+    const payload = {
+      id: rec.id,
+      merchant: merchantId,
+      branch: branchId,
+      staff: staffId,
+      customer: rec.getString("customer"),
+      customer_name: rec.getString("customer_name"),
+      customer_phone: rec.getString("customer_phone"),
+      booking_date: rec.getString("booking_date"),
+      start_time: rec.getString("start_time"),
+      end_time: rec.getString("end_time"),
+      total_price: rec.get("total_price"),
+      status: rec.getString("status"),
+      items_summary: itemsSummary,
+      expand: {
+        merchant: merchantData,
+        branch: branchData,
+        staff: staffData
+      }
+    };
+
+    return c.json(200, { booking: payload });
+  } catch (err) {
+    return c.json(500, { error: err.message || err });
+  }
+});
+
