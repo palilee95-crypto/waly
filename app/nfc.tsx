@@ -176,6 +176,8 @@ interface LiquidRadarWaitingViewProps {
   approvedStamps: number | null;
   onViewStampCard: () => void;
   onChangePhone: () => void;
+  canBookAppointment?: boolean;
+  onBookAppointment?: () => void;
 }
 
 const PARTICLES = Array.from({ length: 12 }).map((_, i) => {
@@ -199,6 +201,8 @@ const LiquidRadarWaitingView: React.FC<LiquidRadarWaitingViewProps> = ({
   approvedStamps,
   onViewStampCard,
   onChangePhone,
+  canBookAppointment,
+  onBookAppointment,
 }) => {
   // 1. Radar Pulse Rings
   const pulse1 = useRef(new Animated.Value(0)).current;
@@ -536,17 +540,33 @@ const LiquidRadarWaitingView: React.FC<LiquidRadarWaitingViewProps> = ({
 
         {/* Approved Action Button */}
         {isApproved && (
-          <TouchableOpacity
-            style={styles.radarSuccessBtn}
-            onPress={onViewStampCard}
-            activeOpacity={0.88}
-          >
-            <Ionicons name="card" size={20} color="#0F172A" style={{ marginRight: 8 }} />
-            <Text style={styles.radarSuccessBtnText}>
-              {isPointsOnly ? 'View My Points Card' : 'View My Stamp Card'}
-            </Text>
-            <Ionicons name="arrow-forward" size={18} color="#0F172A" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
+          <View style={{ width: '100%', gap: 8, marginTop: 10 }}>
+            <TouchableOpacity
+              style={styles.radarSuccessBtn}
+              onPress={onViewStampCard}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="card" size={20} color="#0F172A" style={{ marginRight: 8 }} />
+              <Text style={styles.radarSuccessBtnText}>
+                {isPointsOnly ? 'View My Points Card' : 'View My Stamp Card'}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#0F172A" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+
+            {canBookAppointment && onBookAppointment && (
+              <TouchableOpacity
+                style={[styles.radarSuccessBtn, { backgroundColor: '#10B981' }]}
+                onPress={onBookAppointment}
+                activeOpacity={0.88}
+              >
+                <Ionicons name="calendar" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF' }]}>
+                  Book Next Appointment
+                </Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {/* Wrong Phone Number Link */}
@@ -609,6 +629,8 @@ export default function NfcLandingScreen() {
   const [program, setProgram] = useState<any>(null);
   const [reward, setReward] = useState<any>(null);
   const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
+  const [canBookAppointment, setCanBookAppointment] = useState(false);
+  const bookingSlug = merchant?.pwa_slug || merchant?.slug || merchant?.id;
   const [approvedStamps, setApprovedStamps] = useState<number | null>(null);
   const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'pairing' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
@@ -979,6 +1001,33 @@ export default function NfcLandingScreen() {
           }
         }
       } catch (pErr) {}
+
+      // Check if merchant is eligible for appointment bookings (Pro / Business plan or add-on) and has active services
+      try {
+        let hasBookingPlan = m.has_booking_addon === true;
+        if (!hasBookingPlan) {
+          const subs = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${merchantId}" && (status = "active" || status = "trialing")`,
+            requestKey: null,
+          });
+          if (subs.items.length > 0) {
+            const plan = (subs.items[0].plan || '').toLowerCase();
+            if (plan === 'pro' || plan === 'business') {
+              hasBookingPlan = true;
+            }
+          }
+        }
+
+        if (hasBookingPlan) {
+          const services = await pb.collection('merchant_services').getList(1, 1, {
+            filter: `merchant = "${merchantId}" && is_active = true`,
+            requestKey: null,
+          });
+          if (services.totalItems > 0 || (services.items && services.items.length > 0)) {
+            if (isMounted) setCanBookAppointment(true);
+          }
+        }
+      } catch (bookErr) {}
 
       if (isMounted) {
         setStep((prev) => (prev === 'loading' || prev === 'pairing' ? 'form' : prev));
@@ -2441,6 +2490,20 @@ export default function NfcLandingScreen() {
                     <Ionicons name="lock-closed" size={12} color={brandSubtextColor} />
                     <Text style={[styles.fakeTrustText, { color: brandSubtextColor, fontSize: 11 }]}>Secure connection by risev.app</Text>
                   </View>
+
+                  {/* Pre-Claim Appointment Booking Link */}
+                  {canBookAppointment && bookingSlug && (
+                    <TouchableOpacity
+                      onPress={() => router.push(`/b/${bookingSlug}` as any)}
+                      activeOpacity={0.7}
+                      style={styles.nfcBookAppointmentLink}
+                    >
+                      <Ionicons name="calendar-outline" size={13} color={brandSubtextColor} style={{ marginRight: 6 }} />
+                      <Text style={[styles.nfcBookAppointmentLinkText, { color: brandSubtextColor }]}>
+                        Looking to schedule a visit? Book Online ›
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </BlurView>
 
                 {/* Risev Logo below the card */}
@@ -2512,19 +2575,33 @@ export default function NfcLandingScreen() {
                       </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0 }]}
-                      onPress={() => {
-                        if (merchant?.slug) router.push(`/b/${merchant.slug}`);
-                        else router.push(`/b/${merchant?.id}`);
-                      }}
-                      activeOpacity={0.88}
-                    >
-                      <Ionicons name="download-outline" size={18} color={getContrastColor(primaryColor || '#000')} style={{ marginRight: 6 }} />
-                      <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#000'), fontSize: 13 }]}>
-                        Download App
-                      </Text>
-                    </TouchableOpacity>
+                    {canBookAppointment && bookingSlug ? (
+                      <TouchableOpacity
+                        style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#10B981', marginTop: 0 }]}
+                        onPress={() => router.push(`/b/${bookingSlug}` as any)}
+                        activeOpacity={0.88}
+                      >
+                        <Ionicons name="calendar" size={17} color={getContrastColor(primaryColor || '#10B981')} style={{ marginRight: 6 }} />
+                        <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#10B981'), fontSize: 13, fontWeight: '700' }]}>
+                          Book Next Visit
+                        </Text>
+                        <Ionicons name="arrow-forward" size={14} color={getContrastColor(primaryColor || '#10B981')} style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0 }]}
+                        onPress={() => {
+                          if (merchant?.slug) router.push(`/b/${merchant.slug}`);
+                          else router.push(`/b/${merchant?.id}`);
+                        }}
+                        activeOpacity={0.88}
+                      >
+                        <Ionicons name="download-outline" size={18} color={getContrastColor(primaryColor || '#000')} style={{ marginRight: 6 }} />
+                        <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#000'), fontSize: 13 }]}>
+                          Download App
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
@@ -4515,6 +4592,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: 'rgba(255, 255, 255, 0.65)',
+    textDecorationLine: 'underline',
+  },
+  nfcBookAppointmentLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  nfcBookAppointmentLinkText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     textDecorationLine: 'underline',
   },
   receiptBanner: {
