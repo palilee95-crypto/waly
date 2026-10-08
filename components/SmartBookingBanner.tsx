@@ -9,10 +9,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '@/context/LanguageContext';
 
 type SmartBookingBannerProps = {
   onPress: () => void;
   hasAccess?: boolean;
+  isOptedIn?: boolean;
   style?: StyleProp<ViewStyle>;
   targetDate?: Date;
 };
@@ -20,9 +22,12 @@ type SmartBookingBannerProps = {
 export default function SmartBookingBanner({
   onPress,
   hasAccess = false,
+  isOptedIn = false,
   style,
   targetDate,
 }: SmartBookingBannerProps) {
+  const { locale } = useLanguage();
+  const isMalay = locale === 'ms';
   // Live Countdown Timer state (seconds included for real-time live ticking)
   const [timeLeft, setTimeLeft] = useState({ days: '02', hours: '14', minutes: '31', seconds: '59' });
 
@@ -94,17 +99,19 @@ export default function SmartBookingBanner({
               {!hasAccess && (
                 <View style={styles.goldBadge}>
                   <Ionicons name="ribbon" size={10} color="#000000" />
-                  <Text style={styles.goldBadgeText}>7 DAYS FREE</Text>
+                  <Text style={styles.goldBadgeText}>{isMalay ? '7 HARI PERCUMA' : '7 DAYS FREE'}</Text>
                 </View>
               )}
             </View>
 
             {/* Headline Benefit */}
-            <Text style={styles.headlineText}>Let customers book you 24/7</Text>
+            <Text style={styles.headlineText}>
+              {isMalay ? 'Pelanggan boleh tempah 24/7' : 'Let customers book you 24/7'}
+            </Text>
 
             {/* Clean Subtitle */}
             <Text style={styles.subdetailText} numberOfLines={1}>
-              Automated appointments & reminders
+              {isMalay ? 'Temujanji & peringatan automatik' : 'Automated appointments & reminders'}
             </Text>
           </View>
 
@@ -114,20 +121,20 @@ export default function SmartBookingBanner({
             <View style={styles.countdownPill}>
               <View style={styles.launchTag}>
                 <Ionicons name="time-outline" size={10} color="#FFFFFF" />
-                <Text style={styles.launchTagText}>Launch in</Text>
+                <Text style={styles.launchTagText}>{isMalay ? 'Pelancaran dlm' : 'Launch in'}</Text>
               </View>
 
               {/* Ticking Digits */}
               <View style={styles.digitsRow}>
                 <View style={styles.digitUnit}>
                   <Text style={styles.digitValue}>{timeLeft.days}</Text>
-                  <Text style={styles.digitUnitLabel}>D</Text>
+                  <Text style={styles.digitUnitLabel}>{isMalay ? 'H' : 'D'}</Text>
                 </View>
                 <Text style={styles.colon}>:</Text>
 
                 <View style={styles.digitUnit}>
                   <Text style={styles.digitValue}>{timeLeft.hours}</Text>
-                  <Text style={styles.digitUnitLabel}>H</Text>
+                  <Text style={styles.digitUnitLabel}>{isMalay ? 'J' : 'H'}</Text>
                 </View>
                 <Text style={styles.colon}>:</Text>
 
@@ -141,7 +148,11 @@ export default function SmartBookingBanner({
             {/* CTA Button */}
             <View style={styles.ctaButton}>
               <Text style={styles.ctaButtonText}>
-                {hasAccess ? 'Open ➔' : 'Early Access ➔'}
+                {hasAccess
+                  ? (isMalay ? 'Buka ➔' : 'Open ➔')
+                  : isOptedIn
+                    ? (isMalay ? 'VIP Dikunci ➔' : 'VIP Locked ➔')
+                    : (isMalay ? 'Akses Awal ➔' : 'Early Access ➔')}
               </Text>
             </View>
           </View>

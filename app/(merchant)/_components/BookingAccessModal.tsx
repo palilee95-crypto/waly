@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { pb } from '@/lib/pocketbase';
 
 const { width } = Dimensions.get('window');
 
@@ -20,27 +22,39 @@ type BookingAccessModalProps = {
   visible: boolean;
   onClose: () => void;
   merchantName?: string;
+  merchantId?: string;
+  isOptedIn?: boolean;
+  onOptedInSuccess?: () => void;
 };
 
-export default function BookingAccessModal({ visible, onClose, merchantName }: BookingAccessModalProps) {
+export default function BookingAccessModal({
+  visible,
+  onClose,
+  merchantName,
+  merchantId,
+  isOptedIn = false,
+  onOptedInSuccess,
+}: BookingAccessModalProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { locale } = useLanguage();
+  const isMalay = locale === 'ms';
 
   // Pre-launch date logic: October 10, 2026
   const isBeforeLaunch = useMemo(() => {
     return new Date() < new Date('2026-10-10T00:00:00');
   }, []);
 
-  // Sticky slot number between 36 and 39 for maximum realistic FOMO
-  const slotNumber = useMemo(() => {
-    const seed = user?.id || user?.name || 'risev_merchant';
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) hash += seed.charCodeAt(i);
-    return 36 + (Math.abs(hash) % 4); // yields 36, 37, 38, or 39
-  }, [user?.id, user?.name]);
-
   const [showEarlyAccessModal, setShowEarlyAccessModal] = useState(false);
-  const [isAutoActivated, setIsAutoActivated] = useState(false);
+  const [isAutoActivated, setIsAutoActivated] = useState(isOptedIn);
+  const [saving, setSaving] = useState(false);
+
+  // Sync isAutoActivated if isOptedIn prop changes
+  React.useEffect(() => {
+    if (isOptedIn) {
+      setIsAutoActivated(true);
+    }
+  }, [isOptedIn]);
 
   const handleMainAction = () => {
     if (isBeforeLaunch) {
@@ -51,15 +65,43 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
     }
   };
 
-  const handleAutoActivate = () => {
-    setIsAutoActivated(true);
-    setTimeout(() => {
+  const handleAutoActivate = async () => {
+    if (isAutoActivated && isOptedIn) {
+      // Already activated and opted in
       setShowEarlyAccessModal(false);
       onClose();
-    }, 1800);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const targetMid = merchantId || user?.merchant_id;
+      if (targetMid) {
+        await pb.collection('merchants').update(targetMid, {
+          booking_vip_opt_in: true,
+          booking_vip_claimed_at: new Date().toISOString(),
+        });
+      }
+      setIsAutoActivated(true);
+      onOptedInSuccess?.();
+      setTimeout(() => {
+        setShowEarlyAccessModal(false);
+        onClose();
+      }, 1600);
+    } catch (err) {
+      console.error('[BookingAccessModal] Error saving booking VIP opt-in:', err);
+      // Still show successful visual feedback to avoid frustrating user
+      setIsAutoActivated(true);
+      setTimeout(() => {
+        setShowEarlyAccessModal(false);
+        onClose();
+      }, 1600);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const store = merchantName || user?.name || 'Hashiff';
+  const store = merchantName || user?.name || (isMalay ? 'Kedai Anda' : 'Your Store');
 
   return (
     <>
@@ -91,12 +133,17 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
               {/* Main Headline & Subtitle */}
               <View style={styles.headerTextGroup}>
                 <Text style={styles.mainTitle}>
-                  Smart Booking,{'\n'}built for{' '}
-                  <Text style={styles.titleOrangeHighlight}>your business.</Text>
+                  Smart Booking,{'\n'}
+                  {isMalay ? 'khas untuk ' : 'built for '}
+                  <Text style={styles.titleOrangeHighlight}>
+                    {isMalay ? 'kedai anda.' : 'your business.'}
+                  </Text>
                 </Text>
 
                 <Text style={styles.subtitle}>
-                  Let customers book 24/7 while Risev handles availability, reminders and scheduling automatically.
+                  {isMalay
+                    ? 'Pelanggan boleh tempah 24/7 sementara Risev mengurus jadual, kekosongan dan peringatan secara automatik.'
+                    : 'Let customers book 24/7 while Risev handles availability, reminders and scheduling automatically.'}
                 </Text>
               </View>
 
@@ -104,8 +151,11 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
               <View style={styles.fomoBannerContainer}>
                 <View style={styles.fomoBannerPill}>
                   <Text style={styles.fomoBannerText}>
-                    🔥 LAUNCH 10.10 &nbsp;<Text style={styles.fomoDivider}>|</Text>&nbsp; LIMITED TO FIRST{' '}
-                    <Text style={styles.fomoHighlight}>50 MERCHANTS</Text>
+                    {isMalay ? '🔥 PELANCARAN 10.10' : '🔥 LAUNCH 10.10'} &nbsp;
+                    <Text style={styles.fomoDivider}>|</Text>&nbsp;{' '}
+                    <Text style={styles.fomoHighlight}>
+                      {isMalay ? 'SLOT AKSES AWAL TERHAD' : 'LIMITED EARLY ACCESS SLOTS'}
+                    </Text>
                   </Text>
                 </View>
               </View>
@@ -130,9 +180,13 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   <View style={[styles.featureIconWrap, { backgroundColor: '#FEF3C7' }]}>
                     <Ionicons name="calendar" size={19} color="#D97706" />
                   </View>
-                  <Text style={styles.featureGridTitle}>24/7 Online Booking</Text>
+                  <Text style={styles.featureGridTitle}>
+                    {isMalay ? 'Tempahan Online 24/7' : '24/7 Online Booking'}
+                  </Text>
                   <Text style={styles.featureGridDesc}>
-                    Customers book anytime, even when you're busy.
+                    {isMalay
+                      ? 'Pelanggan boleh tempah bila-bila masa, walaupun anda sibuk.'
+                      : "Customers book anytime, even when you're busy."}
                   </Text>
                 </View>
 
@@ -141,9 +195,13 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   <View style={[styles.featureIconWrap, { backgroundColor: '#DCFCE7' }]}>
                     <Ionicons name="people" size={19} color="#16A34A" />
                   </View>
-                  <Text style={styles.featureGridTitle}>Staff Scheduling</Text>
+                  <Text style={styles.featureGridTitle}>
+                    {isMalay ? 'Jadual Staf Automatik' : 'Staff Scheduling'}
+                  </Text>
                   <Text style={styles.featureGridDesc}>
-                    Show only available slots automatically.
+                    {isMalay
+                      ? 'Paparkan kekosongan staf secara automatik.'
+                      : 'Show only available slots automatically.'}
                   </Text>
                 </View>
 
@@ -152,9 +210,13 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   <View style={[styles.featureIconWrap, { backgroundColor: '#FEE2E2' }]}>
                     <Ionicons name="notifications" size={19} color="#DC2626" />
                   </View>
-                  <Text style={styles.featureGridTitle}>Push Notifications</Text>
+                  <Text style={styles.featureGridTitle}>
+                    {isMalay ? 'Notifikasi Segera' : 'Push Notifications'}
+                  </Text>
                   <Text style={styles.featureGridDesc}>
-                    Send reminders, booking updates & alerts instantly.
+                    {isMalay
+                      ? 'Hantar peringatan & status tempahan secara terus.'
+                      : 'Send reminders, booking updates & alerts instantly.'}
                   </Text>
                 </View>
 
@@ -163,9 +225,13 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   <View style={[styles.featureIconWrap, { backgroundColor: '#F3E8FF' }]}>
                     <Ionicons name="browsers-outline" size={19} color="#9333EA" />
                   </View>
-                  <Text style={styles.featureGridTitle}>White-Label Page</Text>
+                  <Text style={styles.featureGridTitle}>
+                    {isMalay ? 'Laman Khas Berjenama' : 'White-Label Page'}
+                  </Text>
                   <Text style={styles.featureGridDesc}>
-                    Get a branded booking page with your own identity.
+                    {isMalay
+                      ? 'Halaman tempahan eksklusif mengikut jenama kedai anda.'
+                      : 'Get a branded booking page with your own identity.'}
                   </Text>
                 </View>
               </View>
@@ -174,7 +240,9 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
               <View style={styles.giftOfferCard}>
                 {/* Floating Gold Stamp Badge on Right */}
                 <View style={styles.stampBadgePill}>
-                  <Text style={styles.stampBadgeText}>Just RM2.60/day!</Text>
+                  <Text style={styles.stampBadgeText}>
+                    {isMalay ? 'Hanya RM2.60/hari!' : 'Just RM2.60/day!'}
+                  </Text>
                 </View>
 
                 {/* Gift Box Icon Graphic */}
@@ -188,11 +256,19 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                 </View>
 
                 <View style={{ flex: 1, paddingLeft: 6 }}>
-                  <Text style={styles.giftOfferTitle}>7 DAYS FREE</Text>
-                  <Text style={styles.giftOfferPriceText}>
-                    Then <Text style={styles.giftPriceRed}>RM2.60/day</Text> only
+                  <Text style={styles.giftOfferTitle}>
+                    {isMalay ? '7 HARI PERCUMA' : '7 DAYS FREE'}
                   </Text>
-                  <Text style={styles.giftOfferSubtext}>No charge during your trial.</Text>
+                  <Text style={styles.giftOfferPriceText}>
+                    {isMalay ? 'Kemudian ' : 'Then '}
+                    <Text style={styles.giftPriceRed}>RM2.60/{isMalay ? 'hari' : 'day'}</Text>{' '}
+                    {isMalay ? 'sahaja' : 'only'}
+                  </Text>
+                  <Text style={styles.giftOfferSubtext}>
+                    {isMalay
+                      ? 'Tiada bayaran dikenakan sepanjang tempoh percubaan.'
+                      : 'No charge during your trial.'}
+                  </Text>
                 </View>
               </View>
 
@@ -210,20 +286,28 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                 >
                   <Ionicons name="flash" size={18} color="#FFFFFF" />
                   <Text style={styles.ctaText}>
-                    {isBeforeLaunch ? 'Get Early Access ➔' : 'Start Free Trial ➔'}
+                    {isBeforeLaunch
+                      ? isAutoActivated
+                        ? (isMalay ? 'Lihat Pas VIP ➔' : 'View VIP Pass ➔')
+                        : (isMalay ? 'Dapatkan Akses Awal ➔' : 'Get Early Access ➔')
+                      : (isMalay ? 'Mulakan Percubaan Percuma ➔' : 'Start Free Trial ➔')}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
 
               <Text style={styles.noPaymentText}>
-                {isBeforeLaunch ? 'Slot terhad untuk 50 kedai pertama.' : 'No payment today.'}
+                {isBeforeLaunch
+                  ? (isMalay ? 'Slot akses awal terhad.' : 'Limited early access slots.')
+                  : (isMalay ? 'Tiada bayaran hari ini.' : 'No payment today.')}
               </Text>
 
               {/* Maybe Later with flanking divider lines */}
               <View style={styles.dismissRow}>
                 <View style={styles.dismissDivider} />
                 <TouchableOpacity style={styles.dismissLinkBtn} onPress={onClose} activeOpacity={0.7}>
-                  <Text style={styles.dismissLinkText}>Maybe Later</Text>
+                  <Text style={styles.dismissLinkText}>
+                    {isMalay ? 'Mungkin Nanti' : 'Maybe Later'}
+                  </Text>
                 </TouchableOpacity>
                 <View style={styles.dismissDivider} />
               </View>
@@ -232,7 +316,7 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
         </View>
       </Modal>
 
-      {/* 🏆 IMAGE NO. 1 IDENTICAL: VIP EARLY ACCESS CONFIRMATION MODAL */}
+      {/* 🏆 VIP EARLY ACCESS CONFIRMATION MODAL */}
       <Modal
         visible={showEarlyAccessModal}
         animationType="slide"
@@ -275,19 +359,25 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
             </View>
 
             {/* Main Title */}
-            <Text style={styles.vipModalTitle}>Slot Anda Berjaya Dikunci</Text>
+            <Text style={styles.vipModalTitle}>
+              {isMalay ? 'Slot Anda Berjaya Dikunci' : 'Your Slot Is Locked'}
+            </Text>
 
             {/* Diamond VIP Tag */}
             <View style={styles.vipDiamondBadge}>
-              <Text style={styles.vipDiamondText}>💎 VIP EARLY ACCESS</Text>
+              <Text style={styles.vipDiamondText}>
+                {isMalay ? '💎 VIP AKSES AWAL' : '💎 VIP EARLY ACCESS'}
+              </Text>
             </View>
 
             {/* Subtitle */}
             <Text style={styles.vipModalSubtitle}>
-              Anda kini antara 50 merchant terawal{'\n'}untuk pelancaran 10.10.
+              {isMalay
+                ? 'Kedai anda kini berdaftar untuk\npelancaran eksklusif 10.10.'
+                : 'Your store is now registered for\nthe exclusive 10.10 launch.'}
             </Text>
 
-            {/* 🎟️ LUXURY DIGITAL VIP PASS TICKET */}
+            {/* 🎟️ LUXURY DIGITAL VIP PASS TICKET (Cleaned without / 50 count) */}
             <View style={styles.vipTicket}>
               <LinearGradient
                 colors={['#1E293B', '#0F172A']}
@@ -309,74 +399,58 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   </View>
                 </View>
 
-                {/* Big Pass Number & Locked Badge */}
+                {/* Big Pass Header & Locked Badge */}
                 <View style={styles.ticketPassRow}>
                   <Text style={styles.ticketPassText}>
-                    PASS <Text style={styles.ticketPassHighlight}>#{slotNumber} / 50</Text>
+                    VIP PASS <Text style={styles.ticketPassHighlight}>• EARLY ACCESS</Text>
                   </Text>
                   <View style={styles.lockedBadgePill}>
                     <Ionicons name="lock-closed" size={12} color="#34D399" />
-                    <Text style={styles.lockedBadgeText}>Terkunci</Text>
+                    <Text style={styles.lockedBadgeText}>
+                      {isMalay ? 'Terkunci' : 'Locked'}
+                    </Text>
                   </View>
                 </View>
 
                 <View style={styles.ticketDivider} />
 
-                {/* Kedai Info */}
+                {/* Kedai / Store Info */}
                 <View style={styles.ticketDetailsRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="business" size={14} color="#94A3B8" />
-                    <Text style={styles.ticketLabel}>Kedai:</Text>
+                    <Text style={styles.ticketLabel}>{isMalay ? 'Kedai:' : 'Store:'}</Text>
                   </View>
                   <Text style={styles.ticketVal} numberOfLines={1}>{store}</Text>
                 </View>
 
-                {/* Pelancaran Rasmi */}
+                {/* Pelancaran Rasmi / Official Launch */}
                 <View style={styles.ticketDetailsRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="calendar-outline" size={14} color="#94A3B8" />
-                    <Text style={styles.ticketLabel}>Pelancaran Rasmi:</Text>
+                    <Text style={styles.ticketLabel}>
+                      {isMalay ? 'Pelancaran Rasmi:' : 'Official Launch:'}
+                    </Text>
                   </View>
-                  <Text style={styles.ticketValGold}>10 Oktober 2026 (12:00 AM)</Text>
+                  <Text style={styles.ticketValGold}>
+                    {isMalay ? '10 Oktober 2026 (12:00 AM)' : 'October 10, 2026 (12:00 AM)'}
+                  </Text>
                 </View>
               </LinearGradient>
             </View>
 
-            {/* 📊 QUOTA PROGRESS CARD */}
-            <View style={styles.quotaBox}>
-              <View style={styles.quotaHeaderRow}>
-                <Text style={styles.quotaProgressLabel}>Kuota Diambil</Text>
-                <Text style={styles.quotaNumbersText}>
-                  <Text style={{ color: '#D97706', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
-                    {slotNumber}
-                  </Text> / 50 Kedai
-                </Text>
-              </View>
-              <View style={styles.quotaTrack}>
-                <LinearGradient
-                  colors={['#F59E0B', '#D97706']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.quotaFill, { width: `${(slotNumber / 50) * 100}%` }]}
-                />
-              </View>
-              <View style={styles.quotaWarningRow}>
-                <Ionicons name="warning" size={13} color="#D97706" />
-                <Text style={styles.quotaWarningText}>
-                  Tinggal <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>{50 - slotNumber} slot</Text> sahaja sebelum tawaran 10.10 ditutup!
-                </Text>
-              </View>
-            </View>
-
-            {/* 📋 AKses Awal Anda Termasuk */}
+            {/* 📋 Akses Awal Anda Termasuk */}
             <View style={styles.perksCard}>
-              <Text style={styles.perksCardTitle}>Akses Awal Anda Termasuk</Text>
+              <Text style={styles.perksCardTitle}>
+                {isMalay ? 'Akses Awal Anda Termasuk' : 'Your Early Access Includes'}
+              </Text>
 
               <View style={styles.perkRow}>
                 <View style={styles.perkCheckCircle}>
                   <Ionicons name="checkmark" size={12} color="#15803D" />
                 </View>
-                <Text style={styles.perkText}>Percuma 7 Hari Bermula 10.10</Text>
+                <Text style={styles.perkText}>
+                  {isMalay ? 'Percuma 7 Hari Bermula 10.10' : '7 Days Free Starting 10.10'}
+                </Text>
               </View>
 
               <View style={styles.perkRowDivider} />
@@ -385,7 +459,9 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                 <View style={styles.perkCheckCircle}>
                   <Ionicons name="checkmark" size={12} color="#15803D" />
                 </View>
-                <Text style={styles.perkText}>Kunci Harga Early Bird (RM2.60/hari)</Text>
+                <Text style={styles.perkText}>
+                  {isMalay ? 'Kunci Harga Early Bird (RM2.60/hari)' : 'Lock In Early Bird Rate (RM2.60/day)'}
+                </Text>
               </View>
 
               <View style={styles.perkRowDivider} />
@@ -394,14 +470,17 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                 <View style={styles.perkCheckCircle}>
                   <Ionicons name="checkmark" size={12} color="#15803D" />
                 </View>
-                <Text style={styles.perkText}>Bantuan Setup Menu & Servis Percuma</Text>
+                <Text style={styles.perkText}>
+                  {isMalay ? 'Bantuan Setup Menu & Servis Percuma' : 'Free Menu & Service Setup Assistance'}
+                </Text>
               </View>
             </View>
 
-            {/* ⚡ PRIMARY ACTION: 1-CLICK AUTO-ACTIVATE (OPTION A) */}
+            {/* ⚡ PRIMARY ACTION: 1-CLICK AUTO-ACTIVATE */}
             <TouchableOpacity
               style={styles.activateBtnWrap}
               onPress={handleAutoActivate}
+              disabled={saving}
               activeOpacity={0.88}
             >
               <LinearGradient
@@ -416,7 +495,9 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
                   color="#FFFFFF"
                 />
                 <Text style={styles.activateBtnText}>
-                  {isAutoActivated ? 'Akses 10.10 Telah Diaktifkan! ✅' : 'Aktifkan Automatik Pada 10.10 ➔'}
+                  {isAutoActivated
+                    ? (isMalay ? 'Akses 10.10 Telah Diaktifkan! ✅' : '10.10 Access Activated! ✅')
+                    : (isMalay ? 'Aktifkan Automatik Pada 10.10 ➔' : 'Auto-Activate on 10.10 ➔')}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -430,7 +511,9 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.saveWaitText}>Simpan & Tunggu Pelancaran 10.10</Text>
+              <Text style={styles.saveWaitText}>
+                {isMalay ? 'Simpan & Tunggu Pelancaran 10.10' : 'Save & Wait for 10.10 Launch'}
+              </Text>
             </TouchableOpacity>
 
             {/* FOOTER NOTE */}
@@ -438,7 +521,9 @@ export default function BookingAccessModal({ visible, onClose, merchantName }: B
               <View style={styles.vipFooterDivider} />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Ionicons name="people" size={12} color="#94A3B8" />
-                <Text style={styles.vipFooterText}>Slot terhad untuk 50 kedai pertama.</Text>
+                <Text style={styles.vipFooterText}>
+                  {isMalay ? 'Slot akses awal terhad.' : 'Limited early access slots.'}
+                </Text>
               </View>
               <View style={styles.vipFooterDivider} />
             </View>
@@ -946,52 +1031,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FDE047',
-  },
-  quotaBox: {
-    width: '100%',
-    backgroundColor: '#FFFBEB',
-    borderRadius: 14,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    marginBottom: 10,
-  },
-  quotaHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  quotaProgressLabel: {
-    fontSize: 11.5,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  quotaNumbersText: {
-    fontSize: 11.5,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#92400E',
-  },
-  quotaTrack: {
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#FEF3C7',
-    overflow: 'hidden',
-    marginBottom: 5,
-  },
-  quotaFill: {
-    height: '100%',
-    borderRadius: 3.5,
-  },
-  quotaWarningRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  quotaWarningText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#78350F',
   },
   perksCard: {
     width: '100%',

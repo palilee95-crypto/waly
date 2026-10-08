@@ -556,6 +556,7 @@ export default function MerchantDashboard() {
           return (
             <SmartBookingBanner
               hasAccess={hasBookingAccess}
+              isOptedIn={Boolean(merchant?.booking_vip_opt_in)}
               onPress={() => {
                 if (hasBookingAccess) {
                   router.push('/(merchant)/bookings' as any);
@@ -1028,6 +1029,12 @@ export default function MerchantDashboard() {
         visible={showBookingAccessModal}
         onClose={() => setShowBookingAccessModal(false)}
         merchantName={merchant?.name}
+        merchantId={merchant?.id}
+        isOptedIn={Boolean(merchant?.booking_vip_opt_in)}
+        onOptedInSuccess={() => {
+          setMerchant((prev: any) => (prev ? { ...prev, booking_vip_opt_in: true } : prev));
+          fetchMerchantData();
+        }}
       />
     </SafeAreaView>
   );
