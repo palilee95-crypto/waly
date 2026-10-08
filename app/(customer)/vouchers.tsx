@@ -161,6 +161,11 @@ export default function VouchersScreen() {
             bdayExpiryDisplay = `Valid until ${new Date(String(expiresAt).replace(' ', 'T')).toLocaleDateString()}`;
           }
 
+          let parsedMeta: any = {};
+          try {
+            parsedMeta = typeof voucher.metadata === 'string' ? JSON.parse(voucher.metadata) : (voucher.metadata || {});
+          } catch (e) {}
+
           return {
             id: voucher.id,
             merchantName: merchant?.name || 'Unknown Merchant',
@@ -168,8 +173,8 @@ export default function VouchersScreen() {
             logo: merchant?.logo
               ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
               : 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?auto=format&fit=crop&q=80&w=120',
-            title: voucher.title || 'Birthday Reward',
-            subtitle: voucher.description || 'Birthday treat',
+            title: voucher.title || parsedMeta.title || 'Birthday Reward',
+            subtitle: voucher.description || parsedMeta.description || 'Birthday treat',
             code: voucher.code || 'CODE-PENDING',
             expiry: bdayExpiryDisplay,
             status: (isBirthdayUsed || isBirthdayExpired ? 'used' : 'active') as 'used' | 'active',

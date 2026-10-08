@@ -93,6 +93,7 @@ export default function UnifiedRewardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const isMalay = locale === 'ms';
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -331,26 +332,23 @@ export default function UnifiedRewardsScreen() {
   // Tab 4: Birthday Rewards Handlers
   const handleSaveBirthday = async () => {
     if (!user || !user.merchant_id) return;
-    if (!birthdayForm.title.trim()) {
-      Alert.alert('Validation Error', 'Please enter a reward title.');
-      return;
-    }
-    if (!birthdayForm.reward_value.trim()) {
-      Alert.alert('Validation Error', 'Please enter a reward value.');
-      return;
-    }
-    if (!birthdayForm.message_template.trim()) {
-      Alert.alert('Validation Error', 'Please enter a WhatsApp message template.');
+    if (!birthdayForm.title.trim() || !birthdayForm.reward_value.trim()) {
+      Alert.alert(
+        'Validation Error',
+        birthdayForm.reward_type === 'stamps'
+          ? (isMalay ? 'Sila masukkan bilangan cop bonus.' : 'Please enter the number of bonus stamps.')
+          : (isMalay ? 'Sila masukkan tawaran atau hadiah percuma.' : 'Please enter the reward offer or free gift.')
+      );
       return;
     }
     const expiryDays = parseInt(birthdayForm.expiry_days, 10);
     if (isNaN(expiryDays) || expiryDays < 1) {
-      Alert.alert('Validation Error', 'Expiry must be at least 1 day.');
+      Alert.alert('Validation Error', isMalay ? 'Tempoh luput mestilah sekurang-kurangnya 1 hari.' : 'Expiry must be at least 1 day.');
       return;
     }
     const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)$/;
     if (!timeRegex.test(birthdayForm.send_time)) {
-      Alert.alert('Validation Error', 'Send time must be HH:MM (e.g. 09:00).');
+      Alert.alert('Validation Error', isMalay ? 'Masa hantar mestilah dalam format JJ:MM (cth: 09:00).' : 'Send time must be HH:MM (e.g. 09:00).');
       return;
     }
 
@@ -362,8 +360,8 @@ export default function UnifiedRewardsScreen() {
         description: birthdayForm.description.trim(),
         reward_type: birthdayForm.reward_type,
         reward_value: birthdayForm.reward_value.trim(),
-        message_template: birthdayForm.message_template.trim(),
-        message_template_b: birthdayForm.message_template_b.trim() || null,
+        message_template: birthdayForm.message_template.trim() || `Happy Birthday {{name}}! Special gift from ${merchant?.name || 'us'}: ${birthdayForm.title.trim()}`,
+        message_template_b: null,
         expiry_days: expiryDays,
         send_time: birthdayForm.send_time,
         is_active: birthdayForm.is_active,
@@ -1861,7 +1859,9 @@ export default function UnifiedRewardsScreen() {
                   <Text style={styles.cardSectionTitle}>Birthday Rewards</Text>
                 </View>
                 <Text style={styles.cardSectionDesc}>
-                  Automatically send a WhatsApp reward to customers on their birthday.
+                  {isMalay
+                    ? 'Ganjaran hari lahir diberikan secara automatik kepada pelanggan pada hari lahir mereka.'
+                    : 'Automatically reward customers on their birthday with digital vouchers or bonus stamps.'}
                 </Text>
 
                 {loadingBirthday ? (
@@ -1869,37 +1869,65 @@ export default function UnifiedRewardsScreen() {
                 ) : (
                   <>
                     <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Reward Type</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                      <Text style={styles.inputLabel}>{isMalay ? 'Jenis Ganjaran' : 'Reward Type'}</Text>
+                      <View style={{ flexDirection: 'row', gap: 12 }}>
                         {[
-                          { id: 'voucher_code', icon: 'ticket-outline', label: 'Voucher', color: '#10B981' },
-                          { id: 'free_item', icon: 'gift-outline', label: 'Free Item', color: '#8B5CF6' },
-                          { id: 'discount_percent', icon: 'pricetag-outline', label: 'Discount', color: '#F59E0B' },
-                          { id: 'stamps', icon: 'star-outline', label: 'Stamps', color: '#EAB308' },
+                          {
+                            id: 'voucher_code',
+                            icon: 'gift-outline',
+                            label: isMalay ? 'Baucar / Hadiah' : 'Voucher / Gift',
+                            desc: isMalay ? 'Jana kod baucar digital' : 'Redeemable voucher code',
+                            color: '#10B981',
+                          },
+                          {
+                            id: 'stamps',
+                            icon: 'star-outline',
+                            label: isMalay ? 'Cop Bonus' : 'Bonus Stamps',
+                            desc: isMalay ? 'Kredit terus ke kad' : 'Direct to stamp card',
+                            color: '#EAB308',
+                          },
                         ].map((type) => {
                           const isActive = birthdayForm.reward_type === type.id;
                           return (
                             <TouchableOpacity
                               key={type.id}
                               style={{
-                                width: '47%',
+                                flex: 1,
                                 backgroundColor: isActive ? '#FFFBEB' : '#F8FAFC',
                                 borderColor: isActive ? '#FFC700' : '#E2E8F0',
-                                borderWidth: 1,
+                                borderWidth: 1.5,
                                 borderRadius: 16,
-                                padding: 16,
+                                padding: 14,
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: 8,
+                                gap: 6,
                               }}
-                              onPress={() => setBirthdayForm((f) => ({ ...f, reward_type: type.id as any }))}
+                              onPress={() => {
+                                const newType = type.id as any;
+                                setBirthdayForm((f) => {
+                                  const isStamps = newType === 'stamps';
+                                  const defaultTpl = isStamps
+                                    ? 'Happy Birthday {{name}}! {{merchant}} has gifted you {{title}} directly to your stamp card! Check your card anytime at {{login_link}}.'
+                                    : 'Happy Birthday {{name}}! {{merchant}} has a special treat for you: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}.';
+                                  return {
+                                    ...f,
+                                    reward_type: newType,
+                                    reward_value: '',
+                                    title: '',
+                                    message_template: defaultTpl,
+                                  };
+                                });
+                              }}
                               activeOpacity={0.7}
                             >
-                              <View style={{ backgroundColor: isActive ? '#FFC700' : '#FFFFFF', width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowColor: isActive ? '#FFC700' : '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isActive ? 0.2 : 0.05, shadowRadius: 4, elevation: 2 }}>
-                                <Ionicons name={type.icon as any} size={20} color={isActive ? '#1A1400' : type.color} />
+                              <View style={{ backgroundColor: isActive ? '#FFC700' : '#FFFFFF', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', shadowColor: isActive ? '#FFC700' : '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isActive ? 0.2 : 0.05, shadowRadius: 4, elevation: 2 }}>
+                                <Ionicons name={type.icon as any} size={22} color={isActive ? '#1A1400' : type.color} />
                               </View>
-                              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#1A1400' : '#64748B' }}>
+                              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isActive ? '#1A1400' : '#0F172A', textAlign: 'center' }}>
                                 {type.label}
+                              </Text>
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
+                                {type.desc}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -1908,16 +1936,44 @@ export default function UnifiedRewardsScreen() {
                     </View>
 
                     <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>What's the offer?</Text>
+                      <Text style={styles.inputLabel}>
+                        {birthdayForm.reward_type === 'stamps'
+                          ? (isMalay ? 'Berapa banyak cop bonus?' : 'How many bonus stamps?')
+                          : (isMalay ? 'Apakah tawaran / hadiah percuma?' : "What's the offer / gift?")}
+                      </Text>
                       <TextInput
                         style={styles.textInput}
                         value={birthdayForm.reward_value}
-                        onChangeText={(text) => setBirthdayForm((f) => ({ ...f, reward_value: text, title: text, description: `Birthday special: ${text}` }))}
-                        placeholder={birthdayForm.reward_type === 'discount_percent' ? "e.g. 10% Off Your Next Meal" : birthdayForm.reward_type === 'stamps' ? "e.g. 3 Free Stamps" : "e.g. Free Coffee"}
+                        onChangeText={(text) => {
+                          if (birthdayForm.reward_type === 'stamps') {
+                            const cleaned = text.replace(/[^0-9]/g, '');
+                            setBirthdayForm((f) => ({
+                              ...f,
+                              reward_value: cleaned,
+                              title: cleaned ? `${cleaned} Free Stamp${Number(cleaned) > 1 ? 's' : ''}` : '',
+                              description: cleaned ? `Birthday Reward: ${cleaned} free stamp${Number(cleaned) > 1 ? 's' : ''}` : '',
+                            }));
+                          } else {
+                            setBirthdayForm((f) => ({
+                              ...f,
+                              reward_value: text,
+                              title: text,
+                              description: `Birthday special: ${text}`,
+                            }));
+                          }
+                        }}
+                        placeholder={birthdayForm.reward_type === 'stamps' ? 'e.g. 2' : 'e.g. Free Coffee / 15% Off'}
                         placeholderTextColor="#94A3B8"
+                        keyboardType={birthdayForm.reward_type === 'stamps' ? 'number-pad' : 'default'}
                       />
                       <Text style={styles.helpText}>
-                        This is what the customer will see (e.g., "Free Coffee"). A unique code is auto-generated.
+                        {birthdayForm.reward_type === 'stamps'
+                          ? (isMalay
+                              ? 'Cop akan dikreditkan secara automatik ke kad cop digital pelanggan pada hari lahir mereka.'
+                              : "Stamps will be credited directly to the customer's digital card on their birthday.")
+                          : (isMalay
+                              ? 'Pelanggan akan menerima kod baucar unik (cth: BDAY-XXXX) untuk ditebus di kedai.'
+                              : 'Customer receives a unique voucher code (e.g. BDAY-XXXX) to show in-store.')}
                       </Text>
                     </View>
 
@@ -1958,41 +2014,7 @@ export default function UnifiedRewardsScreen() {
                       </View>
                     </View>
 
-                    <View style={{ marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}
-                        onPress={() => setShowAdvancedMessages(!showAdvancedMessages)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Ionicons name="chatbubbles-outline" size={20} color="#64748B" />
-                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569' }}>
-                            Advanced Message Settings
-                          </Text>
-                        </View>
-                        <Ionicons name={showAdvancedMessages ? "chevron-up" : "chevron-down"} size={20} color="#64748B" />
-                      </TouchableOpacity>
 
-                      {showAdvancedMessages && (
-                        <View style={{ marginTop: 16 }}>
-                          <View style={styles.inputContainer}>
-                            <Text style={styles.inputLabel}>WhatsApp Message Template</Text>
-                            <TextInput
-                              style={[styles.textInput, { height: 96, textAlignVertical: 'top' }]}
-                              value={birthdayForm.message_template}
-                              onChangeText={(text) => setBirthdayForm((f) => ({ ...f, message_template: text }))}
-                              placeholder="Happy Birthday {{name}}! {{merchant}} has a special treat: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}."
-                              placeholderTextColor="#94A3B8"
-                              multiline
-                              numberOfLines={4}
-                            />
-                            <Text style={styles.helpText}>
-                              Variables: {'{{name}}'}, {'{{merchant}}'}, {'{{title}}'}, {'{{code}}'}, {'{{expiry}}'}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
 
                     <View style={styles.switchRow}>
                       <Text style={styles.switchLabel}>Active</Text>
