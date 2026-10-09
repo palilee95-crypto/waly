@@ -768,47 +768,58 @@ export default function ProfileOnboardingScreen() {
                         };
 
                         return (
-                          <View key={day} style={styles.dayRow}>
-                            <View style={styles.dayLabelWrap}>
+                          <View key={day} style={styles.dayCardItem}>
+                            {/* Day Header Row */}
+                            <View style={styles.dayHeaderRow}>
                               <Text style={[styles.dayText, s.closed && { color: '#94A3B8' }]}>
                                 {dayLabels[day]}
                               </Text>
+
+                              <View style={styles.closedToggleWrap}>
+                                <Text style={[styles.closedToggleLabel, s.closed ? styles.closedLabelOff : styles.closedLabelOn]}>
+                                  {s.closed ? 'Closed' : 'Open'}
+                                </Text>
+                                <Switch
+                                  value={!s.closed}
+                                  onValueChange={() => toggleDayClosed(day)}
+                                  trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+                                  thumbColor="#FFFFFF"
+                                  style={Platform.OS === 'web' ? { transform: [{ scale: 0.85 }] } : {}}
+                                />
+                              </View>
                             </View>
 
+                            {/* Time Range Row */}
                             {s.closed ? (
-                              <View style={styles.closedPill}>
-                                <Text style={styles.closedPillText}>CLOSED</Text>
+                              <View style={styles.closedDayBanner}>
+                                <Ionicons name="moon-outline" size={13} color="#94A3B8" />
+                                <Text style={styles.closedDayBannerText}>Closed on this day</Text>
                               </View>
                             ) : (
-                              <View style={styles.timeInputsWrap}>
-                                <TextInput
-                                  style={styles.timeInput}
-                                  value={s.open}
-                                  onChangeText={(txt) => updateDayTime(day, 'open', txt)}
-                                  placeholder="10:00 AM"
-                                  placeholderTextColor="#94A3B8"
-                                />
-                                <Text style={{ color: '#94A3B8', fontSize: 12 }}>–</Text>
-                                <TextInput
-                                  style={styles.timeInput}
-                                  value={s.close}
-                                  onChangeText={(txt) => updateDayTime(day, 'close', txt)}
-                                  placeholder="10:00 PM"
-                                  placeholderTextColor="#94A3B8"
-                                />
+                              <View style={styles.timeInputsRow}>
+                                <View style={styles.timeInputBox}>
+                                  <Ionicons name="sunny-outline" size={13} color="#94A3B8" />
+                                  <TextInput
+                                    style={styles.timeInput}
+                                    value={s.open}
+                                    onChangeText={(txt) => updateDayTime(day, 'open', txt)}
+                                    placeholder="10:00 AM"
+                                    placeholderTextColor="#94A3B8"
+                                  />
+                                </View>
+                                <Text style={styles.timeRangeArrow}>➔</Text>
+                                <View style={styles.timeInputBox}>
+                                  <Ionicons name="moon-outline" size={13} color="#94A3B8" />
+                                  <TextInput
+                                    style={styles.timeInput}
+                                    value={s.close}
+                                    onChangeText={(txt) => updateDayTime(day, 'close', txt)}
+                                    placeholder="10:00 PM"
+                                    placeholderTextColor="#94A3B8"
+                                  />
+                                </View>
                               </View>
                             )}
-
-                            <View style={styles.closedToggleWrap}>
-                              <Switch
-                                value={s.closed}
-                                onValueChange={() => toggleDayClosed(day)}
-                                trackColor={{ false: '#CBD5E1', true: '#EF4444' }}
-                                thumbColor="#FFFFFF"
-                                style={Platform.OS === 'web' ? { transform: [{ scale: 0.8 }] } : {}}
-                              />
-                              <Text style={styles.closedToggleLabel}>{s.closed ? 'Off' : 'Open'}</Text>
-                            </View>
                           </View>
                         );
                       })}
@@ -1392,67 +1403,82 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
-  dayRow: {
+  dayCardItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 8,
+  },
+  dayHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  dayLabelWrap: {
-    width: 84,
+    justifyContent: 'space-between',
   },
   dayText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
-  },
-  closedPill: {
-    flex: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-  },
-  closedPillText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#DC2626',
-    letterSpacing: 0.5,
-  },
-  timeInputsWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  timeInput: {
-    flex: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0F172A',
-    textAlign: 'center',
   },
   closedToggleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
+    gap: 6,
   },
   closedToggleLabel: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  closedLabelOn: {
+    color: '#10B981',
+  },
+  closedLabelOff: {
+    color: '#94A3B8',
+  },
+  timeInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeInputBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+  },
+  timeInput: {
+    flex: 1,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    width: 30,
+    color: '#0F172A',
+    paddingVertical: 4,
+  },
+  timeRangeArrow: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  closedDayBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  closedDayBannerText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
   },
 
   /* City Chips */
