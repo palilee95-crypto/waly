@@ -68,7 +68,7 @@ cronAdd("check_expired_subscriptions", "0 1 * * *", () => {
 
     const expiredSubs = $app.findRecordsByFilter(
       "subscriptions",
-      `(status = 'active' || status = 'trialing') && current_period_end <= '${nowStr}'`,
+      `(status = 'active' || status = 'trialing') && plan != 'stand_bundle' && current_period_end != '' && current_period_end <= '${nowStr}'`,
       "-created",
       500,
       0
@@ -92,7 +92,7 @@ routerAdd("GET", "/api/risev/test/check-expired-subscriptions", (e) => {
 
     const expiredSubs = $app.findRecordsByFilter(
       "subscriptions",
-      `(status = 'active' || status = 'trialing') && current_period_end <= '${nowStr}'`,
+      `(status = 'active' || status = 'trialing') && plan != 'stand_bundle' && current_period_end != '' && current_period_end <= '${nowStr}'`,
       "-created",
       500,
       0

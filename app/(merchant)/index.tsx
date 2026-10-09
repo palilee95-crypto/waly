@@ -543,6 +543,38 @@ export default function MerchantDashboard() {
           )}
         </View>
 
+        {/* Profile Completion Callout (if profile is not yet marked completed) */}
+        {merchant && !merchant.metadata?.profile_completed && (
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#FFFBEA',
+              borderColor: '#FEF08A',
+              borderWidth: 1.5,
+              borderRadius: 16,
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 16,
+            }}
+            onPress={() => router.push('/(merchant)/profile-onboarding' as any)}
+            activeOpacity={0.85}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFC700', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="sparkles" size={20} color="#000" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 2 }}>
+                Complete Your Store Profile (3 Steps)
+              </Text>
+              <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 16 }}>
+                Set your business category, storefront photos & hours to appear on Customer Explore.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#0F172A" />
+          </TouchableOpacity>
+        )}
+
         {/* 📅 Booking & Appointments Quick Widget */}
         {(() => {
           const plan = (activeSubscription?.plan || '').toLowerCase();

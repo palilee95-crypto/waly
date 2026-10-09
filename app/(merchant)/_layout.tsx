@@ -28,8 +28,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   const isDesktop = width >= 768;
 
   const currentRoute = state.routes[state.index]?.name;
-  // Hide tab bar on sub-screens like subscription paywall or nfc-marketplace
-  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace') {
+  // Hide tab bar on sub-screens like subscription paywall, nfc-marketplace, or profile onboarding
+  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace' || currentRoute === 'profile-onboarding') {
     return null;
   }
 
@@ -958,6 +958,8 @@ export default function MerchantLayout() {
     );
   }
 
+  const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding');
+
   return (
     <View style={styles.container}>
       <Tabs
@@ -965,7 +967,7 @@ export default function MerchantLayout() {
         tabBar={(props) => <CustomMerchantTabBar {...props} isSidebarExpanded={isSidebarExpanded} toggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} sidebarWidth={sidebarWidth} />}
         screenOptions={{
           headerShown: false,
-          sceneStyle: { paddingLeft: isDesktop ? sidebarWidth : 0 }
+          sceneStyle: { paddingLeft: (isDesktop && !isFullScreenRoute) ? sidebarWidth : 0 }
         } as any}
       >
         <Tabs.Screen name="index" />
@@ -973,6 +975,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="give" />
         <Tabs.Screen name="marketing" />
         <Tabs.Screen name="profile" />
+        <Tabs.Screen name="profile-onboarding" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="staff" options={{ href: null }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />
         <Tabs.Screen name="subscription" options={{ href: null }} />
@@ -988,8 +991,9 @@ export default function MerchantLayout() {
       <NfcClaimModal />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      <TouchableOpacity
-        activeOpacity={0.8}
+      {!pathname.includes('profile-onboarding') && (
+        <TouchableOpacity
+          activeOpacity={0.8}
         onPress={() => {
           if (Platform.OS === 'web' && typeof window !== 'undefined') {
             window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
@@ -1033,6 +1037,7 @@ export default function MerchantLayout() {
           </Text>
         </BlurView>
       </TouchableOpacity>
+      )}
     </View>
   );
 }

@@ -119,11 +119,11 @@ export default function ActivateStandPage() {
 
             <TouchableOpacity
               style={styles.dashboardBtn}
-              onPress={() => router.replace('/(merchant)')}
+              onPress={() => router.replace('/(merchant)/profile-onboarding' as any)}
               activeOpacity={0.85}
             >
               <Text style={styles.dashboardBtnText}>
-                {locale === 'en' ? 'Go to Merchant Dashboard →' : 'Buka Papan Pemuka Peniaga →'}
+                {locale === 'en' ? 'Complete Store Profile (3 Steps) →' : 'Lengkapkan Profil Kedai (3 Langkah) →'}
               </Text>
             </TouchableOpacity>
           </View>

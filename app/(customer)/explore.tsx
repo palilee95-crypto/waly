@@ -18,12 +18,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FilterModal, { FilterState } from './_components/FilterModal';
-import AllCategoriesModal from './_components/AllCategoriesModal';
+import AllCategoriesModal, { ALL_CATEGORIES_LIST } from './_components/AllCategoriesModal';
 
 const { width } = Dimensions.get('window');
 
@@ -144,6 +144,19 @@ function determineCategoryLabel(m: any): { display: string; key: string } {
   if (name.includes('carwash') || name.includes('autospa') || name.includes('garage') || name.includes('detailing')) {
     return { display: 'Car Wash', key: 'carwash' };
   }
+  if (name.includes('workshop') || name.includes('mechanic') || name.includes('bengkel') || name.includes('tayar') || name.includes('tyre')) {
+    return { display: 'Workshop & Repair', key: 'workshop' };
+  }
+  if (
+    name.includes('ice cream') ||
+    name.includes('gelato') ||
+    name.includes('scoop') ||
+    name.includes('creamy') ||
+    name.includes('dessert') ||
+    name.includes('waffle')
+  ) {
+    return { display: 'Dessert & Ice Cream', key: 'dessert' };
+  }
   if (
     name.includes('coffee') ||
     name.includes('teh') ||
@@ -159,6 +172,9 @@ function determineCategoryLabel(m: any): { display: string; key: string } {
   if (cat === 'beauty' || name.includes('spa') || name.includes('facepainting') || name.includes('butik') || name.includes('house')) {
     return { display: 'Beauty', key: 'beauty' };
   }
+  if (name.includes('gym') || name.includes('fitness') || name.includes('badminton') || name.includes('court')) {
+    return { display: 'Gym & Fitness', key: 'gym' };
+  }
   if (cat === 'retail') {
     return { display: 'Retail', key: 'retail' };
   }
@@ -170,6 +186,7 @@ function determineCategoryLabel(m: any): { display: string; key: string } {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ category?: string; q?: string }>();
   const { user } = useAuth();
 
   // Search and Filter States (Default search is EMPTY so all merchants load by default)
@@ -177,6 +194,25 @@ export default function ExploreScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [merchants, setMerchants] = useState<MerchantExploreItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync incoming router params (e.g. from Home page or AllCategoriesModal)
+  useEffect(() => {
+    if (params.category) {
+      const catParam = String(params.category).trim();
+      const matchedCat = ALL_CATEGORIES_LIST.find(
+        (c) => c.id.toLowerCase() === catParam.toLowerCase() || c.name.toLowerCase() === catParam.toLowerCase()
+      );
+      if (matchedCat) {
+        setActiveCategory(matchedCat.name);
+      } else {
+        setActiveCategory(catParam);
+      }
+      setSearchQuery('');
+    }
+    if (params.q) {
+      setSearchQuery(String(params.q));
+    }
+  }, [params.category, params.q]);
 
   // Favorites state
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -269,7 +305,7 @@ export default function ExploreScreen() {
         pb.collection('merchants').getFullList({ requestKey: null }).catch(() => []),
         pb.collection('loyalty_programs').getFullList({ filter: 'is_active = true' }).catch(() => []),
         pb.collection('store_locations').getFullList({ requestKey: null }).catch(() => []),
-        pb.collection('services').getFullList({ requestKey: null }).catch(() => []),
+        pb.collection('merchant_services').getFullList({ requestKey: null }).catch(() => []),
       ]);
 
       const cardList = user
@@ -442,13 +478,35 @@ export default function ExploreScreen() {
       // Active category filtering
       if (activeCategory !== 'All') {
         const cat = activeCategory.toLowerCase();
-        const mCat = m.category.toLowerCase();
+        const mCat = (m.category || '').toLowerCase();
+        const rawCat = (m.rawCategory || '').toLowerCase();
+        const mName = (m.name || '').toLowerCase();
 
-        if (cat === 'barber' && !mCat.includes('barber')) return false;
-        if (cat === 'beauty' && !mCat.includes('beauty')) return false;
-        if (cat === 'car wash' && !mCat.includes('car wash')) return false;
-        if (cat === 'cafe' && !mCat.includes('cafe') && !mCat.includes('food')) return false;
-        if (cat === 'restaurant' && !mCat.includes('restaurant') && !mCat.includes('food') && !mCat.includes('cafe')) return false;
+        let matched = false;
+        if (cat.includes('barber') && (mCat.includes('barber') || rawCat.includes('barber') || mName.includes('barber') || mName.includes('saloon'))) {
+          matched = true;
+        } else if (cat.includes('beauty') && (mCat.includes('beauty') || rawCat.includes('beauty') || mName.includes('beauty') || mCat.includes('salon'))) {
+          matched = true;
+        } else if (cat.includes('car wash') && (mCat.includes('car wash') || rawCat.includes('carwash') || mName.includes('car wash') || mName.includes('detailing'))) {
+          matched = true;
+        } else if ((cat.includes('workshop') || cat.includes('repair')) && (mCat.includes('workshop') || rawCat.includes('workshop') || mName.includes('workshop') || mName.includes('mechanic') || mName.includes('bengkel'))) {
+          matched = true;
+        } else if ((cat.includes('dessert') || cat.includes('ice cream')) && (mCat.includes('dessert') || rawCat.includes('dessert') || mName.includes('ice cream') || mName.includes('scoop') || mName.includes('creamy') || mName.includes('gelato'))) {
+          matched = true;
+        } else if (cat.includes('cafe') && (mCat.includes('cafe') || rawCat.includes('cafe') || mCat.includes('food') || mName.includes('cafe') || mName.includes('coffee'))) {
+          matched = true;
+        } else if (cat.includes('restaurant') && (mCat.includes('restaurant') || rawCat.includes('restaurant') || mCat.includes('food') || mName.includes('restaurant'))) {
+          matched = true;
+        } else if ((cat.includes('spa') || cat.includes('massage')) && (mCat.includes('spa') || rawCat.includes('spa') || mName.includes('spa') || mName.includes('massage'))) {
+          matched = true;
+        } else if ((cat.includes('gym') || cat.includes('fitness') || cat.includes('sport')) && (mCat.includes('gym') || rawCat.includes('gym') || mName.includes('gym') || mName.includes('fitness') || mName.includes('badminton') || mName.includes('court'))) {
+          matched = true;
+        } else {
+          // General flexible fallback
+          matched = mCat.includes(cat) || rawCat.includes(cat) || mName.includes(cat) || cat.includes(mCat) || cat.includes(rawCat);
+        }
+
+        if (!matched) return false;
       }
 
       // Radius filter

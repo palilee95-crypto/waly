@@ -986,6 +986,10 @@ export default function BookingsScreen() {
     try {
       const priceNum = parseFloat(newServicePrice) || 0;
       const durNum = parseInt(newServiceDuration) || 0;
+      const unitsNum = parseInt(totalUnits) || 1;
+      const paxNum = parseInt(maxPax) || 1;
+      const peakNum = peakPrice ? (parseFloat(peakPrice) || 0) : undefined;
+      const depositNum = securityDeposit ? (parseFloat(securityDeposit) || 0) : undefined;
       
       let finalImageUrl = photoUri || '';
 
@@ -998,6 +1002,11 @@ export default function BookingsScreen() {
           price: priceNum,
           duration_minutes: durNum,
           item_type: addItemType,
+          requires_staff: requiresStaff,
+          total_units: unitsNum,
+          max_pax: paxNum,
+          peak_price: peakNum,
+          security_deposit: depositNum,
           is_active: isOnlineAvailable,
           image_url: finalImageUrl
         };
@@ -1011,6 +1020,11 @@ export default function BookingsScreen() {
             formData.append('price', String(priceNum));
             formData.append('duration_minutes', String(durNum));
             formData.append('item_type', addItemType);
+            formData.append('requires_staff', String(requiresStaff));
+            formData.append('total_units', String(unitsNum));
+            formData.append('max_pax', String(paxNum));
+            if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
+            if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
             formData.append('is_active', String(isOnlineAvailable));
             if (matchingBranch?.id) {
               formData.append('branch', matchingBranch.id);
@@ -1038,6 +1052,11 @@ export default function BookingsScreen() {
                 price: priceNum,
                 duration_minutes: durNum,
                 item_type: addItemType,
+                requires_staff: requiresStaff,
+                total_units: unitsNum,
+                max_pax: paxNum,
+                peak_price: peakNum,
+                security_deposit: depositNum,
                 is_active: isOnlineAvailable,
                 image_url: photoUri || ''
               });
@@ -1050,6 +1069,9 @@ export default function BookingsScreen() {
                 price: priceNum,
                 duration_minutes: durNum,
                 item_type: addItemType,
+                requires_staff: requiresStaff,
+                total_units: unitsNum,
+                max_pax: paxNum,
                 is_active: isOnlineAvailable
               });
             }
@@ -1070,6 +1092,11 @@ export default function BookingsScreen() {
         price: priceNum,
         duration_minutes: durNum,
         item_type: addItemType,
+        requires_staff: requiresStaff,
+        total_units: unitsNum,
+        max_pax: paxNum,
+        peak_price: peakNum,
+        security_deposit: depositNum,
         is_active: isOnlineAvailable,
         image_url: finalImageUrl
       };
@@ -1087,6 +1114,11 @@ export default function BookingsScreen() {
           formData.append('price', String(priceNum));
           formData.append('duration_minutes', String(durNum));
           formData.append('item_type', addItemType);
+          formData.append('requires_staff', String(requiresStaff));
+          formData.append('total_units', String(unitsNum));
+          formData.append('max_pax', String(paxNum));
+          if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
+          if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
           formData.append('is_active', String(isOnlineAvailable));
 
           if (photoFile) {
@@ -1115,6 +1147,11 @@ export default function BookingsScreen() {
               price: priceNum,
               duration_minutes: durNum,
               item_type: addItemType,
+              requires_staff: requiresStaff,
+              total_units: unitsNum,
+              max_pax: paxNum,
+              peak_price: peakNum,
+              security_deposit: depositNum,
               is_active: isOnlineAvailable,
               image_url: photoUri || ''
             });
@@ -1129,6 +1166,9 @@ export default function BookingsScreen() {
               price: priceNum,
               duration_minutes: durNum,
               item_type: addItemType,
+              requires_staff: requiresStaff,
+              total_units: unitsNum,
+              max_pax: paxNum,
               is_active: isOnlineAvailable
             });
             newService.id = rec.id;

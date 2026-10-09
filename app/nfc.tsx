@@ -1158,13 +1158,7 @@ export default function NfcLandingScreen() {
 
       if (res.success) {
         await refreshSession();
-        const updatedRec = pb.authStore.record;
-        const targetMerchId = updatedRec?.merchant_id || user?.merchant_id;
-        if (targetMerchId) {
-          await loadMerchantAndPrograms(targetMerchId, true);
-        } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.location.reload();
-        }
+        router.push('/(merchant)/profile-onboarding' as any);
       } else {
         alert(res.message || 'Failed to activate stand code.');
       }

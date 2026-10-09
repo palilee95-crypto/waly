@@ -41,7 +41,27 @@ interface ServiceItem {
   price: number;
   duration_minutes: number;
   image_url?: string;
-  item_type: 'service' | 'product';
+  image_source?: any;
+  item_type?: 'service' | 'automotive' | 'facility' | 'lodging' | 'dining' | 'catering' | 'class' | 'product' | 'addon';
+  requires_staff?: boolean;
+  total_units?: number;
+  max_pax?: number;
+  peak_price?: number;
+  security_deposit?: number;
+}
+
+function getServiceItemIcon(type?: string): string {
+  switch (type) {
+    case 'automotive': return 'car-sport-outline';
+    case 'facility': return 'business-outline';
+    case 'lodging': return 'bed-outline';
+    case 'dining': return 'restaurant-outline';
+    case 'catering': return 'sparkles-outline';
+    case 'class': return 'school-outline';
+    case 'product': return 'cube-outline';
+    case 'addon': return 'add-circle-outline';
+    default: return 'sparkles-outline';
+  }
 }
 
 interface StaffItem {
@@ -247,6 +267,7 @@ export default function CustomerBookingPwaScreen() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
+  const [eventVenue, setEventVenue] = useState('');
   const [profileTab, setProfileTab] = useState<'Services' | 'Reviews' | 'About'>('Services');
 
   // Post-booking state
@@ -643,16 +664,59 @@ export default function CustomerBookingPwaScreen() {
       }
 
       if (!mRecord) {
-        setMerchant(null);
-        setServices([]);
-        setBranches([]);
-        setStaffList([]);
-        return;
+        if (slug === 'scoop-creamy') {
+          mRecord = {
+            id: 'demo-scoop',
+            name: 'Scoop Creamy',
+            store_name: 'Scoop Creamy',
+            subtitle: 'Artisanal Gelato & Handcrafted Ice Cream',
+            pwa_slug: 'scoop-creamy',
+            category: 'Food & Drinks',
+            is_pro: true,
+            plan: 'pro',
+            rating: '4.9',
+            reviews_count: '98',
+            pwa_brand_color: '#FF6B8B',
+            address: 'Jitra, Kedah'
+          };
+        } else if (slug === 'jerami-barbershop') {
+          mRecord = {
+            id: 'demo-jerami',
+            name: 'Jerami Barbershop',
+            store_name: 'Jerami Barbershop',
+            subtitle: 'Gentlemen Grooming & Classic Haircuts',
+            pwa_slug: 'jerami-barbershop',
+            category: 'Barber',
+            is_pro: true,
+            plan: 'pro',
+            rating: '4.9',
+            reviews_count: '142',
+            pwa_brand_color: '#FFC700',
+            address: 'Jitra, Kedah'
+          };
+        } else {
+          setMerchant(null);
+          setServices([]);
+          setBranches([]);
+          setStaffList([]);
+          return;
+        }
       }
 
       const bannerUrl = mRecord.banner 
         ? `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`
         : null;
+
+      let fallbackCover = 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80';
+      if (slug === 'scoop-creamy') {
+        try {
+          fallbackCover = Image.resolveAssetSource(require('@/assets/images/scoop_creamy_storefront.jpg')).uri;
+        } catch (e) {}
+      } else if (slug === 'jerami-barbershop') {
+        try {
+          fallbackCover = Image.resolveAssetSource(require('@/assets/images/jerami_barbershop.jpg')).uri;
+        } catch (e) {}
+      }
 
       const normalizedMerchant = {
         ...mRecord,
@@ -660,7 +724,7 @@ export default function CustomerBookingPwaScreen() {
         subtitle: mRecord.subtitle || mRecord.category || 'Quality Services & Bookings',
         rating: mRecord.rating || '5.0',
         reviews_count: mRecord.reviews_count || '120',
-        cover_url: bannerUrl || (mRecord.cover_url && isValidImageUri(mRecord.cover_url) ? mRecord.cover_url : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80'),
+        cover_url: bannerUrl || (mRecord.cover_url && isValidImageUri(mRecord.cover_url) ? mRecord.cover_url : fallbackCover),
         logo_url: mRecord.logo_url || (mRecord.logo ? pb.files.getURL(mRecord, mRecord.logo) : null),
         pwa_brand_color: mRecord.pwa_brand_color || '#FFC700',
       };
@@ -729,12 +793,56 @@ export default function CustomerBookingPwaScreen() {
           filter: `merchant = "${mRecord.id}" && is_active = true`,
           sort: 'created'
         });
-        const sItems = sRes.items.map((item: any) => ({
+        let sItems = sRes.items.map((item: any) => ({
           ...item,
           image_url: item.image 
             ? `${pb.baseUrl}/api/files/merchant_services/${item.id}/${item.image}` 
             : (item.image_url || '')
         }));
+
+        if (sItems.length === 0) {
+          if (slug === 'scoop-creamy') {
+            sItems = [
+              {
+                id: 'scoop-item-1',
+                name: 'Signature Artisanal Ice Cream Cup',
+                category: 'Ice Cream',
+                description: 'Fresh handcrafted waffle cup gelato with premium double scoops',
+                price: 12,
+                duration_minutes: 15,
+                item_type: 'product',
+                image_source: require('@/assets/images/scoop_icecream_cup.png'),
+                is_active: true
+              },
+              {
+                id: 'scoop-item-2',
+                name: 'Event Ice Cream Catering Booth',
+                category: 'Catering',
+                description: 'Full artisanal ice cream booth with live server for private events & weddings',
+                price: 350,
+                duration_minutes: 120,
+                item_type: 'catering',
+                requires_staff: true,
+                is_active: true
+              }
+            ];
+          } else if (slug === 'jerami-barbershop') {
+            sItems = [
+              {
+                id: 'jerami-item-1',
+                name: 'Signature Gentlemen Haircut',
+                category: 'Haircut',
+                description: 'Precision cut, wash, hot towel and styling',
+                price: 25,
+                duration_minutes: 30,
+                item_type: 'service',
+                requires_staff: true,
+                is_active: true
+              }
+            ];
+          }
+        }
+
         setServices(sItems as any);
         if (sItems.length > 0) {
           setSelectedServices([sItems[0] as any]);
@@ -744,8 +852,27 @@ export default function CustomerBookingPwaScreen() {
         }
       } catch (sErr) {
         console.warn('Error fetching services:', sErr);
-        setServices([]);
-        setSelectedServices([]);
+        if (slug === 'scoop-creamy') {
+          const fallbackScoop = [
+            {
+              id: 'scoop-item-1',
+              name: 'Signature Artisanal Ice Cream Cup',
+              category: 'Ice Cream',
+              description: 'Fresh handcrafted waffle cup gelato with premium double scoops',
+              price: 12,
+              duration_minutes: 15,
+              item_type: 'product',
+              image_source: require('@/assets/images/scoop_icecream_cup.png'),
+              is_active: true
+            }
+          ];
+          setServices(fallbackScoop as any);
+          setSelectedServices([fallbackScoop[0] as any]);
+          setIsPro(true);
+        } else {
+          setServices([]);
+          setSelectedServices([]);
+        }
       }
 
       // Fetch staff (live active staff only)
@@ -880,6 +1007,11 @@ export default function CustomerBookingPwaScreen() {
           duration_minutes: s.duration_minutes || 30
         }));
 
+        const finalNotes = [
+          customerNotes.trim(),
+          eventVenue.trim() ? `Event Logistics & Venue: ${eventVenue.trim()}` : ''
+        ].filter(Boolean).join('\n');
+
         const payloadToSave = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
@@ -890,7 +1022,7 @@ export default function CustomerBookingPwaScreen() {
           start_time: selectedTime,
           total_price: totalPrice,
           items_summary: itemsSummaryData,
-          notes: customerNotes,
+          notes: finalNotes,
           status: 'booked'
         };
 
@@ -1592,7 +1724,12 @@ export default function CustomerBookingPwaScreen() {
                     onPress={() => toggleServiceSelection(srv)}
                     activeOpacity={0.85}
                   >
-                    {srv.image_url ? (
+                    {srv.image_source ? (
+                      <Image
+                        source={srv.image_source}
+                        style={styles.servicePhotoThumb}
+                      />
+                    ) : srv.image_url ? (
                       <Image
                         source={{ uri: srv.image_url }}
                         style={styles.servicePhotoThumb}
@@ -1600,7 +1737,7 @@ export default function CustomerBookingPwaScreen() {
                     ) : (
                       <View style={[styles.servicePhotoThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
                         <Ionicons 
-                          name={srv.item_type === 'product' ? 'cube-outline' : 'sparkles-outline'} 
+                          name={getServiceItemIcon(srv.item_type) as any} 
                           size={24} 
                           color={themeStyles.textMutedColor} 
                         />
@@ -1928,6 +2065,22 @@ export default function CustomerBookingPwaScreen() {
                 />
               </View>
             </View>
+
+            {selectedServices.some(s => s.item_type === 'catering') && (
+              <View style={styles.inputFieldGroup}>
+                <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Event Venue Address & Setup Time 🎪</Text>
+                <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
+                  <Ionicons name="location-outline" size={18} color={themeStyles.textSecondaryColor} />
+                  <TextInput
+                    style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
+                    placeholder="e.g. Dewan Gemilang, Jitra • Setup by 11:30 AM"
+                    placeholderTextColor={themeStyles.textMutedColor}
+                    value={eventVenue}
+                    onChangeText={setEventVenue}
+                  />
+                </View>
+              </View>
+            )}
 
             <View style={styles.inputFieldGroup}>
               <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Add Note (Optional)</Text>
