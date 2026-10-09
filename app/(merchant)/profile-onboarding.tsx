@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Switch,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,6 +76,31 @@ const DEFAULT_SCHEDULE: Record<DayKey, DaySchedule> = {
   sun: { open: '10:00 AM', close: '10:00 PM', closed: false },
 };
 
+const DAY_LABELS: Record<DayKey, string> = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+};
+
+const TIME_PICKER_OPTIONS = [
+  '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM',
+  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM',
+  '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+  '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM',
+  '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM',
+  '12:00 AM', '12:30 AM', '01:00 AM', '01:30 AM',
+  '02:00 AM', '02:30 AM', '03:00 AM', '03:30 AM',
+  '04:00 AM', '04:30 AM', '05:00 AM', '05:30 AM',
+];
+
 function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other' {
   switch (subId) {
     case 'cafe':
@@ -130,6 +156,11 @@ export default function ProfileOnboardingScreen() {
   const [bannerFile, setBannerFile] = useState<any>(null);
   const [hoursPreset, setHoursPreset] = useState<'daily' | 'weekday_sat' | 'custom'>('daily');
   const [schedule, setSchedule] = useState<Record<DayKey, DaySchedule>>(DEFAULT_SCHEDULE);
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [pickerDay, setPickerDay] = useState<DayKey>('mon');
+  const [pickerField, setPickerField] = useState<'open' | 'close'>('open');
+  const [pickerTab, setPickerTab] = useState<'all' | 'morning' | 'afternoon' | 'night'>('all');
+  const [applyToAllOpenDays, setApplyToAllOpenDays] = useState(false);
 
   // Step 3: Location & Contact
   const [address, setAddress] = useState('');
@@ -213,6 +244,55 @@ export default function ProfileOnboardingScreen() {
       [day]: { ...prev[day], [field]: value },
     }));
   };
+
+  const openTimePicker = (day: DayKey, field: 'open' | 'close') => {
+    setPickerDay(day);
+    setPickerField(field);
+    setApplyToAllOpenDays(false);
+    if (field === 'open') {
+      setPickerTab('morning');
+    } else {
+      setPickerTab('night');
+    }
+    setTimePickerVisible(true);
+  };
+
+  const handleSelectTime = (selectedTime: string) => {
+    setHoursPreset('custom');
+    if (applyToAllOpenDays) {
+      setSchedule((prev) => {
+        const next = { ...prev };
+        (Object.keys(next) as DayKey[]).forEach((d) => {
+          if (!next[d].closed) {
+            next[d] = { ...next[d], [pickerField]: selectedTime };
+          }
+        });
+        return next;
+      });
+    } else {
+      setSchedule((prev) => ({
+        ...prev,
+        [pickerDay]: { ...prev[pickerDay], [pickerField]: selectedTime },
+      }));
+    }
+    setTimePickerVisible(false);
+  };
+
+  const filteredTimeOptions = TIME_PICKER_OPTIONS.filter((time) => {
+    if (pickerTab === 'all') return true;
+    const isAm = time.includes('AM');
+    const hour = parseInt(time.split(':')[0], 10);
+    if (pickerTab === 'morning') {
+      return isAm && hour >= 6 && hour < 12;
+    }
+    if (pickerTab === 'afternoon') {
+      return (!isAm && hour === 12) || (!isAm && hour >= 1 && hour < 6);
+    }
+    if (pickerTab === 'night') {
+      return (!isAm && hour >= 6 && hour < 12) || (isAm && (hour === 12 || hour < 6));
+    }
+    return true;
+  });
 
   const pickImage = async (type: 'logo' | 'banner') => {
     if (Platform.OS === 'web') {
@@ -757,22 +837,12 @@ export default function ProfileOnboardingScreen() {
                     <View style={styles.scheduleCard}>
                       {(Object.keys(schedule) as DayKey[]).map((day) => {
                         const s = schedule[day];
-                        const dayLabels: Record<DayKey, string> = {
-                          mon: 'Monday',
-                          tue: 'Tuesday',
-                          wed: 'Wednesday',
-                          thu: 'Thursday',
-                          fri: 'Friday',
-                          sat: 'Saturday',
-                          sun: 'Sunday',
-                        };
-
                         return (
                           <View key={day} style={styles.dayCardItem}>
                             {/* Day Header Row */}
                             <View style={styles.dayHeaderRow}>
                               <Text style={[styles.dayText, s.closed && { color: '#94A3B8' }]}>
-                                {dayLabels[day]}
+                                {DAY_LABELS[day]}
                               </Text>
 
                               <View style={styles.closedToggleWrap}>
@@ -797,27 +867,27 @@ export default function ProfileOnboardingScreen() {
                               </View>
                             ) : (
                               <View style={styles.timeInputsRow}>
-                                <View style={styles.timeInputBox}>
-                                  <Ionicons name="sunny-outline" size={13} color="#94A3B8" />
-                                  <TextInput
-                                    style={styles.timeInput}
-                                    value={s.open}
-                                    onChangeText={(txt) => updateDayTime(day, 'open', txt)}
-                                    placeholder="10:00 AM"
-                                    placeholderTextColor="#94A3B8"
-                                  />
-                                </View>
+                                <TouchableOpacity
+                                  style={styles.timePickerButton}
+                                  onPress={() => openTimePicker(day, 'open')}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="sunny-outline" size={13} color="#D97706" />
+                                  <Text style={styles.timePickerButtonText}>{s.open || '10:00 AM'}</Text>
+                                  <Ionicons name="chevron-down" size={12} color="#94A3B8" style={{ marginLeft: 'auto' }} />
+                                </TouchableOpacity>
+
                                 <Text style={styles.timeRangeArrow}>➔</Text>
-                                <View style={styles.timeInputBox}>
-                                  <Ionicons name="moon-outline" size={13} color="#94A3B8" />
-                                  <TextInput
-                                    style={styles.timeInput}
-                                    value={s.close}
-                                    onChangeText={(txt) => updateDayTime(day, 'close', txt)}
-                                    placeholder="10:00 PM"
-                                    placeholderTextColor="#94A3B8"
-                                  />
-                                </View>
+
+                                <TouchableOpacity
+                                  style={styles.timePickerButton}
+                                  onPress={() => openTimePicker(day, 'close')}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="moon-outline" size={13} color="#6366F1" />
+                                  <Text style={styles.timePickerButtonText}>{s.close || '10:00 PM'}</Text>
+                                  <Ionicons name="chevron-down" size={12} color="#94A3B8" style={{ marginLeft: 'auto' }} />
+                                </TouchableOpacity>
                               </View>
                             )}
                           </View>
@@ -980,6 +1050,145 @@ export default function ProfileOnboardingScreen() {
           </View>
         )}
       </View>
+
+      {/* TIME PICKER MODAL */}
+      <Modal
+        visible={timePickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTimePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setTimePickerVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalContentCard}
+            activeOpacity={1}
+            onPress={(e) => {
+              if (Platform.OS === 'web') {
+                e.stopPropagation();
+              }
+            }}
+          >
+            <View style={styles.modalHandleBar} />
+
+            {/* Header */}
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons
+                    name={pickerField === 'open' ? 'sunny-outline' : 'moon-outline'}
+                    size={18}
+                    color={pickerField === 'open' ? '#D97706' : '#6366F1'}
+                  />
+                  <Text style={styles.modalHeaderTitle}>
+                    {pickerField === 'open' ? 'Select Opening Time' : 'Select Closing Time'}
+                  </Text>
+                </View>
+                <Text style={styles.modalHeaderSubtitle}>
+                  For {DAY_LABELS[pickerDay]} • Current: {schedule[pickerDay]?.[pickerField]}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setTimePickerVisible(false)}
+              >
+                <Ionicons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Apply to all open days banner */}
+            <View style={styles.modalBulkApplyBanner}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.modalBulkApplyTitle}>Apply to all open days</Text>
+                <Text style={styles.modalBulkApplySub}>
+                  Update {pickerField === 'open' ? 'opening' : 'closing'} time for every open day
+                </Text>
+              </View>
+              <Switch
+                value={applyToAllOpenDays}
+                onValueChange={setApplyToAllOpenDays}
+                trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
+                thumbColor="#FFFFFF"
+                style={Platform.OS === 'web' ? { transform: [{ scale: 0.85 }] } : {}}
+              />
+            </View>
+
+            {/* Quick Popular Picks */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.pickerSectionLabel}>QUICK PICKS</Text>
+              <View style={styles.quickPicksRow}>
+                {(pickerField === 'open'
+                  ? ['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM']
+                  : ['06:00 PM', '08:00 PM', '10:00 PM', '11:00 PM', '12:00 AM']
+                ).map((quickTime) => {
+                  const isSelected = schedule[pickerDay]?.[pickerField] === quickTime;
+                  return (
+                    <TouchableOpacity
+                      key={quickTime}
+                      style={[styles.quickPickChip, isSelected && styles.quickPickChipActive]}
+                      onPress={() => handleSelectTime(quickTime)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.quickPickChipText, isSelected && styles.quickPickChipTextActive]}>
+                        {quickTime}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Filter Tabs */}
+            <View style={styles.modalFilterTabs}>
+              {[
+                { id: 'all', label: 'All Slots' },
+                { id: 'morning', label: 'Morning' },
+                { id: 'afternoon', label: 'Afternoon' },
+                { id: 'night', label: 'Evening & Night' },
+              ].map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[styles.modalFilterTab, pickerTab === tab.id && styles.modalFilterTabActive]}
+                  onPress={() => setPickerTab(tab.id as any)}
+                >
+                  <Text style={[styles.modalFilterTabText, pickerTab === tab.id && styles.modalFilterTabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Time Slots Grid */}
+            <ScrollView
+              style={{ maxHeight: 240 }}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.timeSlotsGrid}
+            >
+              {filteredTimeOptions.map((time) => {
+                const isSelected = schedule[pickerDay]?.[pickerField] === time;
+                return (
+                  <TouchableOpacity
+                    key={time}
+                    style={[styles.timeSlotChip, isSelected && styles.timeSlotChipActive]}
+                    onPress={() => handleSelectTime(time)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.timeSlotChipText, isSelected && styles.timeSlotChipTextActive]}>
+                      {time}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={13} color="#FFC700" style={{ marginLeft: 3 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1442,24 +1651,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  timeInputBox: {
+  timePickerButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 10,
     paddingHorizontal: 10,
-    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+    paddingVertical: 9,
   },
-  timeInput: {
-    flex: 1,
+  timePickerButtonText: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
-    paddingVertical: 4,
   },
   timeRangeArrow: {
     fontSize: 11,
@@ -1479,6 +1686,171 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#94A3B8',
+  },
+
+  /* Time Picker Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  modalContentCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '85%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  modalHandleBar: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  modalHeaderTitle: {
+    fontSize: 17,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  modalHeaderSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBulkApplyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1,
+    borderColor: '#FEF08A',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  modalBulkApplyTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#713F12',
+  },
+  modalBulkApplySub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#854D0E',
+    marginTop: 1,
+  },
+  pickerSectionLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  quickPicksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  quickPickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickPickChipActive: {
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+  },
+  quickPickChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  quickPickChipTextActive: {
+    color: '#FFC700',
+  },
+  modalFilterTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  modalFilterTab: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  modalFilterTabActive: {
+    backgroundColor: '#050505',
+  },
+  modalFilterTabText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  modalFilterTabTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  timeSlotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 16,
+  },
+  timeSlotChip: {
+    width: '31.3%',
+    flexDirection: 'row',
+    paddingVertical: 11,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeSlotChipActive: {
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+  },
+  timeSlotChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+  },
+  timeSlotChipTextActive: {
+    color: '#FFC700',
   },
 
   /* City Chips */
