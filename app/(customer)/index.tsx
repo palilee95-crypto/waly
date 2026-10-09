@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,8 +23,20 @@ import { useLanguage } from '@/context/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
+import FilterModal, { FilterState } from './_components/FilterModal';
+import AllCategoriesModal from './_components/AllCategoriesModal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
+
+const CATEGORIES = [
+  { id: 'barber', name: 'Barber', icon: 'cut', inactiveBg: '#FEF9C3', activeBg: '#FACC15', iconColor: '#0F172A', shadowColor: '#F59E0B' },
+  { id: 'beauty', name: 'Beauty', icon: 'flower', inactiveBg: '#FFF0F5', activeBg: '#FB7185', iconColor: '#E11D48', shadowColor: '#F43F5E' },
+  { id: 'carwash', name: 'Car Wash', icon: 'car-sport', inactiveBg: '#F0F9FF', activeBg: '#38BDF8', iconColor: '#0284C7', shadowColor: '#0284C7' },
+  { id: 'cafe', name: 'Cafe', icon: 'cafe', inactiveBg: '#FFFBEB', activeBg: '#F59E0B', iconColor: '#92400E', shadowColor: '#D97706' },
+  { id: 'restaurant', name: 'Restaurant', icon: 'restaurant', inactiveBg: '#FEF2F2', activeBg: '#F87171', iconColor: '#DC2626', shadowColor: '#DC2626' },
+  { id: 'more', name: 'More', icon: 'ellipsis-horizontal', inactiveBg: '#F8FAFC', activeBg: '#94A3B8', iconColor: '#475569', shadowColor: '#94A3B8' },
+];
 
 function formatUpcomingDate(dateStr?: string) {
   if (!dateStr) return 'Thu, 8 Oct 2026';
@@ -55,6 +67,20 @@ function getContrastColor(hexColor?: string | null) {
   if (isNaN(r) || isNaN(g) || isNaN(b)) return '#000000';
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 150 ? '#000000' : '#FFFFFF';
+}
+
+function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 type LoyaltyCardItem = {
@@ -170,6 +196,88 @@ export default function CustomerDashboard() {
   const [markingArrivedLoading, setMarkingArrivedLoading] = useState(false);
   const [isBookingMissed, setIsBookingMissed] = useState(false);
   const [dismissedBookingId, setDismissedBookingId] = useState<string | null>(null);
+  const [popularMerchants, setPopularMerchants] = useState<any[]>([]);
+  const [allExploreMerchants, setAllExploreMerchants] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [loadingPopular, setLoadingPopular] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('barber');
+
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+      fetchPopularMerchants();
+    }, [])
+  );
+
+  const loadFavorites = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@favorite_stores');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setFavorites(parsed.slice(0, 5));
+        }
+      } else {
+        setFavorites([]);
+      }
+    } catch (e) {
+      console.warn('Failed to load favorites:', e);
+    }
+  };
+
+  const toggleFavorite = async (id: string) => {
+    try {
+      let updated: string[];
+      if (favorites.includes(id)) {
+        updated = favorites.filter((item) => item !== id);
+      } else {
+        if (favorites.length >= 5) {
+          Alert.alert(
+            'Limit Reached',
+            'You can favorite up to 5 stores maximum. Tap the heart on a favorited store to remove it before adding a new one.'
+          );
+          return;
+        }
+        updated = [...favorites, id];
+      }
+      setFavorites(updated);
+      await AsyncStorage.setItem('@favorite_stores', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to save favorites:', e);
+    }
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [allCategoriesModalVisible, setAllCategoriesModalVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Partial<FilterState>>({});
+
+  const handleApplyFilters = (filters: FilterState) => {
+    setActiveFilters(filters);
+    router.push({
+      pathname: '/(customer)/explore',
+      params: {
+        category: filters.category !== 'All' ? filters.category : undefined,
+        q: searchQuery,
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+  }, []);
 
   const fetchNotifications = async () => {
     // Notifications collection was removed in backend cleanup migration
@@ -351,6 +459,125 @@ export default function CustomerDashboard() {
     }
   };
 
+  const fetchPopularMerchants = async () => {
+    try {
+      setLoadingPopular(true);
+      const merchantList = await pb.collection('merchants').getFullList({
+        requestKey: null,
+      }).catch(() => []);
+      const programList = await pb.collection('loyalty_programs').getFullList({
+        filter: 'is_active = true',
+        requestKey: null,
+      }).catch(() => []);
+      const storeLocations = await pb.collection('store_locations').getFullList({ requestKey: null }).catch(() => []);
+      const subscriptions = await pb.collection('subscriptions').getFullList({
+        filter: 'status = "active"',
+        requestKey: null,
+      }).catch(() => []);
+      const loyaltyCards = await pb.collection('loyalty_cards').getFullList({ requestKey: null }).catch(() => []);
+      const serviceBookings = await pb.collection('service_bookings').getFullList({ requestKey: null }).catch(() => []);
+
+      const labelMap: Record<string, string> = {
+        food: 'Food & Drink',
+        retail: 'Retail',
+        beauty: 'Beauty',
+        barber: 'Barber',
+        health: 'Health',
+        entertainment: 'Entertainment',
+        carwash: 'Car Wash',
+        other: 'Services'
+      };
+
+      const mapped = merchantList.map((m: any) => {
+        const program = programList.find((p: any) => p.merchant === m.id);
+        const loc = storeLocations.find((l: any) => l.merchant === m.id);
+
+        // 1. PRO Subscription Check
+        const isPro = m.subscription_plan === 'pro' ||
+                      m.subscription_plan === 'business' ||
+                      subscriptions.some((s: any) => s.merchant === m.id && (s.plan === 'pro' || s.plan === 'business'));
+
+        // 2. Activity & Rating Calculation (Pilihan A & B)
+        const customerCardsCount = loyaltyCards.filter((c: any) => c.merchant === m.id).length;
+        const bookingsCount = serviceBookings.filter((b: any) => b.merchant === m.id).length;
+        const activityTotal = customerCardsCount + bookingsCount;
+
+        let ratingVal = m.rating ? parseFloat(String(m.rating)) : 4.6;
+        if (!m.rating && activityTotal > 0) {
+          ratingVal = Math.min(5.0, 4.6 + (activityTotal * 0.04));
+        }
+        const ratingStr = ratingVal.toFixed(1);
+        const reviewCount = m.review_count || m.reviews || Math.max(16, activityTotal * 4 + 32);
+
+        // 3. Distance Calculation
+        let distanceKm = 999;
+        let distanceStr = loc?.city ? `In ${loc.city}` : 'Jitra';
+        const storeLat = loc?.lat ? parseFloat(String(loc.lat)) : null;
+        const storeLng = loc?.lng ? parseFloat(String(loc.lng)) : null;
+
+        if (storeLat !== null && storeLng !== null && !isNaN(storeLat) && !isNaN(storeLng)) {
+          if (userCoords) {
+            distanceKm = getHaversineDistanceKm(userCoords.lat, userCoords.lng, storeLat, storeLng);
+            distanceStr = distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`;
+          } else if (loc?.city) {
+            distanceStr = loc.city;
+          }
+        }
+
+        let coverUri = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=600';
+        if (m.banner) {
+          coverUri = `${pb.baseUrl}/api/files/merchants/${m.id}/${m.banner}`;
+        } else if (m.logo) {
+          coverUri = `${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`;
+        } else if (program?.card_background) {
+          coverUri = `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`;
+        }
+
+        // Composite Ranking Score: PRO (10000) + Rating (1000) + Activity (10) - Distance
+        const rankingScore = (isPro ? 10000 : 0) + (ratingVal * 1000) + (activityTotal * 10) - (distanceKm * 0.1);
+
+        const proPerksList = ['2× stamps today', '10% OFF booking', 'Free hair wash upgrade', 'Express priority queue'];
+        const proPerk = proPerksList[m.name.length % proPerksList.length];
+
+        return {
+          id: m.id,
+          name: m.name || 'Merchant Store',
+          slug: m.pwa_slug || m.id,
+          category: labelMap[m.category?.toLowerCase()] || m.category || 'General',
+          city: loc?.city || 'Jitra',
+          location: distanceStr,
+          distance: distanceStr,
+          rating: ratingVal,
+          reviews: reviewCount,
+          coverUri,
+          coverImage: coverUri,
+          isPro,
+          hasBooking: isPro,
+          hasRewards: !!program,
+          minPrice: 8 + (m.name.length % 5) * 5,
+          nextAvailable: 'Today 5:15 PM',
+          proPerk: isPro ? proPerk : undefined,
+          galleryThumbnails: [coverUri],
+          distanceKm,
+          rankingScore,
+          badgeText: isPro ? 'PRO Merchant' : (program ? 'Earn rewards' : 'Booking available'),
+          badgeIcon: isPro ? 'ribbon' : (program ? 'gift' : 'calendar'),
+        };
+      });
+
+      // Sort by ranking score descending (PRO & Rating & Closest Distance first)
+      mapped.sort((a: any, b: any) => b.rankingScore - a.rankingScore);
+
+      setAllExploreMerchants(mapped);
+      // Take Top 5 Merchants
+      setPopularMerchants(mapped.slice(0, 5));
+    } catch (err) {
+      console.warn('Failed to fetch popular merchants:', err);
+    } finally {
+      setLoadingPopular(false);
+    }
+  };
+
   const handleMarkArrived = async () => {
     if (!upcomingBooking?.id) return;
     try {
@@ -462,6 +689,8 @@ export default function CustomerDashboard() {
   }, [upcomingBooking]);
 
   useEffect(() => {
+    fetchPopularMerchants();
+
     if (!user) return;
 
     setUnreadCount(0);
@@ -488,9 +717,10 @@ export default function CustomerDashboard() {
     };
   }, [user]);
 
-  // Refresh pinned cards & upcoming bookings whenever the screen comes into focus
+  // Refresh pinned cards, upcoming bookings & popular merchants whenever the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      fetchPopularMerchants();
       if (user) {
         fetchLoyaltyCards();
         fetchUpcomingAppointments();
@@ -711,831 +941,564 @@ export default function CustomerDashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning! 👋';
-    if (hour < 18) return 'Good afternoon! 👋';
-    return 'Good evening! 👋';
+    if (hour < 12) return 'Good morning,';
+    if (hour < 18) return 'Good afternoon,';
+    return 'Good evening,';
+  };
+
+  const getBookingStoreImage = () => {
+    if (upcomingBooking) {
+      const merchant = upcomingBooking.expand?.merchant;
+      const merchantId = merchant?.id || upcomingBooking.merchant || upcomingBooking.merchant_id;
+      const logo = merchant?.logo || upcomingBooking.merchant_logo;
+      if (merchantId && logo) {
+        if (typeof logo === 'string' && (logo.startsWith('http://') || logo.startsWith('https://'))) {
+          return { uri: logo };
+        }
+        return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${logo}` };
+      }
+      const avatar = merchant?.avatar;
+      if (merchantId && avatar) {
+        return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${avatar}` };
+      }
+    }
+    return require('@/assets/images/jerami_barbershop.jpg');
+  };
+
+  const defaultCard: LoyaltyCardItem = {
+    id: 'demo-duans-card',
+    merchantName: "Duans's Store",
+    category: 'Retail',
+    logo: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=120',
+    collectedStamps: 5,
+    totalStamps: 10,
+    rewardName: 'Free reward upon completing stamp card',
+    cardNumber: '•••• •••• •••• 8888',
+    points: 30,
+    gradientColors: ['#EC4899', '#DB2777'],
+    cardIcon: 'coffee',
+    stampColor: '#EC4899',
+    fontColor: '#FFFFFF',
+    validUntil: '10/26',
+    enable_stamps: true,
+    enable_points: true,
   };
 
   const highestCard = loyaltyCards.length > 0 ? loyaltyCards.reduce((prev, current) => (prev.collectedStamps > current.collectedStamps) ? prev : current) : null;
-  const currentStamps = highestCard ? highestCard.collectedStamps : 0;
-  const maxStamps = highestCard ? highestCard.totalStamps : 10;
+  const activeCard: LoyaltyCardItem = highestCard || defaultCard;
+  const currentStamps = activeCard.collectedStamps;
+  const maxStamps = activeCard.totalStamps;
   const progressArray = Array.from({ length: 10 }, (_, i) => i < Math.round((currentStamps / maxStamps) * 10));
 
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Main Content Wrapper for white center on dark background */}
+        {/* Main Content Wrapper */}
         <View style={{ flex: 1, backgroundColor: '#FFFFFF', maxWidth: 800, alignSelf: 'center', width: '100%' }}>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 📍 1. TOP HEADER ROW: LOCATION SELECTOR + RISEV LOGO */}
+            <View style={styles.topNavRow}>
+              <TouchableOpacity
+                style={styles.locationSelector}
+                onPress={() => router.push('/(customer)/explore')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="location" size={18} color="#EAB308" />
+                <Text style={styles.locationText}>Jitra, Kedah</Text>
+                <Ionicons name="chevron-down" size={14} color="#64748B" />
+              </TouchableOpacity>
 
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Group container to bypass scrollContent gap: 20 and join cards */}
-          <View>
-            {/* 🌟 SUPERCARD V2 🌟 */}
-            <View style={{ borderRadius: 32, padding: 24, paddingBottom: 24, gap: 24, shadowColor: '#FFC700', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 6, marginBottom: 8 }}>
-            
-            {/* Absolute Folder Tab Background Layer */}
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderRadius: 32 }}>
-              {/* Base Yellow */}
-              <View style={{ flex: 1, backgroundColor: '#FFC700' }} />
-              
-              {/* 1. Main White Cutout (lowered right area) */}
-              <View style={{ position: 'absolute', top: -5, right: -5, width: 150, height: 80, backgroundColor: '#FFFFFF' }} />
-              
-              {/* 2. Top White Filler (fills the area above the Bottom Curve) */}
-              <View style={{ position: 'absolute', top: -5, right: 145, width: 40, height: 40, backgroundColor: '#FFFFFF' }} />
-              
-              {/* 3. Bottom Curve (Convex part) */}
-              <View style={{ position: 'absolute', top: 35, right: 145, width: 40, height: 40, backgroundColor: '#FFC700' }}>
-                <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderBottomLeftRadius: 40 }} />
-              </View>
-              
-              {/* 4. Top Curve (Concave part) */}
-              <View style={{ position: 'absolute', top: -5, right: 185, width: 40, height: 40, backgroundColor: '#FFFFFF' }}>
-                <View style={{ flex: 1, backgroundColor: '#FFC700', borderTopRightRadius: 40 }} />
-              </View>
-
-              {/* 5. Outer Corner Curve (Rounds the top-right of the lowered yellow part OUTWARDS/CONVEX) */}
-              <View style={{ position: 'absolute', top: 75, right: -5, width: 32, height: 32, backgroundColor: '#FFFFFF' }}>
-                <View style={{ flex: 1, backgroundColor: '#FFC700', borderTopRightRadius: 32 }} />
-              </View>
+              <Image
+                source={require('@/assets/risev logo.png')}
+                style={styles.headerRisevLogoImg}
+              />
             </View>
 
-            {/* Header Content */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
-              <View>
-                <View style={{ 
-                  shadowColor: '#B38B00', 
-                  shadowOffset: { width: 3, height: 6 }, 
-                  shadowOpacity: 0.25, 
-                  shadowRadius: 10, 
-                  elevation: 5,
-                  alignSelf: 'flex-start',
-                  marginBottom: 16,
-                  borderRadius: 34,
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                  ...(Platform.OS === 'web' ? { boxShadow: '4px 6px 14px rgba(179, 139, 0, 0.35), -3px -3px 8px #ffffff' } : {})
-                }}>
-                  <Image source={{ uri: avatarUrl }} style={{ width: 64, height: 64, borderRadius: 32 }} />
-                </View>
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1A1400', marginBottom: 2 }}>{getGreeting()} 🖐</Text>
-                <Text style={{ fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', lineHeight: 36, letterSpacing: -1 }}>
-                  Welcome back,{'\n'}{user?.name ? user.name.split(' ')[0] : 'Fazli'}
+            {/* 👋 2. GREETING & NAME + PROFILE AVATAR ON THE RIGHT */}
+            <View style={styles.greetingContainer}>
+              <View style={styles.greetingTextCol}>
+                <Text style={styles.greetingSub}>{getGreeting()}</Text>
+                <Text style={styles.greetingTitle}>
+                  {user?.name ? user.name.split(' ')[0] : 'Fazli'} 👋
                 </Text>
               </View>
 
-              <View style={{ position: 'absolute', top: -2, right: 10, width: 125, alignItems: 'center' }}>
-                <Image source={require('../../assets/risev logo.png')} style={{ width: 125, height: 42, resizeMode: 'contain' }} />
-              </View>
+              <TouchableOpacity
+                style={styles.avatarWrap}
+                onPress={() => router.push('/(customer)/profile')}
+                activeOpacity={0.8}
+              >
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+              </TouchableOpacity>
             </View>
 
-            {/* Unified Clean Full-Width Reward Card (No Outer Glow) */}
-            <View style={{ 
-              backgroundColor: '#FFFFFF', 
-              borderRadius: 24, 
-              padding: 18, 
-              borderWidth: 1,
-              borderColor: 'rgba(0, 0, 0, 0.08)',
-              shadowColor: '#000000', 
-              shadowOffset: { width: 0, height: 4 }, 
-              shadowOpacity: 0.06, 
-              shadowRadius: 10, 
-              elevation: 2,
-              ...(Platform.OS === 'web' ? { boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)' } : {})
-            }}>
-              {/* Header Row: Title & Total Stamps Badge */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
-                  {highestCard?.logo ? (
-                    <Image 
-                      source={{ uri: highestCard.logo }} 
-                      style={{ 
-                        width: 40, 
-                        height: 40, 
-                        borderRadius: 20, 
-                        backgroundColor: '#FFF5D6', 
-                        flexShrink: 0,
-                        borderWidth: 1,
-                        borderColor: '#FFE38F',
-                        shadowColor: 'rgba(0,0,0,0.1)',
-                        shadowOffset: { width: 2, height: 3 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 4
-                      }} 
-                    />
-                  ) : (
-                    <View style={{ 
-                      width: 40, 
-                      height: 40, 
-                      borderRadius: 20, 
-                      backgroundColor: '#FFE38F', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      flexShrink: 0,
-                      shadowColor: '#B38B00',
-                      shadowOffset: { width: 2, height: 3 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 4
-                    }}>
-                      <Ionicons name="gift-outline" size={20} color="#806400" />
+            {/* 🔍 3. SEARCH BAR ROW WITH FILTER BUTTON */}
+            <View style={styles.searchBarRow}>
+              <TouchableOpacity
+                style={styles.searchBarPill}
+                onPress={() => router.push({ pathname: '/(customer)/explore', params: { q: searchQuery } })}
+                activeOpacity={0.9}
+              >
+                <Ionicons name="search-outline" size={19} color="#0F172A" />
+                <Text style={[styles.searchPlaceholder, searchQuery.length > 0 && styles.searchPlaceholderActive]} numberOfLines={1}>
+                  {searchQuery || 'Search services or venues'}
+                </Text>
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.filterIconBtn, Object.keys(activeFilters).length > 0 && styles.filterIconBtnActive]}
+                onPress={() => setFilterModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="options-outline" size={19} color={Object.keys(activeFilters).length > 0 ? '#FFFFFF' : '#0F172A'} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 🏷️ 4. QUICK CATEGORY CHIPS (3D Neumorphic Soft Clay Squircle) */}
+            <View style={styles.categoriesRow}>
+              {CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={styles.categoryItem}
+                    onPress={() => {
+                      setSelectedCategory(cat.id);
+                      if (cat.id === 'more') {
+                        setAllCategoriesModalVisible(true);
+                      } else {
+                        router.push({ pathname: '/(customer)/explore', params: { category: cat.id } });
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.neuClayCategoryBox,
+                        {
+                          backgroundColor: isSelected ? cat.activeBg : cat.inactiveBg,
+                          shadowColor: cat.shadowColor,
+                          shadowOpacity: isSelected ? 0.5 : 0.22,
+                          shadowRadius: isSelected ? 12 : 6,
+                          elevation: isSelected ? 7 : 3,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={cat.icon as any}
+                        size={22}
+                        color={isSelected ? '#0F172A' : cat.iconColor}
+                      />
                     </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400' }} numberOfLines={1}>
-                      {highestCard ? highestCard.merchantName : 'Next Reward'}
+                    <Text
+                      style={[
+                        styles.categoryLabel,
+                        isSelected && styles.categoryLabelSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {cat.name}
                     </Text>
-                    {highestCard ? (
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#806400', marginTop: 1 }} numberOfLines={1}>
-                        {highestCard.rewardName}
-                      </Text>
-                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ❤️ FAVORITE STORES SECTION (Max 5 Stores Carousel - Placed above Your Next Reward) */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.sectionTitle}>Favorite stores</Text>
+                  <View style={styles.favCountBadge}>
+                    <Text style={styles.favCountBadgeText}>{favorites.length}/5</Text>
                   </View>
                 </View>
-                
-                {/* Neumorphic Inset Total Stamps Badge */}
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  backgroundColor: '#1A1400', 
-                  paddingHorizontal: 12, 
-                  paddingVertical: 7, 
-                  borderRadius: 14, 
-                  gap: 6,
-                  borderWidth: 1,
-                  borderColor: '#332700',
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 2, height: 4 },
-                  shadowOpacity: 0.35,
-                  elevation: 4,
-                  ...(Platform.OS === 'web' ? { boxShadow: 'inset 2px 2px 5px rgba(0,0,0,0.6), 3px 3px 8px rgba(0,0,0,0.15)' } : {})
-                }}>
-                  <Ionicons name="star" size={13} color="#FFC700" />
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                    Total: {loyaltyCards.reduce((acc, curr) => acc + curr.collectedStamps, 0)}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Recessed Neumorphic Progress Bar Track */}
-              <View style={{ 
-                flexDirection: 'row', 
-                gap: 5, 
-                marginBottom: 16,
-                padding: 4,
-                backgroundColor: '#FFF8E6',
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: 'rgba(185, 172, 154, 0.25)',
-                ...(Platform.OS === 'web' ? { boxShadow: 'inset 2px 2px 5px rgba(185, 172, 154, 0.3), inset -2px -2px 5px #ffffff' } : {})
-              }}>
-                {progressArray.map((isFilled, index) => (
-                  <View 
-                    key={index} 
-                    style={{ 
-                      flex: 1, 
-                      height: 10, 
-                      borderRadius: 5, 
-                      backgroundColor: isFilled ? '#FFC700' : 'rgba(255, 227, 143, 0.35)',
-                      shadowColor: isFilled ? '#FFC700' : 'transparent',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 4,
-                      ...(Platform.OS === 'web' ? {
-                        boxShadow: isFilled 
-                          ? '2px 2px 6px rgba(255, 199, 0, 0.45), inset -1px -1px 2px rgba(0,0,0,0.1)' 
-                          : 'inset 1px 1px 3px rgba(185, 172, 154, 0.2)'
-                      } : {})
-                    }} 
-                  />
-                ))}
+                <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
+                  <Text style={styles.sectionLink}>Explore all &gt;</Text>
+                </TouchableOpacity>
               </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View>
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -0.5 }}>
-                    {currentStamps} / {maxStamps} Stamps
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', marginTop: 2 }}>
-                    {maxStamps - currentStamps > 0 ? `${maxStamps - currentStamps} more to unlock reward` : 'Reward unlocked!'}
-                  </Text>
-                </View>
+              {favorites.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.favoriteStoresScroll}
+                >
+                  {favorites.map((favId) => {
+                    const item = allExploreMerchants.find((m: any) => m.id === favId);
+                    if (!item) return null;
 
-                {/* Integrated Neumorphic View Card Button */}
-                <TouchableOpacity 
-                  style={{ 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    backgroundColor: '#FFFBEA', 
-                    paddingHorizontal: 16, 
-                    paddingVertical: 10, 
-                    borderRadius: 16, 
-                    borderWidth: 1, 
-                    borderColor: '#FFE38F',
-                    shadowColor: 'rgba(185, 172, 154, 0.35)',
-                    shadowOffset: { width: 3, height: 5 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 3,
-                    ...(Platform.OS === 'web' ? { boxShadow: '4px 4px 10px rgba(185, 172, 154, 0.25), -3px -3px 8px #ffffff' } : {})
-                  }}
-                  onPress={() => {
-                    if (highestCard) {
-                      setSelectedCard(highestCard);
-                      setDetailModalVisible(true);
+                    if (item.isPro) {
+                      // ──────── PRO PLAN: NEUMORPHISM 3D CLAY CARD ────────
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[styles.proNeuCardContainer, { width: 345, marginRight: 14 }]}
+                          onPress={() => router.push(`/b/${item.slug}`)}
+                          activeOpacity={0.92}
+                        >
+                          {/* Top-Right Floating RISEV PRO Badge */}
+                          <View style={styles.floatingRisevProBadge}>
+                            <FontAwesome5 name="crown" size={10} color="#FFD700" />
+                            <Text style={styles.floatingRisevProText}>RISEV PRO</Text>
+                          </View>
+
+                          <View style={styles.cardTopRow}>
+                            <View style={styles.cardImageWrapper175}>
+                              <Image source={{ uri: item.coverImage || item.coverUri }} style={styles.cardCoverImg175} resizeMode="cover" />
+                              <View style={styles.photosGlassBadge}>
+                                <Ionicons name="images-outline" size={12} color="#FFFFFF" />
+                                <Text style={styles.photosGlassText}>{item.galleryThumbnails?.length || 4} photos</Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.cardRightCol175}>
+                              <View style={styles.cardHeaderRow}>
+                                <View style={styles.titleVerifiedWrap}>
+                                  <Text style={styles.newCardTitle} numberOfLines={1}>{item.name}</Text>
+                                  <View style={styles.verifiedCircBadge}>
+                                    <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                                  </View>
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.proNeuHeartBtn}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavorite(item.id);
+                                  }}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <Ionicons name="heart" size={16} color="#EF4444" />
+                                </TouchableOpacity>
+                              </View>
+
+                              <Text style={styles.newCardSubTitle} numberOfLines={1}>
+                                {item.category} • {item.city || 'Jitra'}
+                              </Text>
+
+                              <View style={styles.newRatingRow}>
+                                <Ionicons name="star" size={13} color="#F59E0B" />
+                                <Text style={styles.newRatingScore}>{item.rating?.toFixed ? item.rating.toFixed(1) : item.rating}</Text>
+                                <Text style={styles.newReviewCount}>({item.reviews || 120})</Text>
+                                <Text style={styles.newBulletDot}>•</Text>
+                                <Ionicons name="location-outline" size={13} color="#0F172A" />
+                                <Text style={styles.newDistanceText}>{item.location || '1.1 km'}</Text>
+                              </View>
+
+                              <View style={styles.newBadgesRow}>
+                                <View style={styles.proNeuRewardPill}>
+                                  <Ionicons name="gift-outline" size={11.5} color="#92400E" />
+                                  <Text style={styles.proNeuRewardPillText} numberOfLines={1}>Rewards</Text>
+                                </View>
+                                <View style={styles.proNeuBookingPill}>
+                                  <Ionicons name="calendar-outline" size={11.5} color="#0F172A" />
+                                  <Text style={styles.proNeuBookingPillText} numberOfLines={1}>Booking</Text>
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+
+                          <View style={styles.proNeuFooterBar}>
+                            <View style={styles.fullFooterPriceCol}>
+                              <Text style={styles.footerFromLabel}>From</Text>
+                              <Text style={styles.fullFooterPriceText}>RM{item.minPrice || 10}</Text>
+                            </View>
+
+                            <View style={styles.fullFooterDivider} />
+
+                            <View style={styles.fullFooterSlotCol}>
+                              <Ionicons name="time-outline" size={15} color="#64748B" />
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.footerSlotLabel}>Next available</Text>
+                                <Text style={styles.fullFooterSlotText} numberOfLines={1}>{item.nextAvailable || 'Today 5:15 PM'}</Text>
+                              </View>
+                            </View>
+
+                            <TouchableOpacity
+                              style={styles.proSleekBookCtaBtn}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                router.push(`/b/${item.slug}`);
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.proSleekBookCtaText}>Book now</Text>
+                              <Ionicons name="chevron-forward" size={13} color="#F59E0B" />
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      );
                     }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="card-outline" size={16} color="#806400" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#806400' }}>View Card</Text>
-                </TouchableOpacity>
-              </View>
 
-              {/* ⚡ QUICK ACTIONS ROW (NEUMORPHIC DUAL BUTTONS) ⚡ */}
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 18, paddingTop: 18, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                {/* My QR Button */}
-                <TouchableOpacity 
-                  style={{ 
-                    flex: 1, 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    backgroundColor: '#1A1400', 
-                    borderRadius: 16, 
-                    paddingVertical: 13, 
-                    gap: 8,
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    elevation: 3,
-                    ...(Platform.OS === 'web' ? { boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)' } : {})
-                  }}
-                  onPress={() => setQrModalVisible(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="qr-code-outline" size={16} color="#FFC700" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>My QR</Text>
-                </TouchableOpacity>
+                    // ──────── NON-PRO STANDARD CLEAN CARD ────────
+                    const targetSlug = item.slug || item.id;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.standardCardContainer, { width: 345, marginRight: 14 }]}
+                        onPress={() => {
+                          if (targetSlug) {
+                            router.push(`/b/${targetSlug}` as any);
+                          } else {
+                            router.push({ pathname: '/(customer)/explore', params: { q: item.name } });
+                          }
+                        }}
+                        activeOpacity={0.92}
+                      >
+                        <View style={styles.cardTopRow}>
+                          <View style={styles.cardImageWrapper175}>
+                            <Image source={{ uri: item.coverImage || item.coverUri }} style={styles.cardCoverImg175} resizeMode="cover" />
+                            <View style={styles.photosGlassBadge}>
+                              <Ionicons name="images-outline" size={12} color="#FFFFFF" />
+                              <Text style={styles.photosGlassText}>{item.galleryThumbnails?.length || 4} photos</Text>
+                            </View>
+                          </View>
 
-                {/* My Vouchers Button */}
-                <TouchableOpacity 
-                  style={{ 
-                    flex: 1, 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    backgroundColor: '#111111', 
-                    borderRadius: 16, 
-                    paddingVertical: 13, 
-                    gap: 8,
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    elevation: 3,
-                    ...(Platform.OS === 'web' ? { boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)' } : {})
-                  }}
-                  onPress={() => router.push('/(customer)/vouchers')}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="ticket-outline" size={16} color="#FFFFFF" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>My Voucher</Text>
-                </TouchableOpacity>
-              </View>
+                          <View style={styles.cardRightCol175}>
+                            <View style={styles.cardHeaderRow}>
+                              <Text style={styles.newCardTitle} numberOfLines={1}>{item.name}</Text>
+                              <TouchableOpacity
+                                style={styles.standardHeartBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(item.id);
+                                }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Ionicons name="heart" size={16} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.newCardSubTitle} numberOfLines={1}>
+                              {item.category} • {item.city || 'Jitra'}
+                            </Text>
+
+                            <View style={styles.newRatingRow}>
+                              <Ionicons name="star" size={13} color="#F59E0B" />
+                              <Text style={styles.newRatingScore}>{item.rating?.toFixed ? item.rating.toFixed(1) : item.rating}</Text>
+                              <Text style={styles.newReviewCount}>({item.reviews || 95})</Text>
+                              <Text style={styles.newBulletDot}>•</Text>
+                              <Ionicons name="location-outline" size={13} color="#0F172A" />
+                              <Text style={styles.newDistanceText}>{item.location || '1.5 km'}</Text>
+                            </View>
+
+                            <View style={styles.newBadgesRow}>
+                              <View style={styles.standardRewardPill}>
+                                <Ionicons name="gift-outline" size={12} color="#92400E" />
+                                <Text style={styles.standardRewardPillText} numberOfLines={1}>Rewards</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.standardFooterBar}>
+                          <View style={styles.fullFooterPriceCol}>
+                            <Text style={styles.footerFromLabel}>From</Text>
+                            <Text style={styles.fullFooterPriceText}>RM{item.minPrice || 8}</Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.standardViewStoreBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              if (targetSlug) {
+                                router.push(`/b/${targetSlug}` as any);
+                              } else {
+                                router.push({ pathname: '/(customer)/explore', params: { q: item.name } });
+                              }
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.standardViewStoreText}>View Store</Text>
+                            <Ionicons name="chevron-forward" size={14} color="#0F172A" />
+                          </TouchableOpacity>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyFavoritesBox}>
+                  <Ionicons name="heart-outline" size={24} color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.emptyFavoritesTitle}>No Favorite Stores Yet</Text>
+                    <Text style={styles.emptyFavoritesSub}>Tap the ❤️ icon on any store to save up to 5 favorites here for quick access!</Text>
+                  </View>
+                </View>
+              )}
             </View>
-          </View>
 
-          {/* 🎟️ UPCOMING APPOINTMENT TICKET STUB (Follows Merchant Set Brand Accent Color) */}
-          {upcomingBooking && (() => {
-            const merchantAccentColor =
-              upcomingBooking.expand?.merchant?.pwa_brand_color ||
-              upcomingBooking.expand?.merchant?.brand_color ||
-              upcomingBooking.expand?.merchant?.theme_color ||
-              '#FFC700';
+            {/* 🎁 5. "YOUR NEXT REWARD" / LOYALTY CARD SECTION */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Your next reward</Text>
+                <TouchableOpacity onPress={() => router.push('/(customer)/my-cards')}>
+                  <Text style={styles.sectionLink}>View all &gt;</Text>
+                </TouchableOpacity>
+              </View>
 
-            const isTicketCardLight = getContrastColor(merchantAccentColor) === '#000000';
-            const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-            const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
-            const ticketPodBgColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.18)';
-            const ticketPodBorderColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.3)';
-            const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-            const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
-            const ticketDashedLineColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.35)';
+              {/* 💳 Actual Merchant Card Design (Using FlippableLoyaltyCard) */}
+              <View style={styles.merchantCardContainer}>
+                <FlippableLoyaltyCard
+                  card={activeCard}
+                  user={user}
+                />
+              </View>
 
-            return (
+
+            </View>
+
+            {/* 📅 6. "UPCOMING BOOKING" SECTION */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming booking</Text>
+                <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
+                  <Text style={styles.sectionLink}>View all &gt;</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
-                style={{
-                  backgroundColor: merchantAccentColor,
-                  borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
-                  borderWidth: 1.5,
-                  borderRadius: 22,
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  marginBottom: 16,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  ...(Platform.OS === 'web' ? {
-                    boxShadow: isTicketCardLight
-                      ? '4px 6px 14px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                      : '4px 6px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                  } : {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 3, height: 5 },
-                    shadowOpacity: isTicketCardLight ? 0.1 : 0.25,
-                    shadowRadius: 7,
-                    elevation: 5,
-                  }),
-                }}
+                style={styles.bookingCard}
                 onPress={() => setAppointmentPassModalVisible(true)}
                 activeOpacity={0.88}
               >
-                {/* Left Notch Cutout */}
-                <View style={{
-                  position: 'absolute',
-                  left: -10,
-                  top: '50%',
-                  marginTop: -10,
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: '#F8FAF5',
-                  borderWidth: 0,
-                  zIndex: 5,
-                }} />
-                {/* Right Notch Cutout */}
-                <View style={{
-                  position: 'absolute',
-                  right: -10,
-                  top: '50%',
-                  marginTop: -10,
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: '#F8FAF5',
-                  borderWidth: 0,
-                  zIndex: 5,
-                }} />
-
-                {/* Left Main Information Column */}
-                <View style={{ flex: 1.3, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  {/* 3D Inset Recessed Calendar Icon Container */}
-                  <View style={{
-                    position: 'relative',
-                    width: 46,
-                    height: 46,
-                    borderRadius: 14,
-                    backgroundColor: ticketPodBgColor,
-                    borderColor: ticketPodBorderColor,
-                    borderWidth: 1,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    ...(Platform.OS === 'web' ? {
-                      boxShadow: isTicketCardLight
-                        ? 'inset 2px 2px 5px rgba(0, 0, 0, 0.08), inset -2px -2px 5px rgba(255, 255, 255, 0.8)'
-                        : 'inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.2)',
-                    } : {}),
-                  }}>
-                    <Ionicons name="calendar-outline" size={22} color={ticketPrimaryTextColor} />
-                    <View style={{
-                      position: 'absolute',
-                      bottom: -2,
-                      right: -2,
-                      width: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      backgroundColor: '#10B981',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1.5,
-                      borderColor: '#FFFFFF',
-                    }}>
-                      <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                    </View>
+                <Image
+                  source={getBookingStoreImage()}
+                  style={styles.bookingStoreImg}
+                />
+                <View style={styles.bookingMidCol}>
+                  <Text style={styles.bookingShopName} numberOfLines={1}>
+                    {upcomingBooking?.expand?.merchant?.name || 'Jerami Barbershop'}
+                  </Text>
+                  <Text style={styles.bookingServiceName} numberOfLines={1}>
+                    {(() => {
+                      let items = upcomingBooking?.items_summary;
+                      if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch (e) { items = []; }
+                      }
+                      if (Array.isArray(items) && items.length > 0) {
+                        return items.map((it: any) => it.name).join(', ');
+                      }
+                      return 'Haircut';
+                    })()}
+                  </Text>
+                  <View style={styles.bookingMetaRow}>
+                    <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                    <Text style={styles.bookingMetaText}>
+                      {upcomingBooking ? `${formatUpcomingDate(upcomingBooking.booking_date)} • ${upcomingBooking.start_time}` : 'Tomorrow • 9:30 AM'}
+                    </Text>
                   </View>
-
-                  {/* Text Details */}
-                  <View style={{ flex: 1, paddingRight: 4 }}>
-                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketSecondaryTextColor, letterSpacing: 0.5, marginBottom: 2 }}>
-                      UPCOMING APPOINTMENT
+                  <View style={styles.bookingMetaRow}>
+                    <Ionicons name="location-outline" size={13} color="#64748B" />
+                    <Text style={styles.bookingMetaText} numberOfLines={1}>
+                      {upcomingBooking?.expand?.branch?.name || 'Jerami Barbershop'}
                     </Text>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketPrimaryTextColor, lineHeight: 18 }} numberOfLines={1}>
-                      {formatUpcomingDate(upcomingBooking.booking_date)}
-                    </Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: ticketPrimaryTextColor, lineHeight: 16 }} numberOfLines={1}>
-                      {upcomingBooking.start_time || '11:30 AM'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
-                      <Ionicons name="location" size={12} color={ticketSecondaryTextColor} />
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: ticketSecondaryTextColor }} numberOfLines={1}>
-                        {upcomingBooking.expand?.branch?.name || (upcomingBooking.expand?.merchant?.name ? `${upcomingBooking.expand.merchant.name} (HQ)` : 'Risev Official Merchant (HQ)')}
-                      </Text>
-                    </View>
                   </View>
                 </View>
 
-                {/* Perforated Vertical Dotted Tear Line */}
-                <View style={{
-                  width: 1,
-                  height: 54,
-                  borderStyle: 'dashed',
-                  borderLeftWidth: 1.5,
-                  borderColor: ticketDashedLineColor,
-                  marginHorizontal: 10,
-                }} />
-
-                {/* Right Action Stub */}
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <View style={{
-                    backgroundColor: ticketPodBgColor,
-                    borderColor: ticketPodBorderColor,
-                    borderWidth: 1,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                    ...(Platform.OS === 'web' ? {
-                      boxShadow: isTicketCardLight
-                        ? 'inset 2px 2px 4px rgba(0, 0, 0, 0.08), inset -2px -2px 4px rgba(255, 255, 255, 0.8)'
-                        : 'inset 2px 2px 4px rgba(0, 0, 0, 0.2), inset -2px -2px 4px rgba(255, 255, 255, 0.15)',
-                    } : {}),
-                  }}>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketPrimaryTextColor, letterSpacing: 0.5 }}>
-                      BOOKING PASS
-                    </Text>
+                <View style={styles.bookingRightCol}>
+                  <View style={styles.confirmedBadge}>
+                    <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
+                    <Text style={styles.confirmedBadgeText}>Confirmed</Text>
                   </View>
-
-                  <View style={{
-                    backgroundColor: ticketBtnBgColor,
-                    borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)',
-                    borderWidth: 1,
-                    borderRadius: 16,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    alignSelf: 'center',
-                    gap: 4,
-                    ...(Platform.OS === 'web' ? {
-                      boxShadow: isTicketCardLight
-                        ? '3px 3px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                        : '3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                    } : {
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 2, height: 3 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 4,
-                      elevation: 3,
-                    }),
-                  }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketBtnTextColor }}>View Pass</Text>
-                    <Ionicons name="chevron-forward" size={14} color={ticketBtnTextColor} />
-                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
-            );
-          })()}
+            </View>
 
-
-        </View>
-
-        {/* My Stamp Cards Header */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('my_stamp_cards')}</Text>
-            <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
-              <Text style={styles.viewAllText}>{t('add_card')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Overlapping Wallet Card Stack Layout */}
-          <View style={styles.walletStackContainer}>
-            {loading ? (
-              <ActivityIndicator size="large" color="#004ac6" style={{ marginVertical: 40 }} />
-            ) : loyaltyCards.length === 0 ? (
-              <View style={styles.emptyStateCard}>
-                <Ionicons name="card-outline" size={48} color="#94A3B8" />
-                <Text style={styles.emptyStateTitle}>{t('no_active_cards')}</Text>
-                <Text style={styles.emptyStateSubtitle}>
-                  {t('no_active_cards_desc')}
-                </Text>
-                <TouchableOpacity 
-                  style={styles.emptyStateBtn} 
-                  onPress={() => router.push('/(customer)/explore')}
-                >
-                  <Text style={styles.emptyStateBtnText}>{t('discover_shops')}</Text>
+            {/* 🌟 7. "POPULAR NEAR YOU" SECTION (Top 5 PRO & Nearest Merchants) */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.sectionTitle}>Popular near you</Text>
+                  <View style={styles.topBadgeTag}>
+                    <Text style={styles.topBadgeTagText}>Top 5</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
+                  <Text style={styles.sectionLink}>See all &gt;</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              getStackedCards().map((item, idx) => {
-                const stackedLength = getStackedCards().length;
-                const isFront = idx === stackedLength - 1;
 
-                // Setup layout interpolation values for smooth transition based on transitionTarget
-                let translateY: Animated.AnimatedInterpolation<number> | number = 0;
-                let scale: Animated.AnimatedInterpolation<number> | number = 1;
-
-                if (stackedLength >= 3) {
-                  if (idx === 2) {
-                    // Front card cycling to the back or middle
-                    const targetY = transitionTarget === 0 ? -110 : -55;
-                    const targetScale = transitionTarget === 0 ? 0.9 : 0.95;
-
-                    translateY = cycleAnim.interpolate({
-                      inputRange: [0, 0.4, 1.0],
-                      outputRange: [0, -180, targetY],
-                    });
-                    const stackScale = cycleAnim.interpolate({
-                      inputRange: [0, 0.4, 1.0],
-                      outputRange: [1.0, 1.05, targetScale],
-                    });
-                    scale = Animated.multiply(stackScale, pressScale);
-                  } else if (idx === 1) {
-                    // Middle card transitioning to the front or back/staying middle
-                    const targetY = transitionTarget === 0 ? 0 : 55;
-                    const targetScale = transitionTarget === 0 ? 0.95 : 1.0;
-
-                    translateY = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0, targetY],
-                    });
-                    scale = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0.95, targetScale],
-                    });
-                  } else {
-                    // Back card transitioning to the front or middle
-                    const targetY = transitionTarget === 0 ? 110 : 55;
-                    const targetScale = transitionTarget === 0 ? 1.0 : 0.95;
-
-                    if (transitionTarget === 0) {
-                      translateY = cycleAnim.interpolate({
-                        inputRange: [0, 0.4, 1.0],
-                        outputRange: [0, -60, targetY],
-                      });
-                    } else {
-                      translateY = cycleAnim.interpolate({
-                        inputRange: [0, 1.0],
-                        outputRange: [0, targetY],
-                      });
-                    }
-
-                    scale = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0.9, targetScale],
-                    });
-                  }
-                } else if (stackedLength === 2) {
-                  if (idx === 1) {
-                    // Front card
-                    translateY = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0, -55],
-                    });
-                    scale = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [1.0, 0.95],
-                    });
-                  } else {
-                    // Back card
-                    translateY = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0, 55],
-                    });
-                    scale = cycleAnim.interpolate({
-                      inputRange: [0, 1.0],
-                      outputRange: [0.95, 1.0],
-                    });
-                  }
-                } else {
-                  // 1 card
-                  translateY = 0;
-                  scale = pressScale;
-                }
-
-                // Determine zIndex dynamically during mid-transition state switch
-                let currentZIndex = idx;
-                if (isCyclingBack && stackedLength >= 3) {
-                  if (transitionTarget === 0) {
-                    if (idx === 2) currentZIndex = 0;
-                    else if (idx === 1) currentZIndex = 1;
-                    else if (idx === 0) currentZIndex = 2;
-                  } else {
-                    if (idx === 2) currentZIndex = 1;
-                    else if (idx === 1) currentZIndex = 2;
-                    else if (idx === 0) currentZIndex = 0;
-                  }
-                } else if (isCyclingBack && stackedLength === 2) {
-                  currentZIndex = idx === 1 ? 0 : 1;
-                }
-                
-                return (
-                  <Animated.View
-                    key={item.id}
-                    style={[
-                      styles.stackedCard,
-                      {
-                        backgroundColor: (item.gradientColors ?? ['#EC4899', '#8B5CF6'])[0],
-                        zIndex: currentZIndex,
-                        marginTop: idx === 0 ? 0 : -145,
-                        transform: [
-                          { translateY: translateY as any },
-                          { scale: scale as any },
-                        ],
-                        overflow: 'hidden',
-                      },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={StyleSheet.absoluteFill}
-                      onPress={isFront ? () => openCardDetails(item) : () => bringCardToFront(item)}
-                      onPressIn={isFront ? () => {
-                        Animated.spring(pressScale, {
-                          toValue: 0.93,
-                          useNativeDriver: true,
-                        }).start();
-                      } : undefined}
-                      onPressOut={isFront ? () => {
-                        Animated.spring(pressScale, {
-                          toValue: 1.0,
-                          useNativeDriver: true,
-                        }).start();
-                      } : undefined}
-                      activeOpacity={0.95}
-                    >
-                      {item.cardBackground ? (
-                        <Image source={{ uri: item.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                      ) : null}
-
-
-                      <View style={styles.stackedCardContent}>
-                        {/* Subtle metallic sheen */}
-                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.35)', zIndex: 1, pointerEvents: 'none' }} />
-                        <View style={{ position: 'absolute', top: -300, left: '30%', width: '18%', height: 900, backgroundColor: 'rgba(255,255,255,0.07)', transform: [{ rotate: '40deg' }], zIndex: 1, pointerEvents: 'none' }} />
-                        
-                        {/* Header: Shop Name & Logo */}
-                        <View style={styles.cardInfoRow}>
-                          <View style={styles.shopLogoBg}>
-                            <Image source={{ uri: item.logo }} style={styles.shopLogo} />
-                          </View>
-                          <View style={{ flex: 1, marginLeft: 0, gap: 2 }}>
-                            <Text style={[styles.shopNameText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
-                              {item.merchantName}
-                            </Text>
-                            <Text style={[styles.shopCategoryText, item.fontColor && { color: item.fontColor, opacity: 0.65 }]} numberOfLines={1}>
-                              {item.category.toUpperCase()}
-                            </Text>
-                          </View>
-                          {item.enable_stamps === false && item.enable_points === true ? (
-                            <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={[{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }, item.fontColor && { color: item.fontColor }]}>
-                                {item.points.toLocaleString()}
-                              </Text>
-                              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>POINTS</Text>
-                            </View>
-                          ) : (
-                            <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
-                                {item.collectedStamps}/{item.totalStamps}
-                              </Text>
-                              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
-                            </View>
-                          )}
-                        </View>
-
-                        {/* Middle row: EMV Chip & Wifi Contactless Symbol */}
-                        <View style={styles.cardMidRow}>
-                          <View style={styles.cardChip}>
-                            <View style={styles.chipLineHoriz} />
-                            <View style={styles.chipLineVert} />
-                            <View style={styles.chipCenterPin} />
-                          </View>
-                          <Ionicons 
-                            name="wifi" 
-                            size={22} 
-                            color={item.fontColor ? item.fontColor : "rgba(255, 255, 255, 0.35)"} 
-                            style={{ opacity: 0.45 }} 
-                          />
-                        </View>
-
-
-                        {/* Footer row: Holder Name, Expiration, CVV, and brand logo */}
-                        <View style={styles.cardBottomRow}>
-                          <View style={styles.holderBlock}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                              CARD HOLDER
-                            </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]} numberOfLines={1}>
-                              {(user?.name || 'Ahmad Fazli').toUpperCase()}
-                            </Text>
-                          </View>
-
-                          <View style={{ width: 45 }}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                              VALID
-                            </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
-                              {item.validUntil || '12/30'}
-                            </Text>
-                          </View>
-
-                          <View style={{ width: 35 }}>
-                            <Text style={[styles.cardLabelText, item.fontColor && { color: item.fontColor, opacity: 0.5 }]}>
-                              CVV
-                            </Text>
-                            <Text style={[styles.holderValueText, item.fontColor && { color: item.fontColor }]}>
-                              888
-                            </Text>
-                          </View>
-
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Image
-                              source={require('../../assets/risev logo.png')}
-                              style={{ width: 44, height: 16, resizeMode: 'contain', tintColor: item.fontColor || '#FFFFFF' }}
-                            />
-                          </View>
-                        </View>
-
-                      </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })
-            )}
-          </View>
-
-          {/* Card Stack Action Row */}
-          {!loading && loyaltyCards.length > 0 && (
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 12,
-              marginTop: 12,
-              marginBottom: 16,
-              width: '100%',
-              paddingHorizontal: 16
-            }}>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#FFFFFF',
-                  borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
-                  borderRadius: 20,
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 3,
-                  elevation: 1
-                }}
-                onPress={() => router.push('/(customer)/my-cards')}
-                activeOpacity={0.8}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.popularGridHorizontal}
+                decelerationRate="fast"
+                snapToInterval={212}
               >
-                <Ionicons name="card-outline" size={14} color="#000000" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 13, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                  {locale === 'en' ? 'View All Cards' : 'Lihat Semua Kad'}
-                </Text>
-              </TouchableOpacity>
-
-              {loyaltyCards.length > 1 && (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#FFC700',
-                    borderRadius: 20,
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 3,
-                    elevation: 2
-                  }}
-                  onPress={cycleCard}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="swap-horizontal" size={14} color="#1A1400" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, color: '#1A1400', fontFamily: 'PlusJakartaSans_700Bold' }}>
-                    {locale === 'en' ? 'Next Card' : 'Kad Seterusnya'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                {(popularMerchants.length > 0 ? popularMerchants : [
+                  {
+                    id: 'demo-jerami',
+                    name: 'Jerami Barbershop',
+                    slug: 'jerami-barbershop',
+                    category: 'Barber',
+                    location: '1.2 km • Jitra',
+                    rating: '4.9',
+                    reviews: '142',
+                    coverSource: require('@/assets/images/jerami_barbershop.jpg'),
+                    isPro: true,
+                    badgeText: 'PRO Merchant',
+                    badgeIcon: 'ribbon',
+                  },
+                  {
+                    id: 'demo-scoop',
+                    name: 'Scoop Creamy',
+                    slug: 'scoop-creamy',
+                    category: 'Food & Drink',
+                    location: '2.5 km • Jitra',
+                    rating: '4.8',
+                    reviews: '98',
+                    coverSource: require('@/assets/images/scoop_creamy_storefront.jpg'),
+                    isPro: true,
+                    badgeText: 'PRO Merchant',
+                    badgeIcon: 'ribbon',
+                  }
+                ]).map((item: any) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.popularCardSlide}
+                    onPress={() => item.slug ? router.push(`/b/${item.slug}` as any) : router.push('/(customer)/explore')}
+                    activeOpacity={0.88}
+                  >
+                    <View style={styles.popularImgWrapSlide}>
+                      <Image
+                        source={item.coverUri ? { uri: item.coverUri } : item.coverSource}
+                        style={styles.popularCardImg}
+                      />
+                      <TouchableOpacity style={styles.favoriteHeartBtn} activeOpacity={0.8}>
+                        <Ionicons name="heart-outline" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={[styles.popularBadgePill, item.isPro && styles.proBadgePill]}>
+                        <Ionicons name={item.badgeIcon as any} size={11} color={item.isPro ? '#FFFFFF' : '#000000'} />
+                        <Text style={[styles.popularBadgeText, item.isPro && styles.proBadgeText]}>
+                          {item.badgeText}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.popularCardBody}>
+                      <Text style={styles.popularCardTitle} numberOfLines={1}>{item.name}</Text>
+                      <View style={styles.popularRatingRow}>
+                        <Ionicons name="star" size={12} color="#EAB308" />
+                        <Text style={styles.popularRatingText}>{item.rating} ({item.reviews})</Text>
+                        <Text style={styles.popularDot}>•</Text>
+                        <Text style={styles.popularCategoryText} numberOfLines={1}>{item.category} • {item.location}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          )}
-        </ScrollView>
+          </ScrollView>
         </View>
       </SafeAreaView>
 
@@ -2091,6 +2054,23 @@ export default function CustomerDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Filter Bottom Sheet Modal */}
+      <FilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        onApply={handleApplyFilters}
+        initialFilters={activeFilters}
+      />
+
+      {/* All Categories Bottom Sheet Modal */}
+      <AllCategoriesModal
+        visible={allCategoriesModalVisible}
+        onClose={() => setAllCategoriesModalVisible(false)}
+        onSelectCategory={(catId) =>
+          router.push({ pathname: '/(customer)/explore', params: { category: catId } })
+        }
+      />
     </View>
   );
 }
@@ -2098,477 +2078,394 @@ export default function CustomerDashboard() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#243339', // Dark slate background for margins
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 60,
-    marginTop: 8,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    gap: 1,
-  },
-  logoText: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000', // Solid black logo text matching mockup
-    letterSpacing: -0.5,
-  },
-  logoSubtext: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roundHeaderBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0', // Gray outline border
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
-    position: 'relative',
-  },
-  badgeDot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
-    right: 10,
-    top: 10,
   },
   scrollContent: {
-    paddingHorizontal: 12,
-    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 110,
     gap: 20,
   },
-  welcomeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    gap: 16,
-    borderWidth: 1.5,
-    borderColor: '#000000', // Highly stylized black frame to match mockup
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  cardHeader: {
+
+  /* 📍 TOP HEADER ROW */
+  topNavRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
   },
-  welcomeTextWrap: {
-    gap: 2,
-  },
-  welcomeSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-  },
-  welcomeName: {
-    fontSize: 22,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000', // Black text matching card holder info
-    letterSpacing: -0.5,
-  },
-  pointsWrap: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  pointsLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
-    letterSpacing: 0.8,
-  },
-  pointsRow: {
+  locationSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 2,
+    paddingVertical: 4,
   },
-  coinGraphic: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFBEA', // primary[50]
+  locationText: {
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  headerRisevLogoImg: {
+    width: 85,
+    height: 28,
+    resizeMode: 'contain',
+  },
+  avatarWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+
+  /* 👋 GREETING */
+  greetingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  greetingTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  greetingSub: {
+    fontSize: 24,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  greetingTitle: {
+    fontSize: 26,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+
+  /* 🔍 SEARCH BAR ROW WITH FILTER BUTTON */
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchBarPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchPlaceholder: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    flex: 1,
+  },
+  searchPlaceholderActive: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  filterIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#FFE38F', // primary[200]
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  pointsValue: {
-    fontSize: 26,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000', // Black text stamp count
-    letterSpacing: -0.5,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 2,
-  },
-  taglineRow: {
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  taglineBold: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Black text tagline
-  },
-  taglineSub: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-  },
-  capsulesRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  capsuleActive: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000000', // Solid black button container matching image
-    borderRadius: 16,
-    height: 48,
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  capsuleActiveText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  capsuleInactive: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF', // Outlined white container matching image
-    borderRadius: 16,
-    height: 48,
-    gap: 8,
-    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-  },
-  capsuleInactiveText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000', // Solid black text
-  },
-  promoCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
-    padding: 20,
-    gap: 10,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
-  promoHeaderRow: {
+  filterIconBtnActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+
+  /* 🏷️ 3D NEUMORPHIC SOFT CLAY CATEGORY CHIPS */
+  categoriesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
-  promoTitle: {
-    fontSize: 18,
+  categoryItem: {
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  neuClayCategoryBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowOffset: { width: 0, height: 5 },
+  },
+  categoryLabel: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+    textAlign: 'center',
+  },
+  categoryLabelSelected: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
+    color: '#0F172A',
   },
-  promoBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+
+  /* 📦 SECTION GENERAL */
+  sectionContainer: {
+    gap: 12,
   },
-  promoBadgeText: {
-    fontSize: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  promoDesc: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
-    lineHeight: 18,
-  },
-  viewPromoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    height: 32,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 2,
-  },
-  viewPromoText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-  },
-  sectionHeaderRow: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0b1c30',
-    letterSpacing: -0.5,
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  viewAllText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#737686',
+  sectionLink: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
-  walletStackContainer: {
-    paddingBottom: 20,
-    marginTop: 10,
-  },
-  stackedCard: {
+
+  /* 💳 LOYALTY CARD */
+  merchantCardContainer: {
     borderRadius: 24,
-    aspectRatio: 1.586,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
     overflow: 'hidden',
+    shadowColor: '#EC4899',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  stackedCardContent: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'space-between',
-    position: 'relative',
-  },
-  cardInfoRow: {
+
+  /* 📅 UPCOMING BOOKING */
+  bookingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 13,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
     gap: 12,
   },
-  shopLogoBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
+  bookingStoreImg: {
+    width: 68,
+    height: 68,
+    borderRadius: 14,
   },
-  shopLogo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 6,
-  },
-  shopTextColumn: {
+  bookingMidCol: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
-  shopNameText: {
-    fontSize: 14,
+  bookingShopName: {
+    fontSize: 14.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
-  shopCategoryText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.65)',
+  bookingServiceName: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
-  ptsColumn: {
-    alignItems: 'flex-end',
-  },
-  ptsValueText: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-  },
-  ptsLabelText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
-  },
-  frontCardFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bottomWaveOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  viewAllPill: {
+  bookingMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    gap: 4,
+  },
+  bookingMetaText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  bookingRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 66,
+  },
+  confirmedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  viewAllPillText: {
-    fontSize: 11,
+  confirmedBadgeText: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#15803D',
   },
-  floatingChevronBtn: {
-    position: 'absolute',
-    right: 18,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+
+  /* 🌟 POPULAR NEAR YOU */
+  topBadgeTag: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  topBadgeTagText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#D97706',
+  },
+  popularGridHorizontal: {
+    paddingRight: 16,
+    gap: 12,
+  },
+  popularCardSlide: {
+    width: 205,
     backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  popularImgWrapSlide: {
+    position: 'relative',
+    width: '100%',
+    height: 115,
+  },
+  proBadgePill: {
+    backgroundColor: '#0F172A',
+  },
+  proBadgeText: {
+    color: '#FFD700',
+  },
+  popularGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  popularCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  popularImgWrap: {
+    position: 'relative',
+    width: '100%',
+    height: 110,
+  },
+  popularCardImg: {
+    width: '100%',
+    height: 110,
+    resizeMode: 'cover',
+  },
+  favoriteHeartBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
   },
-  largeCardView: {
-    borderRadius: 24,
-    padding: 24,
-    gap: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  largeCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  largeCardMerchant: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
-  },
-  largeCardNumber: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.45)',
-    marginTop: 4,
-    letterSpacing: 0.5,
-  },
-  goldBadge: {
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  goldBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  cardChipRow: {
+  popularBadgePill: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  cardChip: {
-    width: 32,
-    height: 24,
-    borderRadius: 6,
-    backgroundColor: '#F59E0B',
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#D97706',
+  popularBadgeText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
   },
-  chipLineHoriz: {
-    position: 'absolute',
-    top: 11,
-    left: 0,
-    width: '100%',
-    height: 1,
-    backgroundColor: '#B45309',
+  popularCardBody: {
+    padding: 10,
+    gap: 3,
   },
-  chipLineVert: {
-    position: 'absolute',
-    top: 0,
-    left: 15,
-    width: 1,
-    height: '100%',
-    backgroundColor: '#B45309',
+  popularCardTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
-  chipCenterPin: {
-    position: 'absolute',
-    top: 6,
-    left: 10,
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: '#FBBF24',
-    borderWidth: 1,
-    borderColor: '#B45309',
+  popularRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
-  nfcIcon: {
-    transform: [{ rotate: '90deg' }],
+  popularRatingText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  popularDot: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  popularCategoryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    flex: 1,
   },
   largeStampsGrid: {
     flexDirection: 'row',
@@ -3155,5 +3052,400 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
+  },
+  /* ❤️ Favorite Stores Section Styles */
+  favCountBadge: {
+    backgroundColor: '#FEF9C3',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  favCountBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+  },
+  favoriteStoresScroll: {
+    paddingRight: 16,
+    gap: 12,
+    paddingVertical: 8,
+  },
+  emptyFavoritesBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
+  },
+  emptyFavoritesTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  emptyFavoritesSub: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  /* ──────── CARD LAYOUT STYLES FOR EXPLORE / FAVORITE CAROUSLE ──────── */
+  proNeuCardContainer: {
+    backgroundColor: '#FAF8F5',
+    borderRadius: 32,
+    padding: 14,
+    gap: 12,
+    shadowColor: 'rgba(160, 140, 120, 0.40)',
+    shadowOffset: { width: 4, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 22,
+    elevation: 8,
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    position: 'relative',
+    marginTop: 14,
+  },
+  standardCardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 14,
+    gap: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginTop: 4,
+  },
+  standardHeartBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proNeuHeartBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FAF8F5',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.15)',
+    shadowOffset: { width: 1, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  floatingRisevProBadge: {
+    position: 'absolute',
+    top: -13,
+    right: 20,
+    backgroundColor: '#0F172A',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    paddingHorizontal: 12,
+    paddingVertical: 5.5,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 25,
+  },
+  floatingRisevProText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFD700',
+    letterSpacing: 0.6,
+  },
+  verifiedCircBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 5,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  titleVerifiedWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+    overflow: 'hidden',
+  },
+  proSleekBookCtaBtn: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 5,
+    flexShrink: 0,
+  },
+  proSleekBookCtaText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+  },
+  proNeuFooterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EDEAE4',
+    borderWidth: 1.5,
+    borderColor: '#E2DED6',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 4,
+    shadowColor: 'rgba(0, 0, 0, 0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  cardImageWrapper175: {
+    width: 135,
+    height: 135,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#F1F5F9',
+  },
+  cardCoverImg175: {
+    width: '100%',
+    height: '100%',
+  },
+  cardRightCol175: {
+    flex: 1,
+    gap: 4,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  fullFooterPriceCol: {
+    justifyContent: 'center',
+    minWidth: 48,
+  },
+  fullFooterPriceText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  fullFooterDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: '#CBD5E1',
+    marginHorizontal: 6,
+  },
+  fullFooterSlotCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginRight: 4,
+    overflow: 'hidden',
+  },
+  fullFooterSlotText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  newCardTitle: {
+    flexShrink: 1,
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  newCardSubTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: -2,
+  },
+  newRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+    flexWrap: 'nowrap',
+  },
+  newRatingScore: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  newReviewCount: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  newBulletDot: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    marginHorizontal: 1,
+  },
+  newDistanceText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    flexShrink: 0,
+  },
+  newBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+    flexWrap: 'wrap',
+  },
+  proNeuRewardPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF9C3',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    gap: 3,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  proNeuRewardPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+  },
+  proNeuBookingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 3,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  proNeuBookingPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  standardRewardPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF9C3',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 4,
+  },
+  standardRewardPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+  },
+  standardFooterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    marginTop: 2,
+    paddingHorizontal: 4,
+  },
+  standardViewStoreBtn: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  standardViewStoreText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  photosGlassBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  photosGlassText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  footerFromLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  footerSlotLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
 });

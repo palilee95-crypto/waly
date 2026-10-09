@@ -49,7 +49,12 @@ interface ServiceItem {
   category: string;
   price: number;
   duration_minutes: number;
-  item_type: 'service' | 'class' | 'product' | 'addon';
+  item_type: 'service' | 'automotive' | 'facility' | 'lodging' | 'dining' | 'catering' | 'class' | 'product' | 'addon';
+  requires_staff?: boolean;
+  total_units?: number;
+  max_pax?: number;
+  peak_price?: number;
+  security_deposit?: number;
   is_active: boolean;
   image_url?: string;
 }
@@ -143,7 +148,12 @@ export default function BookingsScreen() {
   
   // Add Item Wizard State (Step 1, 2, 3)
   const [addModalStep, setAddModalStep] = useState<1 | 2 | 3>(1);
-  const [addItemType, setAddItemType] = useState<'service' | 'class' | 'product' | 'addon'>('service');
+  const [addItemType, setAddItemType] = useState<'service' | 'automotive' | 'facility' | 'lodging' | 'dining' | 'catering' | 'class' | 'product' | 'addon'>('service');
+  const [requiresStaff, setRequiresStaff] = useState<boolean>(true);
+  const [totalUnits, setTotalUnits] = useState<string>('1');
+  const [maxPax, setMaxPax] = useState<string>('4');
+  const [peakPrice, setPeakPrice] = useState<string>('');
+  const [securityDeposit, setSecurityDeposit] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<any>(null);
   const [newServiceName, setNewServiceName] = useState('');
@@ -183,6 +193,151 @@ export default function BookingsScreen() {
     if (!list.includes('Online / Virtual')) list.push('Online / Virtual');
     return list;
   }, [branchesList, merchantData, user]);
+
+  // Dynamic Labels, Placeholders & Options based on selected Item Type
+  const itemTypeMeta = useMemo(() => {
+    switch (addItemType) {
+      case 'automotive':
+        return {
+          title: 'New Auto & Workshop Service 🚗',
+          nameLabel: 'Service / Package Title',
+          namePlaceholder: 'e.g. Premium Clay Polish & Detailing, Full Engine Major Service, Express Car Wash',
+          categoryOptions: ['Car Wash & Detailing', 'Mechanic & Workshop', 'Service Center', 'Tire & Alignment', 'Other'],
+          priceLabel: 'Service Rate (RM)',
+          pricePlaceholder: '65.00',
+          durationLabel: 'Estimated Service Duration',
+          durationOptions: ['30', '45', '60', '90', '120', '180', '240'],
+          durationUnitLabel: (d: string) => d === '60' ? '60 mins (1 Hour)' : d === '120' ? '120 mins (2 Hours)' : d === '180' ? '180 mins (3 Hours)' : d === '240' ? '240 mins (4 Hours)' : `${d} mins`,
+          icon: 'car-sport-outline',
+          unitsLabel: 'Total Work Bays / Hoists Available',
+          unitsPlaceholder: '3',
+          paxLabel: 'Max Vehicles per Slot',
+          paxPlaceholder: '1',
+        };
+      case 'facility':
+        return {
+          title: 'New Court / Bay / Facility',
+          nameLabel: 'Court / Bay Name',
+          namePlaceholder: 'e.g. Court A (Indoor), Music Studio Bay 1, Event Hall',
+          categoryOptions: [
+            'Futsal Court',
+            'Badminton Court',
+            'Pickleball & Tennis',
+            'Music Studio',
+            'Event Space',
+            'Photography Studio',
+            'Other'
+          ],
+          priceLabel: 'Slot Rate (RM)',
+          pricePlaceholder: '30.00',
+          durationLabel: 'Slot Unit',
+          durationOptions: ['30', '45', '60', '90', '120'],
+          durationUnitLabel: (d: string) => d === '60' ? '60 mins (1 Hour)' : d === '120' ? '120 mins (2 Hours)' : `${d} mins`,
+          icon: 'football-outline',
+          unitsLabel: 'Total Courts / Facilities Available',
+          unitsPlaceholder: '1',
+          paxLabel: 'Max Player Capacity / Unit',
+          paxPlaceholder: '10',
+        };
+      case 'lodging':
+        return {
+          title: 'New Homestay / Unit',
+          nameLabel: 'Homestay / Unit Title',
+          namePlaceholder: 'e.g. Villa Dahlia 3-Bedroom (Pool View)',
+          categoryOptions: ['Whole Homestay', 'Private Room', 'Chalet', 'Resort Villa', 'Camping Site', 'Other'],
+          priceLabel: 'Nightly Rate (RM/Night)',
+          pricePlaceholder: '250.00',
+          durationLabel: 'Stay Model',
+          durationOptions: ['0'],
+          durationUnitLabel: () => 'Per Night Stay',
+          icon: 'home-outline',
+          unitsLabel: 'Total Homestay Units Available',
+          unitsPlaceholder: '1',
+          paxLabel: 'Max Guest Capacity (Pax)',
+          paxPlaceholder: '8',
+        };
+      case 'dining':
+        return {
+          title: 'New Table / Dining Area',
+          nameLabel: 'Table / Area Name',
+          namePlaceholder: 'e.g. VIP Room (Table 12), Window View Table',
+          categoryOptions: ['Standard Dining Table', 'Outdoor Table', 'VIP Room', 'Bar Counter', 'Event Hall', 'Other'],
+          priceLabel: 'Reservation Deposit (RM)',
+          pricePlaceholder: '0.00',
+          durationLabel: 'Dining Time Limit',
+          durationOptions: ['45', '60', '90', '120'],
+          durationUnitLabel: (d: string) => `${d} mins limit`,
+          icon: 'restaurant-outline',
+          unitsLabel: 'Total Available Tables',
+          unitsPlaceholder: '1',
+          paxLabel: 'Table Pax Capacity',
+          paxPlaceholder: '4',
+        };
+      case 'catering':
+        return {
+          title: 'New Catering & Event Package',
+          nameLabel: 'Package / Event Title',
+          namePlaceholder: 'e.g. Catering Aiskrim 300pax, Live Waffle Station, Wedding Buffet Set A',
+          categoryOptions: ['Ice Cream & Dessert Catering', 'Live Food Station', 'Buffet & Banquet', 'Canopy & Event Setup', 'Other'],
+          priceLabel: 'Package Price (RM)',
+          pricePlaceholder: '850.00',
+          durationLabel: 'Event Service Duration',
+          durationOptions: ['60', '120', '180', '240', '300'],
+          durationUnitLabel: (d: string) => d === '120' ? '120 mins (2 Hours)' : d === '180' ? '180 mins (3 Hours)' : d === '240' ? '240 mins (4 Hours)' : `${d} mins`,
+          icon: 'fast-food-outline',
+          unitsLabel: 'Max Concurrent Event Slots',
+          unitsPlaceholder: '2',
+          paxLabel: 'Event Serving Pax / Capacity',
+          paxPlaceholder: '300',
+        };
+      case 'product':
+      case 'addon':
+        return {
+          title: 'New Product / Add-on',
+          nameLabel: 'Item Name',
+          namePlaceholder: 'e.g. Engine Oil 4L, Extra 100 Pax Scoops, Extra Bed Mattress, Futsal Ball Rental',
+          categoryOptions: ['Automotive Parts & Accessories', 'Catering Add-on & Extra Pax', 'Rental Accessories', 'Food & Drinks', 'Merchandise', 'Extra Service', 'Other'],
+          priceLabel: 'Price (RM)',
+          pricePlaceholder: '15.00',
+          durationLabel: 'Billing Type',
+          durationOptions: ['0'],
+          durationUnitLabel: () => 'One-Off / Item',
+          icon: 'cube-outline',
+          unitsLabel: 'Stock Inventory Count',
+          unitsPlaceholder: '100',
+          paxLabel: 'Max Order Qty / Customer',
+          paxPlaceholder: '10',
+        };
+      case 'service':
+      default:
+        return {
+          title: 'New Service Appointment',
+          nameLabel: 'Service Name',
+          namePlaceholder: 'e.g. Full Polish Detailing, Engine Major Service, Haircut & Wash',
+          categoryOptions: [
+            'Car Wash & Detailing',
+            'Mechanic & Workshop',
+            'Service Center',
+            'Haircut & Styling',
+            'Hair Treatment',
+            'Shave & Beard',
+            'Facial & Spa',
+            'Massage',
+            'Other'
+          ],
+          priceLabel: 'Service Rate (RM)',
+          pricePlaceholder: '45.00',
+          durationLabel: 'Service Duration',
+          durationOptions: ['15', '30', '45', '60', '90', '120', '180'],
+          durationUnitLabel: (d: string) => d === '60' ? '60 mins (1 Hour)' : d === '120' ? '2 Hours' : d === '180' ? '3 Hours' : `${d} mins`,
+          icon: 'cut-outline',
+          unitsLabel: 'Concurrent Appointment Slots',
+          unitsPlaceholder: '1',
+          paxLabel: 'Max Client Limit per Slot',
+          paxPlaceholder: '1',
+        };
+    }
+  }, [addItemType]);
 
   // PWA State & Branding Customizer
   const [pwaSlug, setPwaSlug] = useState('store');
@@ -397,7 +552,8 @@ export default function BookingsScreen() {
           setCustomCoverUrl('');
           setBannerPreview(null);
         }
-        if (mRecord.pwa_brand_color) setSelectedBrandColor(mRecord.pwa_brand_color);
+        const initialBrandColor = mRecord.pwa_brand_color || mRecord.brand_color;
+        if (initialBrandColor) setSelectedBrandColor(initialBrandColor);
         if (mRecord.pwa_bg_color) setSelectedBgColor(mRecord.pwa_bg_color);
         if (mRecord.pwa_pod_color) setSelectedPodColor(mRecord.pwa_pod_color);
         if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
@@ -657,6 +813,11 @@ export default function BookingsScreen() {
     setEditingService(null);
     setAddModalStep(1);
     setAddItemType('service');
+    setRequiresStaff(true);
+    setTotalUnits('1');
+    setMaxPax('4');
+    setPeakPrice('');
+    setSecurityDeposit('');
     setPhotoUri(null);
     setPhotoFile(null);
     setNewServiceName('');
@@ -675,7 +836,13 @@ export default function BookingsScreen() {
 
   const handleOpenEditService = (s: ServiceItem) => {
     setEditingService(s);
-    setAddItemType(s.item_type || 'service');
+    const itemType = s.item_type || 'service';
+    setAddItemType(itemType);
+    setRequiresStaff(s.requires_staff !== undefined ? s.requires_staff : (itemType === 'service' || itemType === 'class'));
+    setTotalUnits(String(s.total_units || '1'));
+    setMaxPax(String(s.max_pax || '4'));
+    setPeakPrice(s.peak_price ? String(s.peak_price) : '');
+    setSecurityDeposit(s.security_deposit ? String(s.security_deposit) : '');
     setPhotoUri(s.image_url || null);
     setPhotoFile(null);
     setNewServiceName(s.name);
@@ -1874,30 +2041,138 @@ export default function BookingsScreen() {
                   <Text style={styles.brandingSectionTitle}>Branding & Theme Settings</Text>
                 </View>
 
-                {/* SECTION 1: Brand Accent Color */}
-                <Text style={styles.brandingFieldLabel}>1. Brand Accent Color (Buttons & Accents)</Text>
-                <View style={styles.paletteGrid}>
-                  {COLOR_PALETTES.map(p => {
-                    const isSelected = selectedBrandColor.toLowerCase() === p.primary.toLowerCase();
+                {/* 🎨 MASTER THEME SELECTOR: BRIGHT MODE vs DARK MODE */}
+                <Text style={styles.brandingFieldLabel}>Page Theme Style (Select One Master Theme)</Text>
+                <Text style={styles.brandingFieldSub}>
+                  Choose between Bright Mode (Soft Clay Beige) or Dark Mode (Obsidian Dark VIP) for your booking page.
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 16 }}>
+                  {/* ☀️ Bright Mode Card */}
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#FAF8F5',
+                      borderRadius: 18,
+                      padding: 16,
+                      borderWidth: isObsidianDark(selectedBgColor) ? 1.5 : 2.5,
+                      borderColor: isObsidianDark(selectedBgColor) ? '#E2E8F0' : '#0F172A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: isObsidianDark(selectedBgColor) ? 0.05 : 0.15,
+                      shadowRadius: 6,
+                      elevation: isObsidianDark(selectedBgColor) ? 1 : 4,
+                    }}
+                    onPress={() => {
+                      setSelectedBgColor('#FAF8F5');
+                      broadcastPreviewUpdate({ bgColor: '#FAF8F5' });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="sunny" size={22} color="#F59E0B" />
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>☀️ Bright Mode</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
+                      Clean Soft Clay Beige with high contrast dark text
+                    </Text>
+                    {!isObsidianDark(selectedBgColor) && (
+                      <View style={{ backgroundColor: '#0F172A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Ionicons name="checkmark-circle" size={14} color="#FFD700" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Active</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* 🌙 Dark Mode Card */}
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#000000',
+                      borderRadius: 18,
+                      padding: 16,
+                      borderWidth: isObsidianDark(selectedBgColor) ? 2.5 : 1.5,
+                      borderColor: isObsidianDark(selectedBgColor) ? '#FFD700' : '#334155',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: isObsidianDark(selectedBgColor) ? 0.3 : 0.05,
+                      shadowRadius: 8,
+                      elevation: isObsidianDark(selectedBgColor) ? 5 : 1,
+                    }}
+                    onPress={() => {
+                      setSelectedBgColor('#000000');
+                      broadcastPreviewUpdate({ bgColor: '#000000' });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="moon" size={20} color="#FFD700" />
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>🌙 Dark Mode</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center' }}>
+                      Pure Solid Black with glowing gold accents
+                    </Text>
+                    {isObsidianDark(selectedBgColor) && (
+                      <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Ionicons name="checkmark-circle" size={14} color="#000000" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Active</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* 🎨 2. BRAND ACCENT COLOR (Button, Price & Highlights) */}
+                <Text style={[styles.brandingFieldLabel, { marginTop: 16 }]}>2. Brand Accent Color (Button, Price & Highlights)</Text>
+                <Text style={styles.brandingFieldSub}>
+                  Select your primary accent color for action buttons, price tags, and active tab highlights.
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, marginBottom: 14 }}>
+                  {[
+                    { id: 'gold', name: 'Risev Gold', color: '#FFC700' },
+                    { id: 'red', name: 'Crimson Red', color: '#EF4444' },
+                    { id: 'blue', name: 'Sapphire Blue', color: '#0284C7' },
+                    { id: 'green', name: 'Emerald Green', color: '#10B981' },
+                    { id: 'purple', name: 'Royal Purple', color: '#8B5CF6' },
+                    { id: 'dark', name: 'Dark Slate', color: '#0F172A' },
+                  ].map((acc) => {
+                    const isSelected = selectedBrandColor?.toUpperCase() === acc.color.toUpperCase();
                     return (
                       <TouchableOpacity
-                        key={p.id}
-                        style={[
-                          styles.paletteChip,
-                          { backgroundColor: p.bg, borderColor: isSelected ? (p.text === '#FFFFFF' ? '#FFC700' : '#000000') : p.border },
-                          isSelected && styles.paletteChipSelected
-                        ]}
+                        key={acc.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          backgroundColor: isSelected ? '#FFFFFF' : '#F8FAFC',
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 14,
+                          borderWidth: isSelected ? 2 : 1,
+                          borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          shadowColor: isSelected ? acc.color : '#000',
+                          shadowOffset: { width: 0, height: isSelected ? 2 : 1 },
+                          shadowOpacity: isSelected ? 0.3 : 0.05,
+                          shadowRadius: isSelected ? 4 : 2,
+                          elevation: isSelected ? 3 : 1,
+                        }}
                         onPress={() => {
-                          setSelectedBrandColor(p.primary);
-                          broadcastPreviewUpdate({ brandColor: p.primary });
+                          setSelectedBrandColor(acc.color);
+                          broadcastPreviewUpdate({ brandColor: acc.color });
                         }}
                         activeOpacity={0.8}
                       >
-                        <View style={[styles.paletteDot, { backgroundColor: p.primary, borderWidth: p.primary === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }]} />
-                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
-                          {p.name}
+                        <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: acc.color, borderWidth: acc.color === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }} />
+                        <Text style={{ fontSize: 12, fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {acc.name}
                         </Text>
-                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
+                        {isSelected && <Ionicons name="checkmark-circle" size={14} color="#0F172A" />}
                       </TouchableOpacity>
                     );
                   })}
@@ -1908,12 +2183,12 @@ export default function BookingsScreen() {
                   <View 
                     style={[
                       styles.hexInputSwatch, 
-                      { backgroundColor: selectedBrandColor || '#FFC700', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative' }
+                      { backgroundColor: selectedBrandColor || '#FFC700', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: selectedBrandColor === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }
                     ]}
                   >
                     {Platform.OS === 'web' ? (
                       React.createElement('input', {
-                        id: 'risev_brand_color_wheel_input',
+                        id: 'risev_brand_accent_color_wheel',
                         type: 'color',
                         value: selectedBrandColor || '#FFC700',
                         onChange: (e: any) => {
@@ -1930,7 +2205,7 @@ export default function BookingsScreen() {
                           cursor: 'pointer',
                           opacity: 0,
                         },
-                        title: 'Choose Brand Color',
+                        title: 'Choose Accent Color',
                       })
                     ) : null}
                     <Ionicons name="color-palette" size={16} color={getContrastColor(selectedBrandColor || '#FFC700')} />
@@ -1954,204 +2229,17 @@ export default function BookingsScreen() {
                   />
 
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6 }}
                     onPress={() => {
                       if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                        const inputEl = document.getElementById('risev_brand_color_wheel_input');
+                        const inputEl = document.getElementById('risev_brand_accent_color_wheel');
                         if (inputEl) inputEl.click();
                       }
                     }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* SECTION 2: Background Theme Color */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 20 }]}>2. Background Theme (PWA & VIP Card)</Text>
-                <View style={styles.paletteGrid}>
-                  {BG_THEME_PALETTES.map(p => {
-                    const isSelected = selectedBgColor.toLowerCase() === p.primary.toLowerCase();
-                    return (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={[
-                          styles.paletteChip,
-                          { backgroundColor: p.bg, borderColor: isSelected ? (p.text === '#FFFFFF' ? '#FFC700' : '#000000') : p.border },
-                          isSelected && styles.paletteChipSelected
-                        ]}
-                        onPress={() => {
-                          setSelectedBgColor(p.primary);
-                          broadcastPreviewUpdate({ bgColor: p.primary });
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[styles.paletteDot, { backgroundColor: p.primary, borderWidth: p.primary === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }]} />
-                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
-                          {p.name}
-                        </Text>
-                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Custom Background Color Hex + Visual Color Wheel */}
-                <View style={styles.hexInputRow}>
-                  <View 
-                    style={[
-                      styles.hexInputSwatch, 
-                      { backgroundColor: selectedBgColor || '#121318', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: selectedBgColor === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }
-                    ]}
-                  >
-                    {Platform.OS === 'web' ? (
-                      React.createElement('input', {
-                        id: 'risev_bg_color_wheel_input',
-                        type: 'color',
-                        value: selectedBgColor || '#121318',
-                        onChange: (e: any) => {
-                          const val = e.target.value.toUpperCase();
-                          setSelectedBgColor(val);
-                          broadcastPreviewUpdate({ bgColor: val });
-                        },
-                        style: {
-                          position: 'absolute',
-                          top: -10,
-                          left: -10,
-                          width: '200%',
-                          height: '200%',
-                          cursor: 'pointer',
-                          opacity: 0,
-                        },
-                        title: 'Choose Background Color',
-                      })
-                    ) : null}
-                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedBgColor || '#121318')} />
-                  </View>
-
-                  <TextInput
-                    style={styles.hexTextInput}
-                    placeholder="#121318"
-                    placeholderTextColor="#94A3B8"
-                    value={selectedBgColor}
-                    onChangeText={(val) => {
-                      let formatted = val.trim();
-                      if (formatted && !formatted.startsWith('#')) formatted = '#' + formatted;
-                      setSelectedBgColor(formatted);
-                      if (formatted.length === 7) {
-                        broadcastPreviewUpdate({ bgColor: formatted });
-                      }
-                    }}
-                    maxLength={7}
-                    autoCapitalize="characters"
-                  />
-
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
-                    onPress={() => {
-                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                        const inputEl = document.getElementById('risev_bg_color_wheel_input');
-                        if (inputEl) inputEl.click();
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* SECTION 3: Button & Capsule Pod Color */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 20 }]}>3. Buttons & Capsule Pod Color</Text>
-                <View style={styles.paletteGrid}>
-                  {POD_COLOR_PALETTES.map(p => {
-                    const isSelected = selectedPodColor.toLowerCase() === p.primary.toLowerCase();
-                    return (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={[
-                          styles.paletteChip,
-                          { backgroundColor: p.bg, borderColor: isSelected ? '#000000' : p.border },
-                          isSelected && styles.paletteChipSelected
-                        ]}
-                        onPress={() => {
-                          setSelectedPodColor(p.primary);
-                          broadcastPreviewUpdate({ podColor: p.primary });
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[styles.paletteDot, { backgroundColor: p.primary === 'auto' ? '#0284C7' : p.primary, borderWidth: 1, borderColor: '#CBD5E1' }]} />
-                        <Text style={[styles.paletteName, { color: p.text || '#0F172A' }, isSelected && { fontWeight: '800' }]}>
-                          {p.name}
-                        </Text>
-                        {isSelected && <Ionicons name="checkmark-circle" size={16} color={p.checkmark || p.text} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Custom Pod Color Hex + Visual Color Wheel */}
-                <View style={styles.hexInputRow}>
-                  <View 
-                    style={[
-                      styles.hexInputSwatch, 
-                      { backgroundColor: selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'), overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: 1, borderColor: '#CBD5E1' }
-                    ]}
-                  >
-                    {Platform.OS === 'web' ? (
-                      React.createElement('input', {
-                        id: 'risev_pod_color_wheel_input',
-                        type: 'color',
-                        value: selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'),
-                        onChange: (e: any) => {
-                          const val = e.target.value.toUpperCase();
-                          setSelectedPodColor(val);
-                          broadcastPreviewUpdate({ podColor: val });
-                        },
-                        style: {
-                          position: 'absolute',
-                          top: -10,
-                          left: -10,
-                          width: '200%',
-                          height: '200%',
-                          cursor: 'pointer',
-                          opacity: 0,
-                        },
-                        title: 'Choose Button & Pod Color',
-                      })
-                    ) : null}
-                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedPodColor === 'auto' ? '#FFFFFF' : (selectedPodColor || '#FFFFFF'))} />
-                  </View>
-
-                  <TextInput
-                    style={styles.hexTextInput}
-                    placeholder="auto or #FFFFFF"
-                    placeholderTextColor="#94A3B8"
-                    value={selectedPodColor}
-                    onChangeText={(val) => {
-                      let formatted = val.trim();
-                      if (formatted && formatted !== 'auto' && !formatted.startsWith('#')) formatted = '#' + formatted;
-                      setSelectedPodColor(formatted);
-                      if (formatted === 'auto' || formatted.length === 7) {
-                        broadcastPreviewUpdate({ podColor: formatted });
-                      }
-                    }}
-                    maxLength={15}
-                  />
-
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}
-                    onPress={() => {
-                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                        const inputEl = document.getElementById('risev_pod_color_wheel_input');
-                        if (inputEl) inputEl.click();
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Color Wheel 🎨</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Custom Wheel 🎨</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2370,11 +2458,13 @@ export default function BookingsScreen() {
                 </View>
 
                 <View style={styles.typeCardsList}>
-                  {/* Service Card */}
+                  {/* 1. Staff Service Card */}
                   <TouchableOpacity
                     style={[styles.typeCardItem, addItemType === 'service' && styles.typeCardItemSelected]}
                     onPress={() => {
                       setAddItemType('service');
+                      setRequiresStaff(true);
+                      setNewServiceCategory('Haircut');
                       setAddModalStep(2);
                     }}
                     activeOpacity={0.85}
@@ -2383,36 +2473,127 @@ export default function BookingsScreen() {
                       <Ionicons name="cut-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Service</Text>
-                      <Text style={styles.typeCardSub}>One-on-one appointment</Text>
+                      <Text style={styles.typeCardTitle}>Staff Appointment 💇</Text>
+                      <Text style={styles.typeCardSub}>Service assigned to specialist/staff (Barber, Spa, Clinic)</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
 
-                  {/* Class / Session Card */}
+                  {/* 2. Auto & Workshop Service Card */}
                   <TouchableOpacity
-                    style={[styles.typeCardItem, addItemType === 'class' && styles.typeCardItemSelected]}
+                    style={[styles.typeCardItem, addItemType === 'automotive' && styles.typeCardItemSelected]}
                     onPress={() => {
-                      setAddItemType('class');
+                      setAddItemType('automotive');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Car Wash & Detailing');
+                      setNewServiceDuration('60');
                       setAddModalStep(2);
                     }}
                     activeOpacity={0.85}
                   >
                     <View style={styles.typeIconBox}>
-                      <Ionicons name="calendar-outline" size={22} color="#000000" />
+                      <Ionicons name="car-sport-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Class / Session</Text>
-                      <Text style={styles.typeCardSub}>Group session with a set schedule</Text>
+                      <Text style={styles.typeCardTitle}>Auto & Workshop Service 🚗</Text>
+                      <Text style={styles.typeCardSub}>Vehicle bay & slot booking (Car Wash, Detailing, Mechanic, Service Center)</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
 
-                  {/* Product Card */}
+                  {/* 3. Court / Facility Rental */}
                   <TouchableOpacity
-                    style={[styles.typeCardItem, addItemType === 'product' && styles.typeCardItemSelected]}
+                    style={[styles.typeCardItem, addItemType === 'facility' && styles.typeCardItemSelected]}
+                    onPress={() => {
+                      setAddItemType('facility');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Futsal Court');
+                      setAddModalStep(2);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.typeIconBox}>
+                      <Ionicons name="football-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.typeCardTitle}>Court / Bay / Facility ⚽</Text>
+                      <Text style={styles.typeCardSub}>Hourly slot rental with unit counts (Futsal, Badminton, Studio)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {/* 3. Homestay / Lodging / Space */}
+                  <TouchableOpacity
+                    style={[styles.typeCardItem, addItemType === 'lodging' && styles.typeCardItemSelected]}
+                    onPress={() => {
+                      setAddItemType('lodging');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Lodging');
+                      setNewServiceDuration('0');
+                      setAddModalStep(2);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.typeIconBox}>
+                      <Ionicons name="home-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.typeCardTitle}>Homestay & Lodging 🏡</Text>
+                      <Text style={styles.typeCardSub}>Per night stay with deposit & max pax (Homestay, Chalet)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {/* 4. Restaurant Table & Dining */}
+                  <TouchableOpacity
+                    style={[styles.typeCardItem, addItemType === 'dining' && styles.typeCardItemSelected]}
+                    onPress={() => {
+                      setAddItemType('dining');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Dining');
+                      setAddModalStep(2);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.typeIconBox}>
+                      <Ionicons name="restaurant-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.typeCardTitle}>Restaurant Table & Dining 🍽️</Text>
+                      <Text style={styles.typeCardSub}>Table booking with pax capacity (Dine-in, VIP Room)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {/* 5. Event & Food Catering */}
+                  <TouchableOpacity
+                    style={[styles.typeCardItem, addItemType === 'catering' && styles.typeCardItemSelected]}
+                    onPress={() => {
+                      setAddItemType('catering');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Ice Cream & Dessert Catering');
+                      setNewServiceDuration('120');
+                      setAddModalStep(2);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.typeIconBox}>
+                      <Ionicons name="fast-food-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.typeCardTitle}>Event & Food Catering 🎪</Text>
+                      <Text style={styles.typeCardSub}>Catering packages, live booths & event pax (Ice cream, Buffet)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                  </TouchableOpacity>
+
+                  {/* 6. Product & Add-on Card */}
+                  <TouchableOpacity
+                    style={[styles.typeCardItem, (addItemType === 'product' || addItemType === 'addon') && styles.typeCardItemSelected]}
                     onPress={() => {
                       setAddItemType('product');
+                      setRequiresStaff(false);
+                      setNewServiceCategory('Products');
                       setAddModalStep(2);
                     }}
                     activeOpacity={0.85}
@@ -2421,27 +2602,8 @@ export default function BookingsScreen() {
                       <Ionicons name="cube-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Product</Text>
-                      <Text style={styles.typeCardSub}>Physical product for sale</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#64748B" />
-                  </TouchableOpacity>
-
-                  {/* Add-on Card */}
-                  <TouchableOpacity
-                    style={[styles.typeCardItem, addItemType === 'addon' && styles.typeCardItemSelected]}
-                    onPress={() => {
-                      setAddItemType('addon');
-                      setAddModalStep(2);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.typeIconBox}>
-                      <Ionicons name="extension-puzzle-outline" size={22} color="#000000" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Add-on</Text>
-                      <Text style={styles.typeCardSub}>Extra service or option</Text>
+                      <Text style={styles.typeCardTitle}>Product & Add-on 📦</Text>
+                      <Text style={styles.typeCardSub}>Physical product or extra add-on service</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2469,7 +2631,7 @@ export default function BookingsScreen() {
                   </TouchableOpacity>
 
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Service' : 'New Service'}</Text>
+                    <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Details' : itemTypeMeta.title}</Text>
                     <Text style={styles.wizardStepIndicatorText}>
                       {editingService ? 'Edit Details • Basic Info' : 'Step 1 of 2 • Basic Info'}
                     </Text>
@@ -2515,10 +2677,10 @@ export default function BookingsScreen() {
 
                 {/* Form Inputs */}
                 <View style={styles.wizardFormGroup}>
-                  <Text style={styles.wizardInputLabel}>Service Name</Text>
+                  <Text style={styles.wizardInputLabel}>{itemTypeMeta.nameLabel}</Text>
                   <TextInput
                     style={styles.wizardInputText}
-                    placeholder="Signature Fade Cut"
+                    placeholder={itemTypeMeta.namePlaceholder}
                     placeholderTextColor="#94A3B8"
                     value={newServiceName}
                     onChangeText={setNewServiceName}
@@ -2532,13 +2694,13 @@ export default function BookingsScreen() {
                     onPress={() => setShowCategoryPicker(!showCategoryPicker)}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="cut-outline" size={16} color="#000" />
+                    <Ionicons name={itemTypeMeta.icon as any} size={16} color="#000" />
                     <Text style={styles.dropdownPickerValue}>{newServiceCategory}</Text>
                     <Ionicons name={showCategoryPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
                   </TouchableOpacity>
                   {showCategoryPicker && (
                     <View style={styles.pickerOptionsWrap}>
-                      {['Haircut', 'Hair Treatment', 'Shave & Beard', 'Facial & Spa', 'Styling', 'Coloring', 'Massage', 'Other'].map(cat => (
+                      {itemTypeMeta.categoryOptions.map(cat => (
                         <TouchableOpacity
                           key={cat}
                           style={[styles.pickerOptionChip, newServiceCategory === cat && styles.pickerOptionChipActive]}
@@ -2559,10 +2721,10 @@ export default function BookingsScreen() {
                 {/* Price & Duration */}
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.wizardInputLabel}>Price (RM)</Text>
+                    <Text style={styles.wizardInputLabel}>{itemTypeMeta.priceLabel}</Text>
                     <TextInput
                       style={styles.wizardInputText}
-                      placeholder="35.00"
+                      placeholder={itemTypeMeta.pricePlaceholder}
                       placeholderTextColor="#94A3B8"
                       keyboardType="numeric"
                       value={newServicePrice}
@@ -2571,13 +2733,13 @@ export default function BookingsScreen() {
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.wizardInputLabel}>Duration</Text>
+                    <Text style={styles.wizardInputLabel}>{itemTypeMeta.durationLabel}</Text>
                     <TouchableOpacity
                       style={styles.dropdownPickerBox}
                       onPress={() => setShowDurationPicker(!showDurationPicker)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.dropdownPickerValue}>{newServiceDuration} mins</Text>
+                      <Text style={styles.dropdownPickerValue}>{itemTypeMeta.durationUnitLabel(newServiceDuration)}</Text>
                       <Ionicons name={showDurationPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
                     </TouchableOpacity>
                   </View>
@@ -2585,7 +2747,7 @@ export default function BookingsScreen() {
 
                 {showDurationPicker && (
                   <View style={[styles.pickerOptionsWrap, { marginBottom: 16, marginTop: -8 }]}>
-                    {['15', '30', '45', '60', '90', '120'].map(dur => (
+                    {itemTypeMeta.durationOptions.map(dur => (
                       <TouchableOpacity
                         key={dur}
                         style={[styles.pickerOptionChip, newServiceDuration === dur && styles.pickerOptionChipActive]}
@@ -2595,10 +2757,59 @@ export default function BookingsScreen() {
                         }}
                       >
                         <Text style={[styles.pickerOptionText, newServiceDuration === dur && styles.pickerOptionTextActive]}>
-                          {dur} mins
+                          {itemTypeMeta.durationUnitLabel(dur)}
                         </Text>
                       </TouchableOpacity>
                     ))}
+                  </View>
+                )}
+
+                {/* Requires Staff Toggle Card */}
+                <View style={styles.toggleRowCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleRowTitle}>Requires Staff / Specialist?</Text>
+                    <Text style={styles.toggleRowSub}>
+                      {requiresStaff 
+                        ? 'Staff assigned to handle appointment' 
+                        : 'Self-serve / No staff required (Court, Homestay, Table)'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.switchTrack, requiresStaff && styles.switchTrackActive]}
+                    onPress={() => setRequiresStaff(!requiresStaff)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.switchThumb, requiresStaff && styles.switchThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Total Units & Max Pax (For Court / Homestay / Restaurant / Catering / Auto / Facility) */}
+                {(!requiresStaff || addItemType === 'facility' || addItemType === 'lodging' || addItemType === 'dining' || addItemType === 'catering' || addItemType === 'automotive' || addItemType === 'product') && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.wizardInputLabel}>{itemTypeMeta.unitsLabel || 'Total Available Units'}</Text>
+                      <TextInput
+                        style={styles.wizardInputText}
+                        placeholder={itemTypeMeta.unitsPlaceholder || '1'}
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                        value={totalUnits}
+                        onChangeText={setTotalUnits}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.wizardInputLabel}>{itemTypeMeta.paxLabel || 'Max Pax / Limit'}</Text>
+                      <TextInput
+                        style={styles.wizardInputText}
+                        placeholder={itemTypeMeta.paxPlaceholder || '4'}
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                        value={maxPax}
+                        onChangeText={setMaxPax}
+                      />
+                    </View>
                   </View>
                 )}
 
@@ -2679,95 +2890,155 @@ export default function BookingsScreen() {
                   <View style={[styles.wizardProgressFill, { width: '100%' }]} />
                 </View>
 
-                {/* Settings Card 1: Staff Assignment */}
-                <View style={styles.settingAccordionCard}>
-                  <View style={styles.settingHeaderRow}>
-                    <Ionicons name="people-outline" size={20} color="#000" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.settingTitle}>Staff Assignment</Text>
-                      <Text style={styles.settingSub}>Choose who can provide this service</Text>
-                    </View>
-                  </View>
-
-                  {/* Selected Staff Chips */}
-                  <View style={styles.staffChipsRow}>
-                    {assignedStaff.map(st => (
-                      <View key={st} style={styles.staffChipPill}>
-                        <View style={styles.staffChipAvatarBadge}>
-                          <Text style={styles.staffChipAvatarBadgeText}>
-                            {(st || 'S').charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <Text style={styles.staffChipName}>{st}</Text>
-                        <TouchableOpacity onPress={() => setAssignedStaff(prev => prev.filter(s => s !== st))}>
-                          <Ionicons name="close" size={14} color="#64748B" />
-                        </TouchableOpacity>
+                {/* Settings Card 1: Staff Assignment (Only if Requires Staff is ON) */}
+                {requiresStaff && (
+                  <View style={styles.settingAccordionCard}>
+                    <View style={styles.settingHeaderRow}>
+                      <Ionicons name="people-outline" size={20} color="#000" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.settingTitle}>Staff Assignment</Text>
+                        <Text style={styles.settingSub}>Choose who can provide this service</Text>
                       </View>
-                    ))}
+                    </View>
 
-                    {!isAddingStaff && (
-                      <TouchableOpacity
-                        style={styles.btnAddStaffPill}
-                        onPress={() => setIsAddingStaff(true)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="add" size={14} color="#000" />
-                        <Text style={styles.btnAddStaffText}>Add Staff</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Inline Staff Input & Quick Suggestions */}
-                  {isAddingStaff && (
-                    <View style={{ marginTop: 10 }}>
-                      {staffList.filter(s => s.name && !assignedStaff.includes(s.name)).length > 0 && (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                          {staffList
-                            .filter(s => s.name && !assignedStaff.includes(s.name))
-                            .map(s => (
-                              <TouchableOpacity
-                                key={s.id || s.name}
-                                style={[styles.staffChipPill, { backgroundColor: '#F8FAFC' }]}
-                                onPress={() => {
-                                  setAssignedStaff(prev => [...prev, s.name]);
-                                  setIsAddingStaff(false);
-                                }}
-                              >
-                                <Ionicons name="person-add-outline" size={12} color="#050505" />
-                                <Text style={styles.staffChipName}>{s.name}</Text>
-                              </TouchableOpacity>
-                            ))}
+                    {/* Selected Staff Chips */}
+                    <View style={styles.staffChipsRow}>
+                      {assignedStaff.map(st => (
+                        <View key={st} style={styles.staffChipPill}>
+                          <View style={styles.staffChipAvatarBadge}>
+                            <Text style={styles.staffChipAvatarBadgeText}>
+                              {(st || 'S').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <Text style={styles.staffChipName}>{st}</Text>
+                          <TouchableOpacity onPress={() => setAssignedStaff(prev => prev.filter(s => s !== st))}>
+                            <Ionicons name="close" size={14} color="#64748B" />
+                          </TouchableOpacity>
                         </View>
-                      )}
-                      <View style={styles.staffInputWrap}>
-                        <TextInput
-                          style={styles.staffInputField}
-                          placeholder="Staff or Provider Name..."
-                          placeholderTextColor="#94A3B8"
-                          value={newStaffInput}
-                          onChangeText={setNewStaffInput}
-                          autoFocus
-                        />
+                      ))}
+
+                      {!isAddingStaff && (
                         <TouchableOpacity
-                          style={styles.btnStaffInlineAdd}
-                          onPress={handleAddStaffSubmit}
+                          style={styles.btnAddStaffPill}
+                          onPress={() => setIsAddingStaff(true)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="checkmark" size={16} color="#000" />
-                          <Text style={styles.btnStaffInlineAddText}>Add</Text>
+                          <Ionicons name="add" size={14} color="#000" />
+                          <Text style={styles.btnAddStaffText}>Add Staff</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.btnStaffInlineCancel}
-                          onPress={() => {
-                            setNewStaffInput('');
-                            setIsAddingStaff(false);
-                          }}
-                        >
-                          <Ionicons name="close" size={16} color="#64748B" />
-                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Inline Staff Input & Quick Suggestions */}
+                    {isAddingStaff && (
+                      <View style={{ marginTop: 10 }}>
+                        {staffList.filter(s => s.name && !assignedStaff.includes(s.name)).length > 0 && (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                            {staffList
+                              .filter(s => s.name && !assignedStaff.includes(s.name))
+                              .map(s => (
+                                <TouchableOpacity
+                                  key={s.id || s.name}
+                                  style={[styles.staffChipPill, { backgroundColor: '#F8FAFC' }]}
+                                  onPress={() => {
+                                    setAssignedStaff(prev => [...prev, s.name]);
+                                    setIsAddingStaff(false);
+                                  }}
+                                >
+                                  <Ionicons name="person-add-outline" size={12} color="#050505" />
+                                  <Text style={styles.staffChipName}>{s.name}</Text>
+                                </TouchableOpacity>
+                              ))}
+                          </View>
+                        )}
+                        <View style={styles.staffInputWrap}>
+                          <TextInput
+                            style={styles.staffInputField}
+                            placeholder="Staff or Provider Name..."
+                            placeholderTextColor="#94A3B8"
+                            value={newStaffInput}
+                            onChangeText={setNewStaffInput}
+                            autoFocus
+                          />
+                          <TouchableOpacity
+                            style={styles.btnStaffInlineAdd}
+                            onPress={handleAddStaffSubmit}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="checkmark" size={16} color="#000" />
+                            <Text style={styles.btnStaffInlineAddText}>Add</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.btnStaffInlineCancel}
+                            onPress={() => {
+                              setNewStaffInput('');
+                              setIsAddingStaff(false);
+                            }}
+                          >
+                            <Ionicons name="close" size={16} color="#64748B" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Event Catering Logistics & Setup Card (Only for Catering & Event) */}
+                {addItemType === 'catering' && (
+                  <View style={styles.settingAccordionCard}>
+                    <View style={styles.settingHeaderRow}>
+                      <Ionicons name="location-outline" size={20} color="#000" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.settingTitle}>Event Setup & Customer Location</Text>
+                        <Text style={styles.settingSub}>On-site event booth delivery & preparation buffer</Text>
                       </View>
                     </View>
-                  )}
+                    <View style={{ marginTop: 10, padding: 12, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600', marginBottom: 4 }}>
+                        🎪 Customer Event Location & Schedule
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                        Customers will be required to provide their Event Venue Address, Event Date & On-Site Setup Time upon checkout.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Settings Card: Peak Hours & Security Deposit (For Courts / Lodging / Space) */}
+                <View style={styles.settingAccordionCard}>
+                  <View style={styles.settingHeaderRow}>
+                    <Ionicons name="sparkles-outline" size={20} color="#000" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.settingTitle}>Peak Rates & Security Deposit</Text>
+                      <Text style={styles.settingSub}>Dynamic pricing for weekends/nights & security deposits</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.wizardInputLabel}>Peak / Weekend Rate (RM)</Text>
+                      <TextInput
+                        style={styles.wizardInputText}
+                        placeholder="100.00"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                        value={peakPrice}
+                        onChangeText={setPeakPrice}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.wizardInputLabel}>Refundable Security Deposit (RM)</Text>
+                      <TextInput
+                        style={styles.wizardInputText}
+                        placeholder="100.00"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                        value={securityDeposit}
+                        onChangeText={setSecurityDeposit}
+                      />
+                    </View>
+                  </View>
                 </View>
 
                 {/* Settings Card 2: Location */}

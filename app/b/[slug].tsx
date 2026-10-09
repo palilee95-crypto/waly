@@ -379,7 +379,7 @@ export default function CustomerBookingPwaScreen() {
   }, [currentStep, createdBooking, selectedIsoDate, selectedTime]);
 
   const activeBrandColor = liveBrandColor || merchant?.pwa_brand_color || merchant?.brand_color || '#FFC700';
-  const fallbackBg = merchant?.pwa_bg_color || merchant?.bg_color || (merchant?.pwa_theme === 'dark' || merchant?.theme === 'dark' ? '#14161C' : (isObsidianDark(activeBrandColor) ? '#14161C' : '#F5F0E8'));
+  const fallbackBg = merchant?.pwa_bg_color || merchant?.bg_color || (merchant?.pwa_theme === 'dark' || merchant?.theme === 'dark' ? '#000000' : (isObsidianDark(activeBrandColor) ? '#000000' : '#F5F0E8'));
   const activeBgColor = liveBgColor || fallbackBg;
   const activePodColor = livePodColor || merchant?.pwa_pod_color || 'auto';
   const contrastColor = getContrastColor(activeBrandColor);
@@ -390,10 +390,11 @@ export default function CustomerBookingPwaScreen() {
     // 1. Base Adaptive Neumorphic Background Color
     const baseBgColor = activeBgColor;
     
-    // 2. Text Color Palette (High contrast readability on custom background colors)
+    // 2. Text & Secondary Color Palette (Bright Mode secondary: BLACK #000000, Dark Mode secondary: WHITE #FFFFFF)
     const textPrimaryColor = isPageDark ? '#FFFFFF' : '#0F172A';
-    const textSecondaryColor = isPageDark ? 'rgba(255, 255, 255, 0.75)' : '#475569';
-    const textMutedColor = isPageDark ? 'rgba(255, 255, 255, 0.50)' : '#94A3B8';
+    const textSecondaryColor = isPageDark ? '#FFFFFF' : '#000000';
+    const textMutedColor = isPageDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(0, 0, 0, 0.65)';
+    const secondaryColor = isPageDark ? '#FFFFFF' : '#000000';
 
     // 3. Custom / Dynamic Pod & Capsule Color
     const hasCustomPod = activePodColor && activePodColor !== 'auto';
@@ -408,7 +409,7 @@ export default function CustomerBookingPwaScreen() {
       : textPrimaryColor;
 
     const podSecondaryTextColor = hasCustomPod
-      ? (isPodDark ? 'rgba(255, 255, 255, 0.75)' : '#475569')
+      ? (isPodDark ? '#FFFFFF' : '#000000')
       : textSecondaryColor;
 
     const borderColor = hasCustomPod
@@ -468,9 +469,9 @@ export default function CustomerBookingPwaScreen() {
     };
 
     // 5. Price & High Contrast Accent Colors
-    const activeBtnBg = isBrandDark ? '#FFC700' : activeBrandColor;
+    const activeBtnBg = activeBrandColor || '#FFC700';
     const activeBtnText = getContrastColor(activeBtnBg);
-    const priceColor = isBrandDark ? '#FFC700' : activeBrandColor;
+    const priceColor = activeBrandColor || '#FFC700';
 
     return {
       baseBgColor,
@@ -516,7 +517,12 @@ export default function CustomerBookingPwaScreen() {
 
     const readStoredState = () => {
       try {
-        const stored = sessionStorage.getItem(`risev_booking_preview_${slug}`) || localStorage.getItem(`risev_booking_preview_${slug}`);
+        const stored = sessionStorage.getItem(`risev_booking_preview_${slug}`) ||
+                       localStorage.getItem(`risev_booking_preview_${slug}`) ||
+                       sessionStorage.getItem('risev_booking_preview_latest') ||
+                       localStorage.getItem('risev_booking_preview_latest') ||
+                       sessionStorage.getItem('risev_booking_preview_store') ||
+                       localStorage.getItem('risev_booking_preview_store');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed.brandColor) setLiveBrandColor(parsed.brandColor);
@@ -1039,8 +1045,33 @@ export default function CustomerBookingPwaScreen() {
                   <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
-                {/* Compact Top-Right Stamp Progress Badge (PRO Plan Feature Only) */}
-                {isPro && (
+                {!isPro ? (
+                  /* Image 1 Top Right Action Buttons (Favorite & Share) */
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 }}
+                      onPress={() => showToast('Saved to favorites! ❤️')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="heart-outline" size={18} color="#0F172A" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 }}
+                      onPress={() => {
+                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
+                          (navigator as any).share({ title: merchant?.store_name || 'Store', url: window.location.href }).catch(() => {});
+                        } else {
+                          showToast('Store link copied! 🔗');
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="share-outline" size={18} color="#0F172A" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  /* Compact Top-Right Stamp Progress Badge (PRO Plan Feature Only) */
                   <TouchableOpacity
                     style={[
                       styles.topRightStampPill, 
@@ -1060,12 +1091,19 @@ export default function CustomerBookingPwaScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Photos Counter Glassmorphic Badge (Image 1 Style) */}
+              {!isPro && (
+                <View style={{ position: 'absolute', bottom: 12, right: 14, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>1/8</Text>
+                </View>
+              )}
             </View>
 
             {/* Brand Card Info */}
-            <View style={[styles.brandInfoCard, { backgroundColor: themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
+            <View style={[styles.brandInfoCard, { backgroundColor: !isPro ? '#FAF8F5' : themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
 
-              {/* RISEV VIP Badge */}
+              {/* RISEV VIP Badge (PRO Plan Only) */}
               {isPro && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFC700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 }}>
                   <Ionicons name="sparkles" size={12} color="#000000" />
@@ -1073,173 +1111,91 @@ export default function CustomerBookingPwaScreen() {
                 </View>
               )}
 
-              {/* Store Title & Subtitle */}
-              <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
-              <Text style={[styles.brandSubtitleText, { color: themeStyles.textSecondaryColor }]}>{activeTagline}</Text>
-
-              {/* Soft Rating Pill Capsule */}
-              <View style={[styles.ratingCapsulePill, themeStyles.neumorphicInset]}>
-                <Ionicons name="star" size={24} color="#FFC700" />
-                <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>
-                  {merchant?.rating || '4.9'}
-                </Text>
-                <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>
-                  ({merchant?.reviews_count || '450'} reviews)
-                </Text>
-              </View>
-
-              {/* Active 3D Neumorphic Booking Ticket Stub Banner (Smart Dynamic Contrast Pass) */}
-              {existingBooking && (() => {
-                const isTicketCardLight = getContrastColor(themeStyles.activeBrandColor) === '#000000';
-                const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-                const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
-                const ticketPodBgColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.18)';
-                const ticketPodBorderColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.3)';
-                const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-                const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
-                const ticketDashedLineColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.35)';
-
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.upcomingTicketCard,
-                      {
-                        backgroundColor: themeStyles.activeBrandColor,
-                        borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
-                        borderWidth: 1.5,
-                        borderRadius: 22,
-                        ...(Platform.OS === 'web' ? {
-                          boxShadow: isTicketCardLight
-                            ? '4px 6px 14px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                            : '4px 6px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                        } : {
-                          shadowColor: '#000000',
-                          shadowOffset: { width: 3, height: 5 },
-                          shadowOpacity: isTicketCardLight ? 0.1 : 0.25,
-                          shadowRadius: 7,
-                          elevation: 5,
-                        }),
-                      }
-                    ]}
-                    onPress={() => {
-                      setCreatedBooking(existingBooking);
-                      setCurrentStep(4);
-                    }}
-                    activeOpacity={0.88}
-                  >
-                    {/* Left Notch Cutout */}
-                    <View style={[styles.ticketNotchLeft, { backgroundColor: themeStyles.baseBgColor }]} />
-                    {/* Right Notch Cutout */}
-                    <View style={[styles.ticketNotchRight, { backgroundColor: themeStyles.baseBgColor }]} />
-
-                    {/* Left Main Information Column */}
-                    <View style={styles.ticketLeftInfoCol}>
-                      {/* 3D Inset Recessed Calendar Icon Container */}
-                      <View style={[
-                        styles.ticketIconContainer,
-                        {
-                          backgroundColor: ticketPodBgColor,
-                          borderColor: ticketPodBorderColor,
-                          borderWidth: 1,
-                          borderRadius: 14,
-                          ...(Platform.OS === 'web' ? {
-                            boxShadow: isTicketCardLight
-                              ? 'inset 2px 2px 5px rgba(0, 0, 0, 0.08), inset -2px -2px 5px rgba(255, 255, 255, 0.8)'
-                              : 'inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.2)',
-                          } : {}),
-                        }
-                      ]}>
-                        <Ionicons name="calendar-outline" size={22} color={ticketPrimaryTextColor} />
-                        <View style={[styles.ticketCheckBadge, { backgroundColor: '#10B981', borderColor: '#FFFFFF' }]}>
-                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                        </View>
-                      </View>
-
-                      {/* Text Details */}
-                      <View style={{ flex: 1, paddingRight: 4 }}>
-                        <Text style={[styles.ticketHeaderTagline, { color: ticketSecondaryTextColor }]}>
-                          UPCOMING APPOINTMENT
-                        </Text>
-                        <Text style={[styles.ticketDateMainText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>
-                          {formatUpcomingDate(existingBooking.booking_date)}
-                        </Text>
-                        <Text style={[styles.ticketTimeSubText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>
-                          {existingBooking.start_time || '11:30 AM'}
-                        </Text>
-                        <View style={styles.ticketBranchRow}>
-                          <Ionicons name="location" size={12} color={ticketSecondaryTextColor} />
-                          <Text style={[styles.ticketBranchText, { color: ticketSecondaryTextColor }]} numberOfLines={1}>
-                            {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Scoop creamy (HQ)'))}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Perforated Vertical Dotted Tear Line */}
-                    <View style={[styles.ticketDashedVerticalLine, { borderColor: ticketDashedLineColor }]} />
-
-                    {/* Right Action Stub */}
-                    <View style={styles.ticketRightStubCol}>
-                      <View style={[
-                        styles.ticketPassChipTag,
-                        {
-                          backgroundColor: ticketPodBgColor,
-                          borderColor: ticketPodBorderColor,
-                          borderWidth: 1,
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 12,
-                          ...(Platform.OS === 'web' ? {
-                            boxShadow: isTicketCardLight
-                              ? 'inset 2px 2px 4px rgba(0, 0, 0, 0.08), inset -2px -2px 4px rgba(255, 255, 255, 0.8)'
-                              : 'inset 2px 2px 4px rgba(0, 0, 0, 0.2), inset -2px -2px 4px rgba(255, 255, 255, 0.15)',
-                          } : {}),
-                        }
-                      ]}>
-                        <Text style={[styles.ticketPassChipText, { color: ticketPrimaryTextColor }]}>BOOKING PASS</Text>
-                      </View>
-
-                      <View style={[
-                        styles.ticketViewPassButton,
-                        {
-                          backgroundColor: ticketBtnBgColor,
-                          borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)',
-                          borderWidth: 1,
-                          borderRadius: 16,
-                          paddingHorizontal: 14,
-                          paddingVertical: 8,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          alignSelf: 'center',
-                          gap: 4,
-                          ...(Platform.OS === 'web' ? {
-                            boxShadow: isTicketCardLight
-                              ? '3px 3px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                              : '3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                          } : {
-                            shadowColor: '#000000',
-                            shadowOffset: { width: 2, height: 3 },
-                            shadowOpacity: 0.2,
-                            shadowRadius: 4,
-                            elevation: 3,
-                          }),
-                        }
-                      ]}>
-                        <Text style={[styles.ticketViewPassBtnText, { color: ticketBtnTextColor }]}>View Pass</Text>
-                        <Ionicons name="chevron-forward" size={14} color={ticketBtnTextColor} />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })()}
-
-              {/* PRO Plan Specific Elements: Split Meta Location & Operating Hours + Quick Action Bar */}
+              {/* PRO PLAN BRANDING & TICKET PASS */}
               {isPro ? (
                 <>
+                  <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
+                  <Text style={[styles.brandSubtitleText, { color: themeStyles.textSecondaryColor }]}>{activeTagline}</Text>
+
+                  {/* Soft Rating Pill Capsule */}
+                  <View style={[styles.ratingCapsulePill, themeStyles.neumorphicInset]}>
+                    <Ionicons name="star" size={24} color="#FFC700" />
+                    <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>
+                      {merchant?.rating || '4.9'}
+                    </Text>
+                    <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>
+                      ({merchant?.reviews_count || '450'} reviews)
+                    </Text>
+                  </View>
+
+                  {/* Active 3D Neumorphic Booking Ticket Stub Banner */}
+                  {existingBooking && (() => {
+                    const isTicketCardLight = getContrastColor(themeStyles.activeBrandColor) === '#000000';
+                    const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
+                    const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
+                    const ticketPodBgColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.18)';
+                    const ticketPodBorderColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.3)';
+                    const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
+                    const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
+                    const ticketDashedLineColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.35)';
+
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.upcomingTicketCard,
+                          {
+                            backgroundColor: themeStyles.activeBrandColor,
+                            borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
+                            borderWidth: 1.5,
+                            borderRadius: 22,
+                          }
+                        ]}
+                        onPress={() => {
+                          setCreatedBooking(existingBooking);
+                          setCurrentStep(4);
+                        }}
+                        activeOpacity={0.88}
+                      >
+                        <View style={[styles.ticketNotchLeft, { backgroundColor: themeStyles.baseBgColor }]} />
+                        <View style={[styles.ticketNotchRight, { backgroundColor: themeStyles.baseBgColor }]} />
+
+                        <View style={styles.ticketLeftInfoCol}>
+                          <View style={[styles.ticketIconContainer, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, borderRadius: 14 }]}>
+                            <Ionicons name="calendar-outline" size={22} color={ticketPrimaryTextColor} />
+                            <View style={[styles.ticketCheckBadge, { backgroundColor: '#10B981', borderColor: '#FFFFFF' }]}>
+                              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                            </View>
+                          </View>
+                          <View style={{ flex: 1, paddingRight: 4 }}>
+                            <Text style={[styles.ticketHeaderTagline, { color: ticketSecondaryTextColor }]}>UPCOMING APPOINTMENT</Text>
+                            <Text style={[styles.ticketDateMainText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{formatUpcomingDate(existingBooking.booking_date)}</Text>
+                            <Text style={[styles.ticketTimeSubText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{existingBooking.start_time || '11:30 AM'}</Text>
+                            <View style={styles.ticketBranchRow}>
+                              <Ionicons name="location" size={12} color={ticketSecondaryTextColor} />
+                              <Text style={[styles.ticketBranchText, { color: ticketSecondaryTextColor }]} numberOfLines={1}>
+                                {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'HQ Store'))}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={[styles.ticketDashedVerticalLine, { borderColor: ticketDashedLineColor }]} />
+
+                        <View style={styles.ticketRightStubCol}>
+                          <View style={[styles.ticketPassChipTag, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}>
+                            <Text style={[styles.ticketPassChipText, { color: ticketPrimaryTextColor }]}>BOOKING PASS</Text>
+                          </View>
+                          <View style={[styles.ticketViewPassButton, { backgroundColor: ticketBtnBgColor, borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)', borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', gap: 4 }]}>
+                            <Text style={[styles.ticketViewPassBtnText, { color: ticketBtnTextColor }]}>View Pass</Text>
+                            <Ionicons name="chevron-forward" size={14} color={ticketBtnTextColor} />
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })()}
+
                   {/* Split Meta Location & Operating Hours */}
                   <View style={styles.splitMetaRow}>
-                    {/* Left Location Column */}
                     <TouchableOpacity style={styles.splitMetaCol} onPress={handleOpenLocationMap} activeOpacity={0.7}>
                       <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
                         <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
@@ -1248,11 +1204,7 @@ export default function CustomerBookingPwaScreen() {
                         {selectedBranch?.name || branches[0]?.name || merchant?.address || 'HQ Store'}
                       </Text>
                     </TouchableOpacity>
-
-                    {/* Vertical Divider Line */}
                     <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
-
-                    {/* Right Hours Column */}
                     <View style={styles.splitMetaCol}>
                       <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
                         <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
@@ -1268,7 +1220,6 @@ export default function CustomerBookingPwaScreen() {
                     </View>
                   </View>
 
-                  {/* Horizontal Divider Line */}
                   <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
 
                   {/* Quick Action Navigation Bar */}
@@ -1280,21 +1231,18 @@ export default function CustomerBookingPwaScreen() {
                       <Text style={[styles.quickNavTitleActive, { color: themeStyles.textPrimaryColor }]}>Book{'\n'}Appointment</Text>
                       <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
                     </TouchableOpacity>
-
                     <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
                       <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
                         <Ionicons name="list-outline" size={22} color={themeStyles.textPrimaryColor} />
                       </View>
                       <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Menu</Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')} activeOpacity={0.8}>
                       <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
                         <Ionicons name="pricetag-outline" size={22} color={themeStyles.textPrimaryColor} />
                       </View>
                       <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Promotions</Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity style={styles.quickNavItem} onPress={() => setShowVouchersModal(true)} activeOpacity={0.8}>
                       <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
                         <Ionicons name="ticket-outline" size={22} color={themeStyles.textPrimaryColor} />
@@ -1304,16 +1252,182 @@ export default function CustomerBookingPwaScreen() {
                   </View>
                 </>
               ) : (
-                /* Non-PRO / Starter Plan: Clean Action CTA Button */
-                <View style={{ marginTop: 16, width: '100%' }}>
-                  <TouchableOpacity
-                    style={[styles.btnFullYellowBook, { backgroundColor: activeBrandColor, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
-                    onPress={() => setShowLoyaltyModal(true)}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="gift-outline" size={18} color={contrastColor} style={{ marginRight: 6 }} />
-                    <Text style={[styles.btnFullYellowBookText, { color: contrastColor, fontSize: 16 }]}>View Digital Stamp Card</Text>
-                  </TouchableOpacity>
+                /* ──────────────────────────────────────────────────────────── */
+                /* STARTER / NON-PRO MERCHANT STORE PAGE (EXACT IMAGE 1 REPLICA) */
+                /* ──────────────────────────────────────────────────────────── */
+                <View style={{ width: '100%' }}>
+                  
+                  {/* Merchant Details Card */}
+                  <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                    
+                    {/* Header Row: Title + Logo Avatar */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={{ fontSize: 24, fontFamily: 'Outfit_800ExtraBold', color: '#0F172A', letterSpacing: -0.5, lineHeight: 28 }}>
+                          {merchant?.store_name || 'Jerami Barbershop'}
+                        </Text>
+                      </View>
+
+                      {/* Circular Logo Avatar (Image 1 Style) */}
+                      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: '#E2E8F0' }}>
+                        {merchant?.logo ? (
+                          <Image source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+                        ) : (
+                          <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                            {(merchant?.store_name || 'J').charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Rating, Reviews & Distance */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Ionicons name="star" size={16} color="#FFC700" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {merchant?.rating || '4.9'}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        ({merchant?.reviews_count || '120'} reviews)
+                      </Text>
+                      <Text style={{ fontSize: 13, color: '#CBD5E1' }}>•</Text>
+                      <Ionicons name="location-outline" size={14} color="#0F172A" />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        1.2 km
+                      </Text>
+                    </View>
+
+                    {/* Category & City */}
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>
+                      {merchant?.category || 'Barber'} • {merchant?.city || 'Jitra'}, Kedah
+                    </Text>
+
+                    {/* Status & Hours */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>Open</Text>
+                      <Text style={{ fontSize: 13, color: '#CBD5E1' }}>•</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {merchant?.operating_hours || 'Closes 10:00 PM'}
+                      </Text>
+                    </View>
+
+                    {/* Rewards Pill & Location Pin Button */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}>
+                        <Ionicons name="gift" size={14} color="#D97706" />
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#92400E' }}>Earn Risev rewards</Text>
+                      </View>
+
+                      <TouchableOpacity 
+                        style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
+                        onPress={handleOpenLocationMap}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="location-outline" size={18} color="#0F172A" />
+                      </TouchableOpacity>
+                    </View>
+
+                  </View>
+
+                  {/* 🎁 YOUR REWARDS EMBEDDED STAMP CARD (IMAGE 1 EXACT SPEC) */}
+                  <View style={{ backgroundColor: '#FFFDF5', borderRadius: 20, padding: 18, borderWidth: 1.5, borderColor: '#FDE68A', marginBottom: 14 }}>
+                    
+                    {/* Header Row: Title & View All */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Your rewards</Text>
+                      <TouchableOpacity onPress={() => setShowLoyaltyModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>View all</Text>
+                        <Ionicons name="chevron-forward" size={14} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Stamp Count & Gift Box Icon */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                        <Text style={{ fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{stampsCount}</Text>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>/ {totalStamps} visits</Text>
+                      </View>
+
+                      <TouchableOpacity 
+                        style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FDE68A' }}
+                        onPress={() => setShowLoyaltyModal(true)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="gift" size={22} color="#D97706" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* 10 Visual Stamp Progress Pills (Image 1 Style) */}
+                    <View style={{ flexDirection: 'row', gap: 5, marginBottom: 12 }}>
+                      {Array.from({ length: totalStamps }).map((_, idx) => {
+                        const isFilled = idx < stampsCount;
+                        return (
+                          <View 
+                            key={idx}
+                            style={{
+                              flex: 1,
+                              height: 12,
+                              borderRadius: 6,
+                              backgroundColor: isFilled ? '#FFC700' : '#E2E8F0',
+                              borderWidth: isFilled ? 0 : 1,
+                              borderColor: '#CBD5E1',
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+
+                    {/* Milestone Subtext Goal */}
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
+                      <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{Math.max(0, totalStamps - stampsCount)} more visits</Text> to unlock <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>25% off haircut</Text>
+                    </Text>
+
+                  </View>
+
+                  {/* 📞 QUICK ACTION BUTTONS ROW (CALL, DIRECTIONS, SHARE) */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                    
+                    {/* Call Button */}
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
+                      onPress={() => {
+                        const phone = merchant?.phone || merchant?.whatsapp || '0123456789';
+                        Linking.openURL(`tel:${phone}`);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="call-outline" size={18} color="#0F172A" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Call</Text>
+                    </TouchableOpacity>
+
+                    {/* Directions Button */}
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
+                      onPress={handleOpenLocationMap}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="location-outline" size={18} color="#0F172A" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Directions</Text>
+                    </TouchableOpacity>
+
+                    {/* Share Button */}
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
+                      onPress={() => {
+                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
+                          (navigator as any).share({ title: merchant?.store_name || 'Store', url: window.location.href }).catch(() => {});
+                        } else {
+                          showToast('Store link copied! 🔗');
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="share-outline" size={18} color="#0F172A" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Share</Text>
+                    </TouchableOpacity>
+
+                  </View>
+
                 </View>
               )}
 
