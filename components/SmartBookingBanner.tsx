@@ -29,18 +29,29 @@ export default function SmartBookingBanner({
   const { locale } = useLanguage();
   const isMalay = locale === 'ms';
   // Live Countdown Timer state (seconds included for real-time live ticking)
-  const [timeLeft, setTimeLeft] = useState({ days: '02', hours: '14', minutes: '31', seconds: '59' });
+  const [timeLeft, setTimeLeft] = useState({ days: '00', hours: '00', minutes: '00', seconds: '00' });
+  const [isLaunched, setIsLaunched] = useState(() => {
+    const launchTime = targetDate ? targetDate.getTime() : new Date('2026-10-10T00:00:00+08:00').getTime();
+    return Date.now() >= launchTime;
+  });
 
   useEffect(() => {
-    // Default launch time: Oct 10 or 2 days, 14 hours, 31 minutes from current time
+    // Official launch time: October 10, 2026 (12:00 AM MYT)
     const launchTime = targetDate
       ? targetDate.getTime()
-      : new Date().getTime() + (2 * 24 * 3600 + 14 * 3600 + 31 * 60) * 1000;
+      : new Date('2026-10-10T00:00:00+08:00').getTime();
 
     const updateTimer = () => {
-      const now = new Date().getTime();
-      const diff = Math.max(0, launchTime - now);
+      const now = Date.now();
+      const diff = launchTime - now;
 
+      if (diff <= 0) {
+        setIsLaunched(true);
+        setTimeLeft({ days: '00', hours: '00', minutes: '00', seconds: '00' });
+        return;
+      }
+
+      setIsLaunched(false);
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
       const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -117,42 +128,55 @@ export default function SmartBookingBanner({
 
           {/* Right Action & Countdown Section */}
           <View style={styles.rightSection}>
-            {/* Live Countdown Box */}
-            <View style={styles.countdownPill}>
-              <View style={styles.launchTag}>
-                <Ionicons name="time-outline" size={10} color="#FFFFFF" />
-                <Text style={styles.launchTagText}>{isMalay ? 'Pelancaran dlm' : 'Launch in'}</Text>
+            {/* Live Indicator (if launched today) OR Countdown Box (if before launch) */}
+            {isLaunched ? (
+              <View style={styles.liveNowPill}>
+                <View style={styles.livePulseDot} />
+                <Text style={styles.liveNowText}>
+                  {isMalay ? 'KINI LIVE 🔥' : 'NOW LIVE 🔥'}
+                </Text>
               </View>
-
-              {/* Ticking Digits */}
-              <View style={styles.digitsRow}>
-                <View style={styles.digitUnit}>
-                  <Text style={styles.digitValue}>{timeLeft.days}</Text>
-                  <Text style={styles.digitUnitLabel}>{isMalay ? 'H' : 'D'}</Text>
+            ) : (
+              <View style={styles.countdownPill}>
+                <View style={styles.launchTag}>
+                  <Ionicons name="time-outline" size={10} color="#FFFFFF" />
+                  <Text style={styles.launchTagText}>{isMalay ? 'Pelancaran dlm' : 'Launch in'}</Text>
                 </View>
-                <Text style={styles.colon}>:</Text>
 
-                <View style={styles.digitUnit}>
-                  <Text style={styles.digitValue}>{timeLeft.hours}</Text>
-                  <Text style={styles.digitUnitLabel}>{isMalay ? 'J' : 'H'}</Text>
-                </View>
-                <Text style={styles.colon}>:</Text>
+                {/* Ticking Digits */}
+                <View style={styles.digitsRow}>
+                  <View style={styles.digitUnit}>
+                    <Text style={styles.digitValue}>{timeLeft.days}</Text>
+                    <Text style={styles.digitUnitLabel}>{isMalay ? 'H' : 'D'}</Text>
+                  </View>
+                  <Text style={styles.colon}>:</Text>
 
-                <View style={styles.digitUnit}>
-                  <Text style={styles.digitValue}>{timeLeft.minutes}</Text>
-                  <Text style={styles.digitUnitLabel}>M</Text>
+                  <View style={styles.digitUnit}>
+                    <Text style={styles.digitValue}>{timeLeft.hours}</Text>
+                    <Text style={styles.digitUnitLabel}>{isMalay ? 'J' : 'H'}</Text>
+                  </View>
+                  <Text style={styles.colon}>:</Text>
+
+                  <View style={styles.digitUnit}>
+                    <Text style={styles.digitValue}>{timeLeft.minutes}</Text>
+                    <Text style={styles.digitUnitLabel}>M</Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
 
             {/* CTA Button */}
             <View style={styles.ctaButton}>
               <Text style={styles.ctaButtonText}>
                 {hasAccess
                   ? (isMalay ? 'Buka ➔' : 'Open ➔')
-                  : isOptedIn
-                    ? (isMalay ? 'VIP Dikunci ➔' : 'VIP Locked ➔')
-                    : (isMalay ? 'Akses Awal ➔' : 'Early Access ➔')}
+                  : isLaunched
+                    ? isOptedIn
+                      ? (isMalay ? 'Tuntut VIP ➔' : 'Claim VIP ➔')
+                      : (isMalay ? 'Cuba Percuma ➔' : 'Try Free ➔')
+                    : isOptedIn
+                      ? (isMalay ? 'VIP Dikunci ➔' : 'VIP Locked ➔')
+                      : (isMalay ? 'Akses Awal ➔' : 'Early Access ➔')}
               </Text>
             </View>
           </View>
@@ -374,5 +398,33 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+  },
+  liveNowPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(9, 10, 15, 0.65)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  liveNowText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

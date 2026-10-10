@@ -154,7 +154,9 @@ export default function BookingAccessModal({
                     {isMalay ? '🔥 PELANCARAN 10.10' : '🔥 LAUNCH 10.10'} &nbsp;
                     <Text style={styles.fomoDivider}>|</Text>&nbsp;{' '}
                     <Text style={styles.fomoHighlight}>
-                      {isMalay ? 'SLOT AKSES AWAL TERHAD' : 'LIMITED EARLY ACCESS SLOTS'}
+                      {isBeforeLaunch
+                        ? (isMalay ? 'SLOT AKSES AWAL TERHAD' : 'LIMITED EARLY ACCESS SLOTS')
+                        : (isMalay ? 'KINI LIVE HARI INI' : 'NOW LIVE TODAY')}
                     </Text>
                   </Text>
                 </View>
