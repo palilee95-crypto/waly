@@ -8,6 +8,8 @@ import {
   Dimensions,
   ScrollView,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,8 +48,12 @@ export default function BookingAccessModal({
   }, []);
 
   const [showEarlyAccessModal, setShowEarlyAccessModal] = useState(false);
+  const [showTrialSuccessModal, setShowTrialSuccessModal] = useState(false);
   const [isAutoActivated, setIsAutoActivated] = useState(isOptedIn);
   const [saving, setSaving] = useState(false);
+  const [trialStatus, setTrialStatus] = useState<'not_claimed' | 'active' | 'expired'>('not_claimed');
+  const [trialEndsAtStr, setTrialEndsAtStr] = useState<string>('');
+  const [daysRemaining, setDaysRemaining] = useState<number>(7);
 
   // Sync isAutoActivated if isOptedIn prop changes
   React.useEffect(() => {
@@ -56,12 +62,118 @@ export default function BookingAccessModal({
     }
   }, [isOptedIn]);
 
-  const handleMainAction = () => {
+  // Load merchant trial status when modal opens
+  React.useEffect(() => {
+    if (!visible) return;
+    const targetMid = merchantId || user?.merchant_id;
+    if (!targetMid) return;
+
+    pb.collection('merchants')
+      .getOne(targetMid, { requestKey: null })
+      .then((m: any) => {
+        const meta = m.metadata || {};
+        if (meta.booking_trial_claimed) {
+          const endsAt = meta.booking_trial_ends_at ? new Date(meta.booking_trial_ends_at).getTime() : 0;
+          if (endsAt > Date.now()) {
+            setTrialStatus('active');
+            setTrialEndsAtStr(meta.booking_trial_ends_at);
+            const remaining = Math.max(1, Math.ceil((endsAt - Date.now()) / (1000 * 60 * 60 * 24)));
+            setDaysRemaining(remaining);
+          } else {
+            setTrialStatus('expired');
+            setTrialEndsAtStr(meta.booking_trial_ends_at || '');
+          }
+        } else {
+          setTrialStatus('not_claimed');
+        }
+      })
+      .catch(() => {});
+  }, [visible, merchantId, user]);
+
+  const formatTrialDate = (isoStr?: string) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString(isMalay ? 'ms-MY' : 'en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return isoStr;
+    }
+  };
+
+  const handleMainAction = async () => {
     if (isBeforeLaunch) {
       setShowEarlyAccessModal(true);
-    } else {
+      return;
+    }
+
+    if (trialStatus === 'expired') {
+      // 1-time trial already expired -> go to PRO subscription plan
       onClose();
       router.push('/(merchant)/subscription' as any);
+      return;
+    }
+
+    if (trialStatus === 'active') {
+      // Trial is currently active -> go to bookings dashboard
+      onClose();
+      router.push('/(merchant)/bookings' as any);
+      return;
+    }
+
+    // Trial NOT claimed yet -> Activate 7-day free trial on PocketBase
+    try {
+      setSaving(true);
+      const targetMid = merchantId || user?.merchant_id;
+      if (!targetMid) {
+        throw new Error('Merchant account not found.');
+      }
+
+      const freshMerchant = await pb.collection('merchants').getOne(targetMid, { requestKey: null });
+      const meta = freshMerchant.metadata || {};
+
+      if (meta.booking_trial_claimed) {
+        setTrialStatus('expired');
+        Alert.alert(
+          isMalay ? 'Percubaan Telah Digunakan' : 'Trial Already Claimed',
+          isMalay
+            ? 'Percubaan percuma 7 hari telah digunakan sebelum ini. Sila langgan pelan PRO untuk teruskan.'
+            : 'Your 7-day free trial has already been used. Please subscribe to the PRO plan to continue.'
+        );
+        onClose();
+        router.push('/(merchant)/subscription' as any);
+        return;
+      }
+
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      await pb.collection('merchants').update(targetMid, {
+        has_booking_addon: true,
+        metadata: {
+          ...meta,
+          booking_trial_claimed: true,
+          booking_trial_started_at: now.toISOString(),
+          booking_trial_ends_at: trialEndsAt,
+        },
+      });
+
+      setTrialStatus('active');
+      setTrialEndsAtStr(trialEndsAt);
+      setDaysRemaining(7);
+      setShowTrialSuccessModal(true);
+      onOptedInSuccess?.();
+    } catch (err: any) {
+      console.error('[BookingAccessModal] Error activating 7-day trial:', err);
+      Alert.alert(
+        isMalay ? 'Ralat Pengaktifan' : 'Activation Error',
+        err?.message || (isMalay ? 'Gagal mengaktifkan percubaan percuma.' : 'Failed to activate free trial.')
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -239,37 +351,71 @@ export default function BookingAccessModal({
               </View>
 
               {/* 🎁 GIFT BOX PRICING OFFER CARD */}
-              <View style={styles.giftOfferCard}>
-                {/* Floating Gold Stamp Badge on Right */}
-                <View style={styles.stampBadgePill}>
-                  <Text style={styles.stampBadgeText}>
-                    {isMalay ? 'Hanya RM2.60/hari!' : 'Just RM2.60/day!'}
+              <View style={[styles.giftOfferCard, trialStatus === 'expired' && styles.giftOfferCardExpired]}>
+                {/* Floating Stamp Badge on Right */}
+                <View style={[styles.stampBadgePill, trialStatus === 'expired' && styles.stampBadgePillExpired, trialStatus === 'active' && styles.stampBadgePillActive]}>
+                  <Text style={[styles.stampBadgeText, (trialStatus === 'expired' || trialStatus === 'active') && { color: '#FFFFFF' }]}>
+                    {trialStatus === 'expired'
+                      ? (isMalay ? 'Tamat Tempoh' : 'Trial Ended')
+                      : trialStatus === 'active'
+                        ? (isMalay ? `${daysRemaining} Hari Lagi!` : `${daysRemaining} Days Left!`)
+                        : (isMalay ? 'Hanya RM2.60/hari!' : 'Just RM2.60/day!')}
                   </Text>
                 </View>
 
                 {/* Gift Box Icon Graphic */}
                 <View style={styles.giftBoxIconWrap}>
                   <LinearGradient
-                    colors={['#FFD700', '#F59E0B']}
+                    colors={
+                      trialStatus === 'expired'
+                        ? ['#64748B', '#334155']
+                        : trialStatus === 'active'
+                          ? ['#10B981', '#059669']
+                          : ['#FFD700', '#F59E0B']
+                    }
                     style={styles.giftBoxGradient}
                   >
-                    <Ionicons name="gift" size={26} color="#FFFFFF" />
+                    <Ionicons
+                      name={trialStatus === 'expired' ? 'lock-closed' : trialStatus === 'active' ? 'checkmark-circle' : 'gift'}
+                      size={26}
+                      color="#FFFFFF"
+                    />
                   </LinearGradient>
                 </View>
 
                 <View style={{ flex: 1, paddingLeft: 6 }}>
-                  <Text style={styles.giftOfferTitle}>
-                    {isMalay ? '7 HARI PERCUMA' : '7 DAYS FREE'}
+                  <Text style={[styles.giftOfferTitle, trialStatus === 'expired' && { color: '#475569' }]}>
+                    {trialStatus === 'expired'
+                      ? (isMalay ? 'PERCUBAAN TELAH TAMAT' : 'FREE TRIAL HAS ENDED')
+                      : trialStatus === 'active'
+                        ? (isMalay ? 'PERCUBAAN 7 HARI AKTIF' : '7-DAY TRIAL ACTIVE')
+                        : (isMalay ? '7 HARI PERCUMA' : '7 DAYS FREE')}
                   </Text>
                   <Text style={styles.giftOfferPriceText}>
-                    {isMalay ? 'Kemudian ' : 'Then '}
-                    <Text style={styles.giftPriceRed}>RM2.60/{isMalay ? 'hari' : 'day'}</Text>{' '}
-                    {isMalay ? 'sahaja' : 'only'}
+                    {trialStatus === 'expired' ? (
+                      <Text style={{ color: '#0F172A' }}>
+                        {isMalay ? 'Langgan PRO ' : 'Subscribe to PRO '}
+                        <Text style={styles.giftPriceRed}>RM78/{isMalay ? 'bln' : 'mo'}</Text>
+                      </Text>
+                    ) : trialStatus === 'active' ? (
+                      <Text style={{ color: '#059669', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>
+                        {isMalay ? 'Sah sehingga ' : 'Valid until '}
+                        <Text style={{ color: '#0F172A' }}>{formatTrialDate(trialEndsAtStr)}</Text>
+                      </Text>
+                    ) : (
+                      <>
+                        {isMalay ? 'Kemudian ' : 'Then '}
+                        <Text style={styles.giftPriceRed}>RM2.60/{isMalay ? 'hari' : 'day'}</Text>{' '}
+                        {isMalay ? 'sahaja' : 'only'}
+                      </>
+                    )}
                   </Text>
                   <Text style={styles.giftOfferSubtext}>
-                    {isMalay
-                      ? 'Tiada bayaran dikenakan sepanjang tempoh percubaan.'
-                      : 'No charge during your trial.'}
+                    {trialStatus === 'expired'
+                      ? (isMalay ? 'Percubaan 1-kali telah digunakan. Langgan PRO untuk teruskan.' : '1-time trial already used. Subscribe to PRO to continue.')
+                      : trialStatus === 'active'
+                        ? (isMalay ? 'Akses penuh ke tempahan pelanggan, katalog & jadual staf.' : 'Full access to appointments, catalog & staff schedules.')
+                        : (isMalay ? 'Tiada bayaran dikenakan sepanjang tempoh percubaan.' : 'No charge during your trial.')}
                   </Text>
                 </View>
               </View>
@@ -279,28 +425,49 @@ export default function BookingAccessModal({
                 style={styles.ctaButtonWrap}
                 onPress={handleMainAction}
                 activeOpacity={0.88}
+                disabled={saving}
               >
                 <LinearGradient
-                  colors={['#FFB800', '#F97316', '#EF4444']}
+                  colors={
+                    trialStatus === 'expired'
+                      ? ['#0F172A', '#1E293B', '#334155']
+                      : ['#FFB800', '#F97316', '#EF4444']
+                  }
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.ctaGradient}
                 >
-                  <Ionicons name="flash" size={18} color="#FFFFFF" />
-                  <Text style={styles.ctaText}>
-                    {isBeforeLaunch
-                      ? isAutoActivated
-                        ? (isMalay ? 'Lihat Pas VIP ➔' : 'View VIP Pass ➔')
-                        : (isMalay ? 'Dapatkan Akses Awal ➔' : 'Get Early Access ➔')
-                      : (isMalay ? 'Mulakan Percubaan Percuma ➔' : 'Start Free Trial ➔')}
-                  </Text>
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={trialStatus === 'expired' ? 'card' : trialStatus === 'active' ? 'calendar' : 'flash'}
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.ctaText}>
+                        {isBeforeLaunch
+                          ? isAutoActivated
+                            ? (isMalay ? 'Lihat Pas VIP ➔' : 'View VIP Pass ➔')
+                            : (isMalay ? 'Dapatkan Akses Awal ➔' : 'Get Early Access ➔')
+                          : trialStatus === 'expired'
+                            ? (isMalay ? 'Langgan PRO (RM78/bln) ➔' : 'Subscribe to PRO (RM78/mo) ➔')
+                            : trialStatus === 'active'
+                              ? (isMalay ? 'Buka Smart Booking ➔' : 'Open Smart Booking ➔')
+                              : (isMalay ? 'Mulakan Percubaan Percuma 7 Hari ➔' : 'Start 7-Day Free Trial ➔')}
+                      </Text>
+                    </>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 
               <Text style={styles.noPaymentText}>
                 {isBeforeLaunch
                   ? (isMalay ? 'Slot akses awal terhad.' : 'Limited early access slots.')
-                  : (isMalay ? 'Tiada bayaran hari ini.' : 'No payment today.')}
+                  : trialStatus === 'expired'
+                    ? (isMalay ? 'Batalkan langganan bila-bila masa.' : 'Cancel subscription anytime.')
+                    : (isMalay ? 'Tiada bayaran hari ini. Akses 7 hari 1-kali.' : 'No payment today. 1-time 7 days access.')}
               </Text>
 
               {/* Maybe Later with flanking divider lines */}
@@ -529,6 +696,81 @@ export default function BookingAccessModal({
               </View>
               <View style={styles.vipFooterDivider} />
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🎉 7-DAY FREE TRIAL ACTIVATED SUCCESS MODAL */}
+      <Modal
+        visible={showTrialSuccessModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {
+          setShowTrialSuccessModal(false);
+          onClose();
+          router.push('/(merchant)/bookings' as any);
+        }}
+      >
+        <View style={styles.vipOverlay}>
+          <View style={styles.trialSuccessCard}>
+            {/* Success Check Icon */}
+            <View style={styles.trialSuccessIconCircle}>
+              <Ionicons name="checkmark-done" size={32} color="#16A34A" />
+            </View>
+
+            <Text style={styles.trialSuccessTitle}>
+              {isMalay ? 'Percubaan 7 Hari Diaktifkan! 🎉' : '7-Day Free Trial Activated! 🎉'}
+            </Text>
+
+            <Text style={styles.trialSuccessDesc}>
+              {isMalay
+                ? `Kedai anda kini mempunyai akses penuh ke Smart Booking sehingga ${formatTrialDate(trialEndsAtStr)}.`
+                : `Your store now has full access to Smart Booking until ${formatTrialDate(trialEndsAtStr)}.`}
+            </Text>
+
+            {/* Feature Perks Box */}
+            <View style={styles.trialPerksBox}>
+              <View style={styles.trialPerkItem}>
+                <Ionicons name="calendar" size={16} color="#FF6B00" />
+                <Text style={styles.trialPerkText}>
+                  {isMalay ? 'Laman Tempahan Web (PWA 24/7)' : '24/7 Storefront Booking PWA'}
+                </Text>
+              </View>
+              <View style={styles.trialPerkItem}>
+                <Ionicons name="people" size={16} color="#FF6B00" />
+                <Text style={styles.trialPerkText}>
+                  {isMalay ? 'Jadual & Kalendar Staf Automatik' : 'Automated Staff Schedules & Slots'}
+                </Text>
+              </View>
+              <View style={styles.trialPerkItem}>
+                <Ionicons name="notifications" size={16} color="#FF6B00" />
+                <Text style={styles.trialPerkText}>
+                  {isMalay ? 'Notifikasi Peringatan Pelanggan' : 'Customer Appointment Reminders'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Direct Entry CTA */}
+            <TouchableOpacity
+              style={styles.trialSuccessBtnWrap}
+              onPress={() => {
+                setShowTrialSuccessModal(false);
+                onClose();
+                router.push('/(merchant)/bookings' as any);
+              }}
+              activeOpacity={0.88}
+            >
+              <LinearGradient
+                colors={['#FFB800', '#F97316', '#EF4444']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.trialSuccessBtnGradient}
+              >
+                <Text style={styles.trialSuccessBtnText}>
+                  {isMalay ? 'Mula Sediakan Servis ➔' : 'Start Setting Up Services ➔'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1127,5 +1369,102 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#94A3B8',
+  },
+
+  /* Expired / Active Card & Badge Overrides */
+  giftOfferCardExpired: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+  },
+  stampBadgePillExpired: {
+    backgroundColor: '#64748B',
+  },
+  stampBadgePillActive: {
+    backgroundColor: '#10B981',
+  },
+
+  /* 🎉 7-Day Trial Success Modal Styles */
+  trialSuccessCard: {
+    width: '90%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  trialSuccessIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#86EFAC',
+  },
+  trialSuccessTitle: {
+    fontSize: 19,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  trialSuccessDesc: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  trialPerksBox: {
+    width: '100%',
+    backgroundColor: '#FFFBEA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FEF08A',
+    padding: 14,
+    gap: 10,
+    marginBottom: 22,
+  },
+  trialPerkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  trialPerkText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#78350F',
+    flex: 1,
+  },
+  trialSuccessBtnWrap: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  trialSuccessBtnGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trialSuccessBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

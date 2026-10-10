@@ -79,6 +79,35 @@ cronAdd("check_expired_subscriptions", "0 1 * * *", () => {
       $app.save(sub);
       console.log(`[Subscription Cron] Subscription ${sub.id} for merchant ${sub.get("merchant")} has expired. Status set to canceled.`);
     }
+
+    // Revoke expired 7-day booking addon trials
+    const trialMerchants = $app.findRecordsByFilter(
+      "merchants",
+      "has_booking_addon = true",
+      "-created",
+      500,
+      0
+    );
+    for (const m of trialMerchants) {
+      const meta = m.get("metadata") || {};
+      if (meta.booking_trial_ends_at) {
+        const endTime = new Date(meta.booking_trial_ends_at).getTime();
+        if (endTime <= Date.now()) {
+          const activePro = $app.findRecordsByFilter(
+            "subscriptions",
+            `merchant = "${m.id}" && (status = "active" || status = "trialing") && (plan = "pro" || plan = "business")`,
+            "-created",
+            1,
+            0
+          );
+          if (activePro.length === 0) {
+            m.set("has_booking_addon", false);
+            $app.save(m);
+            console.log(`[Subscription Cron] 7-day booking trial expired for merchant ${m.id}`);
+          }
+        }
+      }
+    }
   } catch (err) {
     console.log("[Subscription Cron] Error:", err.message || err);
   }

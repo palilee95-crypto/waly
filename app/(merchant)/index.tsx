@@ -578,11 +578,14 @@ export default function MerchantDashboard() {
         {/* 📅 Booking & Appointments Quick Widget */}
         {(() => {
           const plan = (activeSubscription?.plan || '').toLowerCase();
+          const trialEnd = merchant?.metadata?.booking_trial_ends_at;
+          const isTrialExpired = trialEnd && new Date(trialEnd).getTime() <= Date.now();
+          const isAddonActive = merchant?.has_booking_addon === true && !isTrialExpired;
           const hasBookingAccess = Boolean(
             plan === 'pro' ||
             plan === 'business' ||
             plan === 'enterprise' ||
-            merchant?.has_booking_addon === true
+            isAddonActive
           );
 
           return (

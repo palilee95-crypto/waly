@@ -566,7 +566,12 @@ export default function BookingsScreen() {
       let planName = 'stand_bundle';
       let hasAccess = false;
       if (mRecord?.has_booking_addon === true) {
-        hasAccess = true;
+        const trialEnd = mRecord?.metadata?.booking_trial_ends_at;
+        if (trialEnd && new Date(trialEnd).getTime() <= Date.now()) {
+          hasAccess = false;
+        } else {
+          hasAccess = true;
+        }
       }
       if (user?.merchant_id) {
         try {

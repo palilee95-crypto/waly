@@ -44,7 +44,16 @@ function checkMerchantBookingAccess(merchantId) {
 
     // Check direct addon flag
     if (merchant.getBool("has_booking_addon") === true) {
-      return true;
+      var meta = merchant.get("metadata") || {};
+      if (meta.booking_trial_ends_at) {
+        var endTime = new Date(meta.booking_trial_ends_at).getTime();
+        if (endTime > Date.now()) {
+          return true;
+        }
+        // Trial has ended, proceed below to verify if merchant upgraded to PRO
+      } else {
+        return true;
+      }
     }
 
     // Check active PRO subscription
