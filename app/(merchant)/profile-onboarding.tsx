@@ -183,7 +183,8 @@ export default function ProfileOnboardingScreen() {
         if (m.banner) setBannerUri(`${pb.baseUrl}/api/files/merchants/${m.id}/${m.banner}`);
         if (m.metadata?.sub_category) setSelectedCategoryId(m.metadata.sub_category);
         if (m.metadata?.tagline) setTagline(m.metadata.tagline);
-        if (user.phone) setPhone(user.phone);
+        if (m.metadata?.phone) setPhone(m.metadata.phone);
+        else if (user.phone) setPhone(user.phone);
 
         // Fetch location
         try {
@@ -191,8 +192,10 @@ export default function ProfileOnboardingScreen() {
           if (locRes) {
             if (locRes.address) setAddress(locRes.address);
             if (locRes.city) setCity(locRes.city);
-            if (locRes.operating_hours && typeof locRes.operating_hours === 'object') {
-              setSchedule({ ...DEFAULT_SCHEDULE, ...locRes.operating_hours });
+            if (locRes.phone && !phone) setPhone(locRes.phone);
+            const savedHours = locRes.hours || locRes.operating_hours;
+            if (savedHours && typeof savedHours === 'object') {
+              setSchedule({ ...DEFAULT_SCHEDULE, ...savedHours });
               setHoursPreset('custom');
             }
           }
@@ -403,6 +406,7 @@ export default function ProfileOnboardingScreen() {
         sub_category_name: selectedCatObj?.name || 'Store',
         icon: selectedCatObj?.icon || 'storefront',
         tagline: tagline.trim(),
+        phone: phone.trim(),
         profile_completed: true,
         completed_at: new Date().toISOString(),
       };
@@ -434,9 +438,13 @@ export default function ProfileOnboardingScreen() {
 
         const locPayload = {
           merchant: merchantId,
+          name: storeName.trim() || 'Main Outlet',
           address: address.trim(),
           city: city.trim(),
-          operating_hours: schedule,
+          country: 'Malaysia',
+          phone: phone.trim(),
+          hours: schedule,
+          is_active: true,
         };
 
         if (existingLoc?.id) {
