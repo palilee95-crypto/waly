@@ -137,6 +137,9 @@ export default function BookingsScreen() {
   const [calViewMode, setCalViewMode] = useState<'day' | 'week' | 'month'>('month');
   const [selectedCalIsoDate, setSelectedCalIsoDate] = useState<string>(new Date().toISOString().substring(0, 10));
 
+  // No-Show Confirmation Modal State
+  const [noShowTargetBooking, setNoShowTargetBooking] = useState<BookingItem | null>(null);
+
   // Services State
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [serviceFilter, setServiceFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -748,34 +751,7 @@ export default function BookingsScreen() {
   };
 
   const handleMarkNoShow = (b: BookingItem) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const confirmed = window.confirm(`Mark appointment for ${b.customer_name || 'this customer'} as No Show?`);
-      if (confirmed) {
-        handleUpdateStatus(b.id, 'no_show');
-      }
-      return;
-    }
-    Alert.alert(
-      'Mark as No Show?',
-      `Confirm that ${b.customer_name || 'this customer'} did not attend the scheduled appointment on ${b.booking_date} at ${b.start_time}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'No Show & WhatsApp',
-          onPress: async () => {
-            await handleUpdateStatus(b.id, 'no_show');
-            handleNoShowWhatsApp(b);
-          }
-        },
-        {
-          text: 'Mark No Show',
-          style: 'destructive',
-          onPress: async () => {
-            await handleUpdateStatus(b.id, 'no_show');
-          }
-        }
-      ]
-    );
+    setNoShowTargetBooking(b);
   };
 
   const handleCustomerWhatsApp = (b: BookingItem) => {
@@ -3342,6 +3318,150 @@ export default function BookingsScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* No Show Confirmation Modal */}
+      <Modal
+        visible={!!noShowTargetBooking}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setNoShowTargetBooking(null)}
+      >
+        <TouchableOpacity
+          style={styles.noShowModalOverlay}
+          activeOpacity={1}
+          onPress={() => setNoShowTargetBooking(null)}
+        >
+          <TouchableOpacity
+            style={styles.noShowModalCard}
+            activeOpacity={1}
+            onPress={(e: any) => { if (e?.stopPropagation) e.stopPropagation(); }}
+          >
+            {Platform.OS !== 'web' && <View style={styles.actionSheetDragIndicator} />}
+
+            {/* Modal Header */}
+            <View style={styles.noShowModalHeader}>
+              <View style={styles.noShowIconBox}>
+                <Ionicons name="person-remove" size={24} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.noShowModalTitle}>Mark as No Show?</Text>
+                <Text style={styles.noShowModalSubtitle}>
+                  Update appointment status & record attendance
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setNoShowTargetBooking(null)}
+                style={styles.noShowCloseBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Customer & Booking Details Card */}
+            {noShowTargetBooking && (
+              <View style={styles.noShowDetailCard}>
+                <View style={styles.noShowDetailRow}>
+                  <View style={styles.noShowAvatar}>
+                    <Text style={styles.noShowAvatarText}>
+                      {(noShowTargetBooking.customer_name || 'C').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.noShowCustomerName} numberOfLines={1}>
+                      {noShowTargetBooking.customer_name || 'Customer'}
+                    </Text>
+                    <Text style={styles.noShowCustomerPhone}>
+                      {noShowTargetBooking.customer_phone || 'No phone number'}
+                    </Text>
+                  </View>
+                  <View style={styles.noShowBadge}>
+                    <Text style={styles.noShowBadgeText}>SCHEDULED</Text>
+                  </View>
+                </View>
+
+                <View style={styles.noShowDivider} />
+
+                <View style={styles.noShowInfoGrid}>
+                  <View style={styles.noShowInfoItem}>
+                    <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                    <Text style={styles.noShowInfoText}>
+                      {noShowTargetBooking.booking_date}
+                    </Text>
+                  </View>
+                  <View style={styles.noShowInfoItem}>
+                    <Ionicons name="time-outline" size={14} color="#64748B" />
+                    <Text style={styles.noShowInfoText}>
+                      {noShowTargetBooking.start_time}
+                    </Text>
+                  </View>
+                  {noShowTargetBooking.service_name ? (
+                    <View style={styles.noShowInfoItem}>
+                      <Ionicons name="cut-outline" size={14} color="#64748B" />
+                      <Text style={styles.noShowInfoText} numberOfLines={1}>
+                        {noShowTargetBooking.service_name}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            )}
+
+            <Text style={styles.noShowExplainerText}>
+              Marking as No Show updates your CRM analytics. You can also send a friendly WhatsApp follow-up with a link to reschedule.
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={styles.noShowActionsWrapper}>
+              {/* Option 1: No Show + WhatsApp */}
+              <TouchableOpacity
+                style={styles.btnNoShowWhatsApp}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  if (!noShowTargetBooking) return;
+                  const b = noShowTargetBooking;
+                  setNoShowTargetBooking(null);
+                  await handleUpdateStatus(b.id, 'no_show');
+                  handleNoShowWhatsApp(b);
+                }}
+              >
+                <View style={styles.whatsAppIconCircle}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.btnNoShowWhatsAppText}>No Show & WhatsApp Follow-up</Text>
+                  <Text style={styles.btnNoShowWhatsAppSub}>Send friendly reschedule link</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Option 2: Mark No Show Only */}
+              <TouchableOpacity
+                style={styles.btnNoShowOnly}
+                activeOpacity={0.8}
+                onPress={async () => {
+                  if (!noShowTargetBooking) return;
+                  const b = noShowTargetBooking;
+                  setNoShowTargetBooking(null);
+                  await handleUpdateStatus(b.id, 'no_show');
+                }}
+              >
+                <Ionicons name="person-remove-outline" size={18} color="#EF4444" />
+                <Text style={styles.btnNoShowOnlyText}>Mark No Show Only (No Message)</Text>
+              </TouchableOpacity>
+
+              {/* Option 3: Keep Booking */}
+              <TouchableOpacity
+                style={styles.btnNoShowCancel}
+                activeOpacity={0.7}
+                onPress={() => setNoShowTargetBooking(null)}
+              >
+                <Text style={styles.btnNoShowCancelText}>Keep Appointment</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* View Calendar Modal */}
       <Modal visible={showCalendarModal} animationType="slide" transparent={true}>
         <View style={styles.calendarModalOverlay}>
@@ -5789,6 +5909,193 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   lockedBackBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+
+  // No Show Modal Styles
+  noShowModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: 'center',
+    padding: Platform.OS === 'web' ? 16 : 0,
+  },
+  noShowModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    width: '100%',
+    maxWidth: 480,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  noShowModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  noShowIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noShowModalTitle: {
+    fontSize: 17,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  noShowModalSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  noShowCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noShowDetailCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginBottom: 12,
+  },
+  noShowDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noShowAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noShowAvatarText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+  },
+  noShowCustomerName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  noShowCustomerPhone: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  noShowBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  noShowBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#D97706',
+  },
+  noShowDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 10,
+  },
+  noShowInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  noShowInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  noShowInfoText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  noShowExplainerText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  noShowActionsWrapper: {
+    gap: 10,
+  },
+  btnNoShowWhatsApp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16A34A',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  whatsAppIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnNoShowWhatsAppText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  btnNoShowWhatsAppSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#DCFCE7',
+    marginTop: 1,
+  },
+  btnNoShowOnly: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  btnNoShowOnlyText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#DC2626',
+  },
+  btnNoShowCancel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  btnNoShowCancelText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
