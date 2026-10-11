@@ -2,6 +2,23 @@
 // Automated processor for upcoming customer booking reminders (12 hours, 3 hours, 30 minutes before)
 // Pure Web Push (RFC 8291), 100% independent of WhatsApp / Meta API.
 
+function getMYTDateStrings() {
+  // Malaysia is UTC+8 (28,800,000 ms), no Daylight Saving Time
+  const mytNow = new Date(Date.now() + (8 * 3600 * 1000));
+  const y = mytNow.getUTCFullYear();
+  const m = String(mytNow.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(mytNow.getUTCDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
+
+  const mytTomorrow = new Date(mytNow.getTime() + (24 * 3600 * 1000));
+  const ty = mytTomorrow.getUTCFullYear();
+  const tm = String(mytTomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const td = String(mytTomorrow.getUTCDate()).padStart(2, '0');
+  const tomorrowStr = `${ty}-${tm}-${td}`;
+
+  return { todayStr, tomorrowStr };
+}
+
 function parseBookingDateTime(dateStr, timeStr) {
   if (!dateStr) return null;
   const dateParts = dateStr.trim().split('-');
@@ -27,17 +44,23 @@ function parseBookingDateTime(dateStr, timeStr) {
     }
   }
 
-  return new Date(year, month, day, hours, minutes, 0, 0);
+  // Pure UTC calculation: Malaysia is UTC+8, so subtract 8 hours from Date.UTC
+  const bookingUtcMs = Date.UTC(year, month, day, hours, minutes, 0, 0) - (8 * 3600 * 1000);
+  return new Date(bookingUtcMs);
+}
+
+function hasReminder(arr, tag) {
+  if (!arr || !arr.length) return false;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === tag) return true;
+  }
+  return false;
 }
 
 function processBookingReminders() {
   const pushHelper = require(`${__hooks}/push_notify.js`);
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-
-  // Check bookings for today and tomorrow
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const { todayStr, tomorrowStr } = getMYTDateStrings();
+  const nowMs = Date.now();
 
   let bookings = [];
   try {
@@ -71,7 +94,7 @@ function processBookingReminders() {
       return;
     }
 
-    const diffMs = bDateTime.getTime() - now.getTime();
+    const diffMs = bDateTime.getTime() - nowMs;
     const diffMinutes = Math.round(diffMs / (60 * 1000));
 
     // If appointment has passed by more than 15 minutes, skip
@@ -83,11 +106,12 @@ function processBookingReminders() {
     // Get current reminders_sent array
     let remindersSent = [];
     try {
-      const rawReminders = booking.get("reminders_sent");
+      let rawReminders = booking.get("reminders_sent");
+      if (typeof rawReminders === "string" && rawReminders.trim()) {
+        try { rawReminders = JSON.parse(rawReminders); } catch (_) {}
+      }
       if (Array.isArray(rawReminders)) {
-        remindersSent = rawReminders;
-      } else if (typeof rawReminders === "string" && rawReminders.trim()) {
-        remindersSent = JSON.parse(rawReminders);
+        remindersSent = Array.prototype.slice.call(rawReminders);
       }
     } catch (e) {
       remindersSent = [];
@@ -111,8 +135,11 @@ function processBookingReminders() {
     // Fetch primary service title
     let serviceTitle = "Servis";
     try {
-      const items = booking.get("items_summary");
-      if (Array.isArray(items) && items.length > 0 && items[0].name) {
+      let items = booking.get("items_summary");
+      if (typeof items === "string") {
+        try { items = JSON.parse(items); } catch (_) {}
+      }
+      if (Array.isArray(items) && items.length > 0 && items[0] && items[0].name) {
         serviceTitle = items[0].name;
       }
     } catch (itErr) {}
@@ -121,7 +148,7 @@ function processBookingReminders() {
     let needSave = false;
 
     // ── 1. REMINDER: 12 Hours Before (Window: 660m to 750m) ──
-    if (diffMinutes >= 660 && diffMinutes <= 750 && remindersSent.indexOf("12h") === -1) {
+    if (diffMinutes >= 660 && diffMinutes <= 750 && !hasReminder(remindersSent, "12h")) {
       const payload = {
         title: `Peringatan Temujanji: 12 Jam Lagi ⏰`,
         body: `Temujanji [${serviceTitle}] anda di ${merchantName} pada ${bTimeStr}. Sedia berjumpa anda!`,
@@ -138,7 +165,7 @@ function processBookingReminders() {
     }
 
     // ── 2. REMINDER: 3 Hours Before (Window: 150m to 210m) ──
-    if (diffMinutes >= 150 && diffMinutes <= 210 && remindersSent.indexOf("3h") === -1) {
+    if (diffMinutes >= 150 && diffMinutes <= 210 && !hasReminder(remindersSent, "3h")) {
       const payload = {
         title: `3 Jam Lagi! Bersiap Sedia 💈`,
         body: `Slot [${serviceTitle}] anda di ${merchantName} bermula jam ${bTimeStr}. Sila tiba 5-10 minit awal.`,
@@ -155,7 +182,7 @@ function processBookingReminders() {
     }
 
     // ── 3. REMINDER: 30 Minutes Before (Window: 15m to 45m) ──
-    if (diffMinutes >= 15 && diffMinutes <= 45 && remindersSent.indexOf("30m") === -1) {
+    if (diffMinutes >= 15 && diffMinutes <= 45 && !hasReminder(remindersSent, "30m")) {
       const payload = {
         title: `Giliran Anda 30 Minit Lagi! 🚗`,
         body: `Temujanji di ${merchantName} jam ${bTimeStr}. Buka untuk semak tiket & arah perjalanan.`,
@@ -186,5 +213,6 @@ function processBookingReminders() {
 
 module.exports = {
   processBookingReminders,
-  parseBookingDateTime
+  parseBookingDateTime,
+  getMYTDateStrings
 };

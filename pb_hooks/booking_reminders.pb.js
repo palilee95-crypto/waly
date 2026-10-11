@@ -34,7 +34,8 @@ routerAdd("GET", "/api/risev/test/run-booking-reminders", (e) => {
 });
 
 // 3. Instant Push on Booking Creation: Send immediate booking confirmation push notification
-onRecordAfterCreateSuccess("service_bookings", (e) => {
+onRecordCreate((e) => {
+  e.next();
   try {
     const booking = e.record;
     if (!booking) return;
@@ -58,8 +59,11 @@ onRecordAfterCreateSuccess("service_bookings", (e) => {
 
     let serviceTitle = "Servis";
     try {
-      const items = booking.get("items_summary");
-      if (Array.isArray(items) && items.length > 0 && items[0].name) {
+      let items = booking.get("items_summary");
+      if (typeof items === "string") {
+        try { items = JSON.parse(items); } catch (_) {}
+      }
+      if (Array.isArray(items) && items.length > 0 && items[0] && items[0].name) {
         serviceTitle = items[0].name;
       }
     } catch (itErr) {}
@@ -77,4 +81,5 @@ onRecordAfterCreateSuccess("service_bookings", (e) => {
   } catch (err) {
     console.log("[INSTANT BOOKING PUSH ERROR]:", err.message || err);
   }
-});
+}, "service_bookings");
+
