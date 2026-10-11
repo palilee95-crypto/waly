@@ -25,6 +25,13 @@ onBootstrap((e) => {
         settings.meta.senderName = $os.getenv("SMTP_SENDER_NAME") || "RISEV";
       }
 
+      const envAppUrl = $os.getenv("APP_URL");
+      if (envAppUrl && envAppUrl.startsWith("http")) {
+        settings.meta.appURL = envAppUrl;
+      } else if (!settings.meta.appURL || !settings.meta.appURL.startsWith("http")) {
+        settings.meta.appURL = "https://risev.app";
+      }
+
       try {
         $app.save(settings);
         console.log(`[SMTP CONFIG] Successfully configured SMTP from env: host=${host}, port=${port}, user=${username}, sender=${sender}`);
