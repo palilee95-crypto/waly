@@ -1015,32 +1015,34 @@ export default function NfcLandingScreen() {
         }
       } catch (pErr) {}
 
-      // Check if merchant is eligible for appointment bookings (Pro / Business plan or add-on) and has active services
+      // Check if merchant is eligible for appointment bookings (Pro / Business plan, add-on, or VIP trial)
       try {
-        let hasBookingPlan = m.has_booking_addon === true;
+        let hasBookingPlan = m.has_booking_addon === true ||
+          m.booking_vip_opt_in === true ||
+          (m.metadata && (m.metadata.booking_trial_claimed === true || m.metadata.booking_trial_started_at));
+
         if (!hasBookingPlan) {
-          const subs = await pb.collection('subscriptions').getList(1, 1, {
-            filter: `merchant = "${merchantId}" && (status = "active" || status = "trialing")`,
-            requestKey: null,
-          });
-          if (subs.items.length > 0) {
-            const plan = (subs.items[0].plan || '').toLowerCase();
-            if (plan === 'pro' || plan === 'business') {
-              hasBookingPlan = true;
+          try {
+            const subs = await pb.collection('subscriptions').getList(1, 1, {
+              filter: `merchant = "${merchantId}" && (status = "active" || status = "trialing")`,
+              requestKey: null,
+            });
+            if (subs.items.length > 0) {
+              const plan = (subs.items[0].plan || '').toLowerCase();
+              if (plan === 'pro' || plan === 'business') {
+                hasBookingPlan = true;
+              }
             }
-          }
+          } catch (subErr) {}
         }
 
-        if (hasBookingPlan) {
-          const services = await pb.collection('merchant_services').getList(1, 1, {
-            filter: `merchant = "${merchantId}" && is_active = true`,
-            requestKey: null,
-          });
-          if (services.totalItems > 0 || (services.items && services.items.length > 0)) {
-            if (isMounted) setCanBookAppointment(true);
-          }
+        // Enable walk-in appointment booking if merchant has booking add-on or pwa_slug
+        if (hasBookingPlan || m.pwa_slug) {
+          if (isMounted) setCanBookAppointment(true);
         }
-      } catch (bookErr) {}
+      } catch (bookErr) {
+        console.warn('[NFC] Error checking booking eligibility:', bookErr);
+      }
 
       if (isMounted) {
         setStep((prev) => (prev === 'loading' || prev === 'pairing' ? 'form' : prev));
@@ -1997,7 +1999,7 @@ export default function NfcLandingScreen() {
               style={styles.voucherBookingPillBtn}
             >
               <Ionicons name="calendar" size={13} color="#FFFFFF" />
-              <Text style={styles.voucherBookingPillText}>Book Appointment ›</Text>
+              <Text style={styles.voucherBookingPillText}>Walk-in: Book Appointment ›</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -2498,6 +2500,42 @@ export default function NfcLandingScreen() {
                       </>
                     )}
                   </TouchableOpacity>
+
+                  {/* OR: Walk-in Book Appointment Button */}
+                  {canBookAppointment && bookingSlug && (
+                    <>
+                      <View style={styles.orDividerRow}>
+                        <View style={[styles.orDividerLine, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)' }]} />
+                        <Text style={[styles.orDividerText, { color: brandSubtextColor }]}>ATAU</Text>
+                        <View style={[styles.orDividerLine, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)' }]} />
+                      </View>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.walkinAppointmentBtn,
+                          {
+                            borderColor: isLightBrandColor ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.25)',
+                            backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.08)',
+                          }
+                        ]}
+                        onPress={handleNavigateToBooking}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[styles.walkinBtnIconBox, { backgroundColor: isLightBrandColor ? '#FEF3C7' : 'rgba(251,191,36,0.18)' }]}>
+                          <Ionicons name="calendar" size={17} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.walkinBtnTitle, { color: brandTextColor }]}>
+                            Walk-in: Book Appointment
+                          </Text>
+                          <Text style={[styles.walkinBtnSub, { color: brandSubtextColor }]}>
+                            Tempah slot temujanji & pilih servis
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={brandSubtextColor} />
+                      </TouchableOpacity>
+                    </>
+                  )}
 
                   {/* Trust Footer */}
                   <View style={[styles.fakeTrustFooter, { marginTop: 16 }]}>
@@ -4736,5 +4774,50 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+  },
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+    gap: 10,
+  },
+  orDividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  orDividerText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.5,
+  },
+  walkinAppointmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1.2,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  walkinBtnIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walkinBtnTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    marginBottom: 2,
+  },
+  walkinBtnSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
 });
