@@ -1684,7 +1684,7 @@ export default function CustomerDashboard() {
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Upcoming booking</Text>
-                <TouchableOpacity onPress={() => router.push('/(customer)/bookings')}>
+                <TouchableOpacity onPress={() => router.push('/(customer)/bookings' as any)}>
                   <Text style={styles.sectionLink}>View all &gt;</Text>
                 </TouchableOpacity>
               </View>

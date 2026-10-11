@@ -58,6 +58,7 @@ interface ServiceItem {
   security_deposit?: number;
   is_active: boolean;
   image_url?: string;
+  assigned_staff?: string[];
 }
 
 function getContrastColor(hexColor: string): string {
@@ -644,12 +645,27 @@ export default function BookingsScreen() {
             sort: 'created',
             requestKey: null,
           });
-          sItems = sRes.items.map((item: any) => ({
-            ...item,
-            image_url: item.image
-              ? `${pb.baseUrl}/api/files/merchant_services/${item.id}/${item.image}`
-              : (item.image_url || '')
-          }));
+          sItems = sRes.items.map((item: any) => {
+            let parsedAssignedStaff: string[] = [];
+            if (item.assigned_staff) {
+              if (Array.isArray(item.assigned_staff)) {
+                parsedAssignedStaff = item.assigned_staff;
+              } else if (typeof item.assigned_staff === 'string') {
+                try {
+                  parsedAssignedStaff = JSON.parse(item.assigned_staff);
+                } catch (e) {
+                  parsedAssignedStaff = [item.assigned_staff];
+                }
+              }
+            }
+            return {
+              ...item,
+              assigned_staff: parsedAssignedStaff,
+              image_url: item.image
+                ? `${pb.baseUrl}/api/files/merchant_services/${item.id}/${item.image}`
+                : (item.image_url || '')
+            };
+          });
         }
         setServices(sItems as any);
       } catch (sErr) {
@@ -678,22 +694,89 @@ export default function BookingsScreen() {
         setSelectedLocation(`${mRecord?.name || user?.name || 'Store'} (HQ)`);
       }
 
-      // Fetch staff members (live data only, no mock fallback)
+      // Fetch staff members (unified: API staff + merchant_staff providers + owner)
       let sMembers: any[] = [];
       try {
         if (user?.merchant_id) {
-          const sRes = await pb.send<any>('/api/risev/merchant/staff?timeframe=all&sort_by=stamps', {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Bearer ' + pb.authStore.token
+          // 1. Fetch user-linked staff members
+          try {
+            const sRes = await pb.send<any>('/api/risev/merchant/staff?timeframe=all&sort_by=stamps', {
+              method: 'GET',
+              headers: {
+                'Authorization': 'Bearer ' + pb.authStore.token
+              }
+            });
+            if (sRes && Array.isArray(sRes.staff)) {
+              sMembers = sRes.staff.map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                phone: s.phone || '',
+                role_title: s.role_title || (s.role === 'merchant' ? 'Owner' : 'Staff'),
+                avatar: s.avatar || '',
+                avatar_url: s.avatar ? `${pb.baseUrl}/api/files/users/${s.id}/${s.avatar}` : undefined,
+                is_active: true
+              }));
             }
-          });
-          if (sRes && Array.isArray(sRes.staff)) {
-            sMembers = sRes.staff;
+          } catch (stApiErr) {
+            console.warn('Error fetching staff from API:', stApiErr);
+          }
+
+          // 2. Fetch merchant_staff providers (including staff added without user accounts)
+          try {
+            const msRecords = await pb.collection('merchant_staff').getFullList({
+              filter: `merchant = "${user.merchant_id}" && is_active = true`,
+              requestKey: null
+            });
+
+            msRecords.forEach((ms: any) => {
+              const cleanMsName = (ms.name || '').trim();
+              if (!cleanMsName) return;
+              const existingIdx = sMembers.findIndex((s: any) =>
+                (s.id && ms.user && s.id === ms.user) ||
+                (s.merchant_staff_id && s.merchant_staff_id === ms.id) ||
+                ((s.name || '').trim().toLowerCase() === cleanMsName.toLowerCase())
+              );
+
+              if (existingIdx >= 0) {
+                sMembers[existingIdx] = {
+                  ...sMembers[existingIdx],
+                  merchant_staff_id: ms.id,
+                  role_title: ms.role_title || sMembers[existingIdx].role_title || 'Provider',
+                  avatar_url: ms.avatar ? `${pb.baseUrl}/api/files/merchant_staff/${ms.id}/${ms.avatar}` : sMembers[existingIdx].avatar_url
+                };
+              } else {
+                sMembers.push({
+                  id: ms.user || `ms_${ms.id}`,
+                  merchant_staff_id: ms.id,
+                  name: cleanMsName,
+                  phone: ms.phone || '',
+                  role_title: ms.role_title || 'Provider',
+                  avatar: ms.avatar || '',
+                  avatar_url: ms.avatar ? `${pb.baseUrl}/api/files/merchant_staff/${ms.id}/${ms.avatar}` : undefined,
+                  is_active: ms.is_active !== false
+                });
+              }
+            });
+          } catch (msErr) {
+            console.warn('Error fetching merchant_staff records:', msErr);
+          }
+
+          // 3. Ensure Store Owner is included in staff list
+          const ownerName = user?.name || mRecord?.name || 'Owner';
+          const ownerExists = sMembers.some((s: any) => (s.name || '').trim().toLowerCase() === ownerName.trim().toLowerCase());
+          if (!ownerExists && ownerName) {
+            sMembers.unshift({
+              id: user?.id || 'owner_id',
+              name: ownerName,
+              phone: user?.phone || '',
+              role_title: 'Owner',
+              is_owner: true,
+              is_active: true
+            });
           }
         }
       } catch (stErr) {
-        console.warn('Error fetching staff:', stErr);
+        console.warn('Error fetching staff list:', stErr);
       }
       setStaffList(sMembers);
       const defaultStaff = user?.name || mRecord?.name || 'Owner';
@@ -771,7 +854,7 @@ export default function BookingsScreen() {
     });
   };
 
-  const handleAddStaffSubmit = () => {
+  const handleAddStaffSubmit = async () => {
     const trimmed = newStaffInput.trim();
     if (!trimmed) {
       setIsAddingStaff(false);
@@ -779,13 +862,34 @@ export default function BookingsScreen() {
     }
     if (!assignedStaff.includes(trimmed)) {
       setAssignedStaff(prev => [...prev, trimmed]);
-      if (user?.merchant_id) {
-        pb.collection('merchant_staff').create({
+    }
+    // Also add to staffList immediately so they appear in selectable list
+    const alreadyInList = staffList.some(s => (s.name || '').trim().toLowerCase() === trimmed.toLowerCase());
+    if (!alreadyInList) {
+      setStaffList(prev => [...prev, {
+        id: `ms_temp_${Date.now()}`,
+        name: trimmed,
+        role_title: 'Provider',
+        is_active: true
+      }]);
+    }
+    if (user?.merchant_id) {
+      try {
+        const createdMs = await pb.collection('merchant_staff').create({
           merchant: user.merchant_id,
           name: trimmed,
           role_title: 'Provider',
           is_active: true
-        }).catch(() => {});
+        });
+        if (createdMs) {
+          setStaffList(prev => prev.map(s => s.name === trimmed ? {
+            ...s,
+            id: `ms_${createdMs.id}`,
+            merchant_staff_id: createdMs.id
+          } : s));
+        }
+      } catch (err) {
+        console.warn('Error creating merchant_staff record:', err);
       }
     }
     setNewStaffInput('');
@@ -808,8 +912,9 @@ export default function BookingsScreen() {
     setNewServicePrice('');
     setNewServiceDuration('30');
     setIsOnlineAvailable(true);
+    const allStaffNames = staffList.map(s => s.name).filter(Boolean);
     const primaryStaff = user?.name || merchantData?.name || 'Owner';
-    setAssignedStaff([primaryStaff]);
+    setAssignedStaff(allStaffNames.length > 0 ? allStaffNames : [primaryStaff]);
     const defaultLoc = branchesList.length > 0
       ? branchesList[0].name
       : `${merchantData?.name || user?.name || 'Store'} (HQ)`;
@@ -833,8 +938,18 @@ export default function BookingsScreen() {
     setNewServicePrice(String(s.price || ''));
     setNewServiceDuration(String(s.duration_minutes || '30'));
     setIsOnlineAvailable(s.is_active !== false);
-    const primaryStaff = user?.name || merchantData?.name || 'Owner';
-    setAssignedStaff([primaryStaff]);
+
+    // Load pre-assigned staff or default to all staff
+    let preAssigned: string[] = [];
+    if (s.assigned_staff && Array.isArray(s.assigned_staff) && s.assigned_staff.length > 0) {
+      preAssigned = s.assigned_staff;
+    } else {
+      const allStaffNames = staffList.map(st => st.name).filter(Boolean);
+      const primaryStaff = user?.name || merchantData?.name || 'Owner';
+      preAssigned = allStaffNames.length > 0 ? allStaffNames : [primaryStaff];
+    }
+    setAssignedStaff(preAssigned);
+
     const defaultLoc = branchesList.length > 0
       ? branchesList[0].name
       : `${merchantData?.name || user?.name || 'Store'} (HQ)`;
@@ -993,7 +1108,8 @@ export default function BookingsScreen() {
           peak_price: peakNum,
           security_deposit: depositNum,
           is_active: isOnlineAvailable,
-          image_url: finalImageUrl
+          image_url: finalImageUrl,
+          assigned_staff: assignedStaff
         };
 
         if (user?.merchant_id && !editingService.id.startsWith('srv-')) {
@@ -1011,6 +1127,7 @@ export default function BookingsScreen() {
             if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
             if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
             formData.append('is_active', String(isOnlineAvailable));
+            formData.append('assigned_staff', JSON.stringify(assignedStaff));
             if (matchingBranch?.id) {
               formData.append('branch', matchingBranch.id);
             }
@@ -1043,6 +1160,7 @@ export default function BookingsScreen() {
                 peak_price: peakNum,
                 security_deposit: depositNum,
                 is_active: isOnlineAvailable,
+                assigned_staff: assignedStaff,
                 image_url: photoUri || ''
               });
               if (rec.image_url) updatedService.image_url = rec.image_url;
@@ -1057,7 +1175,8 @@ export default function BookingsScreen() {
                 requires_staff: requiresStaff,
                 total_units: unitsNum,
                 max_pax: paxNum,
-                is_active: isOnlineAvailable
+                is_active: isOnlineAvailable,
+                assigned_staff: assignedStaff
               });
             }
           }
@@ -1084,7 +1203,8 @@ export default function BookingsScreen() {
         peak_price: peakNum,
         security_deposit: depositNum,
         is_active: isOnlineAvailable,
-        image_url: finalImageUrl
+        image_url: finalImageUrl,
+        assigned_staff: assignedStaff
       };
 
       if (user?.merchant_id) {
@@ -1106,6 +1226,7 @@ export default function BookingsScreen() {
           if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
           if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
           formData.append('is_active', String(isOnlineAvailable));
+          formData.append('assigned_staff', JSON.stringify(assignedStaff));
 
           if (photoFile) {
             formData.append('image', photoFile);
@@ -1139,6 +1260,7 @@ export default function BookingsScreen() {
               peak_price: peakNum,
               security_deposit: depositNum,
               is_active: isOnlineAvailable,
+              assigned_staff: assignedStaff,
               image_url: photoUri || ''
             });
             newService.id = rec.id;
@@ -1155,7 +1277,8 @@ export default function BookingsScreen() {
               requires_staff: requiresStaff,
               total_units: unitsNum,
               max_pax: paxNum,
-              is_active: isOnlineAvailable
+              is_active: isOnlineAvailable,
+              assigned_staff: assignedStaff
             });
             newService.id = rec.id;
           }
@@ -2926,24 +3049,87 @@ export default function BookingsScreen() {
                         <Text style={styles.settingTitle}>Staff Assignment</Text>
                         <Text style={styles.settingSub}>Choose who can provide this service</Text>
                       </View>
+                      {staffList.length > 0 && (
+                        <TouchableOpacity
+                          style={styles.btnToggleAllStaff}
+                          onPress={() => {
+                            const allStaffNames = staffList.map(s => s.name).filter(Boolean);
+                            const isAllSelected = allStaffNames.length > 0 && allStaffNames.every(name => assignedStaff.includes(name));
+                            if (isAllSelected) {
+                              const primaryStaff = user?.name || merchantData?.name || 'Owner';
+                              setAssignedStaff([primaryStaff]);
+                            } else {
+                              setAssignedStaff(allStaffNames);
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.btnToggleAllStaffText}>
+                            {staffList.length > 0 && staffList.map(s => s.name).filter(Boolean).every(name => assignedStaff.includes(name))
+                              ? 'Reset'
+                              : 'Select All'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
-                    {/* Selected Staff Chips */}
+                    {/* All Available Staff Members List */}
                     <View style={styles.staffChipsRow}>
-                      {assignedStaff.map(st => (
-                        <View key={st} style={styles.staffChipPill}>
-                          <View style={styles.staffChipAvatarBadge}>
-                            <Text style={styles.staffChipAvatarBadgeText}>
-                              {(st || 'S').charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <Text style={styles.staffChipName}>{st}</Text>
-                          <TouchableOpacity onPress={() => setAssignedStaff(prev => prev.filter(s => s !== st))}>
-                            <Ionicons name="close" size={14} color="#64748B" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
+                      {staffList.map((s, idx) => {
+                        const sName = s.name || 'Staff';
+                        const isSelected = assignedStaff.includes(sName);
+                        const isOwner = !!s.is_owner;
+                        const roleTitle = s.role_title || (isOwner ? 'Owner' : 'Provider');
+                        const initialChar = (sName || 'S').charAt(0).toUpperCase();
 
+                        return (
+                          <TouchableOpacity
+                            key={s.id || `staff_${idx}_${sName}`}
+                            style={[
+                              styles.staffSelectPill,
+                              isSelected && styles.staffSelectPillActive
+                            ]}
+                            onPress={() => {
+                              if (isSelected) {
+                                setAssignedStaff(prev => prev.filter(name => name !== sName));
+                              } else {
+                                setAssignedStaff(prev => [...prev, sName]);
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <View style={[
+                              styles.staffChipAvatarBadge,
+                              isSelected && { backgroundColor: '#FDE68A' }
+                            ]}>
+                              <Text style={[
+                                styles.staffChipAvatarBadgeText,
+                                isSelected && { color: '#78350F' }
+                              ]}>
+                                {initialChar}
+                              </Text>
+                            </View>
+                            <View style={{ marginRight: 2 }}>
+                              <Text style={[
+                                styles.staffChipName,
+                                isSelected && { color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold' }
+                              ]}>
+                                {sName}
+                              </Text>
+                              <Text style={styles.staffChipRoleSub}>
+                                {roleTitle}
+                              </Text>
+                            </View>
+                            <Ionicons
+                              name={isSelected ? "checkmark-circle" : "ellipse-outline"}
+                              size={16}
+                              color={isSelected ? "#050505" : "#94A3B8"}
+                            />
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Add Staff Button */}
                       {!isAddingStaff && (
                         <TouchableOpacity
                           style={styles.btnAddStaffPill}
@@ -2956,28 +3142,9 @@ export default function BookingsScreen() {
                       )}
                     </View>
 
-                    {/* Inline Staff Input & Quick Suggestions */}
+                    {/* Inline Staff Input (Quick Create New Staff) */}
                     {isAddingStaff && (
                       <View style={{ marginTop: 10 }}>
-                        {staffList.filter(s => s.name && !assignedStaff.includes(s.name)).length > 0 && (
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                            {staffList
-                              .filter(s => s.name && !assignedStaff.includes(s.name))
-                              .map(s => (
-                                <TouchableOpacity
-                                  key={s.id || s.name}
-                                  style={[styles.staffChipPill, { backgroundColor: '#F8FAFC' }]}
-                                  onPress={() => {
-                                    setAssignedStaff(prev => [...prev, s.name]);
-                                    setIsAddingStaff(false);
-                                  }}
-                                >
-                                  <Ionicons name="person-add-outline" size={12} color="#050505" />
-                                  <Text style={styles.staffChipName}>{s.name}</Text>
-                                </TouchableOpacity>
-                              ))}
-                          </View>
-                        )}
                         <View style={styles.staffInputWrap}>
                           <TextInput
                             style={styles.staffInputField}
@@ -2985,6 +3152,7 @@ export default function BookingsScreen() {
                             placeholderTextColor="#94A3B8"
                             value={newStaffInput}
                             onChangeText={setNewStaffInput}
+                            onSubmitEditing={handleAddStaffSubmit}
                             autoFocus
                           />
                           <TouchableOpacity
@@ -3009,6 +3177,7 @@ export default function BookingsScreen() {
                     )}
                   </View>
                 )}
+
 
                 {/* Event Catering Logistics & Setup Card (Only for Catering & Event) */}
                 {addItemType === 'catering' && (
@@ -5032,13 +5201,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 20,
   },
   btnAddStaffText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
+  },
+  btnToggleAllStaff: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  btnToggleAllStaffText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  staffSelectPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 24,
+  },
+  staffSelectPillActive: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  staffChipRoleSub: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
   },
   pickerOptionsWrap: {
     flexDirection: 'row',
