@@ -23,6 +23,7 @@ import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   subscribeToPushNotifications,
   isPushSupported,
@@ -303,6 +304,7 @@ function parseStoreOperatingHours(hoursData: any, fallbackStr?: string): Operati
 export default function CustomerBookingPwaScreen() {
   const { slug, phone: queryPhone, name: queryName, ref: queryRef } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string }>();
   const router = useRouter();
+  const { locale } = useLanguage();
 
   // Dynamic upcoming dates from today
   const upcomingDates = useMemo(() => {
@@ -436,12 +438,20 @@ export default function CustomerBookingPwaScreen() {
       });
       if (res.success) {
         setIsPushSubscribed(true);
-        showToast('Peringatan diaktifkan! 🔔 (12j, 3j & 30m)');
+        showToast(
+          locale === 'ms'
+            ? 'Peringatan diaktifkan! 🔔 (12j, 3j & 30m)'
+            : 'Reminders enabled! 🔔 (12h, 3h & 30m)'
+        );
       } else {
-        showToast(res.message || 'Gagal mengaktifkan notifikasi.');
+        showToast(
+          res.message || (locale === 'ms' ? 'Gagal mengaktifkan notifikasi.' : 'Failed to enable notifications.')
+        );
       }
     } catch (e: any) {
-      showToast(e?.message || 'Ralat mengaktifkan notifikasi.');
+      showToast(
+        e?.message || (locale === 'ms' ? 'Ralat mengaktifkan notifikasi.' : 'Error enabling notifications.')
+      );
     } finally {
       setIsSubscribingPush(false);
     }
@@ -2892,12 +2902,18 @@ export default function CustomerBookingPwaScreen() {
                 </View>
                 <View style={{ flex: 1, paddingRight: 6 }}>
                   <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>
-                    {isPushSubscribed ? 'Peringatan Temujanji Aktif' : 'Peringatan Temujanji'}
+                    {isPushSubscribed
+                      ? (locale === 'ms' ? 'Peringatan Temujanji Aktif' : 'Appointment Reminder Active')
+                      : (locale === 'ms' ? 'Peringatan Temujanji' : 'Appointment Reminder')}
                   </Text>
                   <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
                     {isPushSubscribed
-                      ? 'Notifikasi akan dihantar 12 jam, 3 jam & 30 minit sebelum slot.'
-                      : 'Terima push noti automatik 12 jam, 3 jam & 30 minit sebelum slot.'}
+                      ? (locale === 'ms'
+                          ? 'Notifikasi akan dihantar 12 jam, 3 jam & 30 minit sebelum slot.'
+                          : 'Notifications will be sent 12 hours, 3 hours & 30 mins before your slot.')
+                      : (locale === 'ms'
+                          ? 'Terima push noti automatik 12 jam, 3 jam & 30 minit sebelum slot.'
+                          : 'Get automatic push reminders 12 hours, 3 hours & 30 mins before your slot.')}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2913,7 +2929,9 @@ export default function CustomerBookingPwaScreen() {
                     <ActivityIndicator size="small" color="#000000" />
                   ) : (
                     <Text style={[styles.btnInstallPwaTextBlack, isPushSubscribed && { color: '#FFFFFF' }]}>
-                      {isPushSubscribed ? 'Aktif ✓' : 'Aktifkan 🔔'}
+                      {isPushSubscribed
+                        ? (locale === 'ms' ? 'Aktif ✓' : 'Active ✓')
+                        : (locale === 'ms' ? 'Aktifkan 🔔' : 'Enable 🔔')}
                     </Text>
                   )}
                 </TouchableOpacity>
