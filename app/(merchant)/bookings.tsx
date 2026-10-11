@@ -351,9 +351,9 @@ export default function BookingsScreen() {
   const [customCoverUrl, setCustomCoverUrl] = useState<string>('');
   const [bannerFile, setBannerFile] = useState<any>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFC700');
-  const [selectedBgColor, setSelectedBgColor] = useState<string>('#121318');
-  const [selectedPodColor, setSelectedPodColor] = useState<string>('auto');
+  const [selectedBrandColor, setSelectedBrandColor] = useState<string>('#FFCC00');
+  const [selectedBgColor, setSelectedBgColor] = useState<string>('#FFFFFF');
+  const [selectedPodColor, setSelectedPodColor] = useState<string>('#FFFFFF');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
@@ -470,10 +470,10 @@ export default function BookingsScreen() {
         if (bannerFile) {
           const formData = new FormData();
           formData.append('banner', bannerFile);
-          formData.append('pwa_brand_color', selectedBrandColor);
-          formData.append('pwa_bg_color', selectedBgColor);
-          formData.append('pwa_pod_color', selectedPodColor);
-          formData.append('pwa_theme', isObsidianDark(selectedBgColor) ? 'dark' : 'light');
+          formData.append('pwa_brand_color', '#FFCC00');
+          formData.append('pwa_bg_color', '#FFFFFF');
+          formData.append('pwa_pod_color', '#FFFFFF');
+          formData.append('pwa_theme', 'light');
           formData.append('subtitle', customTagline);
           formData.append('pwa_slug', pwaSlug || merchantData?.pwa_slug || 'store');
           updated = await pb.collection('merchants').update(targetMerchantId, formData, { requestKey: null });
@@ -486,10 +486,10 @@ export default function BookingsScreen() {
           setBannerFile(null);
         } else {
           const payload: any = {
-            pwa_brand_color: selectedBrandColor,
-            pwa_bg_color: selectedBgColor,
-            pwa_pod_color: selectedPodColor,
-            pwa_theme: isObsidianDark(selectedBgColor) ? 'dark' : 'light',
+            pwa_brand_color: '#FFCC00',
+            pwa_bg_color: '#FFFFFF',
+            pwa_pod_color: '#FFFFFF',
+            pwa_theme: 'light',
             subtitle: customTagline,
             pwa_slug: pwaSlug || merchantData?.pwa_slug || 'store',
           };
@@ -502,15 +502,15 @@ export default function BookingsScreen() {
 
         // Keep local preview synchronized
         broadcastPreviewUpdate({
-          brandColor: selectedBrandColor,
-          bgColor: selectedBgColor,
-          podColor: selectedPodColor,
+          brandColor: '#FFCC00',
+          bgColor: '#FFFFFF',
+          podColor: '#FFFFFF',
           tagline: customTagline,
           coverUrl: bannerPreview || customCoverUrl,
         });
       }
       setPreviewRefreshKey(Date.now());
-      Alert.alert('Branding Saved', 'Your live booking PWA color and branding have been updated!');
+      Alert.alert('Settings Saved', 'Your store hero photo and booking page details have been updated!');
     } catch (e: any) {
       console.warn('Save branding error:', e);
       Alert.alert('Error', e?.message || 'Failed to update branding.');
@@ -2250,216 +2250,46 @@ export default function BookingsScreen() {
               {/* BRANDING & HERO CUSTOMIZER CARD */}
               <View style={styles.brandingCustomizerCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <Ionicons name="color-palette-outline" size={20} color="#000" />
-                  <Text style={styles.brandingSectionTitle}>Branding & Theme Settings</Text>
+                  <Ionicons name="storefront-outline" size={20} color="#000" />
+                  <Text style={styles.brandingSectionTitle}>Storefront Media & Profile</Text>
                 </View>
 
-                {/* 🎨 MASTER THEME SELECTOR: BRIGHT MODE vs DARK MODE */}
-                <Text style={styles.brandingFieldLabel}>Page Theme Style (Select One Master Theme)</Text>
-                <Text style={styles.brandingFieldSub}>
-                  Choose between Bright Mode (Soft Clay Beige) or Dark Mode (Obsidian Dark VIP) for your booking page.
-                </Text>
-
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 16 }}>
-                  {/* ☀️ Bright Mode Card */}
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#FAF8F5',
-                      borderRadius: 18,
-                      padding: 16,
-                      borderWidth: isObsidianDark(selectedBgColor) ? 1.5 : 2.5,
-                      borderColor: isObsidianDark(selectedBgColor) ? '#E2E8F0' : '#0F172A',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: isObsidianDark(selectedBgColor) ? 0.05 : 0.15,
-                      shadowRadius: 6,
-                      elevation: isObsidianDark(selectedBgColor) ? 1 : 4,
-                    }}
-                    onPress={() => {
-                      setSelectedBgColor('#FAF8F5');
-                      broadcastPreviewUpdate({ bgColor: '#FAF8F5' });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="sunny" size={22} color="#F59E0B" />
-                    </View>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>☀️ Bright Mode</Text>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
-                      Clean Soft Clay Beige with high contrast dark text
-                    </Text>
-                    {!isObsidianDark(selectedBgColor) && (
-                      <View style={{ backgroundColor: '#0F172A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <Ionicons name="checkmark-circle" size={14} color="#FFD700" />
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Active</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  {/* 🌙 Dark Mode Card */}
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#000000',
-                      borderRadius: 18,
-                      padding: 16,
-                      borderWidth: isObsidianDark(selectedBgColor) ? 2.5 : 1.5,
-                      borderColor: isObsidianDark(selectedBgColor) ? '#FFD700' : '#334155',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: isObsidianDark(selectedBgColor) ? 0.3 : 0.05,
-                      shadowRadius: 8,
-                      elevation: isObsidianDark(selectedBgColor) ? 5 : 1,
-                    }}
-                    onPress={() => {
-                      setSelectedBgColor('#000000');
-                      broadcastPreviewUpdate({ bgColor: '#000000' });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="moon" size={20} color="#FFD700" />
-                    </View>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>🌙 Dark Mode</Text>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center' }}>
-                      Pure Solid Black with glowing gold accents
-                    </Text>
-                    {isObsidianDark(selectedBgColor) && (
-                      <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <Ionicons name="checkmark-circle" size={14} color="#000000" />
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Active</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* 🎨 2. BRAND ACCENT COLOR (Button, Price & Highlights) */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 16 }]}>2. Brand Accent Color (Button, Price & Highlights)</Text>
-                <Text style={styles.brandingFieldSub}>
-                  Select your primary accent color for action buttons, price tags, and active tab highlights.
-                </Text>
-
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, marginBottom: 14 }}>
-                  {[
-                    { id: 'gold', name: 'Risev Gold', color: '#FFC700' },
-                    { id: 'red', name: 'Crimson Red', color: '#EF4444' },
-                    { id: 'blue', name: 'Sapphire Blue', color: '#0284C7' },
-                    { id: 'green', name: 'Emerald Green', color: '#10B981' },
-                    { id: 'purple', name: 'Royal Purple', color: '#8B5CF6' },
-                    { id: 'dark', name: 'Dark Slate', color: '#0F172A' },
-                  ].map((acc) => {
-                    const isSelected = selectedBrandColor?.toUpperCase() === acc.color.toUpperCase();
-                    return (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          backgroundColor: isSelected ? '#FFFFFF' : '#F8FAFC',
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          borderRadius: 14,
-                          borderWidth: isSelected ? 2 : 1,
-                          borderColor: isSelected ? '#000000' : '#E2E8F0',
-                          shadowColor: isSelected ? acc.color : '#000',
-                          shadowOffset: { width: 0, height: isSelected ? 2 : 1 },
-                          shadowOpacity: isSelected ? 0.3 : 0.05,
-                          shadowRadius: isSelected ? 4 : 2,
-                          elevation: isSelected ? 3 : 1,
-                        }}
-                        onPress={() => {
-                          setSelectedBrandColor(acc.color);
-                          broadcastPreviewUpdate({ brandColor: acc.color });
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: acc.color, borderWidth: acc.color === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }} />
-                        <Text style={{ fontSize: 12, fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                          {acc.name}
-                        </Text>
-                        {isSelected && <Ionicons name="checkmark-circle" size={14} color="#0F172A" />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Custom Brand Color Hex + Visual Color Wheel */}
-                <View style={styles.hexInputRow}>
-                  <View 
-                    style={[
-                      styles.hexInputSwatch, 
-                      { backgroundColor: selectedBrandColor || '#FFC700', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: selectedBrandColor === '#FFFFFF' ? 1 : 0, borderColor: '#CBD5E1' }
-                    ]}
-                  >
-                    {Platform.OS === 'web' ? (
-                      React.createElement('input', {
-                        id: 'risev_brand_accent_color_wheel',
-                        type: 'color',
-                        value: selectedBrandColor || '#FFC700',
-                        onChange: (e: any) => {
-                          const val = e.target.value.toUpperCase();
-                          setSelectedBrandColor(val);
-                          broadcastPreviewUpdate({ brandColor: val });
-                        },
-                        style: {
-                          position: 'absolute',
-                          top: -10,
-                          left: -10,
-                          width: '200%',
-                          height: '200%',
-                          cursor: 'pointer',
-                          opacity: 0,
-                        },
-                        title: 'Choose Accent Color',
-                      })
-                    ) : null}
-                    <Ionicons name="color-palette" size={16} color={getContrastColor(selectedBrandColor || '#FFC700')} />
+                {/* ✨ Standardized Fresha x Apple iOS Layout Badge */}
+                <View style={{
+                  backgroundColor: '#FFFDF0',
+                  borderWidth: 1,
+                  borderColor: '#FEF08A',
+                  borderRadius: 16,
+                  padding: 14,
+                  marginBottom: 18,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#FFCC00',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="sparkles" size={18} color="#000000" />
                   </View>
-
-                  <TextInput
-                    style={styles.hexTextInput}
-                    placeholder="#FFC700"
-                    placeholderTextColor="#94A3B8"
-                    value={selectedBrandColor}
-                    onChangeText={(val) => {
-                      let formatted = val.trim();
-                      if (formatted && !formatted.startsWith('#')) formatted = '#' + formatted;
-                      setSelectedBrandColor(formatted);
-                      if (formatted.length === 7) {
-                        broadcastPreviewUpdate({ brandColor: formatted });
-                      }
-                    }}
-                    maxLength={7}
-                    autoCapitalize="characters"
-                  />
-
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6 }}
-                    onPress={() => {
-                      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                        const inputEl = document.getElementById('risev_brand_accent_color_wheel');
-                        if (inputEl) inputEl.click();
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="color-palette-outline" size={18} color="#0284C7" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0284C7' }}>Custom Wheel 🎨</Text>
-                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' }}>
+                      Standardized iOS Booking Page
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2, lineHeight: 15 }}>
+                      Pure White theme with Pure Black CTAs enabled across all customer touchpoints.
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Real Store Hero Banner Photo Uploader */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 18 }]}>Store Hero Banner Photo</Text>
+                <Text style={styles.brandingFieldLabel}>Store Hero Banner Photo</Text>
                 <Text style={styles.brandingFieldSub}>
-                  Upload a high-quality photo of your storefront, salon, or workspace (16:9 recommended).
+                  Upload a high-quality photo of your storefront, kiosk, or workspace (16:9 recommended).
                 </Text>
 
                 <View style={styles.bannerUploadCard}>

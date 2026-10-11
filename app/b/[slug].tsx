@@ -597,94 +597,68 @@ export default function CustomerBookingPwaScreen() {
   const activePodColor = livePodColor || merchant?.pwa_pod_color || 'auto';
   const contrastColor = getContrastColor(activeBrandColor);
   const isBrandDark = isObsidianDark(activeBrandColor);
-  const isPageDark = isObsidianDark(activeBgColor);
+  const isPageDark = false;
   
   const themeStyles = useMemo(() => {
-    // 1. Base Adaptive Neumorphic Background Color
-    const baseBgColor = activeBgColor;
-    
-    // 2. Text & Secondary Color Palette (Bright Mode secondary: BLACK #000000, Dark Mode secondary: WHITE #FFFFFF)
-    const textPrimaryColor = isPageDark ? '#FFFFFF' : '#0F172A';
-    const textSecondaryColor = isPageDark ? '#FFFFFF' : '#000000';
-    const textMutedColor = isPageDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(0, 0, 0, 0.65)';
-    const secondaryColor = isPageDark ? '#FFFFFF' : '#000000';
+    // 1. Fresha x Apple iOS Pure White Design System
+    const baseBgColor = '#FFFFFF';
+    const textPrimaryColor = '#111111';
+    const textSecondaryColor = '#64748B';
+    const textMutedColor = '#94A3B8';
+    const secondaryColor = '#64748B';
+    const borderColor = '#F1F5F9';
+    const pillBgColor = '#F8FAFC';
+    const podTextColor = '#111111';
+    const podSecondaryTextColor = '#64748B';
+    const hasCustomPod = false;
+    const shadowDark = 'rgba(0, 0, 0, 0.04)';
+    const shadowLight = '#FFFFFF';
+    const isBrandDark = false;
+    const contrastColor = '#FFFFFF';
+    const activePodColor = '#FFFFFF';
+    const activeBtnBg = '#000000';
+    const activeBtnText = '#FFFFFF';
+    const priceColor = '#111111';
 
-    // 3. Custom / Dynamic Pod & Capsule Color
-    const hasCustomPod = activePodColor && activePodColor !== 'auto';
-    const isPodDark = hasCustomPod ? isObsidianDark(activePodColor) : isPageDark;
-
-    const pillBgColor = hasCustomPod
-      ? activePodColor
-      : (isPageDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.05)');
-
-    const podTextColor = hasCustomPod
-      ? (isPodDark ? '#FFFFFF' : '#0F172A')
-      : textPrimaryColor;
-
-    const podSecondaryTextColor = hasCustomPod
-      ? (isPodDark ? '#FFFFFF' : '#000000')
-      : textSecondaryColor;
-
-    const borderColor = hasCustomPod
-      ? (isPodDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.08)')
-      : (isPageDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.06)');
-
-    // 4. Shadow System for Neumorphism
-    const shadowDark = isPageDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(160, 145, 125, 0.45)';
-    const shadowLight = isPageDark ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF';
-
-    // Neumorphic Convex Card Style (Soft 3D elevation matching base background)
+    // Apple Card Style (Pure White card with subtle light-gray border and soft shadow)
     const neumorphicCard = {
-      backgroundColor: baseBgColor,
-      borderColor: isPageDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.8)',
+      backgroundColor: '#FFFFFF',
+      borderColor: '#F1F5F9',
       borderWidth: 1,
-      shadowColor: shadowDark,
-      shadowOffset: { width: 4, height: 6 },
-      shadowOpacity: 0.35,
-      shadowRadius: 10,
-      elevation: 4,
-      ...(Platform.OS === 'web' ? {
-        boxShadow: isPageDark
-          ? '6px 6px 16px rgba(0, 0, 0, 0.5), -4px -4px 14px rgba(255, 255, 255, 0.08)'
-          : '6px 6px 16px rgba(160, 145, 125, 0.35), -6px -6px 16px #ffffff',
-      } : {}),
-    };
-
-    // Neumorphic Recessed / Inset Surface (Pills, inputs, chips)
-    const neumorphicInset = {
-      backgroundColor: pillBgColor,
-      borderColor: borderColor,
-      borderWidth: 1,
-      ...(Platform.OS === 'web' ? {
-        boxShadow: hasCustomPod
-          ? '2px 3px 8px rgba(0, 0, 0, 0.12)'
-          : (isPageDark
-            ? 'inset 3px 3px 6px rgba(0, 0, 0, 0.4), inset -3px -3px 6px rgba(255, 255, 255, 0.1)'
-            : 'inset 3px 3px 6px rgba(160, 145, 125, 0.3), inset -3px -3px 6px #ffffff'),
-      } : {}),
-    };
-
-    // Neumorphic Active Accent Button Style (No auto glow)
-    const neumorphicActiveBtn = {
-      backgroundColor: activeBrandColor,
-      borderColor: activeBrandColor,
-      borderWidth: 1,
+      borderRadius: 20,
       shadowColor: '#000000',
-      shadowOffset: { width: 2, height: 4 },
-      shadowOpacity: isPageDark ? 0.35 : 0.12,
-      shadowRadius: 6,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      elevation: 2,
       ...(Platform.OS === 'web' ? {
-        boxShadow: isPageDark
-          ? '3px 3px 8px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)'
-          : '3px 3px 8px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
       } : {}),
     };
 
-    // 5. Price & High Contrast Accent Colors
-    const activeBtnBg = activeBrandColor || '#FFC700';
-    const activeBtnText = getContrastColor(activeBtnBg);
-    const priceColor = activeBrandColor || '#FFC700';
+    // Minimal Inset / Pill Surface
+    const neumorphicInset = {
+      backgroundColor: '#F8FAFC',
+      borderColor: '#E2E8F0',
+      borderWidth: 1,
+      borderRadius: 16,
+      ...(Platform.OS === 'web' ? {
+        boxShadow: 'none',
+      } : {}),
+    };
+
+    // Primary CTA Button Style (Pure Black #000000)
+    const neumorphicActiveBtn = {
+      backgroundColor: '#000000',
+      borderColor: '#000000',
+      borderWidth: 1,
+      borderRadius: 20,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 3,
+    };
 
     return {
       baseBgColor,
@@ -699,7 +673,7 @@ export default function CustomerBookingPwaScreen() {
       shadowDark,
       shadowLight,
       isBrandDark,
-      isPageDark,
+      isPageDark: false,
       contrastColor,
       activeBrandColor,
       activePodColor,
@@ -707,7 +681,7 @@ export default function CustomerBookingPwaScreen() {
       activeBtnText,
       priceColor,
 
-      // Pre-baked Neumorphic Objects & Helpers
+      // Helpers
       neumorphicCard,
       neumorphicInset,
       neumorphicActiveBtn: {
@@ -722,7 +696,7 @@ export default function CustomerBookingPwaScreen() {
       pillSurface: { backgroundColor: pillBgColor },
       iconCircle: { backgroundColor: pillBgColor },
     };
-  }, [activeBrandColor, activeBgColor, activePodColor, contrastColor, isBrandDark, isPageDark]);
+  }, [activeBrandColor]);
 
   // 1. Live Preview real-time listener from parent customization panel
   useEffect(() => {
@@ -1029,24 +1003,24 @@ export default function CustomerBookingPwaScreen() {
             sItems = [
               {
                 id: 'scoop-item-1',
-                name: 'Signature Artisanal Ice Cream Cup',
-                category: 'Ice Cream',
-                description: 'Fresh handcrafted waffle cup gelato with premium double scoops',
-                price: 12,
-                duration_minutes: 15,
-                item_type: 'product',
-                image_source: require('@/assets/images/scoop_icecream_cup.png'),
+                name: 'Catering Aiskrim 300 Pax',
+                category: 'Catering',
+                description: 'Full artisanal ice cream booth with live server for private events & weddings',
+                price: 850,
+                duration_minutes: 120,
+                item_type: 'catering',
+                image: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=400&auto=format&fit=crop&q=80',
                 is_active: true
               },
               {
                 id: 'scoop-item-2',
-                name: 'Event Ice Cream Catering Booth',
+                name: 'Premium aiskrim custom booth',
                 category: 'Catering',
-                description: 'Full artisanal ice cream booth with live server for private events & weddings',
-                price: 350,
-                duration_minutes: 120,
+                description: 'Custom branded luxury booth with unlimited scoops & waffle cones',
+                price: 1450,
+                duration_minutes: 180,
                 item_type: 'catering',
-                requires_staff: true,
+                image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&auto=format&fit=crop&q=80',
                 is_active: true
               }
             ];
@@ -1080,13 +1054,24 @@ export default function CustomerBookingPwaScreen() {
           const fallbackScoop = [
             {
               id: 'scoop-item-1',
-              name: 'Signature Artisanal Ice Cream Cup',
-              category: 'Ice Cream',
-              description: 'Fresh handcrafted waffle cup gelato with premium double scoops',
-              price: 12,
-              duration_minutes: 15,
-              item_type: 'product',
-              image_source: require('@/assets/images/scoop_icecream_cup.png'),
+              name: 'Catering Aiskrim 300 Pax',
+              category: 'Catering',
+              description: 'Full artisanal ice cream booth with live server for private events & weddings',
+              price: 850,
+              duration_minutes: 120,
+              item_type: 'catering',
+              image: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=400&auto=format&fit=crop&q=80',
+              is_active: true
+            },
+            {
+              id: 'scoop-item-2',
+              name: 'Premium aiskrim custom booth',
+              category: 'Catering',
+              description: 'Custom branded luxury booth with unlimited scoops & waffle cones',
+              price: 1450,
+              duration_minutes: 180,
+              item_type: 'catering',
+              image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&auto=format&fit=crop&q=80',
               is_active: true
             }
           ];
@@ -1451,18 +1436,83 @@ export default function CustomerBookingPwaScreen() {
         </View>
       )}
 
-      {/* Top Header Bar for Steps 1, 2, 3 */}
+      {/* Top Header Bar for Steps 1, 2, 3 (Fresha Compact x Apple iOS) */}
       {currentStep > 0 && currentStep < 4 && (
-        <View style={[styles.headerBar, { backgroundColor: themeStyles.baseBgColor, borderBottomColor: themeStyles.borderColor }]}>
-          <TouchableOpacity onPress={handlePrevStep} style={[styles.btnHeaderBack, themeStyles.neumorphicInset]} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={22} color={themeStyles.textPrimaryColor} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: themeStyles.textPrimaryColor }]}>
-            {currentStep === 1 && 'Select Service'}
-            {currentStep === 2 && 'Schedule Appointment'}
-            {currentStep === 3 && 'Your Details'}
-          </Text>
-          <Text style={[styles.stepBadgeText, { color: themeStyles.textSecondaryColor }]}>Step {currentStep} of 3</Text>
+        <View style={{ backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: 'rgba(0, 0, 0, 0.05)' }}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 10,
+          }}>
+            <TouchableOpacity
+              onPress={handlePrevStep}
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 21,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.1)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.04,
+                shadowRadius: 6,
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={20} color="#000000" />
+            </TouchableOpacity>
+
+            <Text style={{
+              fontSize: 18,
+              fontFamily: 'PlusJakartaSans_800ExtraBold',
+              color: '#000000',
+            }}>
+              {currentStep === 1 && 'Select Service'}
+              {currentStep === 2 && 'Schedule Appointment'}
+              {currentStep === 3 && 'Your Details'}
+            </Text>
+
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'PlusJakartaSans_600SemiBold',
+              color: 'rgba(0, 0, 0, 0.55)',
+            }}>
+              Step {currentStep} of 3
+            </Text>
+          </View>
+
+          {/* Horizontal 3-Segment Progress Indicator */}
+          <View style={{
+            flexDirection: 'row',
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingBottom: 12,
+          }}>
+            <View style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: '#FFCC00',
+            }} />
+            <View style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentStep >= 2 ? '#FFCC00' : 'rgba(0, 0, 0, 0.08)',
+            }} />
+            <View style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentStep >= 3 ? '#FFCC00' : 'rgba(0, 0, 0, 0.08)',
+            }} />
+          </View>
         </View>
       )}
 
@@ -1475,20 +1525,50 @@ export default function CustomerBookingPwaScreen() {
         {currentStep === 0 && (
           <View style={styles.profileContainer}>
             
-            {/* Hero Cover Header */}
-            <View style={styles.coverWrapper}>
+            {/* 1. Hero Cover Header (Rounded Bottom Corners) */}
+            <View style={{
+              width: '100%',
+              height: 320,
+              position: 'relative',
+              borderBottomLeftRadius: 28,
+              borderBottomRightRadius: 28,
+              overflow: 'hidden',
+              backgroundColor: '#FFFFFF',
+            }}>
               <Image
                 source={{
                   uri: finalCoverUrl
                 }}
-                style={styles.coverImage}
+                style={{ width: '100%', height: 320 }}
                 resizeMode="cover"
               />
-              <View style={styles.coverDarkOverlay} />
 
-              <View style={styles.coverTopRow}>
+              {/* Floating Top Controls Row */}
+              <View style={{
+                position: 'absolute',
+                top: 16,
+                left: 16,
+                right: 16,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                zIndex: 10,
+              }}>
+                {/* Floating Back Button */}
                 <TouchableOpacity
-                  style={styles.circleIconButton}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 21,
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 6,
+                    elevation: 4,
+                  }}
                   activeOpacity={0.8}
                   onPress={() => {
                     if (router.canGoBack()) {
@@ -1498,643 +1578,717 @@ export default function CustomerBookingPwaScreen() {
                     }
                   }}
                 >
-                  <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                  <Ionicons name="arrow-back" size={20} color="#111111" />
                 </TouchableOpacity>
 
-                {!isPro ? (
-                  /* Image 1 Top Right Action Buttons (Favorite & Share) */
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity
-                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 }}
-                      onPress={() => showToast('Saved to favorites! ❤️')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="heart-outline" size={18} color="#0F172A" />
-                    </TouchableOpacity>
+                {/* Floating Loyalty Stamp Pill */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 20,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 6,
+                    elevation: 4,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}
+                  onPress={() => setShowLoyaltyModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <View style={{
+                    backgroundColor: '#FEF08A',
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="gift" size={13} color="#D97706" />
+                  </View>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: '#111111' }}>
+                    {stampsCount}/{totalStamps} stamps
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color="#111111" />
+                </TouchableOpacity>
+              </View>
+            </View>
 
+            {/* 2. Merchant Information Section */}
+            <View style={{ paddingHorizontal: 20, paddingTop: 18, backgroundColor: '#FFFFFF' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  {/* Small Yellow RISEV VIP Badge (Conditional for PRO / Eligible) */}
+                  {isPro && (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#FFCC00',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3.5,
+                      borderRadius: 10,
+                      alignSelf: 'flex-start',
+                      marginBottom: 6,
+                    }}>
+                      <Ionicons name="sparkles" size={11} color="#111111" />
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 0.6 }}>
+                        RISEV VIP
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Merchant Name */}
+                  <Text style={{
+                    fontSize: 26,
+                    fontFamily: 'Outfit_800ExtraBold',
+                    color: '#111111',
+                    letterSpacing: -0.5,
+                    lineHeight: 30,
+                  }} numberOfLines={1}>
+                    {merchant?.store_name || 'Scoop creamy'}
+                  </Text>
+
+                  {/* Description / Subtitle */}
+                  <Text style={{
+                    fontSize: 13.5,
+                    fontFamily: 'PlusJakartaSans_500Medium',
+                    color: '#64748B',
+                    marginTop: 4,
+                  }}>
+                    {activeTagline || merchant?.subtitle || 'Quality Services & Online Booking'}
+                  </Text>
+                </View>
+
+                {/* Rating & Review Count Compact Pill */}
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 20,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  alignSelf: 'center',
+                }}>
+                  <Ionicons name="star" size={15} color="#FFC700" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111' }}>
+                    {merchant?.rating || '5.0'}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                    ({merchant?.reviews_count || '120'} reviews)
+                  </Text>
+                </View>
+              </View>
+
+              {/* 3. Location & Operating Hours Row */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: 16,
+                marginBottom: 12,
+              }}>
+                {/* Left: Location */}
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                  onPress={handleOpenLocationMap}
+                  activeOpacity={0.7}
+                >
+                  <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: '#F8FAFC',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}>
+                    <Ionicons name="location-outline" size={18} color="#111111" />
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', flex: 1 }} numberOfLines={1}>
+                    {selectedBranch?.name || branches[0]?.name || merchant?.address || 'Scoop creamy (HQ)'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Vertical Divider */}
+                <View style={{ width: 1, height: 26, backgroundColor: '#E2E8F0', marginHorizontal: 12 }} />
+
+                {/* Right: Operating Hours */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                  onPress={() => setShowHoursModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: '#F8FAFC',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}>
+                    <Ionicons name="time-outline" size={18} color="#111111" />
+                  </View>
+                  <View style={{ flexDirection: 'column' }}>
+                    <View style={{
+                      backgroundColor: operatingHoursInfo.isOpen ? '#DCFCE7' : '#FEE2E2',
+                      paddingHorizontal: 7,
+                      paddingVertical: 1.5,
+                      borderRadius: 8,
+                      alignSelf: 'flex-start',
+                    }}>
+                      <Text style={{
+                        fontSize: 11,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: operatingHoursInfo.isOpen ? '#15803D' : '#B91C1C',
+                      }}>
+                        {operatingHoursInfo.isOpen ? 'Open' : 'Closed'}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1.5 }}>
+                      {operatingHoursInfo.todayHoursText}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* 4. Upcoming Appointment Card (Apple Wallet Style Pass) */}
+              {existingBooking && existingBooking.id !== dismissedPassId && (() => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const bDateStr = existingBooking.booking_date ? existingBooking.booking_date.split('T')[0] : todayStr;
+                const isCompleted = existingBooking.status === 'completed';
+                const isPastDate = bDateStr < todayStr;
+                const isMissed = isPastDate && !isCompleted;
+
+                let headerTagline = 'UPCOMING APPOINTMENT';
+                let actionBtnText = 'View Pass';
+
+                if (isMissed) {
+                  headerTagline = '⚠️ MISSED APPOINTMENT';
+                  actionBtnText = 'Rebook';
+                } else if (isCompleted) {
+                  headerTagline = '🎉 RECENT VISIT';
+                  actionBtnText = 'Review';
+                }
+
+                const handleCardPress = () => {
+                  if (isMissed) {
+                    setCurrentStep(1);
+                  } else if (isCompleted) {
+                    handleOpenReviewModal();
+                  } else {
+                    setCreatedBooking(existingBooking);
+                    setCurrentStep(4);
+                  }
+                };
+
+                return (
+                  <View style={{ marginVertical: 10 }}>
                     <TouchableOpacity
-                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 }}
-                      onPress={() => {
-                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
-                          (navigator as any).share({ title: merchant?.store_name || 'Store', url: window.location.href }).catch(() => {});
-                        } else {
-                          showToast('Store link copied! 🔗');
-                        }
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 20,
+                        padding: 14,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderWidth: 1,
+                        borderColor: '#F1F5F9',
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 10,
+                        elevation: 2,
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
-                      activeOpacity={0.8}
+                      onPress={handleCardPress}
+                      activeOpacity={0.88}
                     >
-                      <Ionicons name="share-outline" size={18} color="#0F172A" />
+                      {/* Left & Right Semicircular Ticket Cutouts */}
+                      <View style={{
+                        position: 'absolute',
+                        left: -9,
+                        top: '50%',
+                        marginTop: -9,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        zIndex: 5,
+                      }} />
+                      <View style={{
+                        position: 'absolute',
+                        right: -9,
+                        top: '50%',
+                        marginTop: -9,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        zIndex: 5,
+                      }} />
+
+                      {/* Left Section: Icon + Schedule + Location */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1.4, paddingLeft: 6 }}>
+                        <View style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 14,
+                          backgroundColor: '#F8FAFC',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                        }}>
+                          <Ionicons name="calendar-outline" size={22} color="#111111" />
+                          <View style={{
+                            position: 'absolute',
+                            bottom: -2,
+                            right: -2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: 8,
+                            backgroundColor: '#10B981',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1.5,
+                            borderColor: '#FFFFFF',
+                          }}>
+                            <Ionicons name="checkmark" size={9} color="#FFFFFF" />
+                          </View>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.5 }}>
+                            {headerTagline}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', lineHeight: 18, marginTop: 1 }}>
+                            {formatUpcomingDate(existingBooking.booking_date)}
+                          </Text>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', lineHeight: 17 }}>
+                            {existingBooking.start_time || '03:00 PM'}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                            <Ionicons name="location-outline" size={11} color="#64748B" />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }} numberOfLines={1}>
+                              {selectedBranch?.name || branches[0]?.name || merchant?.store_name || 'Scoop creamy (HQ)'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Dashed Perforation Line */}
+                      <View style={{ width: 1, height: 50, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: '#E2E8F0', marginHorizontal: 8 }} />
+
+                      {/* Right Section: Compact Pure Black CTA */}
+                      <View style={{ alignItems: 'center', justifyContent: 'center', paddingRight: 6 }}>
+                        <View style={{
+                          backgroundColor: '#000000',
+                          borderRadius: 20,
+                          paddingHorizontal: 15,
+                          paddingVertical: 10,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}>
+                          <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                            {actionBtnText}
+                          </Text>
+                          <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+                        </View>
+                      </View>
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  /* Compact Top-Right Stamp Progress Badge (PRO Plan Feature Only) */
-                  <TouchableOpacity
-                    style={[
-                      styles.topRightStampPill, 
-                      themeStyles.neumorphicCard,
-                      { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }
-                    ]}
-                    onPress={() => setShowLoyaltyModal(true)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={[styles.topRightGiftBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
-                      <Ionicons name="gift" size={14} color={themeStyles.activeBtnText} />
-                    </View>
-                    <Text style={[styles.topRightStampText, { color: themeStyles.textPrimaryColor }]}>
-                      <Text style={{ fontWeight: '800' }}>{stampsCount}/{totalStamps}</Text> stamps
-                    </Text>
-                    <Ionicons name="chevron-forward" size={14} color={themeStyles.priceColor} />
+                );
+              })()}
+
+              {/* 5. Quick Action Navigation (4 Minimal Rounded-Square Icon Tiles) */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 16,
+                marginBottom: 22,
+              }}>
+                {/* 1. Book Appointment (Active) */}
+                <TouchableOpacity style={{ alignItems: 'center', flex: 1 }} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 18,
+                    backgroundColor: '#FEF9C3',
+                    borderWidth: 1,
+                    borderColor: '#FEF08A',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="calendar-outline" size={24} color="#111111" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: '#111111',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    lineHeight: 14,
+                  }}>
+                    Book{'\n'}Appointment
+                  </Text>
+                  <View style={{ width: 22, height: 3, borderRadius: 1.5, backgroundColor: '#FFCC00', marginTop: 4 }} />
+                </TouchableOpacity>
+
+                {/* 2. Menu */}
+                <TouchableOpacity style={{ alignItems: 'center', flex: 1 }} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 18,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="list-outline" size={24} color="#111111" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    lineHeight: 14,
+                  }}>
+                    Menu
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 3. Promotions */}
+                <TouchableOpacity
+                  style={{ alignItems: 'center', flex: 1 }}
+                  onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 18,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="pricetag-outline" size={24} color="#111111" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    lineHeight: 14,
+                  }}>
+                    Promotions
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 4. Vouchers */}
+                <TouchableOpacity
+                  style={{ alignItems: 'center', flex: 1 }}
+                  onPress={() => setShowVouchersModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 18,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="ticket-outline" size={24} color="#111111" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    lineHeight: 14,
+                  }}>
+                    Vouchers
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* 6. Popular Items Section (2-Column Cards) */}
+              <View style={{ marginBottom: 28 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <Text style={{ fontSize: 18, fontFamily: 'Outfit_800ExtraBold', color: '#111111' }}>
+                    Popular Items
+                  </Text>
+                  <TouchableOpacity onPress={() => setCurrentStep(1)} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>See all</Text>
+                    <Ionicons name="chevron-forward" size={13} color="#64748B" />
                   </TouchableOpacity>
+                </View>
+
+                {services.length > 0 ? (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {services.slice(0, 2).map(srv => {
+                      const isSelected = selectedServices.some(s => s.id === srv.id);
+                      return (
+                        <View
+                          key={srv.id}
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: '#F1F5F9',
+                            shadowColor: '#000000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.04,
+                            shadowRadius: 6,
+                            elevation: 1,
+                            padding: 8,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <TouchableOpacity
+                            onPress={() => toggleServiceSelection(srv)}
+                            activeOpacity={0.85}
+                          >
+                            <Image
+                              source={{ uri: srv.image_url || 'https://images.unsplash.com/photo-1557142046-c704a3adf364?w=400&auto=format&fit=crop&q=80' }}
+                              style={{ width: '100%', height: 115, borderRadius: 12, resizeMode: 'cover' }}
+                            />
+                          </TouchableOpacity>
+
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', marginTop: 8, marginBottom: 6 }} numberOfLines={1}>
+                            {srv.name}
+                          </Text>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111' }}>
+                              RM{srv.price}
+                            </Text>
+
+                            <TouchableOpacity
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: isSelected ? '#000000' : '#F8FAFC',
+                                borderWidth: isSelected ? 0 : 1,
+                                borderColor: '#E2E8F0',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              onPress={() => toggleServiceSelection(srv)}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons
+                                name={isSelected ? "checkmark" : "add"}
+                                size={isSelected ? 17 : 18}
+                                color={isSelected ? "#FFFFFF" : "#111111"}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={{ paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      No items published yet.
+                    </Text>
+                  </View>
                 )}
               </View>
 
-              {/* Photos Counter Glassmorphic Badge (Image 1 Style) */}
-              {!isPro && (
-                <View style={{ position: 'absolute', bottom: 12, right: 14, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>1/8</Text>
-                </View>
-              )}
             </View>
-
-            {/* Brand Card Info */}
-            <View style={[styles.brandInfoCard, { backgroundColor: !isPro ? '#FAF8F5' : themeStyles.baseBgColor }, { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0, boxShadow: 'none' }]}>
-
-              {/* RISEV VIP Badge (PRO Plan Only) */}
-              {isPro && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFC700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 }}>
-                  <Ionicons name="sparkles" size={12} color="#000000" />
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.8 }}>RISEV VIP</Text>
-                </View>
-              )}
-
-              {/* PRO PLAN BRANDING & TICKET PASS */}
-              {isPro ? (
-                <>
-                  <Text style={[styles.brandNameText, { color: themeStyles.textPrimaryColor }]}>{merchant?.store_name || 'SCOOP CREAMY'}</Text>
-                  <Text style={[styles.brandSubtitleText, { color: themeStyles.textSecondaryColor }]}>{activeTagline}</Text>
-
-                  {/* Soft Rating Pill Capsule */}
-                  <View style={[styles.ratingCapsulePill, themeStyles.neumorphicInset]}>
-                    <Ionicons name="star" size={24} color="#FFC700" />
-                    <Text style={[styles.ratingCapsuleNum, { color: themeStyles.textPrimaryColor }]}>
-                      {merchant?.rating || '4.9'}
-                    </Text>
-                    <Text style={[styles.ratingCapsuleRev, { color: themeStyles.textSecondaryColor }]}>
-                      ({merchant?.reviews_count || '450'} reviews)
-                    </Text>
-                  </View>
-
-                  {/* Active 3D Neumorphic Booking Ticket Stub Banner (Smart Dynamic State Machine) */}
-                  {existingBooking && existingBooking.id !== dismissedPassId && (() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const bDateStr = existingBooking.booking_date ? existingBooking.booking_date.split('T')[0] : todayStr;
-                    
-                    const isCompleted = existingBooking.status === 'completed';
-                    const isPastDate = bDateStr < todayStr;
-                    const isMissed = isPastDate && !isCompleted;
-
-                    const isTicketCardLight = getContrastColor(themeStyles.activeBrandColor) === '#000000';
-                    const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-                    const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
-                    const ticketPodBgColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.18)';
-                    const ticketPodBorderColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.3)';
-                    const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-                    const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
-                    const ticketDashedLineColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.35)';
-
-                    // Dynamic State Classifier Config
-                    let headerTagline = 'UPCOMING APPOINTMENT';
-                    let headerIcon = 'calendar-outline';
-                    let badgeIcon = 'checkmark';
-                    let badgeBg = '#10B981'; // Emerald Green
-                    let passChipText = 'BOOKING PASS';
-                    let actionBtnText = 'View Pass';
-                    let actionIcon = 'chevron-forward';
-
-                    if (isMissed) {
-                      headerTagline = '⚠️ MISSED APPOINTMENT';
-                      headerIcon = 'alert-circle-outline';
-                      badgeIcon = 'close';
-                      badgeBg = '#EF4444'; // Red
-                      passChipText = 'EXPIRED';
-                      actionBtnText = 'Rebook Slot';
-                      actionIcon = 'refresh-outline';
-                    } else if (isCompleted) {
-                      headerTagline = '🎉 RECENT VISIT';
-                      headerIcon = 'checkmark-circle-outline';
-                      badgeIcon = 'star';
-                      badgeBg = '#3B82F6'; // Blue
-                      passChipText = 'COMPLETED';
-                      actionBtnText = 'Leave Review';
-                      actionIcon = 'star-outline';
-                    }
-
-                    const handleCardPress = () => {
-                      if (isMissed) {
-                        setCurrentStep(1);
-                      } else if (isCompleted) {
-                        handleOpenReviewModal();
-                      } else {
-                        setCreatedBooking(existingBooking);
-                        setCurrentStep(4);
-                      }
-                    };
-
-                    return (
-                      <TouchableOpacity
-                        style={[
-                          styles.upcomingTicketCard,
-                          {
-                            backgroundColor: themeStyles.activeBrandColor,
-                            borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
-                            borderWidth: 1.5,
-                            borderRadius: 22,
-                            position: 'relative',
-                          }
-                        ]}
-                        onPress={handleCardPress}
-                        activeOpacity={0.88}
-                      >
-                        <View style={[styles.ticketNotchLeft, { backgroundColor: themeStyles.baseBgColor }]} />
-                        <View style={[styles.ticketNotchRight, { backgroundColor: themeStyles.baseBgColor }]} />
-
-                        {/* Top-Right Dismiss ✕ Button for Missed or Completed passes */}
-                        {(isMissed || isCompleted) && (
-                          <TouchableOpacity
-                            style={{
-                              position: 'absolute',
-                              top: 8,
-                              right: 8,
-                              zIndex: 20,
-                              width: 22,
-                              height: 22,
-                              borderRadius: 11,
-                              backgroundColor: isTicketCardLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                            onPress={(e: any) => {
-                              e?.stopPropagation?.();
-                              setDismissedPassId(existingBooking.id);
-                            }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <Ionicons name="close" size={13} color={ticketPrimaryTextColor} />
-                          </TouchableOpacity>
-                        )}
-
-                        <View style={styles.ticketLeftInfoCol}>
-                          <View style={[styles.ticketIconContainer, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, borderRadius: 14 }]}>
-                            <Ionicons name={headerIcon as any} size={22} color={ticketPrimaryTextColor} />
-                            <View style={[styles.ticketCheckBadge, { backgroundColor: badgeBg, borderColor: '#FFFFFF' }]}>
-                              <Ionicons name={badgeIcon as any} size={10} color="#FFFFFF" />
-                            </View>
-                          </View>
-                          <View style={{ flex: 1, paddingRight: 4 }}>
-                            <Text style={[styles.ticketHeaderTagline, { color: ticketSecondaryTextColor }]}>{headerTagline}</Text>
-                            <Text style={[styles.ticketDateMainText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{formatUpcomingDate(existingBooking.booking_date)}</Text>
-                            <Text style={[styles.ticketTimeSubText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{existingBooking.start_time || '11:30 AM'}</Text>
-                            <View style={styles.ticketBranchRow}>
-                              <Ionicons name="location" size={12} color={ticketSecondaryTextColor} />
-                              <Text style={[styles.ticketBranchText, { color: ticketSecondaryTextColor }]} numberOfLines={1}>
-                                {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'HQ Store'))}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={[styles.ticketDashedVerticalLine, { borderColor: ticketDashedLineColor }]} />
-
-                        <View style={styles.ticketRightStubCol}>
-                          <View style={[styles.ticketPassChipTag, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}>
-                            <Text style={[styles.ticketPassChipText, { color: ticketPrimaryTextColor }]}>{passChipText}</Text>
-                          </View>
-                          <TouchableOpacity
-                            style={[
-                              styles.ticketViewPassButton,
-                              {
-                                backgroundColor: ticketBtnBgColor,
-                                borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)',
-                                borderWidth: 1,
-                                borderRadius: 16,
-                                paddingHorizontal: 14,
-                                paddingVertical: 8,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                alignSelf: 'center',
-                                gap: 4,
-                              }
-                            ]}
-                            onPress={(e: any) => {
-                              e?.stopPropagation?.();
-                              if (isCompleted) {
-                                handleOpenReviewModal();
-                              } else {
-                                handleCardPress();
-                              }
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={[styles.ticketViewPassBtnText, { color: ticketBtnTextColor }]}>{actionBtnText}</Text>
-                            <Ionicons name={actionIcon as any} size={14} color={ticketBtnTextColor} />
-                          </TouchableOpacity>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })()}
-
-                  {/* Split Meta Location & Operating Hours */}
-                  <View style={styles.splitMetaRow}>
-                    <TouchableOpacity style={styles.splitMetaCol} onPress={handleOpenLocationMap} activeOpacity={0.7}>
-                      <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
-                        <Ionicons name="location-outline" size={20} color={themeStyles.textPrimaryColor} />
-                      </View>
-                      <Text style={[styles.locationBoldText, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                        {selectedBranch?.name || branches[0]?.name || merchant?.address || 'HQ Store'}
-                      </Text>
-                    </TouchableOpacity>
-                    <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
-                    <TouchableOpacity 
-                      style={styles.splitMetaCol} 
-                      onPress={() => setShowHoursModal(true)} 
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
-                        <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
-                      </View>
-                      <View style={{ flexDirection: 'column' }}>
-                        <View style={operatingHoursInfo.isOpen ? styles.openBadgePill : styles.closedBadgePill}>
-                          <Text style={operatingHoursInfo.isOpen ? styles.openBadgeText : styles.closedBadgeText}>
-                            {operatingHoursInfo.isOpen ? 'Open' : 'Closed'}
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
-                            {operatingHoursInfo.todayHoursText}
-                          </Text>
-                          <Ionicons name="chevron-forward" size={11} color={themeStyles.textSecondaryColor} />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
-
-                  {/* Quick Action Navigation Bar */}
-                  <View style={styles.quickNavStrip}>
-                    <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                      <View style={[styles.quickNavCircle, themeStyles.neumorphicActiveBtn]}>
-                        <Ionicons name="calendar" size={22} color={themeStyles.contrastColor} />
-                      </View>
-                      <Text style={[styles.quickNavTitleActive, { color: themeStyles.textPrimaryColor }]}>Book{'\n'}Appointment</Text>
-                      <View style={[styles.activeTabIndicatorLine, { backgroundColor: activeBrandColor }]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickNavItem} onPress={() => setCurrentStep(1)} activeOpacity={0.8}>
-                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                        <Ionicons name="list-outline" size={22} color={themeStyles.textPrimaryColor} />
-                      </View>
-                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Menu</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickNavItem} onPress={() => showToast('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')} activeOpacity={0.8}>
-                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                        <Ionicons name="pricetag-outline" size={22} color={themeStyles.textPrimaryColor} />
-                      </View>
-                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Promotions</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickNavItem} onPress={() => setShowVouchersModal(true)} activeOpacity={0.8}>
-                      <View style={[styles.quickNavCircle, themeStyles.neumorphicInset]}>
-                        <Ionicons name="ticket-outline" size={22} color={themeStyles.textPrimaryColor} />
-                      </View>
-                      <Text style={[styles.quickNavTitle, { color: themeStyles.textSecondaryColor }]}>Vouchers</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                /* ──────────────────────────────────────────────────────────── */
-                /* STARTER / NON-PRO MERCHANT STORE PAGE (EXACT IMAGE 1 REPLICA) */
-                /* ──────────────────────────────────────────────────────────── */
-                <View style={{ width: '100%' }}>
-                  
-                  {/* Merchant Details Card */}
-                  <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
-                    
-                    {/* Header Row: Title + Logo Avatar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <View style={{ flex: 1, paddingRight: 12 }}>
-                        <Text style={{ fontSize: 24, fontFamily: 'Outfit_800ExtraBold', color: '#0F172A', letterSpacing: -0.5, lineHeight: 28 }}>
-                          {merchant?.store_name || 'Jerami Barbershop'}
-                        </Text>
-                      </View>
-
-                      {/* Circular Logo Avatar (Image 1 Style) */}
-                      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: '#E2E8F0' }}>
-                        {merchant?.logo ? (
-                          <Image source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` }} style={{ width: 56, height: 56 }} resizeMode="cover" />
-                        ) : (
-                          <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                            {(merchant?.store_name || 'J').charAt(0).toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Rating, Reviews & Distance */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <Ionicons name="star" size={16} color="#FFC700" />
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                        {merchant?.rating || '4.9'}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                        ({merchant?.reviews_count || '120'} reviews)
-                      </Text>
-                      <Text style={{ fontSize: 13, color: '#CBD5E1' }}>•</Text>
-                      <Ionicons name="location-outline" size={14} color="#0F172A" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                        1.2 km
-                      </Text>
-                    </View>
-
-                    {/* Category & City */}
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>
-                      {merchant?.category || 'Barber'} • {merchant?.city || 'Jitra'}, Kedah
-                    </Text>
-
-                    {/* Status & Hours */}
-                    <TouchableOpacity 
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}
-                      onPress={() => setShowHoursModal(true)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: operatingHoursInfo.isOpen ? '#10B981' : '#EF4444' }} />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: operatingHoursInfo.isOpen ? '#10B981' : '#EF4444' }}>
-                        {operatingHoursInfo.isOpen ? 'Open' : 'Closed'}
-                      </Text>
-                      <Text style={{ fontSize: 13, color: '#CBD5E1' }}>•</Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                        {operatingHoursInfo.todayHoursText}
-                      </Text>
-                      <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
-                    </TouchableOpacity>
-
-                    {/* Rewards Pill & Location Pin Button */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}>
-                        <Ionicons name="gift" size={14} color="#D97706" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#92400E' }}>Earn Risev rewards</Text>
-                      </View>
-
-                      <TouchableOpacity 
-                        style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
-                        onPress={handleOpenLocationMap}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="location-outline" size={18} color="#0F172A" />
-                      </TouchableOpacity>
-                    </View>
-
-                  </View>
-
-                  {/* 🎁 YOUR REWARDS EMBEDDED STAMP CARD (IMAGE 1 EXACT SPEC) */}
-                  <View style={{ backgroundColor: '#FFFDF5', borderRadius: 20, padding: 18, borderWidth: 1.5, borderColor: '#FDE68A', marginBottom: 14 }}>
-                    
-                    {/* Header Row: Title & View All */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Your rewards</Text>
-                      <TouchableOpacity onPress={() => setShowLoyaltyModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>View all</Text>
-                        <Ionicons name="chevron-forward" size={14} color="#64748B" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Stamp Count & Gift Box Icon */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                        <Text style={{ fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{stampsCount}</Text>
-                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>/ {totalStamps} visits</Text>
-                      </View>
-
-                      <TouchableOpacity 
-                        style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FDE68A' }}
-                        onPress={() => setShowLoyaltyModal(true)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="gift" size={22} color="#D97706" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* 10 Visual Stamp Progress Pills (Image 1 Style) */}
-                    <View style={{ flexDirection: 'row', gap: 5, marginBottom: 12 }}>
-                      {Array.from({ length: totalStamps }).map((_, idx) => {
-                        const isFilled = idx < stampsCount;
-                        return (
-                          <View 
-                            key={idx}
-                            style={{
-                              flex: 1,
-                              height: 12,
-                              borderRadius: 6,
-                              backgroundColor: isFilled ? '#FFC700' : '#E2E8F0',
-                              borderWidth: isFilled ? 0 : 1,
-                              borderColor: '#CBD5E1',
-                            }}
-                          />
-                        );
-                      })}
-                    </View>
-
-                    {/* Milestone Subtext Goal */}
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
-                      <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{Math.max(0, totalStamps - stampsCount)} more visits</Text> to unlock <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>25% off haircut</Text>
-                    </Text>
-
-                  </View>
-
-                  {/* 📞 QUICK ACTION BUTTONS ROW (CALL, DIRECTIONS, SHARE) */}
-                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-                    
-                    {/* Call Button */}
-                    <TouchableOpacity
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
-                      onPress={() => {
-                        const phone = merchant?.phone || merchant?.whatsapp || '0123456789';
-                        Linking.openURL(`tel:${phone}`);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="call-outline" size={18} color="#0F172A" />
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Call</Text>
-                    </TouchableOpacity>
-
-                    {/* Directions Button */}
-                    <TouchableOpacity
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
-                      onPress={handleOpenLocationMap}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="location-outline" size={18} color="#0F172A" />
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Directions</Text>
-                    </TouchableOpacity>
-
-                    {/* Share Button */}
-                    <TouchableOpacity
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 12, borderRadius: 16 }}
-                      onPress={() => {
-                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
-                          (navigator as any).share({ title: merchant?.store_name || 'Store', url: window.location.href }).catch(() => {});
-                        } else {
-                          showToast('Store link copied! 🔗');
-                        }
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="share-outline" size={18} color="#0F172A" />
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Share</Text>
-                    </TouchableOpacity>
-
-                  </View>
-
-                </View>
-              )}
-
-            </View>
-
-            {/* Popular Items Horizontal Grid / Carousel */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionHeadingTitle, { color: themeStyles.textPrimaryColor }]}>Popular Items</Text>
-              <TouchableOpacity onPress={() => setCurrentStep(1)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={[styles.seeAllText, { color: themeStyles.textSecondaryColor }]}>See all</Text>
-                <Ionicons name="arrow-forward" size={14} color={themeStyles.textSecondaryColor} />
-              </TouchableOpacity>
-            </View>
-
-            {services.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularCarouselScroll}>
-                {services.slice(0, 5).map(srv => {
-                  const isSelected = selectedServices.some(s => s.id === srv.id);
-                  return (
-                    <View key={srv.id} style={[styles.popularCardItem, themeStyles.neumorphicCard]}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setSelectedServices([srv]);
-                          setCurrentStep(1);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <Image
-                          source={{ uri: srv.image_url || 'https://images.unsplash.com/photo-1557142046-c704a3adf364?w=400&auto=format&fit=crop&q=80' }}
-                          style={styles.popularCardPhoto}
-                        />
-                      </TouchableOpacity>
-
-                      <View style={styles.popularCardBody}>
-                        <Text style={[styles.popularCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>{srv.name}</Text>
-
-                        <View style={styles.popularCardBottomRow}>
-                          <Text style={[styles.popularCardPrice, { color: themeStyles.priceColor }]}>RM{srv.price}</Text>
-
-                          <TouchableOpacity
-                            style={[
-                              styles.popularAddCircleBtn, 
-                              isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
-                            ]}
-                            onPress={() => toggleServiceSelection(srv)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons
-                              name={isSelected ? "checkmark" : "add"}
-                              size={20}
-                              color={isSelected ? themeStyles.activeBtnText : themeStyles.textPrimaryColor}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                <Text style={[styles.seeAllText, { color: themeStyles.textSecondaryColor }]}>No items published yet.</Text>
-              </View>
-            )}
 
           </View>
         )}
 
         {/* ======================================================== */}
-        {/* SCREEN 1: CHOOSE SERVICE (STEP 1 OF 3)                    */}
+        {/* SCREEN 1: CHOOSE SERVICE (STEP 1 OF 3 - REDESIGN V3)     */}
         {/* ======================================================== */}
         {currentStep === 1 && (
-          <View style={styles.stepContainer}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
             
             {/* Walk-in Referral Welcome Banner */}
             {queryRef === 'nfc_walkin' && (
-              <View style={[styles.walkinWelcomeBanner, themeStyles.neumorphicCard]}>
-                <Text style={[styles.walkinWelcomeTitle, { color: themeStyles.textPrimaryColor }]}>
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                padding: 14,
+                marginBottom: 14,
+              }}>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
                   {customerName ? `Welcome back, ${customerName}! 👋` : 'Welcome! 👋'}
                 </Text>
-                <Text style={[styles.walkinWelcomeSub, { color: themeStyles.textSecondaryColor }]}>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 2 }}>
                   Select your service and preferred time slot for your next visit.
                 </Text>
               </View>
             )}
 
-            {/* Step 1: Branch Selector */}
+            {/* 3. Selected Branch Card */}
             <TouchableOpacity
-              style={[styles.dropdownCardBox, themeStyles.neumorphicCard, { marginBottom: 14 }]}
-              onPress={() => setShowBranchPicker(!showBranchPicker)}
-              activeOpacity={0.7}
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 16,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1,
+              }}
+              onPress={() => branches.length > 1 && setShowBranchPicker(!showBranchPicker)}
+              activeOpacity={branches.length > 1 ? 0.7 : 1}
             >
-              <Ionicons name="location-outline" size={18} color={themeStyles.priceColor} />
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: themeStyles.textSecondaryColor }}>SELECTED BRANCH</Text>
-                <Text style={[styles.dropdownTextValue, { color: themeStyles.textPrimaryColor, marginTop: 1 }]}>{selectedBranch?.name || 'Main HQ Branch'}</Text>
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 12,
+              }}>
+                <Ionicons name="location-outline" size={24} color="#000000" />
               </View>
-              <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={18} color={themeStyles.textSecondaryColor} />
+              <View style={{ flex: 1 }}>
+                <Text style={{
+                  fontSize: 10,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: 'rgba(0, 0, 0, 0.5)',
+                  letterSpacing: 0.5,
+                }}>
+                  SELECTED BRANCH
+                </Text>
+                <Text style={{
+                  fontSize: 15.5,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#000000',
+                  marginTop: 2,
+                }} numberOfLines={1}>
+                  {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name ? `${merchant.store_name} (HQ)` : 'Scoop creamy (HQ)'))}
+                </Text>
+              </View>
+              {branches.length > 1 && (
+                <Ionicons name={showBranchPicker ? "chevron-up" : "chevron-down"} size={20} color="#000000" />
+              )}
             </TouchableOpacity>
 
-            {showBranchPicker && branches.length > 0 && (
-              <View style={[styles.pickerOptionsContainer, themeStyles.neumorphicCard, { marginBottom: 14 }]}>
-                {branches.map(br => (
-                  <TouchableOpacity
-                    key={br.id}
-                    style={[
-                      styles.pickerOptionItem,
-                      { backgroundColor: selectedBranch?.id === br.id ? (isBrandDark ? '#262933' : '#FEF08A') : themeStyles.pillBgColor }
-                    ]}
-                    onPress={() => {
-                      setSelectedBranch(br);
-                      setShowBranchPicker(false);
-                    }}
-                  >
-                    <Ionicons name="business-outline" size={16} color={selectedBranch?.id === br.id ? (isBrandDark ? "#FFFFFF" : "#000000") : themeStyles.textSecondaryColor} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickerOptionItemTitle, { color: themeStyles.textPrimaryColor }]}>
-                        {br.name}
-                      </Text>
-                      {br.address ? <Text style={[styles.pickerOptionItemSub, { color: themeStyles.textSecondaryColor }]}>{br.address}</Text> : null}
-                    </View>
-                    {selectedBranch?.id === br.id && <Ionicons name="checkmark-circle" size={16} color={isBrandDark ? "#FFFFFF" : "#000000"} />}
-                  </TouchableOpacity>
-                ))}
+            {/* Branch dropdown options if multiple branches exist */}
+            {showBranchPicker && branches.length > 1 && (
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                padding: 8,
+                marginBottom: 16,
+                marginTop: -8,
+                gap: 6,
+              }}>
+                {branches.map(br => {
+                  const isBrSelected = selectedBranch?.id === br.id;
+                  return (
+                    <TouchableOpacity
+                      key={br.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        backgroundColor: isBrSelected ? '#FFCC00' : 'transparent',
+                        gap: 10,
+                      }}
+                      onPress={() => {
+                        setSelectedBranch(br);
+                        setShowBranchPicker(false);
+                      }}
+                    >
+                      <Ionicons name="business-outline" size={16} color="#000000" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          {br.name}
+                        </Text>
+                        {Boolean(br.address) && (
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 1 }}>
+                            {br.address}
+                          </Text>
+                        )}
+                      </View>
+                      {isBrSelected && <Ionicons name="checkmark-circle" size={16} color="#000000" />}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
-            {/* Horizontal Category Strip */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+            {/* 4. Horizontal Category Strip (Pill Badges) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 18 }}
+              contentContainerStyle={{ gap: 10 }}
+            >
               {availableCategories.map(cat => {
                 const isActive = activeCategory === cat;
                 return (
                   <TouchableOpacity
                     key={cat}
-                    style={[
-                      styles.categoryChipPill,
-                      isActive ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
-                    ]}
+                    style={{
+                      paddingHorizontal: 22,
+                      paddingVertical: 10,
+                      borderRadius: 999,
+                      backgroundColor: isActive ? '#000000' : '#FFFFFF',
+                      borderWidth: isActive ? 0 : 1,
+                      borderColor: 'rgba(0, 0, 0, 0.12)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                     onPress={() => setActiveCategory(cat)}
+                    activeOpacity={0.8}
                   >
-                    <Text style={[styles.categoryChipText, { color: isActive ? themeStyles.activeBtnText : themeStyles.textSecondaryColor }]}>
+                    <Text style={{
+                      fontSize: 14,
+                      fontFamily: 'PlusJakartaSans_700Bold',
+                      color: isActive ? '#FFFFFF' : '#000000',
+                    }}>
                       {cat}
                     </Text>
                   </TouchableOpacity>
@@ -2142,85 +2296,181 @@ export default function CustomerBookingPwaScreen() {
               })}
             </ScrollView>
 
-            {/* Service Cards List */}
+            {/* 5. Section Header: Available Services + count */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 14,
+            }}>
+              <Text style={{
+                fontSize: 20,
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: '#000000',
+              }}>
+                Available Services
+              </Text>
+              <Text style={{
+                fontSize: 13,
+                fontFamily: 'PlusJakartaSans_600SemiBold',
+                color: 'rgba(0, 0, 0, 0.55)',
+              }}>
+                {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'}
+              </Text>
+            </View>
+
+            {/* 6. Service Cards List */}
             {services.length === 0 ? (
-              <View style={[styles.whiteServiceCard, themeStyles.neumorphicCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
-                <Ionicons name="sparkles-outline" size={32} color={themeStyles.textMutedColor} />
-                <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor, marginTop: 10, textAlign: 'center' }]}>No Services Available</Text>
-                <Text style={[styles.whiteServiceSub, { color: themeStyles.textSecondaryColor, textAlign: 'center', marginTop: 4 }]}>
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: 32,
+              }}>
+                <Ionicons name="sparkles-outline" size={32} color="rgba(0, 0, 0, 0.3)" />
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 10, textAlign: 'center' }}>
+                  No Services Available
+                </Text>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', textAlign: 'center', marginTop: 4 }}>
                   This store has not published any services for online booking yet.
                 </Text>
               </View>
             ) : filteredServices.length === 0 ? (
-              <View style={[styles.whiteServiceCard, themeStyles.neumorphicCard, { flexDirection: 'column', alignItems: 'center', padding: 32 }]}>
-                <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor }]}>No items in this category</Text>
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: 32,
+              }}>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                  No items in this category
+                </Text>
               </View>
             ) : (
-              <View style={styles.serviceCardsContainer}>
+              <View style={{ gap: 12 }}>
                 {filteredServices.map(srv => {
-                const isSelected = selectedServices.some(item => item.id === srv.id);
-                return (
-                  <TouchableOpacity
-                    key={srv.id}
-                    style={[
-                      styles.whiteServiceCard,
-                      themeStyles.neumorphicCard,
-                      isSelected && { borderColor: activeBrandColor, borderWidth: 2 }
-                    ]}
-                    onPress={() => toggleServiceSelection(srv)}
-                    activeOpacity={0.85}
-                  >
-                    {srv.image_source ? (
-                      <Image
-                        source={srv.image_source}
-                        style={styles.servicePhotoThumb}
-                      />
-                    ) : srv.image_url ? (
-                      <Image
-                        source={{ uri: srv.image_url }}
-                        style={styles.servicePhotoThumb}
-                      />
-                    ) : (
-                      <View style={[styles.servicePhotoThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
-                        <Ionicons 
-                          name={getServiceItemIcon(srv.item_type) as any} 
-                          size={24} 
-                          color={themeStyles.textMutedColor} 
-                        />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.whiteServiceTitle, { color: themeStyles.textPrimaryColor }]}>{srv.name}</Text>
-                      {Boolean(srv.description) && (
-                        <Text style={[styles.whiteServiceSub, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                          {srv.description}
-                        </Text>
-                      )}
-                      <View style={styles.whiteServiceMetaRow}>
-                        <Ionicons name="time-outline" size={13} color={themeStyles.textSecondaryColor} />
-                        <Text style={[styles.whiteServiceDuration, { color: themeStyles.textSecondaryColor }]}>{srv.duration_minutes} min</Text>
-                        <Text style={[styles.whiteServicePrice, { color: themeStyles.priceColor }]}>RM{srv.price}</Text>
-                      </View>
-                    </View>
-
+                  const isSelected = selectedServices.some(item => item.id === srv.id);
+                  return (
                     <TouchableOpacity
-                      style={[
-                        styles.circleAddBtn, 
-                        isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
-                      ]}
+                      key={srv.id}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 20,
+                        borderWidth: isSelected ? 1.5 : 1,
+                        borderColor: isSelected ? '#FFCC00' : 'rgba(0, 0, 0, 0.08)',
+                        padding: 14,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isSelected ? 0.06 : 0.02,
+                        shadowRadius: 8,
+                        elevation: 2,
+                      }}
                       onPress={() => toggleServiceSelection(srv)}
+                      activeOpacity={0.85}
                     >
-                      <Ionicons
-                        name={isSelected ? 'checkmark' : 'add'}
-                        size={20}
-                        color={isSelected ? themeStyles.activeBtnText : themeStyles.textPrimaryColor}
-                      />
+                      {/* Left: Square Service Image */}
+                      {srv.image_source ? (
+                        <Image
+                          source={srv.image_source}
+                          style={{ width: 88, height: 88, borderRadius: 14 }}
+                          resizeMode="cover"
+                        />
+                      ) : srv.image_url ? (
+                        <Image
+                          source={{ uri: srv.image_url }}
+                          style={{ width: 88, height: 88, borderRadius: 14 }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={{
+                          width: 88,
+                          height: 88,
+                          borderRadius: 14,
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: 'rgba(0, 0, 0, 0.06)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Ionicons 
+                            name={getServiceItemIcon(srv.item_type) as any} 
+                            size={28} 
+                            color="rgba(0, 0, 0, 0.4)" 
+                          />
+                        </View>
+                      )}
+
+                      {/* Center: Details */}
+                      <View style={{ flex: 1, paddingRight: 4 }}>
+                        <Text style={{
+                          fontSize: 15.5,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#000000',
+                          lineHeight: 20,
+                        }} numberOfLines={2}>
+                          {srv.name}
+                        </Text>
+                        
+                        {/* Duration with Clock Icon */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <Ionicons name="time-outline" size={13.5} color="rgba(0, 0, 0, 0.6)" />
+                          <Text style={{
+                            fontSize: 12.5,
+                            fontFamily: 'PlusJakartaSans_600SemiBold',
+                            color: 'rgba(0, 0, 0, 0.6)',
+                          }}>
+                            {srv.duration_minutes || 60} min
+                          </Text>
+                        </View>
+
+                        {/* Subtle Divider */}
+                        <View style={{ height: 1, backgroundColor: 'rgba(0, 0, 0, 0.05)', marginVertical: 6 }} />
+
+                        {/* Price */}
+                        <Text style={{
+                          fontSize: 17,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#000000',
+                        }}>
+                          RM{srv.price}
+                        </Text>
+                      </View>
+
+                      {/* Right: Circular Selection Button */}
+                      <TouchableOpacity
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 19,
+                          backgroundColor: isSelected ? '#FFCC00' : '#FFFFFF',
+                          borderWidth: isSelected ? 0 : 1,
+                          borderColor: 'rgba(0, 0, 0, 0.2)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => toggleServiceSelection(srv)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'checkmark' : 'add'}
+                          size={20}
+                          color="#000000"
+                        />
+                      </TouchableOpacity>
                     </TouchableOpacity>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
+                  );
+                })}
+              </View>
+            )}
 
           </View>
         )}
@@ -2569,344 +2819,509 @@ export default function CustomerBookingPwaScreen() {
         )}
 
         {/* ======================================================== */}
-        {/* SCREEN 4: DIGITAL PASS & CONFIRMATION                     */}
-        {/* ======================================================== */}
+        {/* SCREEN 4: DIGITAL PASS & CONFIRMATION (APPLE WALLET x FRESHA) */}
         {currentStep === 4 && (
           <View style={styles.stepContainer}>
             {/* Top Navigation Row (Back & Options) */}
-            <View style={styles.passHeaderNavRow}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}>
               <TouchableOpacity
-                style={[styles.passNavCircleBtn, themeStyles.neumorphicInset]}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.1)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 6,
+                }}
                 onPress={() => setCurrentStep(0)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="chevron-back" size={20} color={themeStyles.textPrimaryColor} />
+                <Ionicons name="chevron-back" size={20} color="#000000" />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.passNavCircleBtn, themeStyles.neumorphicInset]}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.1)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 6,
+                }}
                 onPress={() => showToast('Share or Save Pass')}
                 activeOpacity={0.8}
               >
-                <Ionicons name="ellipsis-horizontal" size={20} color={themeStyles.textPrimaryColor} />
+                <Ionicons name="ellipsis-horizontal" size={20} color="#000000" />
               </TouchableOpacity>
             </View>
 
-            {/* Header Title & 3D Graphic Hero Section */}
-            <View style={styles.passHeroHeaderRow}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <View style={styles.ticketGreenBadge}>
-                  <View style={styles.pulseDotGreen} />
-                  <Text style={styles.ticketBadgeGreenText}>BOOKING CONFIRMED</Text>
+            {/* Header Title & Minimalist Calendar Hero Section */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: 16,
+            }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                {/* Yellow Rounded Badge with Checkmark */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  alignSelf: 'flex-start',
+                  backgroundColor: '#FFCC00',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 16,
+                  marginBottom: 10,
+                }}>
+                  <View style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    backgroundColor: '#000000',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="checkmark" size={10} color="#FFCC00" />
+                  </View>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.4 }}>
+                    BOOKING CONFIRMED
+                  </Text>
                 </View>
-                <Text style={[styles.boardingPassTitle, { color: themeStyles.textPrimaryColor }]}>
+
+                <Text style={{ fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', lineHeight: 36, marginBottom: 4 }}>
                   Appointment Pass
                 </Text>
-                <Text style={[styles.boardingPassSubTitle, { color: themeStyles.textSecondaryColor }]}>
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: '#000000', opacity: 0.85 }}>
                   Your appointment is ready.
                 </Text>
               </View>
 
-              {/* 3D Calendar Graphic Illustration */}
-              <View style={styles.calendarGraphicContainer}>
-                <View style={styles.calendarGraphicSunburst}>
-                  <Text style={{ fontSize: 16 }}>✨</Text>
+              {/* Minimal Apple-Style Calendar Confirmation Illustration */}
+              <View style={{ width: 68, height: 68, position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ position: 'absolute', top: 0, right: 0, zIndex: 3 }}>
+                  <Text style={{ fontSize: 15 }}>✨</Text>
                 </View>
-                <View style={[styles.calendarGraphicCardBox, { backgroundColor: themeStyles.isPageDark ? '#262933' : '#FFFFFF' }]}>
-                  <View style={styles.calendarGraphicTopBar}>
-                    <View style={styles.calendarRingBinding} />
-                    <View style={styles.calendarRingBinding} />
+                <View style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 16,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 2,
+                  borderColor: '#000000',
+                  transform: [{ rotate: '5deg' }],
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 8,
+                }}>
+                  {/* Calendar Top Ring Binders */}
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    left: 0,
+                    right: 0,
+                    flexDirection: 'row',
+                    justifyContent: 'space-around',
+                    paddingHorizontal: 8,
+                  }}>
+                    <View style={{ width: 4, height: 8, borderRadius: 2, backgroundColor: '#000000' }} />
+                    <View style={{ width: 4, height: 8, borderRadius: 2, backgroundColor: '#000000' }} />
                   </View>
-                  <View style={[styles.calendarGraphicBody, { backgroundColor: themeStyles.isPageDark ? '#1E2028' : '#FFFBEA' }]} />
-                  <View style={styles.calendarGraphicBadgeCheck}>
+
+                  {/* Yellow Check Badge */}
+                  <View style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: '#FFCC00',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
                     <Ionicons name="checkmark" size={16} color="#000000" />
                   </View>
                 </View>
               </View>
             </View>
 
-            {/* Main Appointment Ticket Pass Card (Smart Dynamic Contrast Pass) */}
-            {(() => {
-              const isTicketCardLight = getContrastColor(themeStyles.activeBrandColor) === '#000000';
-              const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-              const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
-              const ticketPodBgColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.18)';
-              const ticketPodBorderColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.25)';
-              const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
-              const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
+            {/* Main Appointment Ticket Card (Pure White with Ticket Cutouts & Perforation) */}
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.1)',
+              borderRadius: 24,
+              position: 'relative',
+              overflow: 'hidden',
+              padding: 20,
+              marginBottom: 16,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 12,
+              elevation: 3,
+            }}>
+              {/* Left Notch Cutout */}
+              <View style={{
+                position: 'absolute',
+                left: -10,
+                top: 135,
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.1)',
+                zIndex: 5,
+              }} />
+              {/* Right Notch Cutout */}
+              <View style={{
+                position: 'absolute',
+                right: -10,
+                top: 135,
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.1)',
+                zIndex: 5,
+              }} />
 
-              return (
-                <View style={[
-                  styles.passMainCard,
-                  {
-                    backgroundColor: themeStyles.activeBrandColor,
-                    borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
-                    borderWidth: 1.5,
-                    borderRadius: 24,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    padding: 16,
-                    marginBottom: 16,
-                    ...(Platform.OS === 'web' ? {
-                      boxShadow: isTicketCardLight
-                        ? '4px 6px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                        : '4px 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                    } : {
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 3, height: 5 },
-                      shadowOpacity: isTicketCardLight ? 0.1 : 0.25,
-                      shadowRadius: 7,
-                      elevation: 5,
-                    }),
-                  }
-                ]}>
-                  {/* Left Notch Cutout */}
-                  <View style={[styles.ticketNotchLeft, { backgroundColor: themeStyles.baseBgColor }]} />
-                  {/* Right Notch Cutout */}
-                  <View style={[styles.ticketNotchRight, { backgroundColor: themeStyles.baseBgColor }]} />
-
-                  {/* Top Tagline & Status Header Row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: ticketPodBgColor,
-                      paddingHorizontal: 12,
-                      paddingVertical: 5,
-                      borderRadius: 14,
-                      borderColor: ticketPodBorderColor,
-                      borderWidth: 1,
-                    }}>
-                      <Ionicons name="calendar" size={12} color={ticketPrimaryTextColor} />
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketPrimaryTextColor, letterSpacing: 0.5 }}>
-                        UPCOMING APPOINTMENT
-                      </Text>
-                    </View>
-
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 5,
-                      backgroundColor: ticketPodBgColor,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      borderColor: ticketPodBorderColor,
-                      borderWidth: 1,
-                    }}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: ticketPrimaryTextColor }}>Ongoing</Text>
-                    </View>
-                  </View>
-
-                  {/* Store & Service Info Row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <View style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 14,
-                      backgroundColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.08)' : '#FFFFFF',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Ionicons name="storefront" size={22} color={isTicketCardLight ? '#0F172A' : themeStyles.activeBrandColor} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketPrimaryTextColor }} numberOfLines={1}>
-                        {merchant?.store_name || 'Risev Official Merchant'}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: ticketSecondaryTextColor }} numberOfLines={1}>
-                        {selectedServices.map(s => s.name).join(', ') || createdBooking?.service_name || 'Fade Cut'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Inset Recessed Scheduled Slot & Location Pod */}
-                  <View style={{
-                    backgroundColor: ticketPodBgColor,
-                    borderColor: ticketPodBorderColor,
-                    borderWidth: 1,
-                    borderRadius: 16,
-                    padding: 12,
-                    marginBottom: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    ...(Platform.OS === 'web' ? {
-                      boxShadow: isTicketCardLight
-                        ? 'inset 2px 2px 5px rgba(0, 0, 0, 0.08), inset -2px -2px 5px rgba(255, 255, 255, 0.8)'
-                        : 'inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.15)',
-                    } : {}),
-                  }}>
-                    {/* Scheduled Slot */}
-                    <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="time-outline" size={18} color={ticketPrimaryTextColor} />
-                      <View>
-                        <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketSecondaryTextColor, letterSpacing: 0.5 }}>SCHEDULED SLOT</Text>
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: ticketPrimaryTextColor }}>
-                          {selectedDate} @ {createdBooking?.start_time || selectedTime}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Location */}
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketSecondaryTextColor, letterSpacing: 0.5 }}>LOCATION</Text>
-                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: ticketPrimaryTextColor, textAlign: 'right' }} numberOfLines={1}>
-                        {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Risev Official Merchant (HQ)'))}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Big 3D Popping View Pass & Check In Button */}
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: ticketBtnBgColor,
-                      borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.9)',
-                      borderWidth: 1,
-                      borderRadius: 18,
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      ...(Platform.OS === 'web' ? {
-                        boxShadow: isTicketCardLight
-                          ? '3px 3px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                          : '3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                      } : {
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 2, height: 4 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 5,
-                        elevation: 4,
-                      }),
-                    }}
-                    activeOpacity={0.85}
-                    onPress={() => showToast('Pass Checked In Successfully!')}
-                  >
-                    <Ionicons name="qr-code-outline" size={18} color={ticketBtnTextColor} />
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: ticketBtnTextColor }}>
-                      View Pass & Check In ➔
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-
-            {/* Stepper Progress Bar Pill */}
-            <View style={[styles.passStepperBarCard, themeStyles.neumorphicCard]}>
-              {/* Step 1: Booked */}
-              <View style={styles.stepperItemCol}>
-                <View style={[styles.stepperCircleCompleted, { backgroundColor: themeStyles.priceColor }]}>
-                  <Ionicons name="checkmark" size={15} color={themeStyles.activeBtnText} />
-                </View>
-                <Text style={[styles.stepperLabelCompleted, { color: themeStyles.textPrimaryColor }]}>Booked</Text>
-              </View>
-
-              {/* Connecting Line 1-2 with Flowing Shimmer Light Beam */}
-              <View style={[styles.stepperLineTrack, { backgroundColor: themeStyles.priceColor, overflow: 'hidden', position: 'relative' }]}>
-                {!hasArrived && (
-                  <Animated.View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      width: 24,
-                      backgroundColor: 'rgba(255, 255, 255, 0.85)',
-                      borderRadius: 2,
-                      transform: [{ translateX: shimmerTranslate }],
-                    }}
-                  />
-                )}
-              </View>
-
-              {/* Step 2: Arrive (with Radar Pulse Beacon) */}
-              <View style={styles.stepperItemCol}>
-                <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-                  {!hasArrived && (
-                    <Animated.View
-                      style={{
-                        position: 'absolute',
-                        width: 28,
-                        height: 28,
-                        borderRadius: 14,
-                        backgroundColor: themeStyles.priceColor,
-                        transform: [{ scale: pulseScale }],
-                        opacity: pulseOpacity,
-                      }}
-                    />
-                  )}
-                  <View style={[styles.stepperCircleActive, { backgroundColor: themeStyles.priceColor, shadowColor: themeStyles.priceColor }]}>
-                    <Ionicons name={hasArrived ? "checkmark" : "location"} size={14} color={themeStyles.activeBtnText} />
-                  </View>
+              {/* Top Row: UPCOMING APPOINTMENT & Yellow CONFIRMED Badge */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 14,
+                  borderColor: 'rgba(0, 0, 0, 0.12)',
+                  borderWidth: 1,
+                }}>
+                  <Ionicons name="calendar-outline" size={13} color="#000000" />
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>
+                    UPCOMING APPOINTMENT
+                  </Text>
                 </View>
 
-                {/* Arrive Label with Live Pulsing Indicator */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  {!hasArrived && (
-                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#EF4444' }} />
-                  )}
-                  <Text style={[styles.stepperLabelActive, { color: themeStyles.textPrimaryColor }]}>
-                    Arrive
+                {/* Yellow CONFIRMED badge */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  backgroundColor: '#FFCC00',
+                  paddingHorizontal: 10,
+                  paddingVertical: 4.5,
+                  borderRadius: 12,
+                }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#000000' }} />
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                    CONFIRMED
                   </Text>
                 </View>
               </View>
 
-              {/* Connecting Line 2-3 */}
-              <View style={[styles.stepperLineTrack, { backgroundColor: hasArrived ? themeStyles.priceColor : themeStyles.borderColor }]} />
-
-              {/* Step 3: Service */}
-              <View style={styles.stepperItemCol}>
-                <View style={[styles.stepperCircleMuted, themeStyles.neumorphicInset]}>
-                  <Ionicons name="cut-outline" size={14} color={themeStyles.textMutedColor} />
+              {/* Merchant Info: Logo/Icon + Store Name + Service Name */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="storefront" size={24} color="#000000" />
                 </View>
-                <Text style={[styles.stepperLabelMuted, { color: themeStyles.textMutedColor }]}>Service</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }} numberOfLines={1}>
+                    {merchant?.store_name || 'Scoop creamy'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', opacity: 0.8, marginTop: 2 }} numberOfLines={1}>
+                    {selectedServices.map(s => s.name).join(', ') || createdBooking?.service_name || 'Catering Aiskrim 300pax'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Dashed Perforation Divider */}
+              <View style={{
+                height: 1,
+                borderTopWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: 'rgba(0, 0, 0, 0.12)',
+                marginHorizontal: -4,
+                marginBottom: 16,
+              }} />
+
+              {/* Booking Information: 2 Columns (Scheduled Slot + Location) */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 18,
+              }}>
+                {/* Left: Scheduled Slot */}
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                    <Ionicons name="time-outline" size={17} color="#000000" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>
+                      SCHEDULED SLOT
+                    </Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 2, lineHeight: 17 }}>
+                      {selectedDate} @ {createdBooking?.start_time || selectedTime}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Right: Location */}
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                    <Ionicons name="location-outline" size={17} color="#000000" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>
+                      LOCATION
+                    </Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 2, lineHeight: 17 }} numberOfLines={2}>
+                      {selectedBranch?.name || (branches.length > 0 ? branches[0].name : (merchant?.store_name || 'Scoop creamy (HQ)'))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Pass Action: Pure Black Button with White QR & Arrow */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#000000',
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                activeOpacity={0.85}
+                onPress={() => showToast('Pass Checked In Successfully!')}
+              >
+                <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
+                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', flex: 1, textAlign: 'center' }}>
+                  View Pass & Check In
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 4. Horizontal Three-Step Progress Tracker */}
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 20,
+              paddingVertical: 16,
+              paddingHorizontal: 20,
+              marginBottom: 16,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.03,
+              shadowRadius: 6,
+              elevation: 2,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* Step 1: Booked */}
+                <View style={{ alignItems: 'center', width: 60 }}>
+                  <View style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: '#000000',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  </View>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 6 }}>
+                    Booked
+                  </Text>
+                </View>
+
+                {/* Connecting Line 1-2 (Solid Black) */}
+                <View style={{ flex: 1, height: 2, backgroundColor: '#000000', marginHorizontal: 6, marginBottom: 18 }} />
+
+                {/* Step 2: Arrive */}
+                <View style={{ alignItems: 'center', width: 60 }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: hasArrived ? '#000000' : '#FFCC00',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#FFCC00',
+                    shadowOpacity: hasArrived ? 0 : 0.35,
+                    shadowRadius: 6,
+                    elevation: 3,
+                  }}>
+                    <Ionicons name={hasArrived ? "checkmark" : "location"} size={18} color={hasArrived ? "#FFFFFF" : "#000000"} />
+                  </View>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 6 }}>
+                    Arrive
+                  </Text>
+                </View>
+
+                {/* Connecting Line 2-3 (Dashed or Solid based on status) */}
+                <View style={{
+                  flex: 1,
+                  height: 1,
+                  borderTopWidth: 2,
+                  borderStyle: hasArrived ? 'solid' : 'dashed',
+                  borderColor: hasArrived ? '#000000' : 'rgba(0, 0, 0, 0.25)',
+                  marginHorizontal: 6,
+                  marginBottom: 18,
+                }} />
+
+                {/* Step 3: Service */}
+                <View style={{ alignItems: 'center', width: 60 }}>
+                  <View style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: hasArrived ? '#FFCC00' : '#FFFFFF',
+                    borderWidth: hasArrived ? 0 : 1.5,
+                    borderColor: '#000000',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="cut-outline" size={15} color="#000000" />
+                  </View>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', marginTop: 6 }}>
+                    Service
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* Primary Action Button: I HAVE ARRIVED */}
+            {/* 5. Arrival Check-In Button (Pure Black Pill Button) */}
             <TouchableOpacity
               onPress={handleArrived}
               activeOpacity={0.88}
-              style={styles.btnArrivedGradientTouchable}
+              style={{
+                backgroundColor: '#000000',
+                borderRadius: 999,
+                minHeight: 56,
+                paddingVertical: 16,
+                paddingHorizontal: 22,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 10,
+                elevation: 4,
+              }}
             >
-              <LinearGradient
-                colors={hasArrived ? ['#22C55E', '#16A34A'] : ['#FFE033', '#FFB800']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.btnArrivedGradientContainer}
-              >
-                <View style={[styles.btnArrivedPinCircleBox, hasArrived && { backgroundColor: '#FFFFFF' }]}>
-                  <Ionicons name="location" size={18} color={hasArrived ? '#16A34A' : '#FACC15'} />
-                </View>
-                <Text style={[styles.btnArrivedGradientTextTitle, hasArrived && { color: '#FFFFFF' }]}>
-                  {hasArrived ? '✓ ARRIVAL CONFIRMED' : 'I HAVE ARRIVED'}
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color={hasArrived ? '#FFFFFF' : '#000000'} />
-              </LinearGradient>
+              <View style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="location" size={18} color="#FFFFFF" />
+              </View>
+              <Text style={{
+                fontSize: 15,
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: '#FFFFFF',
+                letterSpacing: 0.5,
+              }}>
+                {hasArrived ? '✓ ARRIVAL CONFIRMED' : 'I HAVE ARRIVED'}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
-            {/* Instruction Subtext below button */}
-            <Text style={[styles.arrivedInstructionSubtext, { color: themeStyles.textSecondaryColor }]}>
+            {/* Helper Text */}
+            <Text style={{
+              fontSize: 12,
+              fontFamily: 'PlusJakartaSans_500Medium',
+              color: 'rgba(0, 0, 0, 0.55)',
+              textAlign: 'center',
+              marginTop: 10,
+              marginBottom: 16,
+            }}>
               Tap the button below as soon as you step inside the store.
             </Text>
 
-            {/* Booking Reminder Web Push Card */}
+            {/* 6. Compact Appointment Reminder Card (English) */}
             {isPushSupported() && (
-              <View style={[styles.pwaCardBox, themeStyles.neumorphicCard, { marginBottom: 12, borderColor: isPushSubscribed ? '#10B981' : themeStyles.borderColor }]}>
-                <View style={[styles.pwaIconBoxYellow, { backgroundColor: isPushSubscribed ? '#ECFDF5' : '#FEF3C7' }]}>
-                  <Ionicons name={isPushSubscribed ? "notifications" : "notifications-outline"} size={22} color={isPushSubscribed ? "#059669" : "#D97706"} />
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                borderRadius: 20,
+                padding: 14,
+                marginBottom: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 2,
+              }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}>
+                  {/* Subtle Yellow Sparkle Accent */}
+                  <View style={{ position: 'absolute', top: 2, right: 3 }}>
+                    <Text style={{ fontSize: 9 }}>✨</Text>
+                  </View>
+                  <Ionicons name="notifications" size={20} color="#000000" />
                 </View>
                 <View style={{ flex: 1, paddingRight: 6 }}>
-                  <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
                     {isPushSubscribed
                       ? (locale === 'ms' ? 'Peringatan Temujanji Aktif' : 'Appointment Reminder Active')
                       : (locale === 'ms' ? 'Peringatan Temujanji' : 'Appointment Reminder')}
                   </Text>
-                  <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 2, lineHeight: 15 }}>
                     {isPushSubscribed
                       ? (locale === 'ms'
                           ? 'Notifikasi akan dihantar 2 jam & 30 minit sebelum slot.'
@@ -2916,11 +3331,14 @@ export default function CustomerBookingPwaScreen() {
                           : 'Get automatic push reminders 2 hours & 30 mins before your slot.')}
                   </Text>
                 </View>
+
                 <TouchableOpacity
-                  style={[
-                    styles.btnInstallPwaYellowPill,
-                    isPushSubscribed && { backgroundColor: '#10B981' }
-                  ]}
+                  style={{
+                    backgroundColor: '#FFCC00',
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 14,
+                  }}
                   onPress={handleSubscribePushReminder}
                   disabled={isSubscribingPush || isPushSubscribed}
                   activeOpacity={0.8}
@@ -2928,7 +3346,7 @@ export default function CustomerBookingPwaScreen() {
                   {isSubscribingPush ? (
                     <ActivityIndicator size="small" color="#000000" />
                   ) : (
-                    <Text style={[styles.btnInstallPwaTextBlack, isPushSubscribed && { color: '#FFFFFF' }]}>
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
                       {isPushSubscribed
                         ? (locale === 'ms' ? 'Aktif ✓' : 'Active ✓')
                         : (locale === 'ms' ? 'Aktifkan 🔔' : 'Enable 🔔')}
@@ -2939,82 +3357,163 @@ export default function CustomerBookingPwaScreen() {
             )}
 
             {/* Save Merchant App PWA Card */}
-            <View style={[styles.pwaCardBox, themeStyles.neumorphicCard]}>
-              <View style={styles.pwaIconBoxYellow}>
-                <Ionicons name="phone-portrait-outline" size={22} color="#854D0E" />
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 20,
+              padding: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <View style={{
+                width: 40,
+                height: 40,
+                borderRadius: 14,
+                backgroundColor: '#FFFDF0',
+                borderWidth: 1,
+                borderColor: '#FEF08A',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#000000" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>
-                  Save {merchant?.store_name || 'Risev Official Merchant'} App
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                  Save {merchant?.store_name || 'Scoop creamy'} App
                 </Text>
-                <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 2 }}>
                   Get instant slot reminders & fast re-booking
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.btnInstallPwaYellowPill}
+                style={{
+                  backgroundColor: '#000000',
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 12,
+                }}
                 onPress={() => showToast('Tap Share ➔ Add to Home Screen')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.btnInstallPwaTextBlack}>Install</Text>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Install</Text>
               </TouchableOpacity>
             </View>
+
           </View>
         )}
 
       </ScrollView>
 
-      {/* Screen 0 Floating Yellow Button (PRO Plan Only) */}
-      {currentStep === 0 && isPro && (
-        <View style={[styles.floatingBottomProfileContainer, { backgroundColor: themeStyles.baseBgColor, borderTopColor: themeStyles.borderColor }]}>
+      {/* Screen 0 Floating Booking Button (Fresha x Apple iOS style) */}
+      {currentStep === 0 && (isPro || services.length > 0) && (
+        <View style={styles.floatingBottomProfileContainer}>
           <TouchableOpacity
-            style={[styles.btnFullYellowBook, themeStyles.neumorphicActiveBtn]}
+            style={styles.btnFullYellowBook}
             onPress={() => setCurrentStep(1)}
             activeOpacity={0.85}
           >
-            <Text style={[styles.btnFullYellowBookText, { color: themeStyles.contrastColor }]}>Book Appointment</Text>
+            <Text style={styles.btnFullYellowBookText}>Book Appointment</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Sticky Dark Action Bar (Steps 1, 2, 3) */}
+      {/* 7. Sticky Booking Summary (Steps 1, 2, 3 - Apple iOS Floating Sticky Bar) */}
       {currentStep > 0 && currentStep < 4 && (
-        <View style={[styles.stickyDarkBar, { backgroundColor: themeStyles.baseBgColor, borderTopColor: themeStyles.borderColor }]}>
+        <View style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(0, 0, 0, 0.08)',
+          paddingHorizontal: 20,
+          paddingTop: 14,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 5,
+        }}>
           <View>
             {currentStep === 1 && (
               <>
-                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''}</Text>
-                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>RM {calculateTotal().toFixed(2)}</Text>
+                <Text style={{
+                  fontSize: 12.5,
+                  fontFamily: 'PlusJakartaSans_600SemiBold',
+                  color: 'rgba(0, 0, 0, 0.55)',
+                }}>
+                  {selectedServices.length} service{selectedServices.length === 1 ? '' : 's'} selected
+                </Text>
+                <Text style={{
+                  fontSize: 24,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#000000',
+                  marginTop: 2,
+                }}>
+                  RM{calculateTotal().toFixed(2)}
+                </Text>
               </>
             )}
 
             {currentStep === 2 && (
               <>
-                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedDate}</Text>
-                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>{selectedTime}</Text>
+                <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(0, 0, 0, 0.55)' }}>
+                  {selectedDate}
+                </Text>
+                <Text style={{ fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 2 }}>
+                  {selectedTime}
+                </Text>
               </>
             )}
 
             {currentStep === 3 && (
               <>
-                <Text style={[styles.darkBarPriceTotal, { color: themeStyles.priceColor }]}>RM {calculateTotal().toFixed(2)}</Text>
-                <Text style={[styles.darkBarMetaLabel, { color: themeStyles.textSecondaryColor }]}>{selectedServices.length} service • {calculateTotalDuration()} min</Text>
+                <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(0, 0, 0, 0.55)' }}>
+                  {selectedServices.length} service • {calculateTotalDuration()} min
+                </Text>
+                <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 2 }}>
+                  RM{calculateTotal().toFixed(2)}
+                </Text>
               </>
             )}
           </View>
 
           <TouchableOpacity
-            style={[styles.btnYellowContinue, themeStyles.neumorphicActiveBtn]}
+            style={{
+              backgroundColor: '#000000',
+              borderRadius: 999,
+              minHeight: 56,
+              paddingHorizontal: 26,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              opacity: (currentStep === 1 && selectedServices.length === 0) ? 0.35 : 1,
+            }}
             onPress={handleNextStep}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (currentStep === 1 && selectedServices.length === 0)}
             activeOpacity={0.85}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={themeStyles.contrastColor} />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={[styles.btnYellowContinueText, { color: themeStyles.contrastColor }]}>
-                {currentStep === 3 ? 'Confirm & Book 🚀' : 'Continue ➔'}
-              </Text>
+              <>
+                <Text style={{
+                  fontSize: 16,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#FFFFFF',
+                }}>
+                  {currentStep === 3 ? 'Confirm & Book 🚀' : 'Continue'}
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </>
             )}
           </TouchableOpacity>
         </View>
@@ -4740,7 +5239,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // Floating Bottom Yellow CTA (Screen 0)
+  // Floating Bottom Booking CTA (Screen 0)
   floatingBottomProfileContainer: {
     position: 'absolute',
     bottom: 0,
@@ -4748,20 +5247,28 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#F1F5F9',
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 99,
   },
   btnFullYellowBook: {
-    backgroundColor: '#FFC700',
-    paddingVertical: 15,
-    borderRadius: 16,
+    backgroundColor: '#000000',
+    paddingVertical: 16,
+    borderRadius: 24,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   btnFullYellowBookText: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
 
   // Sticky Dark Action Bar (Steps 1, 2, 3)

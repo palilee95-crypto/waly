@@ -76,7 +76,7 @@
     .phone-frame {
       width: 100%;
       max-width: 390px;
-      background: var(--risev-bg-light);
+      background: #FFFFFF;
       border: 2px solid #2A2B36;
       border-radius: 36px;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 199, 0, 0.08);
@@ -104,41 +104,61 @@
       z-index: 50;
     }
 
-    /* Header Nav (Steps 1 to 3) */
+    /* Header Nav (Steps 1 to 3 - Apple iOS Style) */
     .header-nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 44px 16px 12px;
+      padding: 12px 16px 10px;
       background: #FFFFFF;
-      border-bottom: 1px solid var(--risev-border);
     }
 
     .btn-nav-back {
-      width: 34px;
-      height: 34px;
-      border-radius: 17px;
-      background: #F1F5F9;
-      border: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 21px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
       font-weight: 800;
-      color: #0F172A;
+      color: #000000;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
     }
 
     .header-nav-title {
-      font-size: 15px;
+      font-size: 18px;
       font-weight: 800;
-      color: #0F172A;
+      color: #000000;
     }
 
     .header-step-badge {
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 600;
-      color: #64748B;
+      color: rgba(0, 0, 0, 0.55);
+    }
+
+    /* Horizontal 3-Segment Progress Indicator */
+    .progress-indicator-bar {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 12px;
+      background: #FFFFFF;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .prog-segment {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .prog-segment.active {
+      background: #FFCC00;
     }
 
     /* Body View Scroll */
@@ -460,99 +480,191 @@
       overflow-x: auto;
     }
 
-    .cat-pill {
-      padding: 8px 18px;
-      border-radius: 9999px;
-      background: #F1F5F9;
-      font-size: 12px;
+    /* ================================================= */
+    /* SCREEN 1: CHOOSE SERVICE (Fresha x Apple iOS)     */
+    /* ================================================= */
+    .step-1-container {
+      padding: 14px 16px 120px;
+      background: #FFFFFF;
+    }
+
+    .branch-card-row {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      cursor: pointer;
+    }
+
+    .branch-icon-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      background: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      color: #000000;
+    }
+
+    .branch-card-lbl {
+      font-size: 10px;
+      font-weight: 800;
+      color: rgba(0, 0, 0, 0.5);
+      letter-spacing: 0.5px;
+    }
+
+    .branch-card-val {
+      font-size: 15.5px;
+      font-weight: 800;
+      color: #000000;
+      margin-top: 2px;
+    }
+
+    .branch-chevron {
+      color: #000000;
+      display: flex;
+      align-items: center;
+    }
+
+    .cat-filter-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      margin-bottom: 18px;
+      scrollbar-width: none;
+    }
+    .cat-filter-scroll::-webkit-scrollbar { display: none; }
+
+    .cat-filter-chip {
+      padding: 10px 22px;
+      border-radius: 999px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      font-size: 14px;
       font-weight: 700;
-      color: #64748B;
+      color: #000000;
       cursor: pointer;
       white-space: nowrap;
     }
 
-    .cat-pill.active {
-      background: var(--risev-yellow);
+    .cat-filter-chip.active {
+      background: #000000;
+      color: #FFFFFF;
+      border: none;
+    }
+
+    .available-services-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .avail-title {
+      font-size: 20px;
+      font-weight: 800;
       color: #000000;
     }
 
-    .services-stack {
-      padding: 0 16px;
+    .avail-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.55);
+    }
+
+    .services-v3-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
-    .service-white-card {
+    .service-v3-card {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      padding: 14px;
       display: flex;
       align-items: center;
-      background: #FFFFFF;
-      border: 1.5px solid var(--risev-border);
-      border-radius: 18px;
-      padding: 12px 14px;
       gap: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
       cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .service-white-card.selected {
-      border-color: var(--risev-yellow);
-      background: var(--risev-yellow-light);
+    .service-v3-card.selected {
+      border: 1.5px solid #FFCC00;
+      box-shadow: 0 4px 12px rgba(255, 204, 0, 0.15);
     }
 
-    .service-white-card img {
-      width: 58px;
-      height: 58px;
+    .srv-v3-thumb {
+      width: 88px;
+      height: 88px;
       border-radius: 14px;
       object-fit: cover;
+      flex-shrink: 0;
     }
 
-    .srv-details {
+    .srv-v3-info {
       flex: 1;
+      padding-right: 4px;
     }
 
-    .srv-title {
-      font-size: 14px;
+    .srv-v3-title {
+      font-size: 15.5px;
       font-weight: 800;
-      color: #0F172A;
+      color: #000000;
+      line-height: 1.25;
     }
 
-    .srv-desc {
-      font-size: 11px;
-      color: #64748B;
-      margin: 2px 0;
-    }
-
-    .srv-meta-line {
-      font-size: 11px;
-      color: #64748B;
+    .srv-v3-meta-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
+      margin-top: 4px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.6);
     }
 
-    .srv-price {
-      font-size: 13px;
+    .srv-v3-divider {
+      height: 1px;
+      background: rgba(0, 0, 0, 0.05);
+      margin: 6px 0;
+    }
+
+    .srv-v3-price {
+      font-size: 17px;
       font-weight: 800;
-      color: #0F172A;
+      color: #000000;
     }
 
-    .btn-circle-add {
-      width: 32px;
-      height: 32px;
-      border-radius: 16px;
-      background: var(--risev-yellow);
-      border: none;
+    .btn-v3-select-circle {
+      width: 38px;
+      height: 38px;
+      border-radius: 19px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.2);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
-      color: #000000;
       cursor: pointer;
+      color: #000000;
+      font-size: 18px;
+      font-weight: 800;
+      flex-shrink: 0;
     }
 
-    .btn-circle-add.added {
-      background: #0F172A;
-      color: #FFFFFF;
+    .btn-v3-select-circle.selected {
+      background: #FFCC00;
+      border: none;
+      color: #000000;
+      font-size: 15px;
     }
 
     /* ================================================= */
@@ -758,37 +870,70 @@
     /* ================================================= */
     /* SCREEN 4: APPOINTMENT PASS                        */
     /* ================================================= */
+    /* SCREEN 4: APPOINTMENT PASS (Apple Wallet x Fresha) */
+    /* ================================================= */
     .pass-container {
       padding: 16px;
+      background: #FFFFFF;
     }
 
-    /* New Pass Styles (Image 2 Redesign) */
     .pass-nav-circle-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 20px;
+      width: 42px;
+      height: 42px;
+      border-radius: 21px;
       background: #FFFFFF;
-      border: 1px solid #E2E8F0;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-      color: #0F172A;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      color: #000000;
+    }
+
+    .pass-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #FFCC00;
+      padding: 5px 10px;
+      border-radius: 16px;
+      margin-bottom: 8px;
+    }
+
+    .pass-badge-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 7px;
+      background: #000000;
+      color: #FFCC00;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .pass-badge span {
+      font-size: 11px;
+      font-weight: 800;
+      color: #000000;
+      letter-spacing: 0.4px;
     }
 
     .pass-hero-title {
-      font-size: 26px;
+      font-size: 30px;
       font-weight: 800;
-      color: #0F172A;
-      margin-top: 2px;
-      line-height: 1.2;
+      color: #000000;
+      line-height: 1.15;
+      margin: 0 0 4px 0;
     }
 
     .pass-hero-subtitle {
       font-size: 14px;
-      color: #64748B;
-      margin-top: 2px;
+      color: #000000;
+      opacity: 0.85;
+      margin: 0;
       font-weight: 500;
     }
 
@@ -796,13 +941,16 @@
       position: relative;
       width: 64px;
       height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .pass-calendar-graphic .sunburst {
       position: absolute;
-      top: -8px;
-      right: -4px;
-      font-size: 16px;
+      top: -2px;
+      right: 0;
+      font-size: 14px;
       z-index: 2;
     }
 
@@ -810,378 +958,363 @@
       width: 52px;
       height: 52px;
       background: #FFFFFF;
-      border-radius: 14px;
-      border: 2px solid #FEF08A;
-      box-shadow: 0 8px 16px rgba(250, 204, 21, 0.25);
-      transform: rotate(6deg);
-      padding: 4px;
+      border: 2px solid #000000;
+      border-radius: 16px;
+      transform: rotate(5deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       position: relative;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     }
 
     .pass-calendar-graphic .cal-header {
-      height: 12px;
-      background: #FEF08A;
-      border-radius: 6px;
+      position: absolute;
+      top: -6px;
+      left: 0;
+      right: 0;
       display: flex;
       justify-content: space-around;
-      padding: 0 6px;
+      padding: 0 8px;
     }
 
     .pass-calendar-graphic .cal-ring {
       width: 4px;
       height: 8px;
       border-radius: 2px;
-      background: #EAB308;
-      margin-top: -3px;
-    }
-
-    .pass-calendar-graphic .cal-body {
-      height: 28px;
-      background: #FFFBEA;
-      border-radius: 6px;
-      margin-top: 4px;
+      background: #000000;
     }
 
     .pass-calendar-graphic .cal-check {
-      position: absolute;
-      bottom: 2px;
-      right: 2px;
-      width: 22px;
-      height: 22px;
-      border-radius: 11px;
-      background: #FACC15;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 800;
-      color: #000000;
-      border: 1.5px solid #FFFFFF;
-    }
-
-    .pass-main-card {
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      border-radius: 24px;
-      padding: 18px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-      margin-bottom: 16px;
-    }
-
-    .pass-service-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .pass-service-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 15px;
-      background: #FEF9C3;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-    }
-
-    .pass-lbl { font-size: 11px; color: #64748B; font-weight: 500; }
-    .pass-service-name { font-size: 18px; font-weight: 800; color: #0F172A; margin-top: 1px; }
-
-    .pass-divider {
-      height: 1px;
-      background: #F1F5F9;
-      margin: 14px 0;
-    }
-
-    .pass-datetime-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .pass-icon-grey {
-      width: 42px;
-      height: 42px;
-      border-radius: 13px;
-      background: #F8FAFC;
-      border: 1px solid #F1F5F9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-
-    .pass-val-bold { font-size: 13px; font-weight: 700; color: #0F172A; }
-
-    .pass-countdown-pill {
-      background: #FFFBEA;
-      border: 1px solid #FEF08A;
-      border-radius: 16px;
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .pass-clock-icon {
-      width: 30px;
-      height: 30px;
-      border-radius: 15px;
-      background: #FEF08A;
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: #FFCC00;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
+      font-weight: 900;
+      color: #000000;
     }
 
-    .pass-pill-lbl { font-size: 10px; color: #854D0E; font-weight: 500; }
-    .pass-pill-val { font-size: 13px; font-weight: 800; color: #D97706; }
+    .pass-main-card {
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 24px;
+      position: relative;
+      overflow: hidden;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
 
-    .pass-provider-branch-row {
+    .pass-cutout-left {
+      position: absolute;
+      left: -10px;
+      top: 130px;
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      z-index: 5;
+    }
+
+    .pass-cutout-right {
+      position: absolute;
+      right: -10px;
+      top: 130px;
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      z-index: 5;
+    }
+
+    .pass-perforation-line {
+      height: 1px;
+      border-top: 1px dashed rgba(0, 0, 0, 0.12);
+      margin: 16px -4px;
+    }
+
+    .btn-pass-action {
+      width: 100%;
+      background: #000000;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 18px;
       display: flex;
       align-items: center;
-    }
-
-    .pass-vdivider {
-      width: 1px;
-      height: 34px;
-      background: #E2E8F0;
-      margin: 0 10px;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     }
 
     .pass-stepper-bar {
       background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      border-radius: 30px;
-      padding: 12px 18px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     }
 
     .stepper-step {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
+      width: 60px;
     }
 
     .stepper-circle {
-      width: 28px;
-      height: 28px;
-      border-radius: 14px;
+      width: 32px;
+      height: 32px;
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 800;
     }
 
-    .stepper-circle.completed { background: #FFC700; color: #000; }
-    .stepper-circle.active { background: #FFC700; color: #000; box-shadow: 0 0 10px rgba(255, 199, 0, 0.5); }
-    .stepper-circle.muted { background: #F1F5F9; color: #94A3B8; }
-
-    .stepper-lbl { font-size: 11px; }
-    .stepper-lbl.completed { font-weight: 700; color: inherit; }
-    .stepper-lbl.active { font-weight: 800; color: inherit; }
-    .stepper-lbl.muted { font-weight: 500; color: #94A3B8; }
-
-    /* Stepper Radar Beacon & Shimmer Beam Animations */
-    @keyframes radarPulse {
-      0% {
-        transform: scale(1);
-        opacity: 0.8;
-      }
-      70% {
-        transform: scale(1.8);
-        opacity: 0.35;
-      }
-      100% {
-        transform: scale(2.2);
-        opacity: 0;
-      }
+    .stepper-circle.step-booked {
+      background: #000000;
+      color: #FFFFFF;
     }
 
-    @keyframes shimmerBeam {
-      0% {
-        transform: translateX(-100%);
-      }
-      100% {
-        transform: translateX(300%);
-      }
-    }
-
-    .radar-beacon-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .radar-beacon-ring {
-      position: absolute;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #FFC700;
-      animation: radarPulse 1.8s infinite ease-out;
-      pointer-events: none;
-    }
-
-    .stepper-line.shimmer-active {
-      position: relative;
-      overflow: hidden;
-      background: #FFC700;
-    }
-
-    .stepper-line.shimmer-active::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      width: 50%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
-      animation: shimmerBeam 2s infinite ease-in-out;
-    }
-
-    .stepper-line.active { background: #FFC700; }
-
-    .btn-arrived-gradient {
-      width: 100%;
-      padding: 16px 20px;
-      background: linear-gradient(135deg, #FFE033 0%, #FFB800 100%);
-      border: none;
-      border-radius: 30px;
-      font-size: 16px;
-      font-weight: 800;
+    .stepper-circle.step-arrive {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      background: #FFCC00;
       color: #000000;
-      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
+    }
+
+    .stepper-circle.step-service {
+      background: #FFFFFF;
+      border: 1.5px solid #000000;
+      color: #000000;
+    }
+
+    .stepper-lbl {
+      font-size: 12px;
+      font-weight: 700;
+      color: #000000;
+    }
+
+    .stepper-line-solid {
+      flex: 1;
+      height: 2px;
+      background: #000000;
+      margin: 0 6px 18px 6px;
+    }
+
+    .stepper-line-dashed {
+      flex: 1;
+      height: 1px;
+      border-top: 2px dashed rgba(0, 0, 0, 0.25);
+      margin: 0 6px 18px 6px;
+    }
+
+    .btn-arrived-pill {
+      width: 100%;
+      min-height: 56px;
+      border-radius: 999px;
+      background: #000000;
+      border: none;
+      padding: 16px 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
-    .btn-arrived-pin {
-      width: 34px;
-      height: 34px;
-      border-radius: 17px;
-      background: #000000;
+    .btn-arrived-pill-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.15);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
     }
 
-    .btn-arrived-arrow {
-      font-size: 18px;
-    }
-
     .arrived-subtext {
       font-size: 12px;
-      color: #64748B;
+      color: rgba(0, 0, 0, 0.55);
       text-align: center;
       margin-top: 10px;
       margin-bottom: 16px;
+      font-weight: 500;
     }
 
-    .pwa-install-box {
+    .pass-reminder-card {
       background: #FFFFFF;
-      border: 1px solid #E2E8F0;
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 20px;
       padding: 14px 16px;
       display: flex;
       align-items: center;
       gap: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      margin-bottom: 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    }
+
+    .pass-reminder-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: #F8FAFC;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      position: relative;
+    }
+
+    .btn-reminder-active-pill {
+      background: #FFCC00;
+      color: #000000;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .pwa-install-box {
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     }
 
     .pwa-icon {
       width: 44px;
       height: 44px;
       border-radius: 14px;
-      background: #FEF9C3;
+      background: #FFCC00;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
+      color: #000000;
     }
 
-    .pwa-title { font-size: 13px; font-weight: 700; color: #0F172A; }
-    .pwa-sub { font-size: 11px; color: #64748B; margin-top: 1px; }
+    .pwa-title { font-size: 13px; font-weight: 800; color: #000000; }
+    .pwa-sub { font-size: 11px; color: rgba(0, 0, 0, 0.6); margin-top: 1px; font-weight: 500; }
 
     .btn-install-yellow {
-      background: #FFC700;
+      background: #000000;
       border: none;
       padding: 8px 16px;
       border-radius: 12px;
       font-size: 12px;
       font-weight: 800;
-      color: #000000;
+      color: #FFFFFF;
       cursor: pointer;
     }
 
-    /* Sticky Dark Action Bar */
+    /* Sticky Summary Bar (Pure White with Pure Black CTA) */
     .sticky-dark-bar {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      background: var(--risev-dark);
-      padding: 14px 20px;
+      background: #FFFFFF;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      padding: 14px 20px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       z-index: 40;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
     }
 
     .dark-bar-total {
-      font-size: 18px;
+      font-size: 24px;
       font-weight: 800;
-      color: var(--risev-yellow);
+      color: #000000;
+      margin-top: 2px;
     }
 
     .dark-bar-sub {
-      font-size: 11px;
-      color: #94A3B8;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.55);
     }
 
     .btn-yellow-continue {
-      padding: 14px 24px;
-      background: var(--risev-yellow);
+      padding: 16px 26px;
+      min-height: 56px;
+      background: #000000;
       border: none;
-      border-radius: 14px;
-      font-size: 14px;
+      border-radius: 999px;
+      font-size: 16px;
       font-weight: 800;
-      color: #000000;
+      color: #FFFFFF;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .btn-profile-book {
       width: 100%;
-      padding: 15px;
-      background: var(--risev-yellow);
+      padding: 16px;
+      background: #000000;
       border: none;
-      border-radius: 16px;
-    /* Upcoming Ticket Stub Banner CSS (Solid Brand Color Background - Premium Pass) */
+      border-radius: 24px;
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s;
+    }
+    .btn-profile-book:active {
+      opacity: 0.9;
+    }
+
+    /* Upcoming Ticket Stub Banner CSS (Apple Wallet Style - Fresha x iOS) */
     .upcoming-ticket-stub {
-      background: #FF477E;
-      border: 1.5px solid rgba(255, 255, 255, 0.35);
-      border-radius: 22px;
+      background: #FFFFFF;
+      border: 1px solid #F1F5F9;
+      border-radius: 20px;
       padding: 14px 16px;
-      margin: 16px 16px;
+      margin: 12px 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: relative;
       overflow: hidden;
       cursor: pointer;
-      box-shadow: 4px 6px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
       transition: all 0.2s ease;
     }
 
@@ -1191,27 +1324,27 @@
 
     .ticket-notch-left {
       position: absolute;
-      left: -10px;
+      left: -8px;
       top: 50%;
-      margin-top: -10px;
-      width: 20px;
-      height: 20px;
-      border-radius: 10px;
-      background: var(--risev-bg-light);
-      border: none;
+      margin-top: -8px;
+      width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
       z-index: 5;
     }
 
     .ticket-notch-right {
       position: absolute;
-      right: -10px;
+      right: -8px;
       top: 50%;
-      margin-top: -10px;
-      width: 20px;
-      height: 20px;
-      border-radius: 10px;
-      background: var(--risev-bg-light);
-      border: none;
+      margin-top: -8px;
+      width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
       z-index: 5;
     }
 
@@ -1224,120 +1357,96 @@
 
     .ticket-icon-box {
       position: relative;
-      width: 46px;
-      height: 46px;
+      width: 44px;
+      height: 44px;
       border-radius: 14px;
-      background: rgba(0, 0, 0, 0.16);
+      background: #F8FAFC;
+      border: 1px solid #F1F5F9;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      color: #FFFFFF;
-      box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 20px;
+      color: #111111;
     }
 
     .ticket-check-dot {
       position: absolute;
       bottom: -2px;
       right: -2px;
-      width: 18px;
-      height: 18px;
-      border-radius: 9px;
+      width: 16px;
+      height: 16px;
+      border-radius: 8px;
       background: #10B981;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 800;
       color: #FFFFFF;
       border: 1.5px solid #FFFFFF;
-      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
     }
 
     .ticket-tagline {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: rgba(255, 255, 255, 0.85);
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748B;
       letter-spacing: 0.5px;
       margin-bottom: 2px;
     }
 
     .ticket-date-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 800;
-      color: #FFFFFF;
+      color: #111111;
       line-height: 1.2;
     }
 
     .ticket-time-title {
       font-size: 13px;
       font-weight: 700;
-      color: #FFFFFF;
+      color: #111111;
       line-height: 1.2;
     }
 
     .ticket-loc-row {
       font-size: 11px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.9);
-      margin-top: 4px;
+      font-weight: 500;
+      color: #64748B;
+      margin-top: 3px;
     }
 
     .ticket-v-line {
       width: 1px;
-      height: 54px;
-      border-left: 1.5px dashed rgba(255, 255, 255, 0.35);
+      height: 48px;
+      border-left: 1px dashed #CBD5E1;
       margin: 0 10px;
     }
 
     .ticket-right-stub {
-      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-    }
-
-    .ticket-pass-badge {
-      background: rgba(0, 0, 0, 0.18);
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 9px;
-      font-weight: 800;
-      color: #FFFFFF;
-      letter-spacing: 0.5px;
-      box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2), inset -2px -2px 4px rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      text-align: center;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      align-self: center;
     }
 
     .btn-ticket-view-pass {
-      background: #FFFFFF;
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      padding: 8px 14px;
-      border-radius: 16px;
+      background: #000000;
+      border: none;
+      padding: 9px 15px;
+      border-radius: 20px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      align-self: center;
       gap: 4px;
       font-size: 12px;
-      font-weight: 800;
-      color: #000000;
+      font-weight: 700;
+      color: #FFFFFF;
       cursor: pointer;
-      box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 2px 8px rgba(16, 24, 40, 0.15);
+      transition: transform 0.15s ease;
     }
 
     .btn-ticket-view-pass:active {
       transform: scale(0.96);
-      box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
@@ -1349,6 +1458,7 @@
     <button class="proto-tab-btn" onclick="switchStep(1)">2. Service</button>
     <button class="proto-tab-btn" onclick="switchStep(2)">3. Date/Time</button>
     <button class="proto-tab-btn" onclick="switchStep(3)">4. Details</button>
+    <button class="proto-tab-btn" onclick="switchStep(4)">5. Pass</button>
   </div>
 
   <!-- Mobile Phone Frame -->
@@ -1362,9 +1472,18 @@
 
     <!-- Dynamic Header Nav (Steps 1, 2, 3) -->
     <div id="headerNav" class="header-nav" style="display: none;">
-      <button class="btn-nav-back" onclick="prevStep()">‹</button>
+      <button class="btn-nav-back" onclick="prevStep()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
       <div id="headerTitle" class="header-nav-title">Select Service</div>
       <div id="stepBadge" class="header-step-badge">Step 1 of 3</div>
+    </div>
+
+    <!-- Horizontal 3-Segment Progress Indicator (Steps 1, 2, 3) -->
+    <div id="progressIndicatorBar" class="progress-indicator-bar" style="display: none;">
+      <div id="progSeg1" class="prog-segment active"></div>
+      <div id="progSeg2" class="prog-segment"></div>
+      <div id="progSeg3" class="prog-segment"></div>
     </div>
 
     <!-- Scrollable View Container -->
@@ -1373,65 +1492,94 @@
       <!-- =================================================== -->
       <!-- SCREEN 0: BUSINESS PROFILE LANDING                  -->
       <!-- =================================================== -->
-      <div id="step-0" class="step-pane active">
-        <div class="cover-box">
-          <div class="cover-controls">
-            <button class="icon-btn-circle">‹</button>
-            <div style="display: flex; gap: 8px;">
-              <button class="icon-btn-circle">♡</button>
-              <button class="icon-btn-circle">⬆</button>
+      <!-- =================================================== -->
+      <!-- SCREEN 0: BUSINESS PROFILE LANDING (FRESHA X APPLE) -->
+      <!-- =================================================== -->
+      <div id="step-0" class="step-pane active" style="background: #FFFFFF;">
+        
+        <!-- 1. Full-Width Hero Cover with Rounded Bottom Corners -->
+        <div style="width: 100%; height: 320px; position: relative; border-bottom-left-radius: 28px; border-bottom-right-radius: 28px; overflow: hidden; background: #FFFFFF;">
+          <img src="./assets/scoop-creamy-hero.jpg" alt="Scoop creamy" style="width: 100%; height: 100%; object-fit: cover;" />
+          
+          <!-- Floating Top Controls Row -->
+          <div style="position: absolute; top: 18px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; z-index: 10;">
+            <!-- Floating Back Button -->
+            <button style="width: 40px; height: 40px; border-radius: 20px; background: #FFFFFF; border: 1px solid #F1F5F9; box-shadow: 0 4px 12px rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #111111; font-size: 18px; font-weight: 800;">‹</button>
+            
+            <!-- Floating Loyalty Stamp Pill -->
+            <div style="background: #FFFFFF; border-radius: 20px; padding: 6px 12px; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); cursor: pointer; border: 1px solid #F1F5F9;">
+              <span style="background: #FEF08A; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px;">🎁</span>
+              <span style="font-size: 12px; font-weight: 800; color: #111111;">5/10 stamps</span>
+              <span style="font-size: 12px; font-weight: 800; color: #111111;">›</span>
             </div>
           </div>
         </div>
 
-        <div class="profile-card-header">
-          <div class="floating-store-logo">🍦</div>
-
-          <div class="brand-title">SCOOP CREAMY</div>
-          <div class="brand-sub">Handcrafted Gelato • Waffles • Desserts</div>
-
-          <div class="dual-badges-row">
-            <div class="rating-pill-badge">
-              <span class="star">★</span>
-              <span>4.9</span>
-              <span class="rev-count">(450 reviews)</span>
+        <!-- 2. Merchant Info & Profile Body -->
+        <div style="padding: 18px 20px 24px; background: #FFFFFF;">
+          
+          <!-- VIP Badge + Title + Rating Pill -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1; padding-right: 12px;">
+              <!-- Yellow VIP Badge -->
+              <div style="display: inline-flex; align-items: center; gap: 4px; background: #FFCC00; padding: 3px 8px; border-radius: 7px; font-size: 10px; font-weight: 800; color: #000000; margin-bottom: 6px;">
+                <span>✨</span>
+                <span>RISEV VIP</span>
+              </div>
+              <h1 style="font-size: 26px; font-weight: 800; color: #111111; margin: 0; line-height: 1.15; font-family: 'Plus Jakarta Sans', sans-serif;">Scoop creamy</h1>
+              <p style="font-size: 13px; font-weight: 500; color: #64748B; margin: 4px 0 0;">Quality Services &amp; Online Booking</p>
             </div>
 
-            <div class="status-pill-badge">
-              <div class="live-pulse-dot"></div>
-              <span>Open • 11 AM - 11 PM</span>
+            <!-- Compact Rating Pill -->
+            <div style="background: #FFFFFF; border: 1px solid #F1F5F9; border-radius: 20px; padding: 6px 12px; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); align-self: flex-start;">
+              <span style="color: #EAB308; font-size: 13px;">★</span>
+              <span style="font-size: 13px; font-weight: 800; color: #111111;">5.0</span>
+              <span style="font-size: 11px; font-weight: 500; color: #64748B;">(120 reviews)</span>
             </div>
           </div>
 
-          <div class="location-tags-strip">
-            <span>📍 Bangi Sentral</span>
-            <span>•</span>
-            <span class="tag-chip-sm">Artisanal</span>
-            <span class="tag-chip-sm">Dine-In</span>
+          <!-- 3. Location & Operating Hours Horizontal Row -->
+          <div style="margin-top: 14px; background: #FFFFFF; border: 1px solid #F1F5F9; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+            <!-- Left: Branch -->
+            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+              <div style="width: 34px; height: 34px; border-radius: 17px; background: #F8FAFC; border: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: center; font-size: 15px;">📍</div>
+              <div style="font-size: 13px; font-weight: 700; color: #111111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scoop creamy (HQ)</div>
+            </div>
+
+            <!-- Vertical Divider -->
+            <div style="width: 1px; height: 26px; background: #E2E8F0; margin: 0 12px;"></div>
+
+            <!-- Right: Hours -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 34px; height: 34px; border-radius: 17px; background: #F8FAFC; border: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: center; font-size: 15px;">🕒</div>
+              <div>
+                <div style="background: #DCFCE7; color: #15803D; font-size: 10px; font-weight: 800; padding: 1.5px 7px; border-radius: 6px; display: inline-block;">Open</div>
+                <div style="font-size: 11px; font-weight: 500; color: #64748B; margin-top: 2px;">11:00 AM – 11:00 PM</div>
+              </div>
+            </div>
           </div>
 
-          <!-- Upcoming Appointment Ticket Stub (Image 2 Redesign) -->
+          <!-- 4. Upcoming Appointment Pass (Apple Wallet Style) -->
           <div class="upcoming-ticket-stub" onclick="switchStep(4)">
             <div class="ticket-notch-left"></div>
             <div class="ticket-notch-right"></div>
             
             <div class="ticket-left-info">
               <div class="ticket-icon-box">
-                📅
+                <span>📅</span>
                 <div class="ticket-check-dot">✓</div>
               </div>
               <div>
                 <div class="ticket-tagline">UPCOMING APPOINTMENT</div>
-                <div class="ticket-date-title">Thu, 8 Oct 2026</div>
-                <div class="ticket-time-title">03:30 PM</div>
-                <div class="ticket-loc-row">📍 Risev Official Merchant (HQ)</div>
+                <div class="ticket-date-title">Sun, Oct 11</div>
+                <div class="ticket-time-title">03:00 PM</div>
+                <div class="ticket-loc-row">📍 Scoop creamy (HQ)</div>
               </div>
             </div>
 
             <div class="ticket-v-line"></div>
 
             <div class="ticket-right-stub">
-              <div class="ticket-pass-badge">BOOKING PASS</div>
               <button class="btn-ticket-view-pass">
                 <span>View Pass</span>
                 <span>›</span>
@@ -1439,99 +1587,153 @@
             </div>
           </div>
 
-          <div class="profile-tabs-strip">
-            <button class="prof-tab-btn active">Book</button>
-            <button class="prof-tab-btn" onclick="switchStep(1)">Menu</button>
-            <button class="prof-tab-btn">Promotions</button>
-            <button class="prof-tab-btn">Vouchers 🎟️</button>
-          </div>
-        </div>
-
-        <div class="section-row">
-          <h4>Popular Services</h4>
-          <a href="#" onclick="switchStep(1)">See all</a>
-        </div>
-
-        <div class="popular-list">
-          <div class="popular-card" onclick="switchStep(1)">
-            <img src="https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=300&auto=format&fit=crop&q=80" alt="Double Scoop Gelato" />
-            <div class="popular-info">
-              <div class="popular-name">Double Scoop Artisanal Gelato</div>
-              <div class="popular-meta">10 min • <strong>RM 18</strong></div>
+          <!-- 5. Quick Action Navigation (4 Minimal Tiles) -->
+          <div style="margin: 16px 0 24px; display: flex; gap: 10px;">
+            <!-- 1. Book Appointment (Active) -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="switchStep(1)">
+              <div style="width: 64px; height: 64px; border-radius: 18px; background: #FEF9C3; border: 1px solid #FEF08A; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 2px 6px rgba(254, 240, 138, 0.4);">
+                📅
+              </div>
+              <div style="font-size: 11px; font-weight: 700; color: #111111; text-align: center; margin-top: 6px; line-height: 1.2;">Book<br>Appointment</div>
+              <div style="width: 16px; height: 3px; border-radius: 2px; background: #FFCC00; margin-top: 4px;"></div>
             </div>
-            <div class="popular-arrow">➔</div>
+
+            <!-- 2. Menu -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="switchStep(1)">
+              <div style="width: 64px; height: 64px; border-radius: 18px; background: #F8FAFC; border: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                📋
+              </div>
+              <div style="font-size: 11px; font-weight: 600; color: #64748B; text-align: center; margin-top: 6px; line-height: 1.2;">Menu</div>
+            </div>
+
+            <!-- 3. Promotions -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="alert('Promotions: Buy 2 Scoops Get 1 Waffle 20% Off! 🍦')">
+              <div style="width: 64px; height: 64px; border-radius: 18px; background: #F8FAFC; border: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                🏷️
+              </div>
+              <div style="font-size: 11px; font-weight: 600; color: #64748B; text-align: center; margin-top: 6px; line-height: 1.2;">Promotions</div>
+            </div>
+
+            <!-- 4. Vouchers -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="alert('Claim your voucher for RM10 off!')">
+              <div style="width: 64px; height: 64px; border-radius: 18px; background: #F8FAFC; border: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                🎟️
+              </div>
+              <div style="font-size: 11px; font-weight: 600; color: #64748B; text-align: center; margin-top: 6px; line-height: 1.2;">Vouchers</div>
+            </div>
           </div>
 
-          <div class="popular-card" onclick="switchStep(1)">
-            <img src="https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=300&auto=format&fit=crop&q=80" alt="Belgian Waffle" />
-            <div class="popular-info">
-              <div class="popular-name">Signature Belgian Waffle with Gelato</div>
-              <div class="popular-meta">15 min • <strong>RM 24</strong></div>
+          <!-- 6. Popular Items (2 Columns) -->
+          <div style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 18px; font-weight: 800; color: #111111; margin: 0;">Popular Items</h3>
+              <a href="#" onclick="switchStep(1)" style="font-size: 13px; font-weight: 600; color: #64748B; text-decoration: none; display: flex; align-items: center; gap: 3px;">
+                <span>See all</span>
+                <span>›</span>
+              </a>
             </div>
-            <div class="popular-arrow">➔</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <!-- Product Card 1 -->
+              <div style="background: #FFFFFF; border-radius: 16px; border: 1px solid #F1F5F9; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                <div style="height: 118px; width: 100%; position: relative;">
+                  <img src="https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=400&auto=format&fit=crop&q=80" alt="Catering Aiskrim" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+                <div style="padding: 10px 10px 12px;">
+                  <div style="font-size: 13px; font-weight: 700; color: #111111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Catering Aiskrim 3...</div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <div style="font-size: 14px; font-weight: 800; color: #111111;">RM850</div>
+                    <button style="width: 30px; height: 30px; border-radius: 15px; background: #000000; border: none; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; cursor: pointer;">✓</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Product Card 2 -->
+              <div style="background: #FFFFFF; border-radius: 16px; border: 1px solid #F1F5F9; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                <div style="height: 118px; width: 100%; position: relative;">
+                  <img src="https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&auto=format&fit=crop&q=80" alt="Premium Aiskrim" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+                <div style="padding: 10px 10px 12px;">
+                  <div style="font-size: 13px; font-weight: 700; color: #111111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Premium aiskrim c...</div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <div style="font-size: 14px; font-weight: 800; color: #111111;">RM1450</div>
+                    <button style="width: 30px; height: 30px; border-radius: 15px; background: #F8FAFC; border: 1px solid #E2E8F0; color: #111111; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; cursor: pointer;">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="popular-card" onclick="switchStep(1)">
-            <img src="https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300&auto=format&fit=crop&q=80" alt="Affogato" />
-            <div class="popular-info">
-              <div class="popular-name">Affogato Espresso Delight</div>
-              <div class="popular-meta">10 min • <strong>RM 14</strong></div>
-            </div>
-            <div class="popular-arrow">➔</div>
-          </div>
         </div>
       </div>
 
       <!-- =================================================== -->
-      <!-- SCREEN 1: CHOOSE SERVICE (STEP 1 OF 3)              -->
+      <!-- SCREEN 1: CHOOSE SERVICE (STEP 1 OF 3 - V3 REDESIGN)-->
       <!-- =================================================== -->
       <div id="step-1" class="step-pane">
-        <div class="cat-strip">
-          <div class="cat-pill active">All</div>
-          <div class="cat-pill">Gelato Scoops</div>
-          <div class="cat-pill">Waffles & Pastries</div>
-          <div class="cat-pill">Beverages</div>
-        </div>
-
-        <div class="services-stack">
-          <div class="service-white-card selected">
-            <img src="https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=300&auto=format&fit=crop&q=80" alt="Double Scoop Gelato" />
-            <div class="srv-details">
-              <div class="srv-title">Double Scoop Artisanal Gelato</div>
-              <div class="srv-desc">Choose 2 flavors of fresh handcrafted gelato</div>
-              <div class="srv-meta-line">
-                <span>⏱ 10 min</span>
-                <span class="srv-price">RM 18</span>
-              </div>
+        <div class="step-1-container">
+          
+          <!-- 3. Selected Branch Card -->
+          <div class="branch-card-row" onclick="alert('Selected Branch: Scoop creamy (HQ)')">
+            <div class="branch-icon-circle">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-7.5-8-12a8 8 0 1 1 16 0c0 4.5-8 12-8 12z"/><circle cx="12" cy="9" r="3"/></svg>
             </div>
-            <button class="btn-circle-add added">✓</button>
+            <div style="flex: 1;">
+              <div class="branch-card-lbl">SELECTED BRANCH</div>
+              <div class="branch-card-val">Scoop creamy (HQ)</div>
+            </div>
+            <div class="branch-chevron">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
           </div>
 
-          <div class="service-white-card">
-            <img src="https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=300&auto=format&fit=crop&q=80" alt="Belgian Waffle" />
-            <div class="srv-details">
-              <div class="srv-title">Signature Belgian Waffle with Gelato</div>
-              <div class="srv-desc">Baked waffle topped with 1 gelato scoop</div>
-              <div class="srv-meta-line">
-                <span>⏱ 15 min</span>
-                <span class="srv-price">RM 24</span>
-              </div>
-            </div>
-            <button class="btn-circle-add">+</button>
+          <!-- 4. Category Filters -->
+          <div class="cat-filter-scroll">
+            <button class="cat-filter-chip active" onclick="toggleProtoCat(this)">All</button>
+            <button class="cat-filter-chip" onclick="toggleProtoCat(this)">Other</button>
           </div>
 
-          <div class="service-white-card">
-            <img src="https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=300&auto=format&fit=crop&q=80" alt="Single Scoop Cone" />
-            <div class="srv-details">
-              <div class="srv-title">Single Scoop Gelato Cone</div>
-              <div class="srv-desc">1 scoop of premium gelato in waffle cone</div>
-              <div class="srv-meta-line">
-                <span>⏱ 5 min</span>
-                <span class="srv-price">RM 10</span>
-              </div>
-            </div>
-            <button class="btn-circle-add">+</button>
+          <!-- 5. Available Services Header -->
+          <div class="available-services-header">
+            <div class="avail-title">Available Services</div>
+            <div class="avail-count" id="protoAvailCount">2 services</div>
           </div>
+
+          <!-- 6. Service Cards List -->
+          <div class="services-v3-list">
+            
+            <!-- Service 1: Catering Aiskrim 300pax (Selected) -->
+            <div class="service-v3-card selected" id="protoCard1" onclick="toggleProtoService(1, 850)">
+              <img src="https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=400&auto=format&fit=crop&q=80" alt="Catering Aiskrim 300pax" class="srv-v3-thumb" />
+              <div class="srv-v3-info">
+                <div class="srv-v3-title">Catering Aiskrim 300pax</div>
+                <div class="srv-v3-meta-row">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>120 min</span>
+                </div>
+                <div class="srv-v3-divider"></div>
+                <div class="srv-v3-price">RM850</div>
+              </div>
+              <button class="btn-v3-select-circle selected" id="protoBtn1">✓</button>
+            </div>
+
+            <!-- Service 2: Premium aiskrim catering (Unselected) -->
+            <div class="service-v3-card" id="protoCard2" onclick="toggleProtoService(2, 1450)">
+              <img src="https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&auto=format&fit=crop&q=80" alt="Premium aiskrim catering" class="srv-v3-thumb" />
+              <div class="srv-v3-info">
+                <div class="srv-v3-title">Premium aiskrim catering</div>
+                <div class="srv-v3-meta-row">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>120 min</span>
+                </div>
+                <div class="srv-v3-divider"></div>
+                <div class="srv-v3-price">RM1450</div>
+              </div>
+              <button class="btn-v3-select-circle" id="protoBtn2">+</button>
+            </div>
+
+          </div>
+
         </div>
       </div>
 
@@ -1646,6 +1848,9 @@
       <!-- =================================================== -->
       <!-- SCREEN 4: APPOINTMENT PASS                          -->
       <!-- =================================================== -->
+      <!-- =================================================== -->
+      <!-- SCREEN 4: APPOINTMENT PASS (Apple Wallet x Fresha)    -->
+      <!-- =================================================== -->
       <div id="step-4" class="step-pane">
         <div class="pass-container">
           <!-- Top Header Nav Row -->
@@ -1653,22 +1858,22 @@
             <button class="pass-nav-circle-btn" onclick="switchStep(0)">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <button class="pass-nav-circle-btn" onclick="alert('Options')">
+            <button class="pass-nav-circle-btn" onclick="alert('Share or Save Pass')">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
             </button>
           </div>
 
-          <!-- Header Hero Title & 3D Illustration -->
+          <!-- Header Hero Title & Minimalist Calendar Hero Section -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <div>
+            <div style="flex: 1; padding-right: 12px;">
               <div class="pass-badge">
-                <div class="pass-badge-dot"></div>
+                <div class="pass-badge-dot">✓</div>
                 <span>BOOKING CONFIRMED</span>
               </div>
               <div class="pass-hero-title">Appointment Pass</div>
               <div class="pass-hero-subtitle">Your appointment is ready.</div>
             </div>
-            <!-- 3D Calendar Graphic -->
+            <!-- Minimal Apple-Style Calendar Illustration -->
             <div class="pass-calendar-graphic">
               <div class="sunburst">✨</div>
               <div class="calendar-box">
@@ -1676,106 +1881,132 @@
                   <div class="cal-ring"></div>
                   <div class="cal-ring"></div>
                 </div>
-                <div class="cal-body"></div>
                 <div class="cal-check">✓</div>
               </div>
             </div>
           </div>
 
-          <!-- Main Appointment Ticket Pass Card (Solid Brand Accent 3D Ticket Stub Design) -->
-          <div class="pass-main-card" style="background: #FF477E; border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 24px; position: relative; overflow: hidden; padding: 16px; margin-bottom: 16px; box-shadow: 4px 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);">
-            <!-- Left Notch Cutout -->
-            <div class="ticket-notch-left" style="background: var(--risev-bg-light); border: none;"></div>
-            <!-- Right Notch Cutout -->
-            <div class="ticket-notch-right" style="background: var(--risev-bg-light); border: none;"></div>
+          <!-- Main Apple Wallet Ticket Card -->
+          <div class="pass-main-card">
+            <!-- Left & Right Ticket Notch Cutouts -->
+            <div class="pass-cutout-left"></div>
+            <div class="pass-cutout-right"></div>
 
-            <!-- Top Tagline & Status Header Row -->
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-              <div style="display: flex; align-items: center; gap: 6px; background: rgba(0, 0, 0, 0.22); padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.25);">
+            <!-- Top Row: UPCOMING APPOINTMENT & Yellow CONFIRMED Badge -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; gap: 6px; background: #FFFFFF; padding: 5px 10px; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.12);">
                 <span style="font-size: 12px;">📅</span>
-                <span style="font-size: 10px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;">UPCOMING APPOINTMENT</span>
+                <span style="font-size: 10px; font-weight: 800; color: #000000; letter-spacing: 0.5px;">UPCOMING APPOINTMENT</span>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 5px; background: rgba(0, 0, 0, 0.18); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);">
-                <div style="width: 6px; height: 6px; border-radius: 3px; background: #10B981;"></div>
-                <span style="font-size: 10px; font-weight: 700; color: #FFFFFF;">Ongoing</span>
+              <div style="display: flex; align-items: center; gap: 5px; background: #FFCC00; padding: 4.5px 10px; border-radius: 12px;">
+                <div style="width: 6px; height: 6px; border-radius: 3px; background: #000000;"></div>
+                <span style="font-size: 10px; font-weight: 800; color: #000000;">CONFIRMED</span>
               </div>
             </div>
 
-            <!-- Store & Service Info Row -->
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-              <div style="width: 44px; height: 44px; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            <!-- Merchant Info: Logo + Store Name + Service Name -->
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+              <div style="width: 48px; height: 48px; border-radius: 14px; background: #F8FAFC; border: 1px solid rgba(0, 0, 0, 0.08); display: flex; align-items: center; justify-content: center; font-size: 24px;">
                 🏪
               </div>
               <div style="flex: 1;">
-                <div style="font-size: 16px; font-weight: 800; color: #FFFFFF;">Risev Official Merchant</div>
-                <div style="font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85);">Fade Cut</div>
+                <div style="font-size: 18px; font-weight: 800; color: #000000;">Scoop creamy</div>
+                <div style="font-size: 13px; font-weight: 600; color: #000000; opacity: 0.8; margin-top: 2px;">Catering Aiskrim 300pax</div>
               </div>
             </div>
 
-            <!-- Inset Recessed Scheduled Slot & Location Pod -->
-            <div style="background: rgba(0, 0, 0, 0.16); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 16px; padding: 12px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25), inset -2px -2px 5px rgba(255, 255, 255, 0.15);">
-              <!-- Scheduled Slot -->
-              <div style="flex: 1.2; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 18px; color: #FFFFFF;">🕒</span>
+            <!-- Dashed Perforation Divider -->
+            <div class="pass-perforation-line"></div>
+
+            <!-- 2-Column Booking Information -->
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+              <!-- Left: Scheduled Slot -->
+              <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+                <div style="width: 28px; height: 28px; border-radius: 14px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-top: 2px;">
+                  🕒
+                </div>
                 <div>
-                  <div style="font-size: 9.5px; font-weight: 800; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.5px;">SCHEDULED SLOT</div>
-                  <div style="font-size: 12px; font-weight: 700; color: #FFFFFF;">2026-10-07 @ 09:30 AM</div>
+                  <div style="font-size: 9.5px; font-weight: 800; color: #000000; letter-spacing: 0.5px;">SCHEDULED SLOT</div>
+                  <div style="font-size: 12.5px; font-weight: 700; color: #000000; margin-top: 2px; line-height: 1.3;">Sun, 11 Oct 2026 @ 03:00 PM</div>
                 </div>
               </div>
 
-              <!-- Location -->
-              <div style="flex: 1; text-align: right;">
-                <div style="font-size: 9.5px; font-weight: 800; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.5px;">LOCATION</div>
-                <div style="font-size: 11.5px; font-weight: 700; color: #FFFFFF;">Risev Official Merchant (HQ)</div>
+              <!-- Right: Location -->
+              <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+                <div style="width: 28px; height: 28px; border-radius: 14px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-top: 2px;">
+                  📍
+                </div>
+                <div>
+                  <div style="font-size: 9.5px; font-weight: 800; color: #000000; letter-spacing: 0.5px;">LOCATION</div>
+                  <div style="font-size: 12.5px; font-weight: 700; color: #000000; margin-top: 2px; line-height: 1.3;">Scoop creamy (HQ)</div>
+                </div>
               </div>
             </div>
 
-            <!-- Big 3D Popping View Pass & Check In Button -->
-            <button style="width: 100%; background: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.9); border-radius: 18px; padding: 12px 16px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);" onclick="alert('Pass Checked In Successfully!')">
-              <span style="font-size: 18px;">📱</span>
-              <span style="font-size: 14px; font-weight: 800; color: #000000;">View Pass & Check In ➔</span>
+            <!-- Pass Action: Pure Black Button with White QR & Arrow -->
+            <button class="btn-pass-action" onclick="alert('Pass Checked In Successfully!')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <span style="flex: 1; text-align: center;">View Pass & Check In</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </button>
           </div>
 
-          <!-- Stepper Progress Bar Pill -->
+          <!-- 4. Horizontal Three-Step Progress Tracker -->
           <div class="pass-stepper-bar">
+            <!-- Step 1: Booked -->
             <div class="stepper-step">
-              <div class="stepper-circle completed">✓</div>
-              <div class="stepper-lbl completed">Booked</div>
+              <div class="stepper-circle step-booked">✓</div>
+              <div class="stepper-lbl">Booked</div>
             </div>
-            <div class="stepper-line active shimmer-active"></div>
+
+            <!-- Connecting Line 1-2 (Solid Black) -->
+            <div class="stepper-line-solid"></div>
+
+            <!-- Step 2: Arrive -->
             <div class="stepper-step">
-              <div class="radar-beacon-wrapper">
-                <div class="radar-beacon-ring"></div>
-                <div class="stepper-circle active">📍</div>
-              </div>
-              <div class="stepper-lbl active" style="display: flex; align-items: center; gap: 3px;">
-                <span style="width: 5px; height: 5px; border-radius: 50%; background: #EF4444; display: inline-block;"></span>
-                <span>Arrive</span>
-              </div>
+              <div class="stepper-circle step-arrive">📍</div>
+              <div class="stepper-lbl">Arrive</div>
             </div>
-            <div class="stepper-line"></div>
+
+            <!-- Connecting Line 2-3 (Dashed) -->
+            <div class="stepper-line-dashed"></div>
+
+            <!-- Step 3: Service -->
             <div class="stepper-step">
-              <div class="stepper-circle muted">✂️</div>
-              <div class="stepper-lbl muted">Service</div>
+              <div class="stepper-circle step-service">✂️</div>
+              <div class="stepper-lbl" style="font-weight: 600;">Service</div>
             </div>
           </div>
 
-          <!-- Primary Action Button: I HAVE ARRIVED -->
-          <button class="btn-arrived-gradient" onclick="alert('Arrival confirmed!')">
-            <div class="btn-arrived-pin">📍</div>
-            <span style="letter-spacing: 0.5px;">I HAVE ARRIVED</span>
-            <div class="btn-arrived-arrow">➔</div>
+          <!-- 5. Arrival Check-In Button (Pure Black Pill Button) -->
+          <button class="btn-arrived-pill" onclick="alert('Arrival confirmed!')">
+            <div class="btn-arrived-pill-icon">📍</div>
+            <span>I HAVE ARRIVED</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
 
+          <!-- Helper Text -->
           <div class="arrived-subtext">Tap the button below as soon as you step inside the store.</div>
+
+          <!-- 6. Compact Appointment Reminder Card -->
+          <div class="pass-reminder-card">
+            <div class="pass-reminder-icon-box">
+              <div style="position: absolute; top: 1px; right: 2px; font-size: 8px;">✨</div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 13px; font-weight: 700; color: #000000;">Appointment Reminder Active</div>
+              <div style="font-size: 11px; font-weight: 500; color: rgba(0, 0, 0, 0.55); margin-top: 2px; line-height: 1.3;">Notifications will be sent 12 hours, 3 hours, and 30 minutes before your appointment.</div>
+            </div>
+            <button class="btn-reminder-active-pill" onclick="alert('Reminder is active')">Active ✓</button>
+          </div>
 
           <!-- Save App PWA Box -->
           <div class="pwa-install-box">
             <div class="pwa-icon">📱</div>
             <div style="flex: 1;">
-              <div class="pwa-title">Save Risev Official Merchant App</div>
+              <div class="pwa-title">Save Scoop creamy App</div>
               <div class="pwa-sub">Get instant slot reminders & fast re-booking</div>
             </div>
             <button class="btn-install-yellow" onclick="alert('Add to Home Screen')">Install</button>
@@ -1791,13 +2022,16 @@
       <button class="btn-profile-book" onclick="switchStep(1)">Book Appointment</button>
     </div>
 
-    <!-- Sticky Dark Action Bar (Steps 1, 2, 3) -->
+    <!-- Sticky Action Bar (Steps 1, 2, 3 - Apple iOS Floating Summary) -->
     <div id="stickyDarkBar" class="sticky-dark-bar" style="display: none;">
       <div>
-        <div id="darkBarSub" class="dark-bar-sub">1 service</div>
-        <div id="darkBarTotal" class="dark-bar-total">RM 120.00</div>
+        <div id="darkBarSub" class="dark-bar-sub">1 service selected</div>
+        <div id="darkBarTotal" class="dark-bar-total">RM850.00</div>
       </div>
-      <button class="btn-yellow-continue" onclick="nextStep()">Continue ➔</button>
+      <button class="btn-yellow-continue" onclick="nextStep()">
+        <span>Continue</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
     </div>
 
   </div>
@@ -1842,6 +2076,11 @@
 
       // Toggle Header & Footers
       const headerNav = document.getElementById('headerNav');
+      const progressIndicatorBar = document.getElementById('progressIndicatorBar');
+      const progSeg1 = document.getElementById('progSeg1');
+      const progSeg2 = document.getElementById('progSeg2');
+      const progSeg3 = document.getElementById('progSeg3');
+
       const headerTitle = document.getElementById('headerTitle');
       const stepBadge = document.getElementById('stepBadge');
       const profileFooter = document.getElementById('profileFooter');
@@ -1850,34 +2089,83 @@
       const darkBarTotal = document.getElementById('darkBarTotal');
 
       if (currentStep === 0) {
-        headerNav.style.display = 'none';
-        profileFooter.style.display = 'block';
-        stickyDarkBar.style.display = 'none';
+        if (headerNav) headerNav.style.display = 'none';
+        if (progressIndicatorBar) progressIndicatorBar.style.display = 'none';
+        if (profileFooter) profileFooter.style.display = 'block';
+        if (stickyDarkBar) stickyDarkBar.style.display = 'none';
       } else if (currentStep <= 3) {
-        headerNav.style.display = 'flex';
-        profileFooter.style.display = 'none';
-        stickyDarkBar.style.display = 'flex';
+        if (headerNav) headerNav.style.display = 'flex';
+        if (progressIndicatorBar) {
+          progressIndicatorBar.style.display = 'flex';
+          if (progSeg1) progSeg1.className = 'prog-segment active';
+          if (progSeg2) progSeg2.className = currentStep >= 2 ? 'prog-segment active' : 'prog-segment';
+          if (progSeg3) progSeg3.className = currentStep >= 3 ? 'prog-segment active' : 'prog-segment';
+        }
+        if (profileFooter) profileFooter.style.display = 'none';
+        if (stickyDarkBar) stickyDarkBar.style.display = 'flex';
 
-        stepBadge.textContent = `Step ${currentStep} of 3`;
+        if (stepBadge) stepBadge.textContent = `Step ${currentStep} of 3`;
 
         if (currentStep === 1) {
-          headerTitle.textContent = "Select Service";
-          darkBarSub.textContent = "1 service";
-          darkBarTotal.textContent = "RM 120.00";
+          if (headerTitle) headerTitle.textContent = "Select Service";
+          recalcProtoSummary();
         } else if (currentStep === 2) {
-          headerTitle.textContent = "Schedule Appointment";
-          darkBarSub.textContent = "Tue, 5 Oct 2026";
-          darkBarTotal.textContent = "11:00 AM";
+          if (headerTitle) headerTitle.textContent = "Schedule Appointment";
+          if (darkBarSub) darkBarSub.textContent = "Tue, 5 Oct 2026";
+          if (darkBarTotal) darkBarTotal.textContent = "11:00 AM";
         } else if (currentStep === 3) {
-          headerTitle.textContent = "Your Details";
-          darkBarSub.textContent = "1 service • 60 min";
-          darkBarTotal.textContent = "RM 120.00";
+          if (headerTitle) headerTitle.textContent = "Your Details";
+          if (darkBarSub) darkBarSub.textContent = "1 service • 60 min";
+          if (darkBarTotal) darkBarTotal.textContent = "RM 120.00";
         }
       } else {
-        headerNav.style.display = 'none';
-        profileFooter.style.display = 'none';
-        stickyDarkBar.style.display = 'none';
+        if (headerNav) headerNav.style.display = 'none';
+        if (progressIndicatorBar) progressIndicatorBar.style.display = 'none';
+        if (profileFooter) profileFooter.style.display = 'none';
+        if (stickyDarkBar) stickyDarkBar.style.display = 'none';
       }
+    }
+
+    let protoSelectedMap = { 1: 850 };
+
+    function toggleProtoService(id, price) {
+      const card = document.getElementById(`protoCard${id}`);
+      const btn = document.getElementById(`protoBtn${id}`);
+      if (protoSelectedMap[id]) {
+        delete protoSelectedMap[id];
+        if (card) card.classList.remove('selected');
+        if (btn) {
+          btn.classList.remove('selected');
+          btn.textContent = '+';
+        }
+      } else {
+        protoSelectedMap[id] = price;
+        if (card) card.classList.add('selected');
+        if (btn) {
+          btn.classList.add('selected');
+          btn.textContent = '✓';
+        }
+      }
+      recalcProtoSummary();
+    }
+
+    function recalcProtoSummary() {
+      const keys = Object.keys(protoSelectedMap);
+      const count = keys.length;
+      let total = 0;
+      keys.forEach(k => { total += protoSelectedMap[k]; });
+      
+      const darkBarSub = document.getElementById('darkBarSub');
+      const darkBarTotal = document.getElementById('darkBarTotal');
+      if (currentStep === 1) {
+        if (darkBarSub) darkBarSub.textContent = `${count} service${count === 1 ? '' : 's'} selected`;
+        if (darkBarTotal) darkBarTotal.textContent = `RM${total.toFixed(2)}`;
+      }
+    }
+
+    function toggleProtoCat(btn) {
+      document.querySelectorAll('.cat-filter-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     }
   </script>
 </body>
