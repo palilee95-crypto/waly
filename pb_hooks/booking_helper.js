@@ -99,12 +99,13 @@ function ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId) {
       customer.set("name", customerName || ("Customer " + digits.slice(-4)));
       customer.set("role", "customer");
       customer.set("verified", true);
+      customer.set("birthday", "2000-01-01 00:00:00.000Z");
       customer.set("total_points", 0);
-      customer.set("tier", "Bronze");
       customer.setPassword($security.randomString(20));
       $app.save(customer);
     } catch (createErr) {
       console.log("[BOOKING CUSTOMER CREATE ERROR]", createErr.message || createErr);
+      customer = null;
     }
   } else if (customerName) {
     var currentName = customer.getString("name");
