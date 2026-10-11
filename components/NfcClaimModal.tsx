@@ -475,8 +475,9 @@ export default function NfcClaimModal() {
     }).catch(() => {});
 
     return () => {
-      if (unsubscribe) unsubscribe();
-      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
+      if (typeof unsubscribe === 'function') {
+        try { unsubscribe(); } catch (e) {}
+      }
     };
   }, [merchantId]);
 
@@ -710,9 +711,18 @@ export default function NfcClaimModal() {
 
   const handleDecline = async () => {
     if (claim && !isSuccess) {
+      const claimId = claim.id;
+      // 1. Optimistically emit to remove from dashboard lists immediately (0ms latency)
+      DeviceEventEmitter.emit('nfc_claim_declined', { claim_id: claimId });
+      DeviceEventEmitter.emit('merchant_transaction_completed');
       try {
-        await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
-      } catch (err) { /* ignore */ }
+        await pb.collection('nfc_claims').update(claimId, { status: 'cancelled' });
+      } catch (err) {
+        console.warn('[NFC CLAIM] Failed to cancel claim:', err);
+      } finally {
+        // 2. Re-trigger sync after backend update completes
+        DeviceEventEmitter.emit('merchant_transaction_completed');
+      }
     }
     handleClose();
   };

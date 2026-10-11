@@ -315,44 +315,55 @@ export default function MerchantDashboard() {
   useEffect(() => {
     fetchMerchantData();
 
-    // Listen to local completion events from NfcClaimModal
+    // Listen to local completion & decline events from NfcClaimModal
     const txnCompleteSub = DeviceEventEmitter.addListener('merchant_transaction_completed', () => {
       fetchMerchantData();
       fetchPendingClaims();
     });
 
+    const claimDeclinedSub = DeviceEventEmitter.addListener('nfc_claim_declined', (data: any) => {
+      if (data?.claim_id) {
+        setPendingClaims((prev) => prev.filter((c) => c.id !== data.claim_id));
+      }
+      fetchPendingClaims();
+    });
+
+    let unsubMerchants: any = null;
+    let unsubTransactions: any = null;
+    let unsubSubscriptions: any = null;
+    let unsubClaims: any = null;
+
     // Subscribe to merchants, transactions, subscriptions & nfc_claims
     if (user && user.merchant_id) {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
         fetchMerchantData();
-      }).catch(() => {});
+      }).then((u) => { unsubMerchants = u; }).catch(() => {});
 
       // Realtime transactions - refresh on new records
       pb.collection('transactions').subscribe('*', () => {
         fetchMerchantData();
-      }).catch(() => {});
+      }).then((u) => { unsubTransactions = u; }).catch(() => {});
 
       pb.collection('subscriptions').subscribe('*', () => {
         fetchMerchantData();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).catch(() => {});
+      }).then((u) => { unsubSubscriptions = u; }).catch(() => {});
 
       pb.collection('nfc_claims').subscribe('*', () => {
         fetchPendingClaims();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).catch(() => {});
+      }).then((u) => { unsubClaims = u; }).catch(() => {});
     }
 
     return () => {
       txnCompleteSub.remove();
-      if (user && user.merchant_id) {
-        pb.collection('merchants').unsubscribe(user.merchant_id).catch(() => {});
-      }
-      pb.collection('transactions').unsubscribe('*').catch(() => {});
-      pb.collection('subscriptions').unsubscribe('*').catch(() => {});
-      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
+      claimDeclinedSub.remove();
+      if (typeof unsubMerchants === 'function') { try { unsubMerchants(); } catch (e) {} }
+      if (typeof unsubTransactions === 'function') { try { unsubTransactions(); } catch (e) {} }
+      if (typeof unsubSubscriptions === 'function') { try { unsubSubscriptions(); } catch (e) {} }
+      if (typeof unsubClaims === 'function') { try { unsubClaims(); } catch (e) {} }
     };
   }, [user]);
 
