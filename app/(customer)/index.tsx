@@ -25,6 +25,8 @@ import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 import FilterModal, { FilterState } from './_components/FilterModal';
 import AllCategoriesModal from './_components/AllCategoriesModal';
+import CustomerPushNotificationModal from '@/components/CustomerPushNotificationModal';
+import { isCustomerPushActive, getPushPermissionStatus } from '@/lib/push-notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   getForYouRecommendations,
@@ -232,7 +234,18 @@ export default function CustomerDashboard() {
       loadFavorites();
       fetchPopularMerchants();
       fetchIntelligenceData();
-    }, [userCoords])
+      checkPushState();
+
+      // Persistent auto-prompt: popup akan berlaku selagi tak on
+      const pushTimer = setTimeout(async () => {
+        const isAlreadyOn = await checkPushState();
+        if (!isAlreadyOn) {
+          setPushModalVisible(true);
+        }
+      }, 700);
+
+      return () => clearTimeout(pushTimer);
+    }, [userCoords, user?.phone, user?.id])
   );
 
   const loadFavorites = async () => {
@@ -270,6 +283,21 @@ export default function CustomerDashboard() {
       await AsyncStorage.setItem('@favorite_stores', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to save favorites:', e);
+    }
+  };
+
+  const [pushModalVisible, setPushModalVisible] = useState(false);
+  const [pushActive, setPushActive] = useState(false);
+
+  const checkPushState = async (): Promise<boolean> => {
+    try {
+      const active = await isCustomerPushActive(user?.phone || user?.id);
+      const perm = getPushPermissionStatus();
+      const isComplete = active && perm === 'granted';
+      setPushActive(isComplete);
+      return isComplete;
+    } catch {
+      return false;
     }
   };
 
@@ -1063,7 +1091,7 @@ export default function CustomerDashboard() {
               />
             </View>
 
-            {/* 👋 2. GREETING & NAME + PROFILE AVATAR ON THE RIGHT */}
+            {/* 👋 2. GREETING & NAME + PROFILE AVATAR & NOTIFICATION BELL ON THE RIGHT */}
             <View style={styles.greetingContainer}>
               <View style={styles.greetingTextCol}>
                 <Text style={styles.greetingSub}>{getGreeting()}</Text>
@@ -1072,14 +1100,59 @@ export default function CustomerDashboard() {
                 </Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.avatarWrap}
-                onPress={() => router.push('/(customer)/profile')}
-                activeOpacity={0.8}
-              >
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {/* 🔔 Notification Status / Trigger Bell */}
+                <TouchableOpacity
+                  style={[
+                    styles.notifHeaderBtn,
+                    !pushActive && styles.notifHeaderBtnInactive,
+                  ]}
+                  onPress={() => setPushModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={pushActive ? 'notifications' : 'notifications-outline'}
+                    size={20}
+                    color={pushActive ? '#0F172A' : '#D97706'}
+                  />
+                  {!pushActive ? (
+                    <View style={styles.notifAlertDot} />
+                  ) : (
+                    <View style={styles.notifGreenDot} />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.avatarWrap}
+                  onPress={() => router.push('/(customer)/profile')}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* 🔔 NOTIFICATION PROMPT BANNER (Displayed as long as notifications are NOT on) */}
+            {!pushActive && (
+              <TouchableOpacity
+                style={styles.notifReminderBanner}
+                onPress={() => setPushModalVisible(true)}
+                activeOpacity={0.88}
+              >
+                <View style={styles.notifBannerIconBox}>
+                  <Ionicons name="notifications" size={18} color="#D97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.notifBannerTitle}>Peringatan Temujanji & Ganjaran 🔔</Text>
+                  <Text style={styles.notifBannerSub}>
+                    Dapatkan alert 12 jam, 3 jam & 30 minit sebelum slot temujanji anda.
+                  </Text>
+                </View>
+                <View style={styles.notifBannerActionPill}>
+                  <Text style={styles.notifBannerActionText}>Aktifkan</Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* 🔍 3. SEARCH BAR ROW WITH FILTER BUTTON */}
             <View style={styles.searchBarRow}>
@@ -2320,6 +2393,15 @@ export default function CustomerDashboard() {
         onSelectCategory={(catId) =>
           router.push({ pathname: '/(customer)/explore', params: { category: catId } })
         }
+      />
+
+      {/* Push Notification Opt-In & Test Modal */}
+      <CustomerPushNotificationModal
+        visible={pushModalVisible}
+        onClose={() => {
+          setPushModalVisible(false);
+          checkPushState();
+        }}
       />
     </View>
   );
@@ -3697,5 +3779,92 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+
+  /* 🔔 NOTIFICATION BELL & BANNER STYLES */
+  notifHeaderBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notifHeaderBtnInactive: {
+    backgroundColor: '#FEF9C3',
+    borderColor: '#FDE047',
+  },
+  notifAlertDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notifGreenDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notifReminderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderRadius: 18,
+    padding: 14,
+    marginTop: -8,
+    marginBottom: 4,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  notifBannerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBannerTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  notifBannerSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#B45309',
+    lineHeight: 15,
+  },
+  notifBannerActionPill: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
+  },
+  notifBannerActionText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
   },
 });

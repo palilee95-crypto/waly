@@ -1,6 +1,6 @@
 // components/CustomerPushNotificationModal.tsx
-// Persistent prompt modal in customer section to ensure notifications are enabled
-// Will continue to prompt the customer as long as notifications are not turned on
+// Persistent prompt modal in customer section to ensure push notifications are enabled.
+// Will continue to prompt the customer as long as notifications are not turned on ("selagi tak on").
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -22,57 +22,95 @@ import {
   getPushPermissionStatus,
   subscribeToPushNotifications,
   PushPermissionStatus,
+  isIOSDevice,
+  isStandalonePWA,
+  isCustomerPushActive,
+  setCustomerPushActive,
+  sendCustomerTestNotification,
 } from '@/lib/push-notifications';
 
-export default function CustomerPushNotificationModal() {
+interface CustomerPushNotificationModalProps {
+  visible?: boolean;
+  onClose?: () => void;
+}
+
+export default function CustomerPushNotificationModal({
+  visible: controlledVisible,
+  onClose: controlledOnClose,
+}: CustomerPushNotificationModalProps = {}) {
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
-  const [visible, setVisible] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<PushPermissionStatus>('unsupported');
+  const [permissionStatus, setPermissionStatus] = useState<PushPermissionStatus>('default');
+  const [isCustomerActive, setIsCustomerActive] = useState<boolean>(false);
   const [success, setSuccess] = useState(false);
   const [deniedGuide, setDeniedGuide] = useState(false);
+  const [testSent, setTestSent] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+
+  const isIOS = isIOSDevice();
+  const isPWA = isStandalonePWA();
+  const isIOSBrowser = isIOS && !isPWA;
+
+  // Controlled or uncontrolled modal visibility
+  const isControlled = controlledVisible !== undefined;
+  const isVisible = isControlled ? controlledVisible : internalVisible;
 
   // Subtle pulse animation for glowing bell
   const pulseScale = useRef(new Animated.Value(1)).current;
 
-  const checkStatusAndPrompt = () => {
-    if (!isPushSupported()) {
-      return;
-    }
-
+  // Check storage and browser status
+  const evaluateNotificationState = async (autoOpenIfInactive = true) => {
+    const supported = isPushSupported();
     const currentStatus = getPushPermissionStatus();
     setPermissionStatus(currentStatus);
 
-    // If already granted, do NOT show popup
-    if (currentStatus === 'granted') {
-      setVisible(false);
-      return;
-    }
+    const activeInStorage = await isCustomerPushActive(user?.phone || user?.id);
+    setIsCustomerActive(activeInStorage);
 
-    // If not granted (default or denied), prompt customer!
     if (currentStatus === 'denied') {
       setDeniedGuide(true);
     } else {
       setDeniedGuide(false);
     }
-    setVisible(true);
+
+    // Condition for "selagi tak on":
+    // If not active in storage OR permission not granted, customer has NOT turned it on yet!
+    const isFullyTurnedOn = activeInStorage && currentStatus === 'granted';
+
+    if (autoOpenIfInactive && !isControlled) {
+      if (!isFullyTurnedOn) {
+        // Customer has NOT turned on notifications yet -> Show popup!
+        setInternalVisible(true);
+      } else {
+        // Already turned on, do not disturb automatically
+        setInternalVisible(false);
+      }
+    }
   };
 
   useEffect(() => {
-    // Initial check with a gentle delay to allow page render
+    // Initial evaluation with gentle delay to avoid blocking initial UI paint
     const timer = setTimeout(() => {
-      checkStatusAndPrompt();
-    }, 1200);
+      evaluateNotificationState(true);
+    }, 700);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [user?.phone, user?.id]);
+
+  // If controlled externally (e.g. user clicked bell icon)
+  useEffect(() => {
+    if (controlledVisible) {
+      evaluateNotificationState(false);
+    }
+  }, [controlledVisible]);
 
   // Continuous bell pulsation animation
   useEffect(() => {
-    if (!visible) return;
+    if (!isVisible) return;
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseScale, {
@@ -89,7 +127,7 @@ export default function CustomerPushNotificationModal() {
     );
     pulseLoop.start();
     return () => pulseLoop.stop();
-  }, [visible]);
+  }, [isVisible]);
 
   const handleEnableNotifications = async () => {
     setLoading(true);
@@ -100,11 +138,15 @@ export default function CustomerPushNotificationModal() {
       const result = await subscribeToPushNotifications({ customerPhone });
 
       if (result.success) {
+        // Mark active in storage
+        await setCustomerPushActive(user?.phone || user?.id, true);
+        setIsCustomerActive(true);
         setSuccess(true);
         setPermissionStatus('granted');
+
         setTimeout(() => {
-          setVisible(false);
           setSuccess(false);
+          handleDismiss();
         }, 1800);
       } else {
         const updatedStatus = getPushPermissionStatus();
@@ -120,19 +162,43 @@ export default function CustomerPushNotificationModal() {
     }
   };
 
-  const handleDismissTemporary = () => {
-    // Closes for this session/action, but since "selagi tak on", next reload or visit prompts again
-    setVisible(false);
+  const handleDismiss = () => {
+    if (isControlled && controlledOnClose) {
+      controlledOnClose();
+    } else {
+      setInternalVisible(false);
+    }
   };
 
-  if (!visible) return null;
+  const handleSendTestNotification = async () => {
+    setTestLoading(true);
+    try {
+      const sent = await sendCustomerTestNotification();
+      if (sent) {
+        setTestSent(true);
+        setTimeout(() => setTestSent(false), 3000);
+      }
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleResetForTesting = async () => {
+    await setCustomerPushActive(user?.phone || user?.id, false);
+    setIsCustomerActive(false);
+    evaluateNotificationState(false);
+  };
+
+  if (!isVisible) return null;
+
+  const isAlreadyActiveState = isCustomerActive && permissionStatus === 'granted';
 
   return (
     <Modal
-      visible={visible}
+      visible={isVisible}
       transparent={true}
       animationType="fade"
-      onRequestClose={handleDismissTemporary}
+      onRequestClose={handleDismiss}
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalCard, isDesktop && { maxWidth: 440 }]}>
@@ -140,15 +206,90 @@ export default function CustomerPushNotificationModal() {
             // ── SUCCESS CONFIRMATION STATE ──
             <View style={styles.successWrapper}>
               <View style={styles.successIconBox}>
-                <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={54} color="#10B981" />
               </View>
               <Text style={styles.successTitle}>Notifikasi Diaktifkan! 🎉</Text>
               <Text style={styles.successSub}>
-                Peringatan temujanji 12 jam, 3 jam & 30 minit serta kemas kini setem akan dihantar terus ke peranti ini.
+                Peringatan temujanji (12 jam, 3 jam & 30 minit) dan makluman ganjaran akan dihantar terus ke peranti anda.
               </Text>
             </View>
+          ) : isAlreadyActiveState ? (
+            // ── ALREADY ACTIVE & TESTING STATE ──
+            <>
+              <View style={styles.headerGraphicRow}>
+                <View style={[styles.bellAura, { backgroundColor: '#ECFDF5' }]}>
+                  <View style={[styles.bellGradientCircle, { backgroundColor: '#10B981' }]}>
+                    <Ionicons name="notifications" size={26} color="#FFFFFF" />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.closeBtnCircle}
+                  onPress={handleDismiss}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.titleWrap}>
+                <View style={[styles.pillBadge, { backgroundColor: '#D1FAE5' }]}>
+                  <Text style={[styles.pillBadgeText, { color: '#047857' }]}>STATUS: AKTIF ✅</Text>
+                </View>
+                <Text style={styles.mainTitle}>Notifikasi Temujanji Hidup</Text>
+                <Text style={styles.mainSubtitle}>
+                  Peranti ini sedia menerima amaran masa-nyata untuk slot temujanji & ganjaran anda.
+                </Text>
+              </View>
+
+              <View style={styles.benefitsContainer}>
+                <View style={styles.benefitRow}>
+                  <View style={[styles.benefitIconBox, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="alarm-outline" size={18} color="#D97706" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.benefitTitle}>Jadual Peringatan Temujanji</Text>
+                    <Text style={styles.benefitDesc}>
+                      Dihantar secara automatik 12 jam, 3 jam, dan 30 minit sebelum slot tiba.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.actionsWrap}>
+                <TouchableOpacity
+                  style={[styles.primaryEnableBtn, testLoading && { opacity: 0.85 }]}
+                  onPress={handleSendTestNotification}
+                  disabled={testLoading}
+                  activeOpacity={0.88}
+                >
+                  {testLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : testSent ? (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                      <Text style={styles.primaryEnableBtnText}>Notis Ujian Telah Dihantar!</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
+                      <Text style={styles.primaryEnableBtnText}>Uji Notifikasi Sekarang 🔔</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryDismissBtn}
+                  onPress={handleDismiss}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.secondaryDismissBtnText}>Tutup</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
-            // ── MAIN NOTIFICATION ONBOARDING STATE ──
+            // ── MAIN NOTIFICATION ONBOARDING STATE ("SELAGI TAK ON") ──
             <>
               {/* Top Graphic Bell Header with Pulse Aura */}
               <View style={styles.headerGraphicRow}>
@@ -164,7 +305,7 @@ export default function CustomerPushNotificationModal() {
                 {/* Subtle Close Button */}
                 <TouchableOpacity
                   style={styles.closeBtnCircle}
-                  onPress={handleDismissTemporary}
+                  onPress={handleDismiss}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   activeOpacity={0.7}
                 >
@@ -181,7 +322,7 @@ export default function CustomerPushNotificationModal() {
                   Aktifkan Notifikasi Temujanji & Ganjaran
                 </Text>
                 <Text style={styles.mainSubtitle}>
-                  Jangan terlepas giliran anda! Dapatkan makluman automatik terus pada skrin telefon anda.
+                  Jangan terlepas slot anda! Dapatkan makluman automatik terus pada skrin telefon anda tanpa Meta WhatsApp.
                 </Text>
               </View>
 
@@ -194,7 +335,7 @@ export default function CustomerPushNotificationModal() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>Peringatan Temujanji</Text>
                     <Text style={styles.benefitDesc}>
-                      Alert automatik 12 jam, 3 jam & 30 minit sebelum waktu slot anda.
+                      Alert automatik 12 jam, 3 jam & 30 minit sebelum slot anda tiba.
                     </Text>
                   </View>
                 </View>
@@ -218,18 +359,31 @@ export default function CustomerPushNotificationModal() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>Navigasi Mudah</Text>
                     <Text style={styles.benefitDesc}>
-                      Pautan terus ke Waze & Google Maps bila giliran anda tiba.
+                      Pautan pantas ke Waze & Google Maps bila giliran anda bermula.
                     </Text>
                   </View>
                 </View>
               </View>
+
+              {/* Special Guide for iOS Safari Users */}
+              {isIOSBrowser && (
+                <View style={styles.iosNoticeBox}>
+                  <Ionicons name="phone-portrait-outline" size={18} color="#2563EB" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.iosNoticeTitle}>Panduan Pengguna iPhone 📱</Text>
+                    <Text style={styles.iosNoticeText}>
+                      Untuk aktifkan notifikasi di iPhone: Tekan butang Kongsi (<Ionicons name="share-outline" size={13} color="#2563EB" />) di Safari ➔ Pilih <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Add to Home Screen (+)</Text> ➔ Buka RISEV dari skrin utama telefon anda.
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {/* Browser Permission Denied Guide Box */}
               {deniedGuide && (
                 <View style={styles.deniedNoticeBox}>
                   <Ionicons name="information-circle" size={18} color="#DC2626" />
                   <Text style={styles.deniedNoticeText}>
-                    Notifikasi disekat dalam pelayar. Sila tekan ikon mangga (🔒) di bahagian atas alamat pelayar dan pilih <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Allow / Benarkan Notifikasi</Text>.
+                    Notifikasi disekat dalam pelayar. Sila tekan ikon mangga (🔒) di bahagian atas alamat URL dan pilih <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Allow / Benarkan Notifikasi</Text>.
                   </Text>
                 </View>
               )}
@@ -256,7 +410,7 @@ export default function CustomerPushNotificationModal() {
 
                 <TouchableOpacity
                   style={styles.secondaryDismissBtn}
-                  onPress={handleDismissTemporary}
+                  onPress={handleDismiss}
                   activeOpacity={0.7}
                   disabled={loading}
                 >
@@ -386,6 +540,29 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     lineHeight: 15,
+  },
+  iosNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+  },
+  iosNoticeTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1D4ED8',
+    marginBottom: 2,
+  },
+  iosNoticeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#1E40AF',
+    lineHeight: 16,
   },
   deniedNoticeBox: {
     flexDirection: 'row',

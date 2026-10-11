@@ -3,6 +3,7 @@
 
 import { pb } from './pocketbase';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type PushPermissionStatus = 'granted' | 'denied' | 'default' | 'unsupported';
 
@@ -14,6 +15,48 @@ export function isPushSupported(): boolean {
     return false;
   }
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+/**
+ * Checks if the current client is running on an iOS device (iPhone/iPad).
+ */
+export function isIOSDevice(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+}
+
+/**
+ * Checks if the Web App is installed to Home Screen (Standalone PWA mode).
+ */
+export function isStandalonePWA(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as any).standalone === true
+  );
+}
+
+/**
+ * Checks whether customer push notifications are currently marked active in local storage.
+ */
+export async function isCustomerPushActive(phoneOrId?: string): Promise<boolean> {
+  try {
+    const key = `risev_push_customer_active_${phoneOrId || 'guest'}`;
+    const val = await AsyncStorage.getItem(key);
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persists customer push notification active state in local storage.
+ */
+export async function setCustomerPushActive(phoneOrId?: string, active = true): Promise<void> {
+  try {
+    const key = `risev_push_customer_active_${phoneOrId || 'guest'}`;
+    await AsyncStorage.setItem(key, active ? 'true' : 'false');
+  } catch {}
 }
 
 /**
@@ -180,3 +223,38 @@ export async function sendTestPushNotification(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Sends an instant test notification to the customer device via Service Worker.
+ */
+export async function sendCustomerTestNotification(): Promise<boolean> {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && 'showNotification' in reg) {
+        await reg.showNotification('RISEV Peringatan Temujanji 🔔', {
+          body: 'Notifikasi aktif! Anda akan menerima peringatan 12 jam, 3 jam & 30 minit sebelum slot temujanji.',
+          icon: '/favicon.png',
+          badge: '/favicon.png',
+          vibrate: [200, 100, 200],
+          data: { url: '/(customer)' },
+        } as any);
+        return true;
+      }
+    }
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('RISEV Peringatan Temujanji 🔔', {
+        body: 'Notifikasi aktif! Anda akan menerima peringatan 12 jam, 3 jam & 30 minit sebelum slot temujanji.',
+        icon: '/favicon.png',
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('[CUSTOMER TEST NOTIF FAILED]', err);
+  }
+  return false;
+}
+
