@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import CustomerStampModal from '@/components/CustomerStampModal';
+import CustomerPushNotificationModal from '@/components/CustomerPushNotificationModal';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Custom Bottom Tab Bar / Sidebar to match the clean minimalist black/white design
@@ -548,6 +549,7 @@ export default function CustomerLayout() {
         <Tabs.Screen name="my-cards" options={{ href: null }} />
         <Tabs.Screen name="history" options={{ href: null }} />
       </Tabs>
+      <CustomerPushNotificationModal />
     </View>
   );
 }
