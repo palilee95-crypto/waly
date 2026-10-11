@@ -13,6 +13,7 @@ import {
   DeviceEventEmitter,
   Alert,
   Share,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
@@ -133,6 +134,11 @@ export default function NfcClaimModal() {
   const [upcomingFutureBooking, setUpcomingFutureBooking] = useState<any>(null);
   const [quickAddons, setQuickAddons] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
+  const [itemActionTarget, setItemActionTarget] = useState<{ item: any; index: number } | null>(null);
+
+  const handleRemoveItemByIndex = (indexToRemove: number) => {
+    setSelectedServices(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
 
   // Customer Vouchers & Smart Discount Engine states
   const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
@@ -1352,8 +1358,14 @@ export default function NfcClaimModal() {
                                   RM {((parseFloat(item.price || 0)) * (item.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </Text>
 
-                                <TouchableOpacity style={{ padding: 4 }}>
-                                  <Ionicons name="ellipsis-vertical" size={16} color="#86868B" />
+                                <TouchableOpacity 
+                                  style={styles.figmaServiceMoreBtn}
+                                  onPress={() => setItemActionTarget({ item, index: idx })}
+                                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                  activeOpacity={0.7}
+                                  accessibilityLabel="Manage item"
+                                >
+                                  <Ionicons name="ellipsis-vertical" size={17} color="#64748B" />
                                 </TouchableOpacity>
                               </View>
                             );
@@ -1685,6 +1697,99 @@ export default function NfcClaimModal() {
       </View>
     </Modal>
     )}
+
+    {/* ── Item Actions Bottom Sheet Modal ────────────── */}
+    <Modal
+      visible={!!itemActionTarget}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setItemActionTarget(null)}
+    >
+      <Pressable style={styles.itemActionOverlay} onPress={() => setItemActionTarget(null)}>
+        <Pressable style={styles.itemActionSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.topDragHandleBar} />
+          
+          <View style={styles.itemActionHeader}>
+            <Text style={styles.itemActionTitle} numberOfLines={1}>
+              {itemActionTarget?.item?.name}
+            </Text>
+            <Text style={styles.itemActionSub}>
+              RM {((parseFloat(itemActionTarget?.item?.price || 0)) * (itemActionTarget?.item?.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {itemActionTarget?.item?.isBooking ? 'Booking service' : 'Add-on service'}
+            </Text>
+          </View>
+
+          {/* Stepper if quantity > 1 */}
+          {(itemActionTarget?.item?.qty || 1) > 1 && (
+            <View style={styles.itemActionStepperRow}>
+              <Text style={styles.itemActionStepperLabel}>Quantity ({itemActionTarget?.item?.qty})</Text>
+              <View style={styles.pickerStepperWrap}>
+                <TouchableOpacity
+                  style={styles.pickerStepperBtn}
+                  onPress={() => {
+                    if (itemActionTarget) {
+                      const targetIdx = itemActionTarget.index;
+                      setSelectedServices(prev => {
+                        const updated = [...prev];
+                        if (updated[targetIdx] && (updated[targetIdx].qty || 1) > 1) {
+                          updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) - 1 };
+                          setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
+                        }
+                        return updated;
+                      });
+                    }
+                  }}
+                >
+                  <Ionicons name="remove" size={14} color="#1D1D1F" />
+                </TouchableOpacity>
+                <Text style={styles.pickerStepperVal}>{itemActionTarget?.item?.qty || 1}</Text>
+                <TouchableOpacity
+                  style={styles.pickerStepperBtn}
+                  onPress={() => {
+                    if (itemActionTarget) {
+                      const targetIdx = itemActionTarget.index;
+                      setSelectedServices(prev => {
+                        const updated = [...prev];
+                        if (updated[targetIdx]) {
+                          updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) + 1 };
+                          setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
+                        }
+                        return updated;
+                      });
+                    }
+                  }}
+                >
+                  <Ionicons name="add" size={14} color="#1D1D1F" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Red Delete Button */}
+          <TouchableOpacity
+            style={styles.itemActionDeleteBtn}
+            onPress={() => {
+              if (itemActionTarget !== null) {
+                handleRemoveItemByIndex(itemActionTarget.index);
+                setItemActionTarget(null);
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+            <Text style={styles.itemActionDeleteText}>Remove from Order</Text>
+          </TouchableOpacity>
+
+          {/* Cancel Button */}
+          <TouchableOpacity
+            style={styles.itemActionCancelBtn}
+            onPress={() => setItemActionTarget(null)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.itemActionCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   </>
   );
 }
@@ -3402,5 +3507,92 @@ const styles = StyleSheet.create({
   },
   quickBillChipTextActive: {
     color: '#FFFFFF',
+  },
+  figmaServiceMoreBtn: {
+    padding: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemActionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    padding: 16,
+  },
+  itemActionSheet: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
+    gap: 12,
+  },
+  itemActionHeader: {
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+  },
+  itemActionTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  itemActionSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  itemActionStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  itemActionStepperLabel: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+  },
+  itemActionDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  itemActionDeleteText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#EF4444',
+  },
+  itemActionCancelBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+  },
+  itemActionCancelText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
   },
 });
