@@ -1989,20 +1989,6 @@ export default function NfcLandingScreen() {
             </View>
           </View>
         </View>
-
-        {/* Pill Button Below Voucher */}
-        {canBookAppointment && bookingSlug && (
-          <View style={styles.voucherBookingPillWrapper}>
-            <TouchableOpacity
-              onPress={handleNavigateToBooking}
-              activeOpacity={0.8}
-              style={styles.voucherBookingPillBtn}
-            >
-              <Ionicons name="calendar" size={13} color="#FFFFFF" />
-              <Text style={styles.voucherBookingPillText}>Walk-in: Book Appointment ›</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </Animated.View>
     );
   };
