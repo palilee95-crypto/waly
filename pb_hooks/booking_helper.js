@@ -158,10 +158,238 @@ function ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId) {
   return customer;
 }
 
+// Helper: Process completed service booking into transactions ledger, update loyalty stamps/points, and generate receipt
+function processCompletedBooking(rec) {
+  if (!rec) return null;
+  var bookingId = rec.id;
+  var merchantId = rec.getString ? rec.getString("merchant") : rec.get("merchant");
+  if (!merchantId) return null;
+
+  var totalPrice = parseFloat(rec.get("total_price")) || 0;
+  var customerName = (rec.getString ? rec.getString("customer_name") : rec.get("customer_name")) || "Customer";
+  var customerPhone = (rec.getString ? rec.getString("customer_phone") : rec.get("customer_phone")) || "";
+  var branchId = rec.getString ? rec.getString("branch") : rec.get("branch");
+  var staffId = rec.getString ? rec.getString("staff") : rec.get("staff");
+
+  // 1. Idempotency Check: Don't create duplicate transaction for this booking
+  try {
+    var checkResult = new DynamicModel({ cnt: 0 });
+    $app.db()
+      .newQuery("SELECT COUNT(*) as cnt FROM transactions WHERE metadata LIKE {:pattern}")
+      .bind({ pattern: `%"booking_id":"${bookingId}"%` })
+      .one(checkResult);
+    if (Number(checkResult.cnt) > 0) {
+      console.log("[BOOKING COMPLETE] Transaction already exists for booking " + bookingId + ", skipping.");
+      return null;
+    }
+  } catch (chkErr) {
+    try {
+      var existingTx = $app.findRecordsByFilter(
+        "transactions",
+        "merchant = '" + merchantId + "' && metadata ~ '\"booking_id\":\"" + bookingId + "\"'",
+        "-created",
+        1,
+        0
+      );
+      if (existingTx && existingTx.length > 0) {
+        console.log("[BOOKING COMPLETE] Transaction already exists for booking " + bookingId + " (" + existingTx[0].id + "), skipping.");
+        return existingTx[0];
+      }
+    } catch (fbErr) {}
+  }
+
+  // 2. Resolve or provision customer
+  var customerId = rec.getString ? rec.getString("customer") : rec.get("customer");
+  var customer = null;
+  if (customerId) {
+    try { customer = $app.findRecordById("users", customerId); } catch (e) {}
+  }
+  if (!customer && customerPhone) {
+    var cleanPhone = normalizePhone(customerPhone);
+    customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
+  }
+  if (!customer) {
+    console.log("[BOOKING COMPLETE] Unable to resolve customer for booking " + bookingId);
+    return null;
+  }
+
+  // Link customer on booking record if not linked
+  if (!customerId && customer) {
+    try {
+      rec.set("customer", customer.id);
+      $app.save(rec);
+    } catch (linkErr) {}
+  }
+
+  // 3. Find merchant loyalty program
+  var program = null;
+  try {
+    var progs = $app.findRecordsByFilter(
+      "loyalty_programs",
+      "merchant = '" + merchantId + "' && is_active = true",
+      "-created",
+      1,
+      0
+    );
+    if (progs.length > 0) program = progs[0];
+  } catch (pErr) {}
+
+  var stampsToAward = 1;
+  var pointsToAward = Math.floor(totalPrice);
+  var programId = null;
+
+  if (program) {
+    programId = program.id;
+    var isStampsEnabled = program.get("enable_stamps") !== false;
+    var isPointsEnabled = program.get("enable_points") !== false;
+    var spendPerPoint = parseFloat(program.get("spend_per_point")) || 1;
+
+    if (!isStampsEnabled) stampsToAward = 0;
+    if (!isPointsEnabled) pointsToAward = 0;
+    else if (spendPerPoint > 0) {
+      pointsToAward = Math.floor(totalPrice / spendPerPoint);
+    }
+  }
+
+  // 4. Resolve items summary
+  var itemsSummary = rec.get("items_summary");
+  if (typeof itemsSummary === "string") {
+    try { itemsSummary = JSON.parse(itemsSummary); } catch (e) {}
+  }
+  var serviceNames = "Service Booking";
+  if (Array.isArray(itemsSummary) && itemsSummary.length > 0) {
+    serviceNames = itemsSummary.map(function(item) { return item.name || "Service"; }).join(", ");
+  }
+
+  // 5. Find or create loyalty card
+  var loyaltyCard = null;
+  try {
+    var cards = $app.findRecordsByFilter(
+      "loyalty_cards",
+      "customer = '" + customer.id + "' && merchant = '" + merchantId + "'",
+      "-created",
+      1,
+      0
+    );
+    if (cards.length > 0) {
+      loyaltyCard = cards[0];
+    } else {
+      var cardCol = $app.findCollectionByNameOrId("loyalty_cards");
+      loyaltyCard = new Record(cardCol);
+      loyaltyCard.set("id", $security.randomString(15).toLowerCase());
+      loyaltyCard.set("customer", customer.id);
+      loyaltyCard.set("merchant", merchantId);
+      if (programId) loyaltyCard.set("program", programId);
+      loyaltyCard.set("stamps_collected", 0);
+      loyaltyCard.set("completions", 0);
+      loyaltyCard.set("status", "active");
+      loyaltyCard.set("opt_in_marketing", true);
+      $app.save(loyaltyCard);
+    }
+  } catch (cErr) {
+    console.log("[BOOKING LOYALTY CARD RESOLVE ERROR]", cErr.message || cErr);
+  }
+
+  // 6. Resolve staff user ID if staff record exists
+  var staffUserId = null;
+  if (staffId) {
+    try {
+      var staffRec = $app.findRecordById("merchant_staff", staffId);
+      if (staffRec) {
+        staffUserId = staffRec.getString("user");
+      }
+    } catch (stErr) {}
+  }
+
+  // 7. Insert transaction record (Unified Sales Ledger)
+  var newTx = null;
+  try {
+    var txCol = $app.findCollectionByNameOrId("transactions");
+    newTx = new Record(txCol);
+    newTx.set("id", $security.randomString(15).toLowerCase());
+    newTx.set("customer", customer.id);
+    newTx.set("merchant", merchantId);
+    if (loyaltyCard) newTx.set("loyalty_card", loyaltyCard.id);
+    if (staffUserId) newTx.set("staff", staffUserId);
+    newTx.set("type", "earn");
+    newTx.set("bill_amount", totalPrice);
+    newTx.set("stamps", stampsToAward);
+    newTx.set("points", pointsToAward);
+
+    var txnMeta = {
+      source: "booking",
+      booking_id: bookingId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      branch_id: branchId || "",
+      staff_id: staffId || "",
+      items_summary: itemsSummary || [],
+      notes: "Booking completed: " + serviceNames
+    };
+    newTx.set("metadata", JSON.stringify(txnMeta));
+    $app.save(newTx);
+    console.log("[BOOKING COMPLETE] Transaction created " + newTx.id + " for customer " + customer.id + ": RM" + totalPrice + ", +" + stampsToAward + " stamps");
+  } catch (txErr) {
+    console.log("[BOOKING TRANSACTION ERROR]", txErr.message || txErr);
+  }
+
+  // 8. Update customer loyalty card stamps (triggers stamp_complete.pb.js)
+  if (loyaltyCard && stampsToAward > 0) {
+    try {
+      var currStamps = parseInt(loyaltyCard.get("stamps_collected")) || 0;
+      loyaltyCard.set("stamps_collected", currStamps + stampsToAward);
+      loyaltyCard.set("last_activity", new Date().toISOString().replace("T", " ").substring(0, 19));
+      $app.save(loyaltyCard);
+      console.log("[BOOKING COMPLETE] Loyalty card " + loyaltyCard.id + " updated to " + (currStamps + stampsToAward) + " stamps");
+    } catch (cardUpErr) {
+      console.log("[BOOKING CARD UPDATE ERROR]", cardUpErr.message || cardUpErr);
+    }
+  }
+
+  // 9. Update customer total points
+  if (pointsToAward > 0) {
+    try {
+      var currPoints = parseInt(customer.get("total_points")) || 0;
+      customer.set("total_points", currPoints + pointsToAward);
+      $app.save(customer);
+    } catch (ptErr) {
+      console.log("[BOOKING POINTS UPDATE ERROR]", ptErr.message || ptErr);
+    }
+  }
+
+  // 10. Generate digital receipt
+  try {
+    var dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    var receiptCode = "REC-" + dateStr + "-" + $security.randomString(4).toUpperCase();
+
+    var recCol = $app.findCollectionByNameOrId("digital_receipts");
+    if (recCol) {
+      var digitalReceipt = new Record(recCol);
+      digitalReceipt.set("id", $security.randomString(15).toLowerCase());
+      digitalReceipt.set("merchant", merchantId);
+      digitalReceipt.set("booking", bookingId);
+      digitalReceipt.set("customer", customer.id);
+      digitalReceipt.set("customer_phone", customer.getString("phone") || customerPhone);
+      digitalReceipt.set("receipt_number", receiptCode);
+      digitalReceipt.set("line_items", itemsSummary || []);
+      digitalReceipt.set("total_amount", totalPrice);
+      digitalReceipt.set("payment_method", "Store Counter");
+      digitalReceipt.set("stamps_earned", stampsToAward);
+      $app.save(digitalReceipt);
+      console.log("[BOOKING COMPLETE] Digital receipt generated: " + receiptCode);
+    }
+  } catch (rErr) {
+    console.log("[DIGITAL RECEIPT ERROR]", rErr.message || rErr);
+  }
+
+  return newTx;
+}
+
 module.exports = {
   parseTimeToMinutes,
   formatMinutesToTime,
   normalizePhone,
   checkMerchantBookingAccess,
-  ensureCustomerAndLoyaltyCard
+  ensureCustomerAndLoyaltyCard,
+  processCompletedBooking
 };

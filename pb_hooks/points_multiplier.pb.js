@@ -146,15 +146,9 @@ onRecordCreate((e) => {
   // Log calculation details in metadata JSON while preserving existing source tags
   let existingMetadata = {};
   try {
-    const rawMeta = e.record.get('metadata');
-    if (typeof rawMeta === 'string' && rawMeta.trim().startsWith('{')) {
-      existingMetadata = JSON.parse(rawMeta);
-    } else if (rawMeta) {
-      try {
-        existingMetadata = JSON.parse($json.stringify(rawMeta));
-      } catch (pErr) {
-        existingMetadata = {};
-      }
+    const rawMetaStr = (e.record.getString ? e.record.getString('metadata') : '') || '';
+    if (rawMetaStr && rawMetaStr.trim().startsWith('{')) {
+      existingMetadata = JSON.parse(rawMetaStr);
     }
   } catch (mErr) {}
 

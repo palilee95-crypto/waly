@@ -37,10 +37,18 @@ onRecordCreate((e) => {
     throw new ForbiddenError('Account is temporarily frozen for review. Contact support@risev.app.');
   }
 
-  // 1. Self-issuance check (V05)
+  // 1. Self-issuance check (V05) - Excludes booking transactions (appointments billed through booking system)
+  let isBookingTx = false;
+  try {
+    const metaStr = (e.record.getString ? e.record.getString('metadata') : '') || '';
+    if (metaStr.indexOf('booking') !== -1) {
+      isBookingTx = true;
+    }
+  } catch (metaErr) {}
+
   const merchant = $app.findRecordById('merchants', merchantId);
   const authRecord = e.httpContext ? e.httpContext.get('authRecord') : null;
-  if ((merchant.get('owner') === customerId) || (authRecord && authRecord.id === customerId)) {
+  if (!isBookingTx && ((merchant.get('owner') === customerId) || (authRecord && authRecord.id === customerId))) {
     // Create fraud flag
     createFlag(customerId, null, 'V05', 'Self-issuance attempt blocked', 'critical');
     throw new ForbiddenError('Self-issuance is not permitted');

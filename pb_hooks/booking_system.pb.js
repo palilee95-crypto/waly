@@ -370,131 +370,15 @@ onRecordUpdate((e) => {
     }
   }
 
-  // B. Service Completed: Option A Loyalty Engine Auto-Sync & Digital Receipt
+  // B. Service Completed: Option A Unified Sales Ledger & Digital Receipt
   if (oldStatus !== "completed" && newStatus === "completed") {
     try {
-      const totalPrice = parseFloat(rec.get("total_price")) || 0;
-      const customerId = rec.getString("customer");
-      let customer = null;
-
-      if (customerId) {
-        try { customer = $app.findRecordById("users", customerId); } catch (e) {}
-      }
-
-      if (!customer) {
-        const cleanPhone = normalizePhone(rec.getString("customer_phone"));
-        customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
-      }
-
-      if (customer && merchantId) {
-        // 1. Find merchant loyalty program
-        let program = null;
-        try {
-          const progs = $app.findRecordsByFilter(
-            "loyalty_programs",
-            "merchant = '" + merchantId + "' && is_active = true",
-            "-created",
-            1,
-            0
-          );
-          if (progs.length > 0) program = progs[0];
-        } catch (pErr) {}
-
-        let stampsToAward = 1; // 1 visit = 1 stamp default
-        let pointsToAward = Math.floor(totalPrice);
-
-        if (program) {
-          const isStampsEnabled = program.get("enable_stamps") !== false;
-          const isPointsEnabled = program.get("enable_points") !== false;
-          const spendPerPoint = parseFloat(program.get("spend_per_point")) || 1;
-
-          if (!isStampsEnabled) stampsToAward = 0;
-          if (!isPointsEnabled) pointsToAward = 0;
-          else if (spendPerPoint > 0) {
-            pointsToAward = Math.floor(totalPrice / spendPerPoint);
-          }
-        }
-
-        // 2. Insert transaction record (type: 'earn')
-        let itemsSummary = rec.get("items_summary");
-        if (typeof itemsSummary === "string") {
-          try { itemsSummary = JSON.parse(itemsSummary); } catch (e) {}
-        }
-        let serviceNames = "Service Booking";
-        if (Array.isArray(itemsSummary) && itemsSummary.length > 0) {
-          serviceNames = itemsSummary.map(function(item) { return item.name; }).join(", ");
-        }
-
-        try {
-          const txCol = $app.findCollectionByNameOrId("transactions");
-          const tx = new Record(txCol);
-          tx.set("id", $security.randomString(15).toLowerCase());
-          tx.set("customer", customer.id);
-          tx.set("merchant", merchantId);
-          if (branchId) tx.set("branch", branchId);
-          tx.set("type", "earn");
-          tx.set("bill_amount", totalPrice);
-          tx.set("stamps", stampsToAward);
-          tx.set("points", pointsToAward);
-          tx.set("notes", "Booking completed: " + serviceNames);
-          $app.save(tx);
-          console.log("[BOOKING COMPLETE] Transaction created for customer " + customer.id + ": RM" + totalPrice + ", +" + stampsToAward + " stamps");
-        } catch (txErr) {
-          console.log("[BOOKING TRANSACTION ERROR]", txErr.message || txErr);
-        }
-
-        // 3. Update customer loyalty card
-        try {
-          const cards = $app.findRecordsByFilter(
-            "loyalty_cards",
-            "customer = '" + customer.id + "' && merchant = '" + merchantId + "'",
-            "-created",
-            1,
-            0
-          );
-          if (cards.length > 0) {
-            const card = cards[0];
-            const currStamps = parseInt(card.get("stamps_collected")) || 0;
-            card.set("stamps_collected", currStamps + stampsToAward);
-            card.set("last_activity", new Date().toISOString().replace("T", " ").substring(0, 19));
-            $app.save(card);
-          }
-        } catch (cErr) {
-          console.log("[BOOKING LOYALTY CARD UPDATE ERROR]", cErr.message || cErr);
-        }
-
-        // 4. Update customer total points
-        if (pointsToAward > 0) {
-          try {
-            const currPoints = parseInt(customer.get("total_points")) || 0;
-            customer.set("total_points", currPoints + pointsToAward);
-            $app.save(customer);
-          } catch (ptErr) {}
-        }
-
-        // 5. Generate digital_receipts record
-        try {
-          const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-          const receiptCode = "REC-" + dateStr + "-" + $security.randomString(4).toUpperCase();
-
-          const recCol = $app.findCollectionByNameOrId("digital_receipts");
-          const digitalReceipt = new Record(recCol);
-          digitalReceipt.set("id", $security.randomString(15).toLowerCase());
-          digitalReceipt.set("merchant", merchantId);
-          digitalReceipt.set("booking", rec.id);
-          digitalReceipt.set("customer", customer.id);
-          digitalReceipt.set("customer_phone", customer.getString("phone") || rec.getString("customer_phone"));
-          digitalReceipt.set("receipt_number", receiptCode);
-          digitalReceipt.set("line_items", itemsSummary || []);
-          digitalReceipt.set("total_amount", totalPrice);
-          digitalReceipt.set("payment_method", "Store Counter");
-          digitalReceipt.set("stamps_earned", stampsToAward);
-          $app.save(digitalReceipt);
-
-          console.log("[BOOKING COMPLETE] Digital receipt generated: " + receiptCode + " (ID: " + digitalReceipt.id + ")");
-        } catch (rErr) {
-          console.log("[DIGITAL RECEIPT ERROR]", rErr.message || rErr);
-        }
+      let bHelper = null;
+      try { bHelper = require(`${__hooks}/booking_helper.js`); } catch (bhErr) {}
+      if (bHelper && typeof bHelper.processCompletedBooking === "function") {
+        bHelper.processCompletedBooking(rec);
+      } else {
+        console.log("[BOOKING COMPLETE ERROR] booking_helper.js not available");
       }
     } catch (compErr) {
       console.log("[BOOKING COMPLETION ERROR]", compErr.message || compErr);
@@ -530,13 +414,63 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
       return e.json(404, { error: "Booking not found" });
     }
 
+    const oldStatus = booking.getString("status");
     booking.set("status", newStatus);
     $app.save(booking);
+
+    if (oldStatus !== "completed" && newStatus === "completed") {
+      try {
+        let bHelper = null;
+        try { bHelper = require(`${__hooks}/booking_helper.js`); } catch (bhErr) {}
+        if (bHelper && typeof bHelper.processCompletedBooking === "function") {
+          bHelper.processCompletedBooking(booking);
+        }
+      } catch (compErr) {
+        console.log("[BOOKING STATUS ENDPOINT COMPLETE ERROR]", compErr.message || compErr);
+      }
+    }
 
     return e.json(200, { success: true, booking_id: bookingId, status: newStatus });
   } catch (err) {
     console.log("[MERCHANT BOOKING STATUS ERROR]", err.message || err);
     return e.json(500, { error: err.message || "Failed to update booking status" });
+  }
+});
+
+// -------------------------------------------------------------
+// 2c. REST API: Backfill Missing Transactions for Completed Bookings
+// -------------------------------------------------------------
+routerAdd("POST", "/api/risev/admin/backfill-booking-transactions", (e) => {
+  try {
+    let bHelper = null;
+    try { bHelper = require(`${__hooks}/booking_helper.js`); } catch (bhErr) {}
+    if (!bHelper || typeof bHelper.processCompletedBooking !== "function") {
+      return e.json(500, { error: "booking_helper not available" });
+    }
+
+    const bookings = $app.findRecordsByFilter(
+      "service_bookings",
+      "status = 'completed'",
+      "-created",
+      500,
+      0
+    );
+
+    let processedCount = 0;
+    for (let i = 0; i < bookings.length; i++) {
+      const b = bookings[i];
+      const res = bHelper.processCompletedBooking(b);
+      if (res) processedCount++;
+    }
+
+    return e.json(200, {
+      success: true,
+      total_completed_bookings: bookings.length,
+      newly_created_transactions: processedCount
+    });
+  } catch (err) {
+    console.log("[BACKFILL BOOKING TRANSACTIONS ERROR]", err.message || err);
+    return e.json(500, { error: err.message || "Failed to backfill" });
   }
 });
 

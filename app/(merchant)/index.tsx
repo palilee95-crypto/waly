@@ -41,6 +41,7 @@ type ActivityItem = {
   stamps: number;
   status?: 'Pending' | 'Success';
   customerId?: string;
+  isBooking?: boolean;
 };
 
 export default function MerchantDashboard() {
@@ -415,10 +416,17 @@ export default function MerchantDashboard() {
 
   const mappedActivities: ActivityItem[] = filteredTransactions.map((tx: any) => {
     const cust = tx.expand?.customer;
-    const billAmt = tx.bill_amount ?? tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+    let meta: any = {};
+    try {
+      meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
+    } catch (e) {}
+    const billAmt = tx.bill_amount ?? meta.bill_amount ?? meta.amount ?? 0;
+    const isBooking = meta.source === 'booking';
+    const customerDisplayName = cust?.name || meta.customer_name || 'Walk-in Customer';
+
     return {
       id: tx.id,
-      name: cust?.name || 'Walk-in Customer',
+      name: customerDisplayName,
       avatar: cust?.avatar 
         ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
@@ -426,7 +434,8 @@ export default function MerchantDashboard() {
       amount: billAmt > 0 ? `RM ${Number(billAmt).toFixed(2)}` : 'RM 0.00',
       stamps: tx.stamps || 0,
       status: tx.type === 'adjust' ? 'Pending' : 'Success',
-      customerId: cust?.id || ''
+      customerId: cust?.id || '',
+      isBooking: isBooking,
     };
   });
 

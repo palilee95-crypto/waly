@@ -167,7 +167,8 @@ export default function CustomersScreen() {
       });
       const mapped = records.map((rec: any) => {
         const cust = rec.expand?.customer;
-        const name = cust?.name || 'Walk-in Customer';
+        const meta = parseSafeMetadata(rec.metadata);
+        const name = (cust?.name && !cust.name.startsWith('Customer ') ? cust.name : (meta?.customer_name || cust?.name || 'Walk-in Customer'));
         const type = (rec.type === 'earn' ? 'PURCHASE' : rec.type === 'redeem' ? 'REDEMPTION' : 'ADJUSTMENT') as 'PURCHASE' | 'REDEMPTION' | 'ADJUSTMENT';
         const bgCircleColor = rec.type === 'earn' ? '#DBEAFE' : rec.type === 'redeem' ? '#FEE2E2' : '#F3F4F6';
         const safeD = parseSafeDate(rec.created);
@@ -185,12 +186,12 @@ export default function CustomersScreen() {
           stamps: rec.stamps || 0,
           points: rec.points || 0,
           customerId: cust?.id || '',
-          customerPhone: cust?.phone || '',
+          customerPhone: cust?.phone || meta?.customer_phone || '',
           avatar: cust?.avatar 
             ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
             : null,
           created: rec.created,
-          metadata: parseSafeMetadata(rec.metadata),
+          metadata: meta,
           bill_amount: rec.bill_amount,
         };
       });
