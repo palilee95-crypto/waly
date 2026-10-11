@@ -109,12 +109,79 @@ routerAdd("POST", "/api/risev/push/subscribe", (e) => {
   }
 }, $apis.requireAuth("users"));
 
-routerAdd("POST", "/api/risev/push/unsubscribe", (e) => {
-  const authRecord = e.auth;
-  if (!authRecord) {
-    return e.json(401, { message: "Unauthorized" });
-  }
+// Dedicated Public/Customer Web Push subscription endpoint (for online booking & customer PWA)
+routerAdd("POST", "/api/risev/push/customer-subscribe", (e) => {
+  try {
+    const body = e.requestInfo().body || {};
+    const endpoint = (body.endpoint || "").trim();
+    const keys = body.keys || {};
+    const p256dh = (keys.p256dh || body.p256dh || "").trim();
+    const auth = (keys.auth || body.auth || "").trim();
+    const device = (body.device || body.user_agent || "").trim();
+    const customerPhone = (body.customer_phone || "").trim();
+    const merchantId = (body.merchant_id || "").trim();
+    const branchId = (body.branch_id || "").trim();
 
+    if (!endpoint || !p256dh || !auth) {
+      return e.json(400, { message: "endpoint, keys.p256dh, and keys.auth are required" });
+    }
+
+    if (!customerPhone && !e.auth) {
+      return e.json(400, { message: "customer_phone or authenticated user is required" });
+    }
+
+    // Resolve user ID if authenticated or matching phone
+    let userId = e.auth ? e.auth.id : "";
+    if (!userId && customerPhone) {
+      try {
+        const cleanPhone = customerPhone.replace(/["'\\]/g, "");
+        const matched = $app.findRecordsByFilter("users", `phone = "${cleanPhone}"`, "-created", 1, 0);
+        if (matched.length > 0) userId = matched[0].id;
+      } catch (uErr) {}
+    }
+
+    const safeEndpoint = endpoint.replace(/["'\\]/g, "");
+    let existingSub = null;
+    try {
+      const subs = $app.findRecordsByFilter("push_subscriptions", `endpoint = "${safeEndpoint}"`, "-created", 1, 0);
+      if (subs.length > 0) existingSub = subs[0];
+    } catch (err) {}
+
+    if (existingSub) {
+      if (userId) existingSub.set("user", userId);
+      if (customerPhone) existingSub.set("customer_phone", customerPhone);
+      if (merchantId) existingSub.set("merchant", merchantId);
+      if (branchId) existingSub.set("branch", branchId);
+      existingSub.set("p256dh", p256dh);
+      existingSub.set("auth", auth);
+      if (device) existingSub.set("device", device);
+      $app.save(existingSub);
+      console.log(`[PUSH API] Updated existing customer push subscription for phone: ${customerPhone}`);
+      return e.json(200, { success: true, subscription_id: existingSub.id, message: "Subscription updated" });
+    }
+
+    const subCol = $app.findCollectionByNameOrId("push_subscriptions");
+    const newSub = new Record(subCol);
+    newSub.set("id", $security.randomString(15).toLowerCase());
+    if (userId) newSub.set("user", userId);
+    if (customerPhone) newSub.set("customer_phone", customerPhone);
+    if (merchantId) newSub.set("merchant", merchantId);
+    if (branchId) newSub.set("branch", branchId);
+    newSub.set("endpoint", endpoint);
+    newSub.set("p256dh", p256dh);
+    newSub.set("auth", auth);
+    if (device) newSub.set("device", device);
+    $app.save(newSub);
+
+    console.log(`[PUSH API] Created new customer push subscription ${newSub.id} for phone: ${customerPhone}`);
+    return e.json(200, { success: true, subscription_id: newSub.id, message: "Customer subscribed successfully" });
+  } catch (err) {
+    console.error("[PUSH API CUSTOMER SUBSCRIBE ERROR]", err);
+    return e.json(500, { message: "Failed to save customer push subscription: " + (err.message || err) });
+  }
+});
+
+routerAdd("POST", "/api/risev/push/unsubscribe", (e) => {
   try {
     const body = e.requestInfo().body || {};
     const endpoint = (body.endpoint || "").trim();
@@ -124,9 +191,14 @@ routerAdd("POST", "/api/risev/push/unsubscribe", (e) => {
     }
 
     const safeEndpoint = endpoint.replace(/["'\\]/g, "");
+    let filter = `endpoint = "${safeEndpoint}"`;
+    if (e.auth) {
+      filter += ` && user = "${e.auth.id}"`;
+    }
+
     const subs = $app.findRecordsByFilter(
       "push_subscriptions",
-      `endpoint = "${safeEndpoint}" && user = "${authRecord.id}"`,
+      filter,
       "-created",
       10,
       0
@@ -135,14 +207,14 @@ routerAdd("POST", "/api/risev/push/unsubscribe", (e) => {
     subs.forEach(s => {
       try {
         $app.delete(s);
-      } catch (e) {}
+      } catch (delErr) {}
     });
 
     return e.json(200, { success: true, message: "Unsubscribed successfully" });
   } catch (err) {
     return e.json(500, { message: err.message || "Failed to unsubscribe" });
   }
-}, $apis.requireAuth("users"));
+});
 
 // Test push endpoint for merchant to verify device
 routerAdd("POST", "/api/risev/push/test", (e) => {

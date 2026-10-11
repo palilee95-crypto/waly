@@ -23,6 +23,11 @@ import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
+import {
+  subscribeToPushNotifications,
+  isPushSupported,
+  getPushPermissionStatus,
+} from '@/lib/push-notifications';
 
 interface BranchItem {
   id: string;
@@ -279,6 +284,38 @@ export default function CustomerBookingPwaScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Web Push Customer Appointment Reminders state
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isSubscribingPush, setIsSubscribingPush] = useState(false);
+
+  useEffect(() => {
+    if (isPushSupported() && getPushPermissionStatus() === 'granted') {
+      setIsPushSubscribed(true);
+    }
+  }, []);
+
+  const handleSubscribePushReminder = async () => {
+    if (isPushSubscribed) return;
+    setIsSubscribingPush(true);
+    try {
+      const res = await subscribeToPushNotifications({
+        customerPhone: customerPhone,
+        merchantId: merchant?.id,
+        branchId: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : undefined,
+      });
+      if (res.success) {
+        setIsPushSubscribed(true);
+        showToast('Peringatan diaktifkan! 🔔 (12j, 3j & 30m)');
+      } else {
+        showToast(res.message || 'Gagal mengaktifkan notifikasi.');
+      }
+    } catch (e: any) {
+      showToast(e?.message || 'Ralat mengaktifkan notifikasi.');
+    } finally {
+      setIsSubscribingPush(false);
+    }
+  };
 
   // Loyalty stamp card state
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
@@ -1151,6 +1188,17 @@ export default function CustomerBookingPwaScreen() {
 
         showToast('Booking Confirmed! 🎉');
         setCurrentStep(4);
+
+        // Auto-subscribe if browser permission is already granted
+        if (isPushSupported() && getPushPermissionStatus() === 'granted') {
+          subscribeToPushNotifications({
+            customerPhone: customerPhone,
+            merchantId: merchant?.id,
+            branchId: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : undefined,
+          }).then(res => {
+            if (res.success) setIsPushSubscribed(true);
+          }).catch(() => {});
+        }
       } catch (err: any) {
         Alert.alert('Error', err?.message || 'Failed to process booking. Please try again.');
       } finally {
@@ -2658,6 +2706,42 @@ export default function CustomerBookingPwaScreen() {
             <Text style={[styles.arrivedInstructionSubtext, { color: themeStyles.textSecondaryColor }]}>
               Tap the button below as soon as you step inside the store.
             </Text>
+
+            {/* Booking Reminder Web Push Card */}
+            {isPushSupported() && (
+              <View style={[styles.pwaCardBox, themeStyles.neumorphicCard, { marginBottom: 12, borderColor: isPushSubscribed ? '#10B981' : themeStyles.borderColor }]}>
+                <View style={[styles.pwaIconBoxYellow, { backgroundColor: isPushSubscribed ? '#ECFDF5' : '#FEF3C7' }]}>
+                  <Ionicons name={isPushSubscribed ? "notifications" : "notifications-outline"} size={22} color={isPushSubscribed ? "#059669" : "#D97706"} />
+                </View>
+                <View style={{ flex: 1, paddingRight: 6 }}>
+                  <Text style={[styles.pwaTitleText, { color: themeStyles.textPrimaryColor }]}>
+                    {isPushSubscribed ? 'Peringatan Temujanji Aktif' : 'Peringatan Temujanji'}
+                  </Text>
+                  <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
+                    {isPushSubscribed
+                      ? 'Notifikasi akan dihantar 12 jam, 3 jam & 30 minit sebelum slot.'
+                      : 'Terima push noti automatik 12 jam, 3 jam & 30 minit sebelum slot.'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.btnInstallPwaYellowPill,
+                    isPushSubscribed && { backgroundColor: '#10B981' }
+                  ]}
+                  onPress={handleSubscribePushReminder}
+                  disabled={isSubscribingPush || isPushSubscribed}
+                  activeOpacity={0.8}
+                >
+                  {isSubscribingPush ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Text style={[styles.btnInstallPwaTextBlack, isPushSubscribed && { color: '#FFFFFF' }]}>
+                      {isPushSubscribed ? 'Aktif ✓' : 'Aktifkan 🔔'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Save Merchant App PWA Card */}
             <View style={[styles.pwaCardBox, themeStyles.neumorphicCard]}>

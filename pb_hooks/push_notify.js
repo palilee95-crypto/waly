@@ -194,7 +194,62 @@ function sendPushToMerchant(merchantId, branchId, payload) {
   }
 }
 
+function sendPushToCustomer(customerId, customerPhone, payload) {
+  if (!customerId && !customerPhone) return null;
+
+  // Anti-spam check
+  if (payload && payload.tag && isDuplicatePush(payload.tag)) {
+    console.log("[PUSH DEBOUNCE] Suppressed duplicate customer push for tag: " + payload.tag);
+    return { successCount: 0, suppressed: true };
+  }
+
+  try {
+    const filterParts = [];
+    if (customerId) {
+      filterParts.push(`user = "${customerId}"`);
+    }
+
+    if (customerPhone) {
+      const cleanPhone = customerPhone.trim().replace(/["'\\]/g, "");
+      filterParts.push(`customer_phone = "${cleanPhone}"`);
+
+      // Also check if any registered user has this phone
+      try {
+        const matchedUsers = $app.findRecordsByFilter("users", `phone = "${cleanPhone}"`, "-created", 5, 0);
+        matchedUsers.forEach(function(u) {
+          if (filterParts.indexOf(`user = "${u.id}"`) === -1) {
+            filterParts.push(`user = "${u.id}"`);
+          }
+        });
+      } catch (uErr) {}
+    }
+
+    if (filterParts.length === 0) return null;
+
+    const subFilter = filterParts.join(" || ");
+    const subs = $app.findRecordsByFilter(
+      "push_subscriptions",
+      subFilter,
+      "-created",
+      20,
+      0
+    );
+
+    if (subs.length === 0) {
+      console.log(`[PUSH CUSTOMER] No active push subscriptions found for customer (id: ${customerId || 'n/a'}, phone: ${customerPhone || 'n/a'})`);
+      return { successCount: 0, failedCount: 0, total: 0 };
+    }
+
+    console.log(`[PUSH CUSTOMER] Dispatching push to ${subs.length} device(s) for customer ${customerPhone || customerId}`);
+    return dispatchToPushService(subs, payload);
+  } catch (err) {
+    console.log("[SEND PUSH TO CUSTOMER ERROR]", err.message || err);
+    return null;
+  }
+}
+
 module.exports = {
   sendPushToUser,
-  sendPushToMerchant
+  sendPushToMerchant,
+  sendPushToCustomer
 };

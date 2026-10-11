@@ -63,6 +63,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 export async function subscribeToPushNotifications(options?: {
   merchantId?: string;
   branchId?: string;
+  customerPhone?: string;
 }): Promise<{ success: boolean; message?: string }> {
   if (!isPushSupported()) {
     return { success: false, message: 'Web Push is not supported on this browser or platform.' };
@@ -114,7 +115,11 @@ export async function subscribeToPushNotifications(options?: {
     else if (/win/i.test(userAgent)) deviceName = 'Windows Desktop';
 
     // 6. Save subscription to PocketBase
-    await pb.send('/api/risev/push/subscribe', {
+    const endpointUrl = options?.customerPhone || !pb.authStore.isValid
+      ? '/api/risev/push/customer-subscribe'
+      : '/api/risev/push/subscribe';
+
+    await pb.send(endpointUrl, {
       method: 'POST',
       body: {
         endpoint: subJson.endpoint,
@@ -123,6 +128,7 @@ export async function subscribeToPushNotifications(options?: {
           auth: subJson.keys.auth,
         },
         device: deviceName,
+        customer_phone: options?.customerPhone,
         merchant_id: options?.merchantId,
         branch_id: options?.branchId,
       },
