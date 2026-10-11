@@ -172,6 +172,134 @@ function getPeriodForSlot(slot: string): 'Morning' | 'Afternoon' | 'Evening' {
   return 'Evening';
 }
 
+interface OperatingHoursInfo {
+  isOpen: boolean;
+  todayHoursText: string;
+  weeklySchedule: { day: string; hours: string; isToday: boolean }[];
+}
+
+function parseStoreOperatingHours(hoursData: any, fallbackStr?: string): OperatingHoursInfo {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const shortDays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+  const now = new Date();
+  const dayIndex = now.getDay();
+  const todayName = days[dayIndex];
+
+  // Helper to format "08:00 - 22:00" to "8:00 AM – 10:00 PM"
+  const formatTimeRange = (range: string): string => {
+    if (!range || range.toLowerCase() === 'closed' || range.toLowerCase() === 'tutup') {
+      return 'Closed';
+    }
+    const parts = range.split('-').map(s => s.trim());
+    if (parts.length === 2) {
+      const formatTime = (t: string) => {
+        if (/am|pm/i.test(t)) return t.toUpperCase();
+        const [hStr, mStr] = t.split(':');
+        const h = parseInt(hStr, 10);
+        if (isNaN(h)) return t;
+        const m = mStr !== undefined ? parseInt(mStr, 10) : 0;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 === 0 ? 12 : h % 12;
+        const displayM = String(m).padStart(2, '0');
+        return `${displayH}:${displayM} ${period}`;
+      };
+      return `${formatTime(parts[0])} – ${formatTime(parts[1])}`;
+    }
+    return range;
+  };
+
+  // Helper to parse if current time is within range
+  const checkIfOpen = (range: string): boolean => {
+    if (!range || range.toLowerCase() === 'closed' || range.toLowerCase() === 'tutup') {
+      return false;
+    }
+    const parts = range.split('-').map(s => s.trim());
+    if (parts.length === 2) {
+      const parseMinutes = (t: string): number => {
+        const isPM = /pm/i.test(t);
+        const isAM = /am/i.test(t);
+        const clean = t.replace(/am|pm/i, '').trim();
+        const [hStr, mStr] = clean.split(':');
+        let h = parseInt(hStr, 10) || 0;
+        const m = parseInt(mStr, 10) || 0;
+        if (isPM && h < 12) h += 12;
+        if (isAM && h === 12) h = 0;
+        return h * 60 + m;
+      };
+
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const startMinutes = parseMinutes(parts[0]);
+      const endMinutes = parseMinutes(parts[1]);
+
+      if (endMinutes > startMinutes) {
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        // Crosses midnight
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+    }
+    return true;
+  };
+
+  // Build weekly schedule (Monday to Sunday)
+  const weeklySchedule: { day: string; hours: string; isToday: boolean }[] = [];
+  let rawTodayRange = '';
+
+  const weekOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  weekOrder.forEach(day => {
+    const idx = days.indexOf(day);
+    const shortKey = shortDays[idx];
+    const isToday = day === todayName;
+
+    let val = '';
+    if (hoursData && typeof hoursData === 'object') {
+      val = hoursData[day] || hoursData[day.toLowerCase()];
+      if (!val && hoursData[shortKey]) {
+        const item = hoursData[shortKey];
+        if (typeof item === 'object') {
+          if (item.closed) {
+            val = 'Closed';
+          } else if (item.open && item.close) {
+            val = `${item.open} - ${item.close}`;
+          }
+        }
+      }
+    }
+
+    const display = val ? formatTimeRange(String(val)) : (fallbackStr || '10:00 AM – 10:00 PM');
+    if (isToday) {
+      rawTodayRange = String(val || '');
+    }
+
+    weeklySchedule.push({
+      day,
+      hours: display,
+      isToday,
+    });
+  });
+
+  let isOpen = false;
+  let todayHoursText = '';
+
+  if (rawTodayRange) {
+    todayHoursText = formatTimeRange(rawTodayRange);
+    isOpen = checkIfOpen(rawTodayRange);
+  } else if (fallbackStr) {
+    todayHoursText = fallbackStr;
+    isOpen = checkIfOpen(fallbackStr);
+  } else {
+    todayHoursText = '10:00 AM – 10:00 PM';
+    isOpen = checkIfOpen('10:00 - 22:00');
+  }
+
+  return {
+    isOpen,
+    todayHoursText,
+    weeklySchedule,
+  };
+}
+
 export default function CustomerBookingPwaScreen() {
   const { slug, phone: queryPhone, name: queryName, ref: queryRef } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string }>();
   const router = useRouter();
@@ -207,6 +335,8 @@ export default function CustomerBookingPwaScreen() {
 
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState<any>(null);
+  const [storeLocation, setStoreLocation] = useState<any>(null);
+  const [showHoursModal, setShowHoursModal] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [branches, setBranches] = useState<BranchItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -316,6 +446,11 @@ export default function CustomerBookingPwaScreen() {
       setIsSubscribingPush(false);
     }
   };
+
+  // Operating hours calculation from real store_locations data
+  const operatingHoursInfo = useMemo(() => {
+    return parseStoreOperatingHours(storeLocation?.hours, merchant?.operating_hours);
+  }, [storeLocation, merchant]);
 
   // Loyalty stamp card state
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
@@ -782,6 +917,32 @@ export default function CustomerBookingPwaScreen() {
         pwa_brand_color: mRecord.pwa_brand_color || '#FFC700',
       };
       setMerchant(normalizedMerchant);
+
+      // Fetch store location for real operating hours
+      try {
+        const locRes = await pb.collection('store_locations').getFirstListItem(
+          `merchant = "${mRecord.id}"`,
+          { requestKey: null }
+        );
+        if (locRes) {
+          setStoreLocation(locRes);
+        }
+      } catch (locErr) {
+        // Fallback for mock demo merchant if no store_locations record found
+        if (slug === 'scoop-creamy' || mRecord.name?.toLowerCase().includes('scoop')) {
+          setStoreLocation({
+            hours: {
+              Monday: '08:00 - 22:00',
+              Tuesday: '08:00 - 22:00',
+              Wednesday: '08:00 - 22:00',
+              Thursday: '08:00 - 22:00',
+              Friday: '08:00 - 22:00',
+              Saturday: '09:00 - 23:00',
+              Sunday: '09:00 - 21:00',
+            }
+          });
+        }
+      }
 
       // Check if merchant is subscribed to PRO plan
       let proStatus = 
@@ -1584,19 +1745,28 @@ export default function CustomerBookingPwaScreen() {
                       </Text>
                     </TouchableOpacity>
                     <View style={[styles.pipeDivider, { backgroundColor: themeStyles.borderColor }]} />
-                    <View style={styles.splitMetaCol}>
+                    <TouchableOpacity 
+                      style={styles.splitMetaCol} 
+                      onPress={() => setShowHoursModal(true)} 
+                      activeOpacity={0.7}
+                    >
                       <View style={[styles.iconCircleBg, themeStyles.neumorphicInset]}>
                         <Ionicons name="time-outline" size={20} color={themeStyles.textPrimaryColor} />
                       </View>
                       <View style={{ flexDirection: 'column' }}>
-                        <View style={styles.openBadgePill}>
-                          <Text style={styles.openBadgeText}>Open</Text>
+                        <View style={operatingHoursInfo.isOpen ? styles.openBadgePill : styles.closedBadgePill}>
+                          <Text style={operatingHoursInfo.isOpen ? styles.openBadgeText : styles.closedBadgeText}>
+                            {operatingHoursInfo.isOpen ? 'Open' : 'Closed'}
+                          </Text>
                         </View>
-                        <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
-                          {merchant?.operating_hours || '11:00 AM – 11:00 PM'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Text style={[styles.hoursSubText, { color: themeStyles.textSecondaryColor }]}>
+                            {operatingHoursInfo.todayHoursText}
+                          </Text>
+                          <Ionicons name="chevron-forward" size={11} color={themeStyles.textSecondaryColor} />
+                        </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   <View style={[styles.headerHorizontalDivider, { backgroundColor: themeStyles.borderColor }]} />
@@ -1681,14 +1851,21 @@ export default function CustomerBookingPwaScreen() {
                     </Text>
 
                     {/* Status & Hours */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>Open</Text>
+                    <TouchableOpacity 
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}
+                      onPress={() => setShowHoursModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: operatingHoursInfo.isOpen ? '#10B981' : '#EF4444' }} />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: operatingHoursInfo.isOpen ? '#10B981' : '#EF4444' }}>
+                        {operatingHoursInfo.isOpen ? 'Open' : 'Closed'}
+                      </Text>
                       <Text style={{ fontSize: 13, color: '#CBD5E1' }}>•</Text>
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                        {merchant?.operating_hours || 'Closes 10:00 PM'}
+                        {operatingHoursInfo.todayHoursText}
                       </Text>
-                    </View>
+                      <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
+                    </TouchableOpacity>
 
                     {/* Rewards Pill & Location Pin Button */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2825,6 +3002,109 @@ export default function CustomerBookingPwaScreen() {
         </View>
       )}
 
+      {/* 🕒 Weekly Operating Hours Modal */}
+      <Modal
+        visible={showHoursModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowHoursModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdropPress}
+            activeOpacity={1}
+            onPress={() => setShowHoursModal(false)}
+          />
+          <View style={[styles.loyaltyCardModalContent, themeStyles.neumorphicCard, { boxShadow: 'none', shadowColor: 'transparent', shadowOpacity: 0, shadowRadius: 0, elevation: 0, maxWidth: 420 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={[styles.modalHeaderIconBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                  <Ionicons name="time" size={20} color={themeStyles.activeBtnText} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>Operating Hours</Text>
+                  <Text style={[styles.loyaltyModalSub, { color: themeStyles.textSecondaryColor }]}>{merchant?.store_name || 'Store'} Schedule</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, themeStyles.neumorphicInset]}
+                onPress={() => setShowHoursModal(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={18} color={themeStyles.textPrimaryColor} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Current Live Status Pill */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: operatingHoursInfo.isOpen ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: operatingHoursInfo.isOpen ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: operatingHoursInfo.isOpen ? '#10B981' : '#EF4444' }} />
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: operatingHoursInfo.isOpen ? '#059669' : '#DC2626' }}>
+                  {operatingHoursInfo.isOpen ? 'Open Now' : 'Closed Now'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: themeStyles.textSecondaryColor }}>
+                Today: {operatingHoursInfo.todayHoursText}
+              </Text>
+            </View>
+
+            {/* Weekly Days List */}
+            <View style={{ width: '100%', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: themeStyles.borderColor, backgroundColor: themeStyles.pillBgColor }}>
+              {operatingHoursInfo.weeklySchedule.map((item, index) => {
+                const isClosed = item.hours.toLowerCase().includes('closed');
+                return (
+                  <View
+                    key={item.day}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      backgroundColor: item.isToday ? (isPageDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') : 'transparent',
+                      borderBottomWidth: index < operatingHoursInfo.weeklySchedule.length - 1 ? 1 : 0,
+                      borderBottomColor: themeStyles.borderColor,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: item.isToday ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                        color: item.isToday ? (activeBrandColor || themeStyles.textPrimaryColor) : themeStyles.textPrimaryColor,
+                      }}>
+                        {item.day}
+                      </Text>
+                      {item.isToday && (
+                        <View style={{ backgroundColor: activeBrandColor || '#10B981', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: themeStyles.contrastColor }}>Today</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{
+                      fontSize: 13,
+                      fontFamily: item.isToday ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_500Medium',
+                      color: isClosed ? '#EF4444' : (item.isToday ? themeStyles.textPrimaryColor : themeStyles.textSecondaryColor),
+                    }}>
+                      {item.hours}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity
+              style={[styles.btnFullYellowBook, themeStyles.neumorphicActiveBtn, { marginTop: 16 }]}
+              onPress={() => setShowHoursModal(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Schedule</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Digital Loyalty Card Modal */}
       <Modal
         visible={showLoyaltyModal}
@@ -3505,6 +3785,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#15803D',
+  },
+  closedBadgePill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 2,
+  },
+  closedBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B91C1C',
   },
   hoursSubText: {
     fontSize: 11,
