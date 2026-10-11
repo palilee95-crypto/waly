@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -135,6 +135,23 @@ export default function NfcClaimModal() {
   const [quickAddons, setQuickAddons] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [itemActionTarget, setItemActionTarget] = useState<{ item: any; index: number } | null>(null);
+
+  const fetchMerchantServices = useCallback(async () => {
+    if (!merchantId) {
+      setQuickAddons([]);
+      return;
+    }
+    try {
+      const qRes = await pb.collection('merchant_services').getList(1, 100, {
+        filter: `merchant = "${merchantId}" && is_active = true`,
+        sort: '-item_type,price',
+        requestKey: null,
+      });
+      setQuickAddons(qRes.items || []);
+    } catch (e) {
+      setQuickAddons([]);
+    }
+  }, [merchantId]);
 
   const handleRemoveItemByIndex = (indexToRemove: number) => {
     setSelectedServices(prev => prev.filter((_, idx) => idx !== indexToRemove));
@@ -374,13 +391,8 @@ export default function NfcClaimModal() {
         }
       }
 
-      try {
-        const qRes = await pb.collection('merchant_services').getList(1, 6, {
-          filter: `merchant = "${merchantId}" && is_active = true`,
-          sort: '-item_type,price',
-        });
-        setQuickAddons(qRes.items);
-      } catch (e) {}
+      // Fetch active merchant services (up-to-date catalog)
+      await fetchMerchantServices();
 
       // Fetch active customer vouchers
       try {
@@ -467,6 +479,49 @@ export default function NfcClaimModal() {
       pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
     };
   }, [merchantId]);
+
+  // Realtime PocketBase & Local event listener for merchant_services
+  useEffect(() => {
+    if (!merchantId) {
+      setQuickAddons([]);
+      return;
+    }
+
+    fetchMerchantServices();
+
+    let unsubServices: any = null;
+    pb.collection('merchant_services').subscribe('*', (e: any) => {
+      const rec = e.record;
+      if (rec && rec.merchant && rec.merchant !== merchantId) return;
+
+      if (e.action === 'delete') {
+        const deletedId = rec?.id || e.id;
+        setQuickAddons((prev) => (prev || []).filter((item: any) => item.id !== deletedId));
+        setSelectedServices((prev) => (prev || []).filter((item: any) => item.id !== deletedId));
+      } else {
+        fetchMerchantServices();
+      }
+    }).then((unsub) => {
+      unsubServices = unsub;
+    }).catch(() => {});
+
+    const localSub = DeviceEventEmitter.addListener('MERCHANT_SERVICES_UPDATED', () => {
+      fetchMerchantServices();
+    });
+
+    return () => {
+      if (unsubServices) unsubServices();
+      pb.collection('merchant_services').unsubscribe('*').catch(() => {});
+      localSub.remove();
+    };
+  }, [merchantId, fetchMerchantServices]);
+
+  // Fresh refetch whenever claim modal opens or catalog picker opens
+  useEffect(() => {
+    if (isVisible || isCatalogPickerOpen) {
+      fetchMerchantServices();
+    }
+  }, [isVisible, isCatalogPickerOpen, fetchMerchantServices]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
@@ -907,7 +962,14 @@ export default function NfcClaimModal() {
 
                       {/* Catalog Items */}
                       {filteredCatalog.length === 0 ? (
-                        <Text style={styles.pickerEmptyText}>No catalog items found matching search.</Text>
+                        <View style={{ alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20 }}>
+                          <Ionicons name="cube-outline" size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                          <Text style={styles.pickerEmptyText}>
+                            {pickerSearchQuery
+                              ? 'No catalog items found matching search.'
+                              : 'Your catalog has no active services or products.\nAdd items in Services & Catalog to select them here.'}
+                          </Text>
+                        </View>
                       ) : (
                         filteredCatalog.map((item: any) => {
                           const selectedMatch = selectedServices.find(s => s.id === item.id || s.name === item.name);

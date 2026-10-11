@@ -14,7 +14,8 @@ import {
   Image,
   Clipboard,
   Share,
-  Linking
+  Linking,
+  DeviceEventEmitter
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -640,7 +641,8 @@ export default function BookingsScreen() {
         if (user?.merchant_id) {
           const sRes = await pb.collection('merchant_services').getList(1, 100, {
             filter: `merchant = "${user.merchant_id}"`,
-            sort: 'created'
+            sort: 'created',
+            requestKey: null,
           });
           sItems = sRes.items.map((item: any) => ({
             ...item,
@@ -852,6 +854,7 @@ export default function BookingsScreen() {
     try {
       if (user?.merchant_id && !service.id.startsWith('srv-')) {
         await pb.collection('merchant_services').update(service.id, { is_active: nextStatus });
+        DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
       }
       setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: nextStatus } : s));
       setShowServiceActionModal(false);
@@ -867,6 +870,7 @@ export default function BookingsScreen() {
       try {
         if (user?.merchant_id && !service.id.startsWith('srv-')) {
           await pb.collection('merchant_services').delete(service.id);
+          DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
         }
         setServices(prev => prev.filter(s => s.id !== service.id));
         setShowServiceActionModal(false);
@@ -1061,6 +1065,7 @@ export default function BookingsScreen() {
 
         setServices(prev => prev.map(s => s.id === editingService.id ? updatedService : s));
         handleCloseAddService();
+        DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
         Alert.alert('Saved ✨', `"${updatedService.name}" updated successfully.`);
         return true;
       }
@@ -1159,6 +1164,7 @@ export default function BookingsScreen() {
 
       setServices(prev => [newService, ...prev]);
       handleCloseAddService();
+      DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
       Alert.alert('Success 🎉', `"${newService.name}" has been added to your catalog.`);
       return true;
     } catch (err: any) {
