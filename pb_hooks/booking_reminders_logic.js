@@ -1,5 +1,5 @@
 // pb_hooks/booking_reminders_logic.js
-// Automated processor for upcoming customer booking reminders (12 hours, 3 hours, 30 minutes before)
+// Automated processor for upcoming customer booking reminders (2 hours and 30 minutes before)
 // Pure Web Push (RFC 8291), 100% independent of WhatsApp / Meta API.
 
 function getMYTDateStrings() {
@@ -78,8 +78,7 @@ function processBookingReminders() {
 
   const results = {
     evaluated: bookings.length,
-    sent12h: 0,
-    sent3h: 0,
+    sent2h: 0,
     sent30m: 0,
     skipped: 0
   };
@@ -147,45 +146,28 @@ function processBookingReminders() {
     const targetUrl = merchantSlug ? `/b/${merchantSlug}` : '/(customer)';
     let needSave = false;
 
-    // ── 1. REMINDER: 12 Hours Before (Window: 660m to 750m) ──
-    if (diffMinutes >= 660 && diffMinutes <= 750 && !hasReminder(remindersSent, "12h")) {
+    // ── 1. REMINDER: 2 Hours Before (Window: 105m to 135m) ──
+    if (diffMinutes >= 105 && diffMinutes <= 135 && !hasReminder(remindersSent, "2h")) {
       const payload = {
-        title: `Peringatan Temujanji: 12 Jam Lagi ⏰`,
-        body: `Temujanji [${serviceTitle}] anda di ${merchantName} pada ${bTimeStr}. Sedia berjumpa anda!`,
+        title: `2 Jam Lagi! Bersiap Sedia 💈`,
+        body: `Slot [${serviceTitle}] anda di ${merchantName} bermula jam ${bTimeStr}. Sedia berjumpa anda!`,
         url: targetUrl,
-        tag: `booking-12h-${booking.id}`,
+        tag: `booking-2h-${booking.id}`,
         renotify: true
       };
 
       pushHelper.sendPushToCustomer(customerId, customerPhone, payload);
-      remindersSent.push("12h");
+      remindersSent.push("2h");
       needSave = true;
-      results.sent12h++;
-      console.log(`[BOOKING REMINDER 12H] Sent for booking ${booking.id} to ${customerPhone || customerId}`);
+      results.sent2h++;
+      console.log(`[BOOKING REMINDER 2H] Sent for booking ${booking.id} to ${customerPhone || customerId}`);
     }
 
-    // ── 2. REMINDER: 3 Hours Before (Window: 150m to 210m) ──
-    if (diffMinutes >= 150 && diffMinutes <= 210 && !hasReminder(remindersSent, "3h")) {
-      const payload = {
-        title: `3 Jam Lagi! Bersiap Sedia 💈`,
-        body: `Slot [${serviceTitle}] anda di ${merchantName} bermula jam ${bTimeStr}. Sila tiba 5-10 minit awal.`,
-        url: targetUrl,
-        tag: `booking-3h-${booking.id}`,
-        renotify: true
-      };
-
-      pushHelper.sendPushToCustomer(customerId, customerPhone, payload);
-      remindersSent.push("3h");
-      needSave = true;
-      results.sent3h++;
-      console.log(`[BOOKING REMINDER 3H] Sent for booking ${booking.id} to ${customerPhone || customerId}`);
-    }
-
-    // ── 3. REMINDER: 30 Minutes Before (Window: 15m to 45m) ──
+    // ── 2. REMINDER: 30 Minutes Before (Window: 15m to 45m) ──
     if (diffMinutes >= 15 && diffMinutes <= 45 && !hasReminder(remindersSent, "30m")) {
       const payload = {
         title: `Giliran Anda 30 Minit Lagi! 🚗`,
-        body: `Temujanji di ${merchantName} jam ${bTimeStr}. Buka untuk semak tiket & arah perjalanan.`,
+        body: `Temujanji di ${merchantName} jam ${bTimeStr}. Sila tiba 5-10 minit awal.`,
         url: targetUrl,
         tag: `booking-30m-${booking.id}`,
         renotify: true

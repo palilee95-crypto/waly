@@ -296,7 +296,7 @@ export async function sendCustomerTestNotification(): Promise<boolean> {
       const reg = await navigator.serviceWorker.ready;
       if (reg && 'showNotification' in reg) {
         await reg.showNotification('RISEV Peringatan Temujanji 🔔', {
-          body: 'Notifikasi aktif! Anda akan menerima peringatan 12 jam, 3 jam & 30 minit sebelum slot temujanji.',
+          body: 'Notifikasi aktif! Anda akan menerima peringatan 2 jam & 30 minit sebelum slot temujanji.',
           icon: '/favicon.png',
           badge: '/favicon.png',
           vibrate: [200, 100, 200],
@@ -308,7 +308,7 @@ export async function sendCustomerTestNotification(): Promise<boolean> {
 
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('RISEV Peringatan Temujanji 🔔', {
-        body: 'Notifikasi aktif! Anda akan menerima peringatan 12 jam, 3 jam & 30 minit sebelum slot temujanji.',
+        body: 'Notifikasi aktif! Anda akan menerima peringatan 2 jam & 30 minit sebelum slot temujanji.',
         icon: '/favicon.png',
       });
       return true;

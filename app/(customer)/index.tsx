@@ -1145,7 +1145,7 @@ export default function CustomerDashboard() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.notifBannerTitle}>Peringatan Temujanji & Ganjaran 🔔</Text>
                   <Text style={styles.notifBannerSub}>
-                    Dapatkan alert 12 jam, 3 jam & 30 minit sebelum slot temujanji anda.
+                    Dapatkan alert 2 jam & 30 minit sebelum slot temujanji anda.
                   </Text>
                 </View>
                 <View style={styles.notifBannerActionPill}>

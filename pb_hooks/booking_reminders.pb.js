@@ -7,7 +7,7 @@ cronAdd("customer_booking_reminders", "*/5 * * * *", () => {
   try {
     const { processBookingReminders } = require(`${__hooks}/booking_reminders_logic.js`);
     const res = processBookingReminders();
-    if (res && (res.sent12h > 0 || res.sent3h > 0 || res.sent30m > 0)) {
+    if (res && (res.sent2h > 0 || res.sent30m > 0)) {
       console.log("[BOOKING REMINDERS CRON] Sent:", JSON.stringify(res));
     }
   } catch (err) {

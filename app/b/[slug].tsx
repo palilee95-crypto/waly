@@ -440,8 +440,8 @@ export default function CustomerBookingPwaScreen() {
         setIsPushSubscribed(true);
         showToast(
           locale === 'ms'
-            ? 'Peringatan diaktifkan! 🔔 (12j, 3j & 30m)'
-            : 'Reminders enabled! 🔔 (12h, 3h & 30m)'
+            ? 'Peringatan diaktifkan! 🔔 (2 jam & 30 minit)'
+            : 'Reminders enabled! 🔔 (2h & 30m)'
         );
       } else {
         showToast(
@@ -2909,11 +2909,11 @@ export default function CustomerBookingPwaScreen() {
                   <Text style={[styles.pwaSubText, { color: themeStyles.textSecondaryColor }]}>
                     {isPushSubscribed
                       ? (locale === 'ms'
-                          ? 'Notifikasi akan dihantar 12 jam, 3 jam & 30 minit sebelum slot.'
-                          : 'Notifications will be sent 12 hours, 3 hours & 30 mins before your slot.')
+                          ? 'Notifikasi akan dihantar 2 jam & 30 minit sebelum slot.'
+                          : 'Notifications will be sent 2 hours & 30 mins before your slot.')
                       : (locale === 'ms'
-                          ? 'Terima push noti automatik 12 jam, 3 jam & 30 minit sebelum slot.'
-                          : 'Get automatic push reminders 12 hours, 3 hours & 30 mins before your slot.')}
+                          ? 'Terima push noti automatik 2 jam & 30 minit sebelum slot.'
+                          : 'Get automatic push reminders 2 hours & 30 mins before your slot.')}
                   </Text>
                 </View>
                 <TouchableOpacity
