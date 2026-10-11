@@ -1756,102 +1756,97 @@ export default function NfcClaimModal() {
             })()
           )}
         </View>
+
+        {/* ── Item Actions Bottom Sheet Overlay (Rendered directly on top inside Main Modal) ── */}
+        {!!itemActionTarget && (
+          <Pressable style={styles.itemActionOverlay} onPress={() => setItemActionTarget(null)}>
+            <Pressable style={styles.itemActionSheet} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.topDragHandleBar} />
+              
+              <View style={styles.itemActionHeader}>
+                <Text style={styles.itemActionTitle} numberOfLines={1}>
+                  {itemActionTarget?.item?.name}
+                </Text>
+                <Text style={styles.itemActionSub}>
+                  RM {((parseFloat(itemActionTarget?.item?.price || 0)) * (itemActionTarget?.item?.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {itemActionTarget?.item?.isBooking ? 'Booking service' : 'Add-on service'}
+                </Text>
+              </View>
+
+              {/* Stepper if quantity > 1 */}
+              {(itemActionTarget?.item?.qty || 1) > 1 && (
+                <View style={styles.itemActionStepperRow}>
+                  <Text style={styles.itemActionStepperLabel}>Quantity ({itemActionTarget?.item?.qty})</Text>
+                  <View style={styles.pickerStepperWrap}>
+                    <TouchableOpacity
+                      style={styles.pickerStepperBtn}
+                      onPress={() => {
+                        if (itemActionTarget) {
+                          const targetIdx = itemActionTarget.index;
+                          setSelectedServices(prev => {
+                            const updated = [...prev];
+                            if (updated[targetIdx] && (updated[targetIdx].qty || 1) > 1) {
+                              updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) - 1 };
+                              setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
+                            }
+                            return updated;
+                          });
+                        }
+                      }}
+                    >
+                      <Ionicons name="remove" size={14} color="#1D1D1F" />
+                    </TouchableOpacity>
+                    <Text style={styles.pickerStepperVal}>{itemActionTarget?.item?.qty || 1}</Text>
+                    <TouchableOpacity
+                      style={styles.pickerStepperBtn}
+                      onPress={() => {
+                        if (itemActionTarget) {
+                          const targetIdx = itemActionTarget.index;
+                          setSelectedServices(prev => {
+                            const updated = [...prev];
+                            if (updated[targetIdx]) {
+                              updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) + 1 };
+                              setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
+                            }
+                            return updated;
+                          });
+                        }
+                      }}
+                    >
+                      <Ionicons name="add" size={14} color="#1D1D1F" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Red Delete Button */}
+              <TouchableOpacity
+                style={styles.itemActionDeleteBtn}
+                onPress={() => {
+                  if (itemActionTarget !== null) {
+                    handleRemoveItemByIndex(itemActionTarget.index);
+                    setItemActionTarget(null);
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                <Text style={styles.itemActionDeleteText}>Remove from Order</Text>
+              </TouchableOpacity>
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={styles.itemActionCancelBtn}
+                onPress={() => setItemActionTarget(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.itemActionCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        )}
       </View>
     </Modal>
     )}
-
-    {/* ── Item Actions Bottom Sheet Modal ────────────── */}
-    <Modal
-      visible={!!itemActionTarget}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setItemActionTarget(null)}
-    >
-      <Pressable style={styles.itemActionOverlay} onPress={() => setItemActionTarget(null)}>
-        <Pressable style={styles.itemActionSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.topDragHandleBar} />
-          
-          <View style={styles.itemActionHeader}>
-            <Text style={styles.itemActionTitle} numberOfLines={1}>
-              {itemActionTarget?.item?.name}
-            </Text>
-            <Text style={styles.itemActionSub}>
-              RM {((parseFloat(itemActionTarget?.item?.price || 0)) * (itemActionTarget?.item?.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {itemActionTarget?.item?.isBooking ? 'Booking service' : 'Add-on service'}
-            </Text>
-          </View>
-
-          {/* Stepper if quantity > 1 */}
-          {(itemActionTarget?.item?.qty || 1) > 1 && (
-            <View style={styles.itemActionStepperRow}>
-              <Text style={styles.itemActionStepperLabel}>Quantity ({itemActionTarget?.item?.qty})</Text>
-              <View style={styles.pickerStepperWrap}>
-                <TouchableOpacity
-                  style={styles.pickerStepperBtn}
-                  onPress={() => {
-                    if (itemActionTarget) {
-                      const targetIdx = itemActionTarget.index;
-                      setSelectedServices(prev => {
-                        const updated = [...prev];
-                        if (updated[targetIdx] && (updated[targetIdx].qty || 1) > 1) {
-                          updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) - 1 };
-                          setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
-                        }
-                        return updated;
-                      });
-                    }
-                  }}
-                >
-                  <Ionicons name="remove" size={14} color="#1D1D1F" />
-                </TouchableOpacity>
-                <Text style={styles.pickerStepperVal}>{itemActionTarget?.item?.qty || 1}</Text>
-                <TouchableOpacity
-                  style={styles.pickerStepperBtn}
-                  onPress={() => {
-                    if (itemActionTarget) {
-                      const targetIdx = itemActionTarget.index;
-                      setSelectedServices(prev => {
-                        const updated = [...prev];
-                        if (updated[targetIdx]) {
-                          updated[targetIdx] = { ...updated[targetIdx], qty: (updated[targetIdx].qty || 1) + 1 };
-                          setItemActionTarget(cur => cur ? { ...cur, item: updated[targetIdx] } : null);
-                        }
-                        return updated;
-                      });
-                    }
-                  }}
-                >
-                  <Ionicons name="add" size={14} color="#1D1D1F" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Red Delete Button */}
-          <TouchableOpacity
-            style={styles.itemActionDeleteBtn}
-            onPress={() => {
-              if (itemActionTarget !== null) {
-                handleRemoveItemByIndex(itemActionTarget.index);
-                setItemActionTarget(null);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-            <Text style={styles.itemActionDeleteText}>Remove from Order</Text>
-          </TouchableOpacity>
-
-          {/* Cancel Button */}
-          <TouchableOpacity
-            style={styles.itemActionCancelBtn}
-            onPress={() => setItemActionTarget(null)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.itemActionCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
-    </Modal>
   </>
   );
 }
@@ -3577,11 +3572,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemActionOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
     alignItems: 'center',
     padding: 16,
+    zIndex: 99999,
+    elevation: 99999,
   },
   itemActionSheet: {
     width: '100%',
