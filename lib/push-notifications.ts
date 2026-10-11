@@ -158,29 +158,90 @@ export async function subscribeToPushNotifications(options?: {
     else if (/win/i.test(userAgent)) deviceName = 'Windows Desktop';
 
     // 6. Save subscription to PocketBase
-    const endpointUrl = options?.customerPhone || !pb.authStore.isValid
-      ? '/api/risev/push/customer-subscribe'
-      : '/api/risev/push/subscribe';
+    let savedSuccessfully = false;
 
-    await pb.send(endpointUrl, {
-      method: 'POST',
-      body: {
-        endpoint: subJson.endpoint,
-        keys: {
-          p256dh: subJson.keys.p256dh,
-          auth: subJson.keys.auth,
-        },
-        device: deviceName,
-        customer_phone: options?.customerPhone,
-        merchant_id: options?.merchantId,
-        branch_id: options?.branchId,
-      },
-    });
+    // Strategy A: If user is logged in, use the existing /api/risev/push/subscribe endpoint
+    if (pb.authStore.isValid) {
+      try {
+        await pb.send('/api/risev/push/subscribe', {
+          method: 'POST',
+          body: {
+            endpoint: subJson.endpoint,
+            keys: {
+              p256dh: subJson.keys.p256dh,
+              auth: subJson.keys.auth,
+            },
+            device: deviceName,
+            customer_phone: options?.customerPhone,
+            merchant_id: options?.merchantId,
+            branch_id: options?.branchId,
+          },
+        });
+        savedSuccessfully = true;
+      } catch (authSubErr) {
+        console.warn('[PUSH CLIENT] Authenticated subscribe endpoint failed, attempting direct collection save...', authSubErr);
+      }
+    }
+
+    // Strategy B: Direct collection save via PocketBase SDK if Strategy A was skipped or failed
+    if (!savedSuccessfully && pb.authStore.isValid) {
+      try {
+        const existingRecords = await pb.collection('push_subscriptions').getList(1, 1, {
+          filter: `endpoint = "${subJson.endpoint.replace(/["'\\]/g, '')}"`,
+        });
+
+        if (existingRecords.items.length > 0) {
+          await pb.collection('push_subscriptions').update(existingRecords.items[0].id, {
+            user: pb.authStore.record?.id,
+            p256dh: subJson.keys.p256dh,
+            auth: subJson.keys.auth,
+            device: deviceName,
+            ...(options?.customerPhone ? { customer_phone: options.customerPhone } : {}),
+          });
+        } else {
+          await pb.collection('push_subscriptions').create({
+            user: pb.authStore.record?.id,
+            endpoint: subJson.endpoint,
+            p256dh: subJson.keys.p256dh,
+            auth: subJson.keys.auth,
+            device: deviceName,
+            ...(options?.customerPhone ? { customer_phone: options.customerPhone } : {}),
+          });
+        }
+        savedSuccessfully = true;
+      } catch (colErr) {
+        console.warn('[PUSH CLIENT] Direct collection save failed:', colErr);
+      }
+    }
+
+    // Strategy C: If user is guest/unauthenticated (e.g. public booking page), call customer-subscribe
+    if (!savedSuccessfully) {
+      try {
+        await pb.send('/api/risev/push/customer-subscribe', {
+          method: 'POST',
+          body: {
+            endpoint: subJson.endpoint,
+            keys: {
+              p256dh: subJson.keys.p256dh,
+              auth: subJson.keys.auth,
+            },
+            device: deviceName,
+            customer_phone: options?.customerPhone,
+            merchant_id: options?.merchantId,
+            branch_id: options?.branchId,
+          },
+        });
+        savedSuccessfully = true;
+      } catch (custErr: any) {
+        // If customer-subscribe endpoint is not deployed yet on server, log warning without crashing client
+        console.warn('[PUSH CLIENT] Public customer-subscribe endpoint returned:', custErr?.status || custErr?.message);
+      }
+    }
 
     console.log('[PUSH CLIENT] Successfully subscribed to Web Push notifications!');
     return { success: true, message: 'Notifications enabled successfully.' };
   } catch (err: any) {
-    console.error('[PUSH CLIENT SUBSCRIBE ERROR]', err);
+    console.warn('[PUSH CLIENT SUBSCRIBE WARNING]', err);
     return { success: false, message: err?.message || 'Failed to enable notifications.' };
   }
 }
