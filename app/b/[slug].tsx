@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
@@ -74,19 +75,20 @@ interface StaffItem {
 }
 
 function formatUpcomingDate(dateStr?: string) {
-  if (!dateStr) return 'Thu, 8 Oct 2026';
+  if (!dateStr) return 'Thu, Oct 8';
   try {
-    const parts = dateStr.split('-');
+    const clean = dateStr.trim().split(' ')[0];
+    const parts = clean.split('-');
     if (parts.length === 3) {
       const year = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10) - 1;
       const day = parseInt(parts[2], 10);
       const d = new Date(year, month, day);
-      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     }
     const d = new Date(dateStr);
     if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     }
     return dateStr;
   } catch {
@@ -166,7 +168,7 @@ function getPeriodForSlot(slot: string): 'Morning' | 'Afternoon' | 'Evening' {
 }
 
 export default function CustomerBookingPwaScreen() {
-  const { slug, phone: queryPhone, name: queryName } = useLocalSearchParams<{ slug: string; phone?: string; name?: string }>();
+  const { slug, phone: queryPhone, name: queryName, ref: queryRef } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string }>();
   const router = useRouter();
 
   // Dynamic upcoming dates from today
@@ -273,6 +275,7 @@ export default function CustomerBookingPwaScreen() {
   // Post-booking state
   const [createdBooking, setCreatedBooking] = useState<any>(null);
   const [existingBooking, setExistingBooking] = useState<any>(null);
+  const [dismissedPassId, setDismissedPassId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -285,6 +288,13 @@ export default function CustomerBookingPwaScreen() {
   // Merchant vouchers state
   const [showVouchersModal, setShowVouchersModal] = useState(false);
   const [selectedVoucherForQR, setSelectedVoucherForQR] = useState<any>(null);
+
+  // Google & Store Review Funnel State
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   // Dynamic countdown timer for Step 4 appointment pass
   const [countdownText, setCountdownText] = useState<string>('Calculating...');
@@ -612,6 +622,12 @@ export default function CustomerBookingPwaScreen() {
     }
   }, [user, queryName, queryPhone]);
 
+  useEffect(() => {
+    if (queryRef === 'nfc_walkin') {
+      setCurrentStep(1);
+    }
+  }, [queryRef]);
+
   const loadCachedCustomerInfo = async () => {
     try {
       const qName = (typeof queryName === 'string' ? queryName : '').trim();
@@ -901,7 +917,7 @@ export default function CustomerBookingPwaScreen() {
           const plusPhone = digits.startsWith('60') ? `+${digits}` : `+60${digits.replace(/^0/, '')}`;
           const localPhone = digits.startsWith('60') ? `0${digits.slice(2)}` : digits;
 
-          const filterQuery = `merchant = "${mRecord.id}" && (customer_phone = "${plusPhone}" || customer_phone = "${phoneToQuery}" || customer_phone = "${localPhone}") && (status = "booked" || status = "arrived")`;
+          const filterQuery = `merchant = "${mRecord.id}" && (customer_phone = "${plusPhone}" || customer_phone = "${phoneToQuery}" || customer_phone = "${localPhone}") && status != "cancelled"`;
           const bkRes = await pb.collection('service_bookings').getList(1, 1, {
             filter: filterQuery,
             sort: '-created',
@@ -949,6 +965,95 @@ export default function CustomerBookingPwaScreen() {
     } else {
       const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
       Linking.openURL(fallbackUrl);
+    }
+  };
+
+  const handleOpenReviewModal = () => {
+    setReviewRating(0);
+    setReviewFeedback('');
+    setReviewSubmitted(false);
+    setShowReviewModal(true);
+  };
+
+  const handleSelectStar = async (star: number) => {
+    setReviewRating(star);
+    const phone = customerPhone || (user as any)?.phone || '';
+    const name = customerName || (user as any)?.name || '';
+    const targetBranch = selectedBranch || (branches.length > 0 ? branches[0] : null);
+
+    if (star === 5) {
+      // 1. Prepare target Google URL (Prioritize branch-specific Google Review link over general merchant link)
+      let targetUrl = (targetBranch?.google_review_url || merchant?.google_review_url || '').trim();
+      if (!targetUrl) {
+        const outletName = targetBranch?.name ? `${merchant?.name || merchant?.store_name || ''} ${targetBranch.name}` : (merchant?.name || merchant?.store_name || '');
+        const storeName = outletName ? `${outletName} review` : 'google review';
+        targetUrl = `https://www.google.com/search?q=${encodeURIComponent(storeName)}`;
+      } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = `https://${targetUrl}`;
+      }
+
+      // 2. Open Google Review immediately
+      try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const opened = window.open(targetUrl, '_blank');
+          if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+            window.location.href = targetUrl;
+          }
+        } else {
+          Linking.openURL(targetUrl).catch(() => {});
+        }
+      } catch {
+        Linking.openURL(targetUrl).catch(() => {});
+      }
+
+      // 3. Save feedback in database
+      if (merchant?.id) {
+        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
+        pb.collection('store_feedbacks').create({
+          id: genId,
+          merchant: merchant.id,
+          customer_phone: phone,
+          customer_name: name,
+          rating: 5,
+          feedback: '',
+          redirected_to_google: true,
+        }).catch((err) => {
+          console.warn('[STORE FEEDBACK 5-STAR ERROR]', err?.message || err);
+        });
+      }
+
+      setTimeout(() => {
+        setReviewSubmitted(true);
+      }, 1400);
+    }
+  };
+
+  const handleSubmitPrivateFeedback = async () => {
+    if (!merchant?.id) {
+      setShowReviewModal(false);
+      return;
+    }
+    setIsSubmittingReview(true);
+    const phone = customerPhone || (user as any)?.phone || '';
+    const name = customerName || (user as any)?.name || '';
+
+    try {
+      const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
+      await pb.collection('store_feedbacks').create({
+        id: genId,
+        merchant: merchant.id,
+        customer_phone: phone,
+        customer_name: name,
+        rating: reviewRating,
+        feedback: reviewFeedback.trim(),
+        redirected_to_google: false,
+      });
+      setReviewSubmitted(true);
+    } catch (err: any) {
+      console.warn('[STORE FEEDBACK PRIVATE ERROR]', err?.message || err);
+      setReviewSubmitted(true);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -1260,8 +1365,15 @@ export default function CustomerBookingPwaScreen() {
                     </Text>
                   </View>
 
-                  {/* Active 3D Neumorphic Booking Ticket Stub Banner */}
-                  {existingBooking && (() => {
+                  {/* Active 3D Neumorphic Booking Ticket Stub Banner (Smart Dynamic State Machine) */}
+                  {existingBooking && existingBooking.id !== dismissedPassId && (() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const bDateStr = existingBooking.booking_date ? existingBooking.booking_date.split('T')[0] : todayStr;
+                    
+                    const isCompleted = existingBooking.status === 'completed';
+                    const isPastDate = bDateStr < todayStr;
+                    const isMissed = isPastDate && !isCompleted;
+
                     const isTicketCardLight = getContrastColor(themeStyles.activeBrandColor) === '#000000';
                     const ticketPrimaryTextColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
                     const ticketSecondaryTextColor = isTicketCardLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
@@ -1270,6 +1382,44 @@ export default function CustomerBookingPwaScreen() {
                     const ticketBtnBgColor = isTicketCardLight ? '#0F172A' : '#FFFFFF';
                     const ticketBtnTextColor = isTicketCardLight ? '#FFFFFF' : '#000000';
                     const ticketDashedLineColor = isTicketCardLight ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.35)';
+
+                    // Dynamic State Classifier Config
+                    let headerTagline = 'UPCOMING APPOINTMENT';
+                    let headerIcon = 'calendar-outline';
+                    let badgeIcon = 'checkmark';
+                    let badgeBg = '#10B981'; // Emerald Green
+                    let passChipText = 'BOOKING PASS';
+                    let actionBtnText = 'View Pass';
+                    let actionIcon = 'chevron-forward';
+
+                    if (isMissed) {
+                      headerTagline = '⚠️ MISSED APPOINTMENT';
+                      headerIcon = 'alert-circle-outline';
+                      badgeIcon = 'close';
+                      badgeBg = '#EF4444'; // Red
+                      passChipText = 'EXPIRED';
+                      actionBtnText = 'Rebook Slot';
+                      actionIcon = 'refresh-outline';
+                    } else if (isCompleted) {
+                      headerTagline = '🎉 RECENT VISIT';
+                      headerIcon = 'checkmark-circle-outline';
+                      badgeIcon = 'star';
+                      badgeBg = '#3B82F6'; // Blue
+                      passChipText = 'COMPLETED';
+                      actionBtnText = 'Leave Review';
+                      actionIcon = 'star-outline';
+                    }
+
+                    const handleCardPress = () => {
+                      if (isMissed) {
+                        setCurrentStep(1);
+                      } else if (isCompleted) {
+                        handleOpenReviewModal();
+                      } else {
+                        setCreatedBooking(existingBooking);
+                        setCurrentStep(4);
+                      }
+                    };
 
                     return (
                       <TouchableOpacity
@@ -1280,26 +1430,49 @@ export default function CustomerBookingPwaScreen() {
                             borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.35)',
                             borderWidth: 1.5,
                             borderRadius: 22,
+                            position: 'relative',
                           }
                         ]}
-                        onPress={() => {
-                          setCreatedBooking(existingBooking);
-                          setCurrentStep(4);
-                        }}
+                        onPress={handleCardPress}
                         activeOpacity={0.88}
                       >
                         <View style={[styles.ticketNotchLeft, { backgroundColor: themeStyles.baseBgColor }]} />
                         <View style={[styles.ticketNotchRight, { backgroundColor: themeStyles.baseBgColor }]} />
 
+                        {/* Top-Right Dismiss ✕ Button for Missed or Completed passes */}
+                        {(isMissed || isCompleted) && (
+                          <TouchableOpacity
+                            style={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              zIndex: 20,
+                              width: 22,
+                              height: 22,
+                              borderRadius: 11,
+                              backgroundColor: isTicketCardLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onPress={(e: any) => {
+                              e?.stopPropagation?.();
+                              setDismissedPassId(existingBooking.id);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Ionicons name="close" size={13} color={ticketPrimaryTextColor} />
+                          </TouchableOpacity>
+                        )}
+
                         <View style={styles.ticketLeftInfoCol}>
                           <View style={[styles.ticketIconContainer, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, borderRadius: 14 }]}>
-                            <Ionicons name="calendar-outline" size={22} color={ticketPrimaryTextColor} />
-                            <View style={[styles.ticketCheckBadge, { backgroundColor: '#10B981', borderColor: '#FFFFFF' }]}>
-                              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                            <Ionicons name={headerIcon as any} size={22} color={ticketPrimaryTextColor} />
+                            <View style={[styles.ticketCheckBadge, { backgroundColor: badgeBg, borderColor: '#FFFFFF' }]}>
+                              <Ionicons name={badgeIcon as any} size={10} color="#FFFFFF" />
                             </View>
                           </View>
                           <View style={{ flex: 1, paddingRight: 4 }}>
-                            <Text style={[styles.ticketHeaderTagline, { color: ticketSecondaryTextColor }]}>UPCOMING APPOINTMENT</Text>
+                            <Text style={[styles.ticketHeaderTagline, { color: ticketSecondaryTextColor }]}>{headerTagline}</Text>
                             <Text style={[styles.ticketDateMainText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{formatUpcomingDate(existingBooking.booking_date)}</Text>
                             <Text style={[styles.ticketTimeSubText, { color: ticketPrimaryTextColor }]} numberOfLines={1}>{existingBooking.start_time || '11:30 AM'}</Text>
                             <View style={styles.ticketBranchRow}>
@@ -1315,12 +1488,38 @@ export default function CustomerBookingPwaScreen() {
 
                         <View style={styles.ticketRightStubCol}>
                           <View style={[styles.ticketPassChipTag, { backgroundColor: ticketPodBgColor, borderColor: ticketPodBorderColor, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}>
-                            <Text style={[styles.ticketPassChipText, { color: ticketPrimaryTextColor }]}>BOOKING PASS</Text>
+                            <Text style={[styles.ticketPassChipText, { color: ticketPrimaryTextColor }]}>{passChipText}</Text>
                           </View>
-                          <View style={[styles.ticketViewPassButton, { backgroundColor: ticketBtnBgColor, borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)', borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', gap: 4 }]}>
-                            <Text style={[styles.ticketViewPassBtnText, { color: ticketBtnTextColor }]}>View Pass</Text>
-                            <Ionicons name="chevron-forward" size={14} color={ticketBtnTextColor} />
-                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.ticketViewPassButton,
+                              {
+                                backgroundColor: ticketBtnBgColor,
+                                borderColor: isTicketCardLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.8)',
+                                borderWidth: 1,
+                                borderRadius: 16,
+                                paddingHorizontal: 14,
+                                paddingVertical: 8,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                alignSelf: 'center',
+                                gap: 4,
+                              }
+                            ]}
+                            onPress={(e: any) => {
+                              e?.stopPropagation?.();
+                              if (isCompleted) {
+                                handleOpenReviewModal();
+                              } else {
+                                handleCardPress();
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.ticketViewPassBtnText, { color: ticketBtnTextColor }]}>{actionBtnText}</Text>
+                            <Ionicons name={actionIcon as any} size={14} color={ticketBtnTextColor} />
+                          </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
                     );
@@ -1634,6 +1833,18 @@ export default function CustomerBookingPwaScreen() {
         {currentStep === 1 && (
           <View style={styles.stepContainer}>
             
+            {/* Walk-in Referral Welcome Banner */}
+            {queryRef === 'nfc_walkin' && (
+              <View style={[styles.walkinWelcomeBanner, themeStyles.neumorphicCard]}>
+                <Text style={[styles.walkinWelcomeTitle, { color: themeStyles.textPrimaryColor }]}>
+                  {customerName ? `Welcome back, ${customerName}! 👋` : 'Welcome! 👋'}
+                </Text>
+                <Text style={[styles.walkinWelcomeSub, { color: themeStyles.textSecondaryColor }]}>
+                  Select your service and preferred time slot for your next visit.
+                </Text>
+              </View>
+            )}
+
             {/* Step 1: Branch Selector */}
             <TouchableOpacity
               style={[styles.dropdownCardBox, themeStyles.neumorphicCard, { marginBottom: 14 }]}
@@ -2819,6 +3030,149 @@ export default function CustomerBookingPwaScreen() {
         </View>
       </Modal>
 
+      {/* 🌟 GOOGLE & STORE REVIEW FUNNEL MODAL */}
+      <Modal
+        visible={showReviewModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowReviewModal(false)}
+      >
+        <View style={styles.reviewModalBackdrop}>
+          <BlurView intensity={85} tint="dark" style={[styles.reviewModalCard, { paddingVertical: 32 }]}>
+            
+            {/* Close ✕ Button */}
+            <TouchableOpacity 
+              style={styles.reviewCloseBtn}
+              onPress={() => setShowReviewModal(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Store Avatar Icon & Google Badge */}
+            <View style={{ position: 'relative', marginBottom: 20, zIndex: 2 }}>
+              <View style={[styles.reviewAvatar, { 
+                borderColor: '#334155', marginBottom: 0, width: 64, height: 64, borderRadius: 32,
+                shadowColor: '#FBBC04', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 10
+              }]}>
+                {merchant?.logo ? (
+                  <Image 
+                    source={{ uri: `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` }}
+                    style={{ width: '100%', height: '100%', borderRadius: 32 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons name="storefront" size={30} color="#FFC700" />
+                )}
+              </View>
+              {/* Google Badge */}
+              <View style={{ 
+                position: 'absolute', bottom: -4, right: -6, backgroundColor: '#FFFFFF', borderRadius: 14, 
+                width: 28, height: 28, alignItems: 'center', justifyContent: 'center', 
+                shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5
+              }}>
+                <Ionicons name="logo-google" size={16} color="#4285F4" />
+              </View>
+            </View>
+
+            <Text style={[styles.reviewTitle, { fontSize: 21, marginBottom: 8, paddingHorizontal: 4 }]}>
+              {reviewSubmitted 
+                ? 'Thank you for your review! 🎉' 
+                : `How was your visit at ${merchant?.store_name || merchant?.name || 'our store'}?`}
+            </Text>
+            
+            <Text style={[styles.reviewSubtitle, { color: '#F8FAFC', opacity: 0.85, fontSize: 13.5, lineHeight: 20, paddingHorizontal: 16 }]}>
+              {reviewSubmitted 
+                ? 'Your feedback helps us continuously improve our service.'
+                : `Support ${merchant?.store_name || merchant?.name || 'us'} on Google with a quick rating.`}
+            </Text>
+
+            {!reviewSubmitted && (
+              <>
+                {/* 5-Star Rating Row */}
+                <View style={[styles.reviewStarsRow, { marginTop: 16, gap: 8 }]}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleSelectStar(star)}
+                      activeOpacity={0.6}
+                      style={[styles.reviewStarBtn, { padding: 4 }]}
+                    >
+                      <Ionicons 
+                        name="star" 
+                        size={44} 
+                        color={star <= reviewRating ? "#FBBC04" : "#475569"} 
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Rating Guide / Private Feedback */}
+                {reviewRating > 0 && reviewRating < 5 && (
+                  <View style={styles.reviewLowRatingSection}>
+                    <Text style={styles.reviewFeedbackPrompt}>
+                      What could we do better? (Private Feedback)
+                    </Text>
+                    <TextInput
+                      style={styles.reviewFeedbackInput}
+                      placeholder="Share your thoughts or suggestions..."
+                      placeholderTextColor="#64748B"
+                      multiline={true}
+                      numberOfLines={3}
+                      value={reviewFeedback}
+                      onChangeText={setReviewFeedback}
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.reviewSubmitBtn, isSubmittingReview && { opacity: 0.7 }]}
+                      onPress={handleSubmitPrivateFeedback}
+                      disabled={isSubmittingReview}
+                      activeOpacity={0.85}
+                    >
+                      {isSubmittingReview ? (
+                        <ActivityIndicator size="small" color="#050505" />
+                      ) : (
+                        <Text style={styles.reviewSubmitBtnText}>Send Private Feedback</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* 5-Star Note */}
+                {reviewRating === 5 && (
+                  <View style={[styles.review5StarRedirecting, { backgroundColor: 'rgba(251, 188, 4, 0.1)', borderColor: 'rgba(251, 188, 4, 0.25)', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }]}>
+                    <ActivityIndicator size="small" color="#FBBC04" style={{ marginRight: 10 }} />
+                    <Text style={[styles.review5StarText, { color: '#FBBC04' }]}>Opening Google Review...</Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Skip Option */}
+            {!reviewSubmitted && reviewRating === 0 && (
+              <TouchableOpacity 
+                style={[styles.reviewSkipBtn, { marginTop: 8 }]} 
+                onPress={() => setShowReviewModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.reviewSkipText}>Maybe later</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Done button after submission */}
+            {reviewSubmitted && (
+              <TouchableOpacity
+                style={[styles.reviewSubmitBtn, { marginTop: 16 }]}
+                onPress={() => setShowReviewModal(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.reviewSubmitBtnText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </BlurView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -3561,7 +3915,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   ticketDateMainText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     lineHeight: 18,
   },
@@ -4366,6 +4720,161 @@ const styles = StyleSheet.create({
   nextSlotText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // Google Review Funnel Modal Styles
+  reviewModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 99999,
+  },
+  reviewModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#121212',
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 10,
+    position: 'relative',
+  },
+  reviewCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  reviewAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    overflow: 'hidden',
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 8,
+  },
+  reviewSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  reviewStarBtn: {
+    padding: 4,
+  },
+  reviewLowRatingSection: {
+    width: '100%',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  reviewFeedbackPrompt: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#E2E8F0',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  reviewFeedbackInput: {
+    width: '100%',
+    minHeight: 74,
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    borderRadius: 14,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    textAlignVertical: 'top',
+    marginBottom: 14,
+  },
+  reviewSubmitBtn: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#FFC700',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewSubmitBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  review5StarRedirecting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  review5StarText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFC700',
+  },
+  reviewSkipBtn: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  reviewSkipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  walkinWelcomeBanner: {
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  walkinWelcomeTitle: {
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: -0.2,
+  },
+  walkinWelcomeSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginTop: 3,
+    lineHeight: 17,
+    opacity: 0.85,
   },
 });
 

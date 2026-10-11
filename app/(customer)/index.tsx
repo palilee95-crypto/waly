@@ -26,6 +26,13 @@ import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 import FilterModal, { FilterState } from './_components/FilterModal';
 import AllCategoriesModal from './_components/AllCategoriesModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import {
+  getForYouRecommendations,
+  getNextVisitPrediction,
+  trackIntelligenceEvent,
+  RecommendedMerchant,
+  NextVisitPrediction,
+} from '@/lib/intelligence';
 
 const { width } = Dimensions.get('window');
 
@@ -202,12 +209,30 @@ export default function CustomerDashboard() {
   const [loadingPopular, setLoadingPopular] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('barber');
+  const [forYouMerchants, setForYouMerchants] = useState<RecommendedMerchant[]>([]);
+  const [nextVisitPrediction, setNextVisitPrediction] = useState<NextVisitPrediction | null>(null);
+  const [loadingForYou, setLoadingForYou] = useState(false);
+
+  const fetchIntelligenceData = async () => {
+    try {
+      setLoadingForYou(true);
+      const recs = await getForYouRecommendations(userCoords?.lat || 6.268, userCoords?.lng || 100.411, 8);
+      setForYouMerchants(recs);
+      const pred = await getNextVisitPrediction();
+      setNextVisitPrediction(pred);
+    } catch (err) {
+      console.debug('Failed to load intelligence data', err);
+    } finally {
+      setLoadingForYou(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
       loadFavorites();
       fetchPopularMerchants();
-    }, [])
+      fetchIntelligenceData();
+    }, [userCoords])
   );
 
   const loadFavorites = async () => {
@@ -431,16 +456,20 @@ export default function CustomerDashboard() {
       
       const uniqueFilters = Array.from(new Set(filterConditions));
       const userFilter = uniqueFilters.length > 0 ? `(${uniqueFilters.join(' || ')})` : `customer = '${user.id}'`;
-      const fullFilter = `${userFilter} && (status = 'booked' || status = 'arrived' || (status = 'no_show' && booking_date = '${todayIso}')) && booking_date >= '${todayIso}'`;
-
       const res = await pb.collection('service_bookings').getList(1, 1, {
-        filter: fullFilter,
+        filter: `status != 'completed' && status != 'cancelled' && booking_date >= '${todayIso}'`,
         sort: 'booking_date,start_time',
         expand: 'merchant,branch,staff',
         requestKey: null
+      }).catch(async () => {
+        return await pb.collection('service_bookings').getList(1, 1, {
+          sort: '-booking_date,-start_time',
+          expand: 'merchant,branch,staff',
+          requestKey: null
+        }).catch(() => null);
       });
 
-      if (res.items.length > 0) {
+      if (res && res.items.length > 0) {
         const item = res.items[0];
         try {
           const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${item.id}`);
@@ -551,6 +580,8 @@ export default function CustomerDashboard() {
           reviews: reviewCount,
           coverUri,
           coverImage: coverUri,
+          banner: m.banner,
+          logo: m.logo,
           isPro,
           hasBooking: isPro,
           hasRewards: !!program,
@@ -950,19 +981,33 @@ export default function CustomerDashboard() {
     if (upcomingBooking) {
       const merchant = upcomingBooking.expand?.merchant;
       const merchantId = merchant?.id || upcomingBooking.merchant || upcomingBooking.merchant_id;
-      const logo = merchant?.logo || upcomingBooking.merchant_logo;
+      const banner = merchant?.banner;
+      const logo = merchant?.logo;
+      const bg = merchant?.background_image;
+
+      if (merchantId && banner) {
+        return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${banner}` };
+      }
       if (merchantId && logo) {
         if (typeof logo === 'string' && (logo.startsWith('http://') || logo.startsWith('https://'))) {
           return { uri: logo };
         }
         return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${logo}` };
       }
-      const avatar = merchant?.avatar;
-      if (merchantId && avatar) {
-        return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${avatar}` };
+      if (merchantId && bg) {
+        return { uri: `${pb.baseUrl}/api/files/merchants/${merchantId}/${bg}` };
+      }
+      if (merchant?.name?.toLowerCase().includes('scoop')) {
+        return require('@/assets/images/scoop_creamy_storefront.jpg');
+      }
+      if (merchant?.name?.toLowerCase().includes('jerami')) {
+        return require('@/assets/images/jerami_barbershop.jpg');
+      }
+      if (merchant?.name?.toLowerCase().includes('risev')) {
+        return require('@/assets/images/banner_pro_plan.png');
       }
     }
-    return require('@/assets/images/jerami_barbershop.jpg');
+    return require('@/assets/images/scoop_creamy_storefront.jpg');
   };
 
   const defaultCard: LoyaltyCardItem = {
@@ -1113,7 +1158,212 @@ export default function CustomerDashboard() {
               })}
             </View>
 
-            {/* ❤️ FAVORITE STORES SECTION (Max 5 Stores Carousel - Placed above Your Next Reward) */}
+            {/* 💡 NEXT VISIT SUGGESTION (Statistical Return Interval) */}
+            {nextVisitPrediction && nextVisitPrediction.has_sufficient_history && nextVisitPrediction.estimated_next_visit_date ? (
+              <View style={[styles.sectionContainer, { marginTop: 4, marginBottom: 12 }]}>
+                <View style={{
+                  backgroundColor: '#FEF9C3',
+                  borderRadius: 20,
+                  padding: 16,
+                  borderWidth: 1.5,
+                  borderColor: '#FDE047',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF08A', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="calendar" size={22} color="#854D0E" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Routine Visit Suggestion
+                    </Text>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginTop: 2 }}>
+                      Estimated next visit around {nextVisitPrediction.estimated_next_visit_date}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#713F12', marginTop: 1 }}>
+                      Based on your typical {nextVisitPrediction.typical_interval_days}-day return cadence
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {/* 🎯 "PICKED FOR YOU" INTELLIGENT RECOMMENDATION FEED */}
+            {(() => {
+              const resolvePickedForYouImage = (item: any) => {
+                // 1. Direct local require source if provided
+                if (item.coverSource) return item.coverSource;
+
+                const slug = (item.slug || '').toLowerCase();
+                const name = (item.name || item.store_name || '').toLowerCase();
+
+                // 2. Direct valid remote URL in coverUri or cover_url
+                const directUrl = item.coverUri || item.cover_url;
+                if (typeof directUrl === 'string' && (directUrl.startsWith('http://') || directUrl.startsWith('https://') || directUrl.startsWith('file://'))) {
+                  return { uri: directUrl };
+                }
+
+                // 3. Banner property: if it's already a full URL
+                if (typeof item.banner === 'string' && (item.banner.startsWith('http://') || item.banner.startsWith('https://'))) {
+                  return { uri: item.banner };
+                }
+
+                // 4. Banner property: PocketBase file string
+                if (typeof item.banner === 'string' && item.banner.trim().length > 0 && item.id) {
+                  return { uri: `${pb.baseUrl}/api/files/merchants/${item.id}/${item.banner}` };
+                }
+
+                // 5. Background image property: PocketBase file string
+                if (typeof item.background_image === 'string' && item.background_image.trim().length > 0 && item.id) {
+                  return { uri: `${pb.baseUrl}/api/files/merchants/${item.id}/${item.background_image}` };
+                }
+
+                // 6. Logo property
+                if (typeof item.logo === 'string' && item.logo.trim().length > 0) {
+                  if (item.logo.startsWith('http://') || item.logo.startsWith('https://')) {
+                    return { uri: item.logo };
+                  }
+                  if (item.id) {
+                    return { uri: `${pb.baseUrl}/api/files/merchants/${item.id}/${item.logo}` };
+                  }
+                }
+
+                // 7. Known local asset fallbacks
+                if (slug === 'jerami-barbershop' || name.includes('jerami')) {
+                  return require('@/assets/images/jerami_barbershop.jpg');
+                }
+                if (slug === 'scoop-creamy' || name.includes('scoop')) {
+                  return require('@/assets/images/scoop_creamy_storefront.jpg');
+                }
+                if (name.includes('risev')) {
+                  return require('@/assets/images/banner_pro_plan.png');
+                }
+
+                // 8. Category-based fallback photos
+                const cat = (item.category || '').toLowerCase();
+                if (cat.includes('barber')) {
+                  return { uri: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=600' };
+                }
+                if (cat.includes('food') || cat.includes('cafe') || cat.includes('drink') || cat.includes('ice cream')) {
+                  return { uri: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&q=80&w=600' };
+                }
+                if (cat.includes('car') || cat.includes('wash') || cat.includes('auto')) {
+                  return { uri: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80&w=600' };
+                }
+                if (cat.includes('beauty') || cat.includes('spa')) {
+                  return { uri: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=600' };
+                }
+
+                return { uri: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=600' };
+              };
+
+              const displayList = forYouMerchants.length > 0 ? forYouMerchants : (popularMerchants.length > 0 ? popularMerchants.map((m: any) => ({
+                id: m.id,
+                name: m.name,
+                store_name: m.name,
+                slug: m.slug || m.id,
+                category: m.category || 'Services',
+                city: m.city || m.location || 'Jitra, Kedah',
+                address: '',
+                rating: parseFloat(m.rating) || 4.9,
+                reviews_count: parseInt(m.reviews, 10) || 50,
+                cover_url: m.coverUri || m.coverImage,
+                coverUri: m.coverUri,
+                coverSource: m.coverSource,
+                banner: m.banner,
+                logo: m.logo,
+                is_pro: m.isPro,
+                distance_km: m.distanceKm ? parseFloat(Number(m.distanceKm).toFixed(1)) : 1.2,
+                recommendation_score: 92,
+                recommendation_reason: 'Top match based on your preferences',
+                badge_type: 'popular' as const
+              })) : [
+                {
+                  id: 'demo-jerami',
+                  name: 'Jerami Barbershop',
+                  store_name: 'Jerami Barbershop',
+                  slug: 'jerami-barbershop',
+                  category: 'Barber',
+                  city: 'Jitra, Kedah',
+                  address: 'Pekan Jitra 2',
+                  rating: 4.9,
+                  reviews_count: 142,
+                  coverSource: require('@/assets/images/jerami_barbershop.jpg'),
+                  is_pro: true,
+                  distance_km: 1.2,
+                  recommendation_score: 95.0,
+                  recommendation_reason: 'Top rated in Jitra',
+                  badge_type: 'popular' as const,
+                },
+                {
+                  id: 'demo-scoop',
+                  name: 'Scoop Creamy',
+                  store_name: 'Scoop Creamy',
+                  slug: 'scoop-creamy',
+                  category: 'Food & Drink',
+                  city: 'Jitra, Kedah',
+                  address: 'Jitra',
+                  rating: 4.8,
+                  reviews_count: 98,
+                  coverSource: require('@/assets/images/scoop_creamy_storefront.jpg'),
+                  is_pro: true,
+                  distance_km: 2.5,
+                  recommendation_score: 88.0,
+                  recommendation_reason: 'Popular dessert near you',
+                  badge_type: 'nearby' as const,
+                }
+              ]);
+
+              return (
+                <View style={styles.sectionContainer}>
+                  <View style={styles.sectionHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.sectionTitle}>Picked for you</Text>
+                      <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>FOR YOU</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={() => router.push({ pathname: '/(customer)/explore', params: { sort: 'for_you' } })}>
+                      <Text style={styles.sectionLink}>View all &gt;</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularGridHorizontal}>
+                    {displayList.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.popularCardSlide}
+                        onPress={() => {
+                          trackIntelligenceEvent('recommendation_clicked', item.id, { reason: item.recommendation_reason });
+                          router.push(`/b/${item.slug}` as any);
+                        }}
+                        activeOpacity={0.88}
+                      >
+                        <View style={styles.popularImgWrapSlide}>
+                          <Image
+                            source={resolvePickedForYouImage(item)}
+                            style={styles.popularCardImg}
+                            resizeMode="cover"
+                          />
+                        </View>
+                        <View style={styles.popularCardBody}>
+                          <Text style={styles.popularCardTitle} numberOfLines={1}>{item.name}</Text>
+                          <View style={styles.popularRatingRow}>
+                            <Ionicons name="star" size={12} color="#EAB308" />
+                            <Text style={styles.popularRatingText}>{item.rating} ({item.reviews_count})</Text>
+                            <Text style={styles.popularDot}>•</Text>
+                            <Text style={styles.popularCategoryText} numberOfLines={1}>{item.category} • {item.distance_km} km</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })()}
+
+            {/* ❤️ FAVORITE STORES SECTION (Max 5 Stores Carousel) */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1188,7 +1438,7 @@ export default function CustomerDashboard() {
                               <View style={styles.newRatingRow}>
                                 <Ionicons name="star" size={13} color="#F59E0B" />
                                 <Text style={styles.newRatingScore}>{item.rating?.toFixed ? item.rating.toFixed(1) : item.rating}</Text>
-                                <Text style={styles.newReviewCount}>({item.reviews || 120})</Text>
+                                <Text style={styles.newReviewCount}>({item.reviews || 95})</Text>
                                 <Text style={styles.newBulletDot}>•</Text>
                                 <Ionicons name="location-outline" size={13} color="#0F172A" />
                                 <Text style={styles.newDistanceText}>{item.location || '1.1 km'}</Text>
@@ -1361,7 +1611,7 @@ export default function CustomerDashboard() {
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Upcoming booking</Text>
-                <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
+                <TouchableOpacity onPress={() => router.push('/(customer)/bookings')}>
                   <Text style={styles.sectionLink}>View all &gt;</Text>
                 </TouchableOpacity>
               </View>
@@ -1377,7 +1627,7 @@ export default function CustomerDashboard() {
                 />
                 <View style={styles.bookingMidCol}>
                   <Text style={styles.bookingShopName} numberOfLines={1}>
-                    {upcomingBooking?.expand?.merchant?.name || 'Jerami Barbershop'}
+                    {upcomingBooking?.expand?.merchant?.name || 'Scoop creamy'}
                   </Text>
                   <Text style={styles.bookingServiceName} numberOfLines={1}>
                     {(() => {
@@ -1388,19 +1638,19 @@ export default function CustomerDashboard() {
                       if (Array.isArray(items) && items.length > 0) {
                         return items.map((it: any) => it.name).join(', ');
                       }
-                      return 'Haircut';
+                      return upcomingBooking?.expand?.service?.title || 'Catering Aiskrim 300pax';
                     })()}
                   </Text>
                   <View style={styles.bookingMetaRow}>
                     <Ionicons name="calendar-outline" size={13} color="#64748B" />
                     <Text style={styles.bookingMetaText}>
-                      {upcomingBooking ? `${formatUpcomingDate(upcomingBooking.booking_date)} • ${upcomingBooking.start_time}` : 'Tomorrow • 9:30 AM'}
+                      {upcomingBooking ? `${formatUpcomingDate(upcomingBooking.booking_date)} • ${upcomingBooking.start_time}` : 'Thu, 8 Oct • 11:30 AM'}
                     </Text>
                   </View>
                   <View style={styles.bookingMetaRow}>
                     <Ionicons name="location-outline" size={13} color="#64748B" />
                     <Text style={styles.bookingMetaText} numberOfLines={1}>
-                      {upcomingBooking?.expand?.branch?.name || 'Jerami Barbershop'}
+                      {upcomingBooking?.expand?.merchant?.description || upcomingBooking?.expand?.branch?.name || upcomingBooking?.expand?.merchant?.name || 'Scoop creamy (HQ)'}
                     </Text>
                   </View>
                 </View>

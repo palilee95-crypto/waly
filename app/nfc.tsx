@@ -24,6 +24,7 @@ import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
+import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -944,6 +945,7 @@ export default function NfcLandingScreen() {
     const q = new URLSearchParams();
     if (phone) q.append('phone', phone);
     if (name) q.append('name', name);
+    q.append('ref', 'nfc_walkin');
     const qs = q.toString();
     router.push(`/b/${bookingSlug}${qs ? `?${qs}` : ''}` as any);
   };
@@ -1414,14 +1416,7 @@ export default function NfcLandingScreen() {
       ? reward.description
       : `Collect all ${stampGoal} stamps to unlock this voucher and redeem at counter.`;
 
-  let rewardImageUrl = '';
-  if (reward?.image) {
-    rewardImageUrl = `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`;
-  } else if (linkedReward?.image) {
-    rewardImageUrl = `${pb.baseUrl}/api/files/rewards/${linkedReward.id}/${linkedReward.image}`;
-  } else if (merchantLogoUrl) {
-    rewardImageUrl = merchantLogoUrl;
-  }
+  let rewardImageUrl = getRewardVisualUrl(reward) || getRewardVisualUrl(linkedReward) || merchantLogoUrl || '';
 
   // 3. Submit Direct NFC Claim & Setup Optional WhatsApp Redirect
   const handleNfcSubmit = async () => {
@@ -1992,6 +1987,20 @@ export default function NfcLandingScreen() {
             </View>
           </View>
         </View>
+
+        {/* Pill Button Below Voucher */}
+        {canBookAppointment && bookingSlug && (
+          <View style={styles.voucherBookingPillWrapper}>
+            <TouchableOpacity
+              onPress={handleNavigateToBooking}
+              activeOpacity={0.8}
+              style={styles.voucherBookingPillBtn}
+            >
+              <Ionicons name="calendar" size={13} color="#FFFFFF" />
+              <Text style={styles.voucherBookingPillText}>Book Appointment ›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Animated.View>
     );
   };
@@ -2389,12 +2398,12 @@ export default function NfcLandingScreen() {
                   borderRadius: 20,
                   overflow: 'hidden'
                 }]}>
-                  <View style={[styles.nfcBadgeRow, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)', alignSelf: 'flex-start' }]}>
+                  <View style={[styles.nfcBadgeRow, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', marginBottom: 4 }]}>
                     <View style={[styles.nfcBadgeDot, { backgroundColor: brandTextColor }]} />
                     <Text style={[styles.nfcBadgeTitle, { color: brandTextColor }]}>VERIFIED NFC SCAN</Text>
                   </View>
 
-                  <Text style={[styles.formWelcomeTitle, { color: brandTextColor, marginTop: 16, marginBottom: 12, fontSize: 22 }]}>Claim Your Stamps</Text>
+                  <Text style={[styles.formWelcomeTitle, { color: brandTextColor, marginTop: 12, marginBottom: 12, fontSize: 22 }]}>Claim Your Stamps</Text>
 
                   {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
@@ -2495,20 +2504,6 @@ export default function NfcLandingScreen() {
                     <Ionicons name="lock-closed" size={12} color={brandSubtextColor} />
                     <Text style={[styles.fakeTrustText, { color: brandSubtextColor, fontSize: 11 }]}>Secure connection by risev.app</Text>
                   </View>
-
-                  {/* Pre-Claim Appointment Booking Link */}
-                  {canBookAppointment && bookingSlug && (
-                    <TouchableOpacity
-                      onPress={handleNavigateToBooking}
-                      activeOpacity={0.7}
-                      style={styles.nfcBookAppointmentLink}
-                    >
-                      <Ionicons name="calendar-outline" size={13} color={brandSubtextColor} style={{ marginRight: 6 }} />
-                      <Text style={[styles.nfcBookAppointmentLinkText, { color: brandSubtextColor }]}>
-                        Looking to schedule a visit? Book Online ›
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </BlurView>
 
                 {/* Risev Logo below the card */}
@@ -2568,31 +2563,56 @@ export default function NfcLandingScreen() {
                     </TouchableOpacity>
                   )}
 
-                  <View style={{ flexDirection: 'row', gap: 8, width: '100%', maxWidth: 360, marginTop: 12 }}>
-                    <TouchableOpacity
-                      style={[styles.radarSuccessBtn, { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 0 }]}
-                      onPress={handleViewStampCard}
-                      activeOpacity={0.88}
-                    >
-                      <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
-                        {isPointsOnly ? 'My Points' : 'Kad Saya'}
-                      </Text>
-                    </TouchableOpacity>
+                  {canBookAppointment && bookingSlug ? (
+                    <View style={{ width: '100%', maxWidth: 360, marginTop: 14 }}>
+                      <View style={styles.postApprovalBookingCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <Ionicons name="sparkles" size={13} color="#FFC700" />
+                          <Text style={styles.postApprovalBookingTag}>PLAN YOUR NEXT VISIT</Text>
+                        </View>
+                        <Text style={styles.postApprovalBookingTitle}>
+                          Suka servis hari ini? Elakkan beratur!
+                        </Text>
+                        <Text style={styles.postApprovalBookingSub}>
+                          Tempah slot temujanji seterusnya terus dari telefon anda.
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.postApprovalBookingBtn, { backgroundColor: primaryColor || '#10B981' }]}
+                          onPress={handleNavigateToBooking}
+                          activeOpacity={0.88}
+                        >
+                          <Ionicons name="calendar" size={16} color={getContrastColor(primaryColor || '#10B981')} style={{ marginRight: 6 }} />
+                          <Text style={[styles.postApprovalBookingBtnText, { color: getContrastColor(primaryColor || '#10B981') }]}>
+                            Tempah Temujanji Seterusnya
+                          </Text>
+                          <Ionicons name="arrow-forward" size={15} color={getContrastColor(primaryColor || '#10B981')} style={{ marginLeft: 6 }} />
+                        </TouchableOpacity>
+                      </View>
 
-                    {canBookAppointment && bookingSlug ? (
                       <TouchableOpacity
-                        style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#10B981', marginTop: 0 }]}
-                        onPress={handleNavigateToBooking}
+                        style={[styles.radarSuccessBtn, { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', marginTop: 8 }]}
+                        onPress={handleViewStampCard}
                         activeOpacity={0.88}
                       >
-                        <Ionicons name="calendar" size={17} color={getContrastColor(primaryColor || '#10B981')} style={{ marginRight: 6 }} />
-                        <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#10B981'), fontSize: 13, fontWeight: '700' }]}>
-                          Book Next Visit
+                        <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
+                          {isPointsOnly ? 'Lihat Baki Mata Ganjaran' : 'Lihat Kad Cop Saya'}
                         </Text>
-                        <Ionicons name="arrow-forward" size={14} color={getContrastColor(primaryColor || '#10B981')} style={{ marginLeft: 4 }} />
                       </TouchableOpacity>
-                    ) : (
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: 8, width: '100%', maxWidth: 360, marginTop: 12 }}>
+                      <TouchableOpacity
+                        style={[styles.radarSuccessBtn, { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 0 }]}
+                        onPress={handleViewStampCard}
+                        activeOpacity={0.88}
+                      >
+                        <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
+                          {isPointsOnly ? 'My Points' : 'Kad Saya'}
+                        </Text>
+                      </TouchableOpacity>
+
                       <TouchableOpacity
                         style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0 }]}
                         onPress={() => {
@@ -2606,8 +2626,8 @@ export default function NfcLandingScreen() {
                           Download App
                         </Text>
                       </TouchableOpacity>
-                    )}
-                  </View>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -2856,7 +2876,7 @@ export default function NfcLandingScreen() {
               <View style={styles.nextRewardCard}>
                 <View style={styles.nextRewardHeader}>
                   {rewardImageUrl ? (
-                    <Image source={{ uri: rewardImageUrl }} style={styles.nextRewardImage} resizeMode="cover" />
+                    <Image source={{ uri: rewardImageUrl }} style={styles.nextRewardImage} resizeMode="contain" />
                   ) : (
                     <View style={[styles.nextRewardIconBadge, { backgroundColor: primaryColor + '20' }]}>
                       <Ionicons name={isPointsOnly ? 'sparkles' : 'gift'} size={24} color={primaryColor} />
@@ -4641,5 +4661,80 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
+  },
+  postApprovalBookingCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    width: '100%',
+  },
+  postApprovalBookingTag: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 0.8,
+  },
+  postApprovalBookingTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  postApprovalBookingSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.75)',
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 17,
+  },
+  postApprovalBookingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 46,
+    borderRadius: 23,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  postApprovalBookingBtnText: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  voucherBookingPillWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  voucherBookingPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  voucherBookingPillText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });

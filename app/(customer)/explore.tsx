@@ -217,8 +217,8 @@ export default function ExploreScreen() {
   // Favorites state
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Sorting state: 'nearest' | 'rating' | 'price'
-  const [sortBy, setSortBy] = useState<'nearest' | 'rating' | 'price'>('nearest');
+  // Sorting state: 'for_you' | 'nearest' | 'rating' | 'price'
+  const [sortBy, setSortBy] = useState<'for_you' | 'nearest' | 'rating' | 'price'>('for_you');
   const [sortDropdownVisible, setSortDropdownVisible] = useState(false);
 
   // Location selector state
@@ -517,6 +517,14 @@ export default function ExploreScreen() {
       return true;
     })
     .sort((a, b) => {
+      if (sortBy === 'for_you') {
+        // For You: Combines Pro status, rating quality, and proximity
+        if (a.isPro && !b.isPro) return -1;
+        if (!a.isPro && b.isPro) return 1;
+        const scoreA = (a.rating * 10) - (a.distanceKm * 0.4);
+        const scoreB = (b.rating * 10) - (b.distanceKm * 0.4);
+        return scoreB - scoreA;
+      }
       if (sortBy === 'rating') {
         return b.rating - a.rating;
       }
@@ -642,13 +650,24 @@ export default function ExploreScreen() {
             >
               <Text style={styles.sortLabelText}>Sort by</Text>
               <Text style={styles.sortValueText}>
-                {sortBy === 'nearest' ? 'Nearest' : sortBy === 'rating' ? 'Highest Rating' : 'Lowest Price'}
+                {sortBy === 'for_you' ? 'For You' : sortBy === 'nearest' ? 'Nearest' : sortBy === 'rating' ? 'Highest Rating' : 'Lowest Price'}
               </Text>
               <Ionicons name="chevron-down" size={14} color="#0F172A" />
             </TouchableOpacity>
 
             {sortDropdownVisible && (
               <View style={styles.sortDropdownMenu}>
+                <TouchableOpacity
+                  style={[styles.sortMenuItem, sortBy === 'for_you' && styles.sortMenuItemActive]}
+                  onPress={() => {
+                    setSortBy('for_you');
+                    setSortDropdownVisible(false);
+                  }}
+                >
+                  <Text style={[styles.sortMenuText, sortBy === 'for_you' && styles.sortMenuTextActive]}>For You (Smart)</Text>
+                  {sortBy === 'for_you' && <Ionicons name="checkmark" size={16} color="#0F172A" />}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.sortMenuItem, sortBy === 'nearest' && styles.sortMenuItemActive]}
                   onPress={() => {

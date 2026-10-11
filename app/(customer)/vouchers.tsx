@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
+import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,10 @@ type VoucherItem = {
   color: string;
   isBirthday?: boolean;
   merchantId?: string;
+  rewardImage?: string;
+  rewardType?: 'free_item' | 'discount' | 'experience' | 'cash_credit' | string;
+  discountValue?: number;
+  discountType?: 'percentage' | 'fixed_amount' | 'percent' | string;
 };
 
 // Helper to determine if a hex color is light or dark
@@ -69,7 +74,7 @@ export default function VouchersScreen() {
         }),
         pb.collection('birthday_logs').getFullList({
           filter: `customer = '${user.id}' && status = 'sent'`,
-          expand: 'voucher,merchant',
+          expand: 'voucher,merchant,reward',
           sort: '-created',
           requestKey: null,
         }),
@@ -85,9 +90,16 @@ export default function VouchersScreen() {
           parsedMeta = typeof rec.metadata === 'string' ? JSON.parse(rec.metadata) : (rec.metadata || {});
         } catch (e) {}
 
-        const discountVal = parsedMeta.discount_value || campaign?.discount_value;
-        const discountType = parsedMeta.discount_type || campaign?.discount_type;
-        const displayTitle = reward?.name || reward?.title || campaign?.name || campaign?.title || (discountVal ? `${discountType === 'percent' ? discountVal + '%' : 'RM ' + discountVal} OFF` : 'Voucher');
+        let rewardImage = getRewardVisualUrl(reward) || '';
+        if (!rewardImage && campaign?.image) {
+          rewardImage = `${pb.baseUrl}/api/files/campaigns/${campaign.id}/${campaign.image}`;
+        }
+
+        const rewardType = reward?.type || campaign?.type || parsedMeta.reward_type || 'discount';
+        const discountVal = parsedMeta.discount_value || reward?.discount_value || campaign?.discount_value;
+        const discountType = parsedMeta.discount_type || reward?.discount_type || campaign?.discount_type;
+
+        const displayTitle = reward?.name || reward?.title || campaign?.name || campaign?.title || (discountVal ? `${discountType === 'percent' || discountType === 'percentage' ? discountVal + '%' : 'RM ' + discountVal} OFF` : 'Voucher');
         const displaySubtitle = reward?.description || campaign?.description || parsedMeta.description || 'Redeem at store';
         const merchantName = merchant?.name || parsedMeta.merchant_name || 'Risev Merchant';
         const logo = merchant?.logo 
@@ -128,7 +140,11 @@ export default function VouchersScreen() {
           expiry: expiryDisplay,
           status: (isUsed || isExpired ? 'used' : 'active') as 'used' | 'active',
           rawStatus: (isUsed ? 'used' : isExpired ? 'expired' : 'active') as 'active' | 'used' | 'expired',
-          color: merchant?.onboarding_primary_color || (reward?.type === 'discount' ? '#7C3AED' : '#004ac6')
+          color: merchant?.onboarding_primary_color || (reward?.type === 'discount' ? '#7C3AED' : '#004ac6'),
+          rewardImage,
+          rewardType,
+          discountValue: discountVal,
+          discountType,
         };
       });
       setVouchers(mapped);
@@ -138,6 +154,7 @@ export default function VouchersScreen() {
         .map((log: any) => {
           const voucher = log.expand.voucher;
           const merchant = log.expand?.merchant;
+          const bdayReward = log.expand?.reward;
           const expiresAt = voucher.expires_at || voucher.valid_until;
 
           const isBirthdayUsed = voucher.status === 'used';
@@ -166,6 +183,11 @@ export default function VouchersScreen() {
             parsedMeta = typeof voucher.metadata === 'string' ? JSON.parse(voucher.metadata) : (voucher.metadata || {});
           } catch (e) {}
 
+          let bdayImage = '';
+          if (bdayReward?.image) {
+            bdayImage = `${pb.baseUrl}/api/files/rewards/${bdayReward.id}/${bdayReward.image}`;
+          }
+
           return {
             id: voucher.id,
             merchantName: merchant?.name || 'Unknown Merchant',
@@ -182,6 +204,8 @@ export default function VouchersScreen() {
             color: merchant?.onboarding_primary_color || '#0F172A',
             isBirthday: true,
             merchantId: merchant?.id,
+            rewardImage: bdayImage,
+            rewardType: bdayReward?.type || 'free_item',
           };
         });
       setBirthdayRewards(birthdayMapped);
@@ -396,7 +420,7 @@ export default function VouchersScreen() {
               </View>
             ) : (
               filteredVouchers.map((item) => {
-                const isLight = isLightColor(item.color || '#0F172A');
+                const isLight = isLightColor(item.color || '#0B0F17');
                 
                 const isClickable = item.status === 'active';
                 const Container: any = isClickable ? TouchableOpacity : View;
@@ -408,47 +432,73 @@ export default function VouchersScreen() {
                 return (
                   <Container 
                     key={item.id} 
-                    style={[styles.ticketCard, { backgroundColor: item.color || '#0F172A' }, !isClickable && { opacity: 0.65 }]}
+                    style={[styles.ticketCard, !isClickable && { opacity: 0.65 }]}
                     {...containerProps}
                   >
-                    {/* Left side: Merchant details with barcode and serial number */}
-                    <View style={styles.ticketLeft}>
-                      <View style={styles.stubBarcodeContainer}>
-                        <View style={[styles.barcodeLineWide, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
-                        <View style={[styles.barcodeLineThin, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
-                        <View style={[styles.barcodeLineMedium, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
-                        <View style={[styles.barcodeLineThin, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
-                        <View style={[styles.barcodeLineWide, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }]} />
+                    {/* 1. LEFT ZONE: Merchant Identity ONLY */}
+                    <View style={styles.ticketLeftZone}>
+                      <View style={styles.whiteLogoCircle}>
+                        <Image source={{ uri: item.logo }} style={styles.merchantCircleLogo} />
                       </View>
-                      <Image source={{ uri: item.logo }} style={styles.merchantLogo} />
-                      <Text style={[styles.merchantName, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={2}>{item.merchantName}</Text>
-                      <Text style={[styles.serialNumber, { color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)' }]}>NO. {Math.floor(Math.random() * 90000) + 10000}</Text>
+                      <Text style={styles.merchantName} numberOfLines={1}>{item.merchantName}</Text>
+                      <Text style={styles.merchantCategory} numberOfLines={1}>
+                        {item.category || 'food'}
+                      </Text>
                     </View>
 
-                    {/* Dotted separator divider line */}
+                    {/* CENTER DIVIDER: Ticket Cutout Notches & Perforated Line */}
                     <View style={styles.dottedDivider}>
-                      <View style={[styles.topNotch, { backgroundColor: '#FFFFFF' }]} />
-                      <View style={[styles.dottedLine, { borderColor: isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.4)' }]} />
-                      <View style={[styles.bottomNotch, { backgroundColor: '#FFFFFF' }]} />
+                      <View style={styles.topNotch} />
+                      <View style={styles.dottedLine} />
+                      <View style={styles.bottomNotch} />
                     </View>
 
-                    {/* Right side: Reward details and Claim button */}
-                    <View style={styles.ticketRight}>
-                      <View style={styles.rewardTextColumn}>
-                        <Text style={[styles.rewardTitleLight, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{item.title}</Text>
-                        <Text style={[styles.rewardSubtitleLight, { color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>{item.subtitle}</Text>
-                        <Text style={[styles.expiryTextLight, { color: isLight ? '#EF4444' : '#FFC700' }, item.status === 'used' && { color: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)' }]}>{item.expiry}</Text>
+                    {/* 2. CENTER ZONE: Reward Information */}
+                    <View style={styles.ticketCenterZone}>
+                      {/* Top Badge: Ready to redeem */}
+                      <View style={styles.yellowStatusBadge}>
+                        <Ionicons name="gift" size={11} color="#000000" style={{ marginRight: 4 }} />
+                        <Text style={styles.yellowStatusText}>
+                          {item.isBirthday ? 'Birthday Special' : 'Ready to redeem'}
+                        </Text>
                       </View>
 
+                      {/* Middle: Reward Title & Description */}
+                      <View style={{ marginVertical: 2 }}>
+                        <Text style={styles.rewardTitle} numberOfLines={2}>{item.title}</Text>
+                        <Text style={styles.rewardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                      </View>
+
+                      {/* Bottom Footer Row: Source Badge + Stock */}
+                      <View style={styles.mainFooterRow}>
+                        <View style={styles.sourceBadgePill}>
+                          <Ionicons name="card" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+                          <Text style={styles.sourceBadgeText}>STAMP CARD</Text>
+                        </View>
+
+                        <Text style={styles.stockLabelText}>
+                          Stock: <Text style={styles.stockValueText}>Unlimited</Text>
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 3. RIGHT SAFE ZONE: Tag & Use Voucher CTA */}
+                    <View style={styles.ticketRightZone}>
+                      {/* Top Right Tag */}
+                      <Text style={styles.specialRewardTag}>
+                        {item.rewardType === 'discount' 
+                          ? (item.discountValue ? (item.discountType === 'percentage' ? `${item.discountValue}% OFF` : `RM ${item.discountValue}`) : 'DISCOUNT')
+                          : 'FREE ITEM'}
+                      </Text>
+
+                      {/* Bottom Right CTA Button */}
                       {item.status === 'active' ? (
-                        <View
-                          style={[styles.useBtn, { backgroundColor: isLight ? '#000000' : '#FFFFFF' }]}
-                        >
-                          <Text style={[styles.useBtnText, { color: isLight ? '#FFFFFF' : '#000000' }]}>Use Now</Text>
+                        <View style={styles.ctaPillBtn}>
+                          <Text style={styles.ctaPillText} numberOfLines={1}>Use Voucher ➔</Text>
                         </View>
                       ) : (
-                        <View style={[styles.usedBadge, { borderColor: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}>
-                          <Text style={[styles.usedBadgeText, { color: isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)' }]}>USED / EXPIRED</Text>
+                        <View style={styles.usedBadge}>
+                          <Text style={styles.usedBadgeText}>USED / EXPIRED</Text>
                         </View>
                       )}
                     </View>
@@ -803,154 +853,222 @@ const styles = StyleSheet.create({
   },
   ticketCard: {
     flexDirection: 'row',
-    borderRadius: 12, // Smoother corners for concert ticket
-    height: 140,
+    borderRadius: 20,
+    height: 146,
+    backgroundColor: '#0B0F17',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  ticketLeft: {
-    width: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    gap: 4,
     position: 'relative',
-    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  stubBarcodeContainer: {
-    position: 'absolute',
-    left: -10,
-    top: 0,
-    bottom: 0,
-    width: 24,
-    flexDirection: 'row',
+  ticketLeftZone: {
+    width: 90,
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.35, // Increased visibility
-    transform: [{ rotate: '90deg' }],
+    padding: 8,
   },
-  barcodeLineWide: { width: 4, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 2 },
-  barcodeLineMedium: { width: 2, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 2 },
-  barcodeLineThin: { width: 1, height: '60%', backgroundColor: '#FFFFFF', marginHorizontal: 1 },
-  merchantLogo: {
+  whiteLogoCircle: {
     width: 48,
     height: 48,
-    borderRadius: 24, // Round logo for concert ticket
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-    marginBottom: 4,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 5,
+  },
+  merchantCircleLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    resizeMode: 'cover',
   },
   merchantName: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    marginTop: 2,
     textAlign: 'center',
+    width: '100%',
   },
-  serialNumber: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 1,
-    marginTop: 2,
+  merchantCategory: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    textAlign: 'center',
+    width: '100%',
+    marginTop: 1,
   },
-  // Ticket notch cut divider
   dottedDivider: {
-    width: 20,
+    width: 14,
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'transparent',
     position: 'relative',
   },
   topNotch: {
-    width: 20, 
-    height: 10,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    width: 14,
+    height: 7,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
     backgroundColor: '#FFFFFF',
     position: 'absolute',
     top: 0,
-    zIndex: 2,
+    zIndex: 5,
   },
   bottomNotch: {
-    width: 20, 
-    height: 10,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    width: 14,
+    height: 7,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
     backgroundColor: '#FFFFFF',
     position: 'absolute',
     bottom: 0,
-    zIndex: 2,
+    zIndex: 5,
   },
   dottedLine: {
     width: 1,
     height: '100%',
-    borderColor: 'rgba(255,255,255,0.4)', // White dotted line for dark background
-    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1,
     borderStyle: 'dashed',
   },
-  ticketRight: {
+  ticketCenterZone: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     justifyContent: 'space-between',
+    zIndex: 2,
   },
-  rewardTextColumn: {
-    gap: 2,
+  yellowStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFC700',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 100,
   },
-  rewardTitleLight: {
-    fontSize: 16,
+  yellowStatusText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  rewardTitle: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: -0.2,
+    lineHeight: 18,
   },
-  rewardSubtitleLight: {
-    fontSize: 11,
+  rewardSubtitle: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 15,
+    color: '#94A3B8',
+    marginTop: 1,
+    lineHeight: 14,
   },
-  expiryTextLight: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFC700', // Yellow text for expiry on dark bg
-    marginTop: 4,
-  },
-  useBtn: {
-    backgroundColor: '#FFFFFF', // White button pops against dark ticket
-    height: 32,
-    borderRadius: 16, // Pill shape
+  mainFooterRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    marginTop: 8,
+    gap: 6,
+    flexWrap: 'nowrap',
+  },
+  sourceBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  sourceBadgeText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  footerDividerText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  stockLabelText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+  },
+  stockValueText: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#10B981',
+  },
+  ticketRightZone: {
+    width: 105,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    position: 'relative',
+    zIndex: 2,
+  },
+  specialRewardTag: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFC700',
+    letterSpacing: 0.5,
+    zIndex: 3,
+  },
+  ctaPillBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 100,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    zIndex: 3,
+    alignSelf: 'flex-end',
   },
-  useBtnText: {
-    fontSize: 12,
+  ctaPillText: {
+    fontSize: 9.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
+  floatingRightImageWrap: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 105,
+    overflow: 'hidden',
+  },
+  floatingRightImage: {
+    width: '100%',
+    height: '100%',
+  },
+  rightImageLeftFade: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    backgroundColor: '#0B0F17',
+    opacity: 0.8,
+  },
   usedBadge: {
-    backgroundColor: '#F1F5F9',
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    zIndex: 3,
   },
   usedBadgeText: {
     fontSize: 9,

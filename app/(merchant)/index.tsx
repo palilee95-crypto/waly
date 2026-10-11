@@ -14,6 +14,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -719,150 +720,55 @@ export default function MerchantDashboard() {
             </View>
           ) : (
             pendingClaims.map((claim) => {
-              const cInput = claimInputs[claim.id] || { billAmount: '10', stampAmount: 1 };
-              const isProcessing = processingClaimId === claim.id;
               const timeAgoStr = claim.created ? getTimeAgo(new Date(claim.created)) : 'Just now';
+              const nameParts = (claim.customer_name || 'Customer').split(' ');
+              const initials = nameParts.length >= 2 
+                ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
+                : (claim.customer_name || 'CU').substring(0, 2).toUpperCase();
 
               return (
-                <View key={claim.id} style={styles.pendingCard}>
-                  {/* Customer Info Header */}
-                  <View style={styles.pendingCustomerHeader}>
-                    <View style={styles.customerAvatarPlaceholder}>
-                      <Text style={styles.avatarLetter}>{(claim.customer_name || 'C')[0].toUpperCase()}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingCustomerName}>{claim.customer_name || 'Walk-in Customer'}</Text>
-                      <Text style={styles.pendingCustomerPhone}>{claim.customer_phone}</Text>
-                    </View>
-                    <View style={styles.timeBadge}>
-                      <Ionicons name="time-outline" size={12} color="#64748B" />
-                      <Text style={styles.timeBadgeText}>{timeAgoStr}</Text>
-                    </View>
+                <TouchableOpacity
+                  key={claim.id}
+                  style={styles.pendingCardAppleMinimal}
+                  onPress={() => {
+                    DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
+                  }}
+                  activeOpacity={0.88}
+                >
+                  {/* Apple Neutral Avatar */}
+                  <View style={styles.pendingAvatarApple}>
+                    <Text style={styles.pendingAvatarAppleText}>{initials}</Text>
                   </View>
 
-                  {/* Input Controls: Bill Amount & Stamps Count */}
-                  <View style={styles.pendingInputRow}>
-                    {/* Bill Amount */}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingInputLabel}>BILL AMOUNT (RM)</Text>
-                      <View style={styles.amountInputWrap}>
-                        <Text style={styles.currencySymbol}>RM</Text>
-                        <TextInput
-                          style={styles.amountInput}
-                          value={cInput.billAmount}
-                          onChangeText={(val) =>
-                            setClaimInputs((prev) => ({
-                              ...prev,
-                              [claim.id]: { ...cInput, billAmount: val },
-                            }))
-                          }
-                          keyboardType="decimal-pad"
-                          placeholder="0.00"
-                          placeholderTextColor="#94A3B8"
-                        />
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 4, marginTop: 6 }}>
-                        {['10', '20', '50'].map((amt) => (
-                          <TouchableOpacity
-                            key={amt}
-                            style={[
-                              styles.presetChip,
-                              cInput.billAmount === amt && styles.presetChipActive,
-                            ]}
-                            onPress={() =>
-                              setClaimInputs((prev) => ({
-                                ...prev,
-                                [claim.id]: { ...cInput, billAmount: amt },
-                              }))
-                            }
-                          >
-                            <Text style={[styles.presetChipText, cInput.billAmount === amt && styles.presetChipTextActive]}>
-                              RM{amt}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    {/* Stamp Count Stepper */}
-                    <View style={{ width: 110 }}>
-                      <Text style={styles.pendingInputLabel}>STAMPS</Text>
-                      <View style={styles.stepperContainer}>
-                        <TouchableOpacity
-                          style={styles.stepperBtn}
-                          onPress={() =>
-                            setClaimInputs((prev) => ({
-                              ...prev,
-                              [claim.id]: { ...cInput, stampAmount: Math.max(1, cInput.stampAmount - 1) },
-                            }))
-                          }
-                        >
-                          <Ionicons name="remove" size={14} color="#050505" />
-                        </TouchableOpacity>
-                        <Text style={styles.stepperValue}>{cInput.stampAmount}</Text>
-                        <TouchableOpacity
-                          style={styles.stepperBtn}
-                          onPress={() =>
-                            setClaimInputs((prev) => ({
-                              ...prev,
-                              [claim.id]: { ...cInput, stampAmount: cInput.stampAmount + 1 },
-                            }))
-                          }
-                        >
-                          <Ionicons name="add" size={14} color="#050505" />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 4, marginTop: 6, justifyContent: 'center' }}>
-                        {[1, 2, 3].map((s) => (
-                          <TouchableOpacity
-                            key={s}
-                            style={[
-                              styles.presetChip,
-                              cInput.stampAmount === s && styles.presetChipActive,
-                            ]}
-                            onPress={() =>
-                              setClaimInputs((prev) => ({
-                                ...prev,
-                                [claim.id]: { ...cInput, stampAmount: s },
-                              }))
-                            }
-                          >
-                            <Text style={[styles.presetChipText, cInput.stampAmount === s && styles.presetChipTextActive]}>
-                              {s}★
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Actions Row */}
-                  <View style={styles.pendingActionsRow}>
-                    <TouchableOpacity
-                      style={styles.declineBtn}
-                      onPress={() => handleDeclineClaim(claim.id)}
-                      disabled={isProcessing}
-                    >
-                      <Ionicons name="close-circle-outline" size={16} color="#64748B" />
-                      <Text style={styles.declineBtnText}>Decline</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.approveBtn, isProcessing && { opacity: 0.6 }]}
-                      onPress={() => handleApproveClaim(claim.id)}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                          <Text style={styles.approveBtnText}>Approve & Credit Stamps</Text>
-                        </>
+                  {/* Customer Info */}
+                  <View style={{ flex: 1, paddingRight: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.pendingCustomerNameApple} numberOfLines={1}>
+                        {claim.customer_name || 'Customer'}
+                      </Text>
+                      {claim.session_code && (
+                        <View style={styles.pendingSessionBadgeApple}>
+                          <Text style={styles.pendingSessionBadgeText}>{claim.session_code}</Text>
+                        </View>
                       )}
-                    </TouchableOpacity>
+                    </View>
+                    <Text style={styles.pendingCustomerSubApple}>
+                      {claim.customer_phone || '+601110209669'} · {timeAgoStr}
+                    </Text>
                   </View>
-                </View>
+
+                  {/* Right CTA Action Pill */}
+                  <TouchableOpacity
+                    style={styles.pendingReviewBtnApple}
+                    onPress={() => {
+                      DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.pendingReviewBtnText}>Review</Text>
+                    <Ionicons name="chevron-forward" size={13} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
               );
             })
           )}
@@ -1833,6 +1739,77 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
+  },
+  pendingCardAppleMinimal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  pendingAvatarApple: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F5F5F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingAvatarAppleText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#1D1D1F',
+  },
+  pendingCustomerNameApple: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1D1D1F',
+  },
+  pendingSessionBadgeApple: {
+    backgroundColor: '#FFFDF0',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pendingSessionBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  pendingCustomerSubApple: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#86868B',
+    marginTop: 2,
+  },
+  pendingReviewBtnApple: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1D1D1F',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 100,
+  },
+  pendingReviewBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
   },
   pendingInputRow: {
     flexDirection: 'row',

@@ -35,6 +35,34 @@ onRecordUpdate((e) => {
       v.set('code', generateVoucherCode());
       v.set('status', 'active');
       v.set('expires_at', new Date(Date.now() + daysValid * 86400000).toISOString());
+
+      // Snapshot reward details into metadata so future catalog edits don't affect this issued voucher
+      try {
+        const rewardObj = $app.findRecordById('rewards', rewardId);
+        if (rewardObj) {
+          let eligibleItemIds = [];
+          try {
+            const relItems = $app.findRecordsByFilter('reward_eligible_items', `reward = "${rewardId}"`, '-created', 100, 0);
+            eligibleItemIds = relItems.map(ri => ri.getString('item')).filter(Boolean);
+          } catch (relErr) {}
+
+          v.set('metadata', JSON.stringify({
+            snapshot_title: rewardObj.get('name') || rewardObj.get('title') || '',
+            snapshot_description: rewardObj.get('description') || '',
+            snapshot_type: rewardObj.get('type') || 'free_item',
+            discount_type: rewardObj.get('discount_type') || 'none',
+            discount_value: parseFloat(rewardObj.get('discount_value')) || 0,
+            min_spend: parseFloat(rewardObj.get('min_spend')) || 0,
+            max_discount: parseFloat(rewardObj.get('max_discount')) || 0,
+            free_quantity: parseInt(rewardObj.get('free_quantity')) || 1,
+            merchant_id: rewardObj.get('merchant') || '',
+            eligible_item_ids: eligibleItemIds,
+          }));
+        }
+      } catch (rErr) {
+        console.log('[STAMP COMPLETE] Snapshot note:', rErr.message || rErr);
+      }
+
       $app.save(v);
       return v;
     };

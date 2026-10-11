@@ -140,11 +140,28 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       card.set("last_activity", new Date().toISOString().replace('T', ' ').substring(0, 19));
       $app.save(card);
 
-      // 4. Record transaction
+      // 4. Record transaction & Process optional Voucher redemption
       const staffId = authRecord.id;
       const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
       const branchName = (body.branch_name || authRecord.getString("branch_name") || claim.getString("branch_name") || "All Branches (HQ)").trim();
       const branchId = (body.branch_id || authRecord.getString("branch") || claim.getString("branch") || "").trim();
+      const voucherId = (body.voucher_id || "").trim();
+      let redeemedVoucherCode = "";
+
+      if (voucherId) {
+        try {
+          const vRec = $app.findRecordById("vouchers", voucherId);
+          if (vRec && vRec.getString("status") === "active") {
+            const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            vRec.set("status", "used");
+            vRec.set("used_at", nowIso);
+            $app.save(vRec);
+            redeemedVoucherCode = vRec.getString("code");
+          }
+        } catch (vErr) {
+          console.log("[NFC COMPLETE] Voucher redemption note:", vErr.message || vErr);
+        }
+      }
 
       try {
         const txnCol = $app.findCollectionByNameOrId("transactions");
@@ -163,7 +180,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
           staff_id: staffId,
           staff_name: staffName,
           branch_name: branchName,
-          branch_id: branchId
+          branch_id: branchId,
+          voucher_id: voucherId || "",
+          voucher_code: redeemedVoucherCode || "",
+          subtotal: body.subtotal ? parseFloat(body.subtotal) : billAmount,
+          discount_amount: body.discount_amount ? parseFloat(body.discount_amount) : 0,
         };
         txn.set("metadata", JSON.stringify(txnMeta));
         $app.save(txn);

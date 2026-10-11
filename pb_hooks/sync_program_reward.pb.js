@@ -4,6 +4,7 @@ onRecordCreate((e) => {
   const merchantId = e.record.get('merchant');
   const rewardDesc = e.record.get('reward_description');
   const isActive = e.record.get('is_active');
+  let existingLinked = e.record.get('linked_reward');
   
   // Guarantee both stamps and points are enabled by default for new programs
   const stampsVal = e.record.get('enable_stamps');
@@ -34,7 +35,9 @@ onRecordCreate((e) => {
       console.log("Error deactivating other loyalty programs:", err.message || err);
     }
   }
-  
+
+  // If a linked_reward is already explicitly selected by the merchant, preserve it
+  if (existingLinked) return e.next();
   if (!rewardDesc) return e.next();
 
   try {
@@ -42,8 +45,8 @@ onRecordCreate((e) => {
     const reward = new Record(rewardsCol);
     reward.set('merchant', merchantId);
     reward.set('name', rewardDesc);
-    reward.set('description', `Reward for completing ${e.record.get('name')}`);
-    reward.set('points_cost', 1);
+    reward.set('description', `Reward for completing ${e.record.get('name') || 'Stamp Card'}`);
+    reward.set('points_cost', 0);
     reward.set('stock', 1000000); // effectively unlimited
     reward.set('is_active', true);
     reward.set('type', 'free_item');
@@ -82,34 +85,26 @@ onRecordUpdate((e) => {
     }
   }
 
+  let linkedRewardId = e.record.get('linked_reward');
   const original = e.record.original();
   const prevDesc = original.get('reward_description');
   const newDesc = e.record.get('reward_description');
-  let linkedRewardId = e.record.get('linked_reward');
 
-  // If description changed or linked_reward is missing
-  if (newDesc && (prevDesc !== newDesc || !linkedRewardId)) {
+  // If linked_reward is missing but newDesc is present, auto-create and link
+  if (!linkedRewardId && newDesc) {
     try {
-      if (linkedRewardId) {
-        // Update existing linked reward name
-        const reward = $app.findRecordById('rewards', linkedRewardId);
-        reward.set('name', newDesc);
-        $app.save(reward);
-      } else {
-        // Create new reward if somehow missing
-        const rewardsCol = $app.findCollectionByNameOrId('rewards');
-        const reward = new Record(rewardsCol);
-        reward.set('merchant', e.record.get('merchant'));
-        reward.set('name', newDesc);
-        reward.set('description', `Reward for completing ${e.record.get('name')}`);
-        reward.set('points_cost', 1);
-        reward.set('stock', 1000000);
-        reward.set('is_active', true);
-        reward.set('type', 'free_item');
-        
-        $app.save(reward);
-        e.record.set('linked_reward', reward.id);
-      }
+      const rewardsCol = $app.findCollectionByNameOrId('rewards');
+      const reward = new Record(rewardsCol);
+      reward.set('merchant', e.record.get('merchant'));
+      reward.set('name', newDesc);
+      reward.set('description', `Reward for completing ${e.record.get('name') || 'Stamp Card'}`);
+      reward.set('points_cost', 0);
+      reward.set('stock', 1000000);
+      reward.set('is_active', true);
+      reward.set('type', 'free_item');
+      
+      $app.save(reward);
+      e.record.set('linked_reward', reward.id);
     } catch (err) {
       console.log("Error syncing reward in before-update hook:", err.message || err);
     }
@@ -122,7 +117,7 @@ onRecordDelete((e) => {
   const linkedRewardId = e.record.get('linked_reward');
   const programId = e.record.id;
   
-  // 1. Delete all customer stamp cards referencing this program
+  // Delete associated loyalty cards when program is explicitly deleted
   try {
     const cards = $app.findRecordsByFilter('loyalty_cards', `program = "${programId}"`, '-created', 5000, 0);
     for (const card of cards) {
@@ -132,16 +127,6 @@ onRecordDelete((e) => {
     console.log("Error deleting associated loyalty cards:", err.message || err);
   }
 
-  // 2. Delete the associated reward record
-  if (linkedRewardId) {
-    try {
-      const reward = $app.findRecordById('rewards', linkedRewardId);
-      $app.delete(reward);
-    } catch (err) {
-      console.log("Error deleting associated reward record:", err.message || err);
-    }
-  }
-  
   return e.next();
 }, 'loyalty_programs');
 
@@ -153,6 +138,10 @@ onRecordDelete((e) => {
     const activePrograms = $app.findRecordsByFilter('loyalty_programs', `linked_reward = "${rewardId}" && is_active = true`, '-created', 1, 0);
     if (activePrograms.length > 0) {
       throw new BadRequestError("Cannot delete this reward because it is linked to your active stamp card program.");
+    }
+    const activeVouchers = $app.findRecordsByFilter('vouchers', `reward = "${rewardId}" && status = "active"`, '-created', 1, 0);
+    if (activeVouchers.length > 0) {
+      throw new BadRequestError("Cannot delete this reward because customers currently hold active vouchers for it.");
     }
   } catch (err) {
     if (err instanceof BadRequestError) throw err;
@@ -189,32 +178,6 @@ onRecordDelete((e) => {
     }
   } catch (err) {
     console.log("[REWARD DELETE] Error unlinking store_feedbacks:", err.message || err);
-  }
-
-  // 5. Delete associated vouchers to satisfy foreign key required relation constraint
-  try {
-    const vouchers = $app.findRecordsByFilter('vouchers', `reward = "${rewardId}"`, '-created', 5000, 0);
-    for (const v of vouchers) {
-      $app.delete(v);
-    }
-    if (vouchers.length > 0) {
-      console.log(`[REWARD DELETE] Deleted ${vouchers.length} voucher(s) associated with reward ${rewardId}`);
-    }
-  } catch (err) {
-    console.log("[REWARD DELETE] Error deleting associated vouchers:", err.message || err);
-  }
-
-  // 6. Delete associated redemptions to satisfy foreign key required relation constraint
-  try {
-    const redemptions = $app.findRecordsByFilter('redemptions', `reward = "${rewardId}"`, '-created', 5000, 0);
-    for (const r of redemptions) {
-      $app.delete(r);
-    }
-    if (redemptions.length > 0) {
-      console.log(`[REWARD DELETE] Deleted ${redemptions.length} redemption(s) associated with reward ${rewardId}`);
-    }
-  } catch (err) {
-    console.log("[REWARD DELETE] Error deleting associated redemptions:", err.message || err);
   }
 
   return e.next();
