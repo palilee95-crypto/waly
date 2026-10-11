@@ -150,13 +150,20 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
 
       if (voucherId) {
         try {
-          const vRec = $app.findRecordById("vouchers", voucherId);
-          if (vRec && vRec.getString("status") === "active") {
+          let vRec = null;
+          try {
+            vRec = $app.findRecordById("vouchers", voucherId);
+          } catch (e) {
+            const byCode = $app.findRecordsByFilter("vouchers", `code = '${voucherId}'`, "-created", 1, 0);
+            if (byCode.length > 0) vRec = byCode[0];
+          }
+          if (vRec) {
             const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
             vRec.set("status", "used");
             vRec.set("used_at", nowIso);
             $app.save(vRec);
             redeemedVoucherCode = vRec.getString("code");
+            console.log("[NFC COMPLETE] Voucher marked as used:", redeemedVoucherCode || voucherId);
           }
         } catch (vErr) {
           console.log("[NFC COMPLETE] Voucher redemption note:", vErr.message || vErr);

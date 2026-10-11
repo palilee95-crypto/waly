@@ -117,6 +117,16 @@ export default function NfcClaimModal() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [merchantColor, setMerchantColor] = useState('#5C3BCC');
   const [merchantSlug, setMerchantSlug] = useState('');
+  const [activePlan, setActivePlan] = useState<string>('stand_bundle');
+  const [merchantData, setMerchantData] = useState<any>(null);
+
+  const isProPlan = Boolean(
+    activePlan === 'pro' ||
+    activePlan === 'business' ||
+    activePlan === 'enterprise' ||
+    merchantData?.has_booking_addon === true ||
+    merchantData?.is_pro === true
+  );
 
   // Booking & Quick Add-on states
   const [activeBooking, setActiveBooking] = useState<any>(null);
@@ -128,9 +138,10 @@ export default function NfcClaimModal() {
   const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
   const [isVouchersExpanded, setIsVouchersExpanded] = useState<boolean>(false);
-  const [subtotalAmount, setSubtotalAmount] = useState<number>(0);
+  const [customBillInput, setCustomBillInput] = useState<string>('20');
+  const [subtotalAmount, setSubtotalAmount] = useState<number>(20);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [netTotalAmount, setNetTotalAmount] = useState<number>(0);
+  const [netTotalAmount, setNetTotalAmount] = useState<number>(20);
   const [spendPerPoint, setSpendPerPoint] = useState<number>(1);
 
   // Option A: Catalog Picker states
@@ -148,7 +159,11 @@ export default function NfcClaimModal() {
 
   useEffect(() => {
     let subtotal = 0;
-    selectedServices.forEach(s => subtotal += (parseFloat(s.price) || 0) * (parseInt(s.qty) || 1));
+    if (selectedServices.length > 0) {
+      selectedServices.forEach(s => subtotal += (parseFloat(s.price) || 0) * (parseInt(s.qty) || 1));
+    } else {
+      subtotal = parseFloat(customBillInput) || 0;
+    }
     setSubtotalAmount(subtotal);
 
     let disc = 0;
@@ -184,7 +199,7 @@ export default function NfcClaimModal() {
 
     setBillAmount(net.toFixed(2));
     setStampAmount('1');
-  }, [selectedServices, appliedVoucher]);
+  }, [selectedServices, appliedVoucher, customBillInput]);
 
   const handleAddItem = (catalogItem: any) => {
     setSelectedServices((prev) => {
@@ -248,6 +263,7 @@ export default function NfcClaimModal() {
     (async () => {
       try {
         const m = await pb.collection('merchants').getOne(merchantId);
+        setMerchantData(m);
         if (m?.slug) {
           setMerchantSlug(m.slug);
         }
@@ -255,6 +271,19 @@ export default function NfcClaimModal() {
           setMerchantColor(m.onboarding_primary_color);
         }
       } catch (e) {}
+
+      try {
+        const subs = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = "${merchantId}" && (status = "active" || status = "trialing")`,
+          sort: '-created',
+          requestKey: null
+        });
+        if (subs.items.length > 0) {
+          setActivePlan((subs.items[0].plan || 'stand_bundle').toLowerCase());
+        } else {
+          setActivePlan('stand_bundle');
+        }
+      } catch (sErr) {}
 
       try {
         const progRes = await pb.collection('loyalty_programs').getList(1, 1, {
@@ -410,11 +439,14 @@ export default function NfcClaimModal() {
         setErrorMsg(null);
         setIsVisible(true);
       } else if (
-        activeClaimRef.current &&
+        (activeClaimRef.current &&
         record.id === activeClaimRef.current.id &&
-        (record.status === 'completed' || record.status === 'cancelled' || action === 'delete')
+        (record.status === 'completed' || record.status === 'cancelled' || action === 'delete')) ||
+        (record.status === 'completed' || record.status === 'cancelled')
       ) {
-        if (!isSuccessRef.current) {
+        if (record.id === activeClaimRef.current?.id && isSuccessRef.current) {
+          // Cashier is looking at in-modal success view, retain until Done is pressed
+        } else if (activeClaimRef.current && record.id === activeClaimRef.current.id) {
           setIsVisible(false);
           setClaim(null);
           setErrorMsg(null);
@@ -432,11 +464,20 @@ export default function NfcClaimModal() {
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
-      if (targetClaim) {
+      if (targetClaim && targetClaim.status === 'pending') {
         setClaim(targetClaim);
+        if (targetClaim.bill_amount) setBillAmount(String(targetClaim.bill_amount));
+        else setBillAmount('10');
+        if (targetClaim.stamp_amount) setStampAmount(String(targetClaim.stamp_amount));
+        else setStampAmount('1');
         setIsSuccess(false);
         setErrorMsg(null);
         setIsVisible(true);
+      } else {
+        // If claim is already completed or cancelled, clear state and do not open
+        setClaim(null);
+        setIsVisible(false);
+        setErrorMsg(null);
       }
     });
     return () => {
@@ -444,7 +485,7 @@ export default function NfcClaimModal() {
     };
   }, []);
 
-  const handleConfirm = async () => {
+  const handleConfirmClassic = async () => {
     if (!claim) return;
     const bill = parseFloat(billAmount) || 0;
     const stamps = parseInt(stampAmount) || 1;
@@ -452,6 +493,69 @@ export default function NfcClaimModal() {
     setIsLoading(true);
     setErrorMsg(null);
     try {
+      await pb.send('/api/risev/nfc/complete', {
+        method: 'POST',
+        body: {
+          claim_id: claim.id,
+          bill_amount: bill,
+          stamp_amount: stamps,
+          handled_by: user?.id,
+          staff_name: user?.name || 'Staff',
+          branch_name: user?.branch_name || '',
+          branch_id: user?.branch || '',
+        },
+      });
+
+      DeviceEventEmitter.emit('merchant_transaction_completed', {
+        bill_amount: bill,
+      });
+
+      setIsSuccess(true);
+    } catch (err: any) {
+      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+        DeviceEventEmitter.emit('merchant_transaction_completed');
+        handleClose();
+        return;
+      }
+      setErrorMsg(err?.message || 'Failed to issue stamps.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!claim) return;
+    const bill = netTotalAmount;
+    const stamps = parseInt(stampAmount) || 1;
+
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      // 1. If voucher was applied, redeem it via the dedicated endpoint AND update status
+      if (appliedVoucher) {
+        if (appliedVoucher.code) {
+          try {
+            await pb.send('/api/risev/merchant/vouchers/redeem', {
+              method: 'POST',
+              body: { code: appliedVoucher.code },
+            });
+          } catch (vErr) {
+            console.warn('[VOUCHER REDEEM] Dedicated endpoint note:', vErr);
+          }
+        }
+        try {
+          await pb.collection('vouchers').update(appliedVoucher.id, {
+            status: 'used',
+            used_at: new Date().toISOString(),
+          });
+        } catch (vDirectErr) {
+          console.warn('[VOUCHER REDEEM] Direct update note:', vDirectErr);
+        }
+        // Remove from local list so it instantly vanishes from UI
+        setCustomerVouchers(prev => prev.filter(v => v.id !== appliedVoucher.id));
+      }
+
+      // 2. Complete NFC transaction
       await pb.send('/api/risev/nfc/complete', {
         method: 'POST',
         body: {
@@ -466,6 +570,12 @@ export default function NfcClaimModal() {
           branch_name: user?.branch_name || '',
           branch_id: user?.branch || '',
         },
+      });
+
+      // 3. Notify merchant dashboard to refresh sales immediately
+      DeviceEventEmitter.emit('merchant_transaction_completed', {
+        bill_amount: netTotalAmount,
+        subtotal: subtotalAmount,
       });
 
       // If customer had an active booking, mark completed
@@ -489,7 +599,7 @@ export default function NfcClaimModal() {
           payment_method: paymentMethod || 'nfc_counter',
           payment_reference: paymentReference.trim(),
           stamps_earned: stamps,
-          line_items: selectedServices.length > 0 ? selectedServices : [{ name: 'Pembayaran Servis', price: bill }]
+          line_items: selectedServices.length > 0 ? selectedServices : [{ name: 'Pembayaran Servis', price: subtotalAmount || bill }]
         };
         if (activeBooking?.id) receiptPayload.booking = activeBooking.id;
         
@@ -501,6 +611,11 @@ export default function NfcClaimModal() {
       // Show sleek in-modal success view
       setIsSuccess(true);
     } catch (err: any) {
+      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+        DeviceEventEmitter.emit('merchant_transaction_completed');
+        handleClose();
+        return;
+      }
       setErrorMsg(err?.message || 'Failed to issue stamps.');
     } finally {
       setIsLoading(false);
@@ -512,7 +627,9 @@ export default function NfcClaimModal() {
     setClaim(null);
     setIsSuccess(false);
     setErrorMsg(null);
-    setBillAmount('10');
+    setBillAmount('20');
+    setCustomBillInput('20');
+    setAppliedVoucher(null);
     setStampAmount('1');
     setSelectedServices([]);
     setCheckoutStep('review');
@@ -522,7 +639,12 @@ export default function NfcClaimModal() {
   };
 
   const handleMinimize = () => {
-    setIsVisible(false);
+    // If the active claim is already completed or cancelled, dismiss it completely instead of keeping banner
+    if (!claim || claim.status !== 'pending') {
+      handleClose();
+    } else {
+      setIsVisible(false);
+    }
   };
 
   const handleDecline = async () => {
@@ -534,12 +656,12 @@ export default function NfcClaimModal() {
     handleClose();
   };
 
-  if (!claim) return null;
+  if (!claim || (!isSuccess && claim.status !== 'pending')) return null;
 
   return (
     <>
       {/* Floating Minimized Pending Capsule (visible when minimized so cashier can re-open anytime) */}
-      {!isVisible && !isSuccess && (
+      {!isVisible && !isSuccess && claim.status === 'pending' && (
         <View style={styles.floatingContainer} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.floatingCapsule}
@@ -622,8 +744,8 @@ export default function NfcClaimModal() {
                 <Text style={styles.doneBtnText}>Done</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            // ── Main Claim Form View ──────────────────────────────
+          ) : isProPlan ? (
+            // ── Main Claim Form View (PRO Flow) ──────────────────────────────
             (() => {
               const getIsLight = (color: string) => {
                 const hex = (color || '#ffffff').replace('#', '');
@@ -1167,9 +1289,44 @@ export default function NfcClaimModal() {
                       <Text style={styles.bookingSummaryTitle}>Booking Summary</Text>
                       
                       {selectedServices.length === 0 ? (
-                        <Text style={{ fontSize: 11, color: '#86868B', fontFamily: 'PlusJakartaSans_500Medium', fontStyle: 'italic', paddingVertical: 4 }}>
-                          Please select services below...
-                        </Text>
+                        <View style={styles.quickBillCard}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <Text style={styles.quickBillLabel}>ORDER / BILL AMOUNT</Text>
+                            <TouchableOpacity onPress={() => setIsCatalogPickerOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="list-outline" size={13} color="#2563EB" />
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#2563EB' }}>Choose Items ›</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <View style={styles.quickBillInputRow}>
+                            <Text style={styles.quickBillCurrency}>RM</Text>
+                            <TextInput
+                              style={styles.quickBillInputField}
+                              value={customBillInput}
+                              onChangeText={(text) => {
+                                const clean = text.replace(/[^0-9.]/g, '');
+                                setCustomBillInput(clean);
+                              }}
+                              keyboardType="decimal-pad"
+                              placeholder="0.00"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                          {/* Quick amount shortcut chips */}
+                          <View style={styles.quickBillChipsRow}>
+                            {['10', '20', '30', '50'].map((amt) => (
+                              <TouchableOpacity
+                                key={amt}
+                                style={[styles.quickBillChip, customBillInput === amt && styles.quickBillChipActive]}
+                                onPress={() => setCustomBillInput(amt)}
+                                activeOpacity={0.75}
+                              >
+                                <Text style={[styles.quickBillChipText, customBillInput === amt && styles.quickBillChipTextActive]}>
+                                  RM {amt}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
                       ) : (
                         <View style={{ gap: 6 }}>
                           {selectedServices.map((item, idx) => {
@@ -1375,6 +1532,150 @@ export default function NfcClaimModal() {
                         <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444' }}>Decline</Text>
                       </TouchableOpacity>
                     </View>
+                  </View>
+                </>
+              );
+            })()
+          ) : (
+            // ── Classic Stamp Claim View (Flow Lama: Stand Bundle & Starter) ──
+            (() => {
+              const getIsLight = (color: string) => {
+                const hex = (color || '#ffffff').replace('#', '');
+                if (hex.length === 3) {
+                  const r = parseInt(hex[0] + hex[0], 16);
+                  const g = parseInt(hex[1] + hex[1], 16);
+                  const b = parseInt(hex[2] + hex[2], 16);
+                  return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                }
+                if (hex.length === 6) {
+                  const r = parseInt(hex.substring(0, 2), 16);
+                  const g = parseInt(hex.substring(2, 4), 16);
+                  const b = parseInt(hex.substring(4, 6), 16);
+                  return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+                }
+                return true;
+              };
+
+              const isLightColor = getIsLight(merchantColor);
+              const contrastTextColor = isLightColor ? '#050505' : '#FFFFFF';
+              const iconBgColor = merchantColor + '10'; // 10% opacity
+              const boxBgColor = merchantColor + '07'; // 7% opacity
+              const boxBorderColor = merchantColor + '15'; // 15% opacity
+
+              return (
+                <>
+                  {/* Header */}
+                  <View style={styles.headerRow}>
+                    <View style={[styles.iconBg, { backgroundColor: iconBgColor, borderColor: boxBorderColor }]}>
+                      <Ionicons name="wifi" size={22} color={merchantColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.title}>NFC Stamp Claim!</Text>
+                      <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
+                    </View>
+                    <TouchableOpacity onPress={handleMinimize} style={styles.closeBtn} accessibilityLabel="Minimize">
+                      <Ionicons name="close" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Error Banner */}
+                  {errorMsg ? (
+                    <View style={styles.errorBanner}>
+                      <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* Customer Details Box as VIP Pass */}
+                  <View style={[styles.customerBox, { backgroundColor: boxBgColor, borderColor: boxBorderColor }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' }}>
+                      <View style={[styles.initialsBadge, { backgroundColor: merchantColor, borderColor: 'transparent' }]}>
+                        <Text style={[styles.initialsText, { color: contrastTextColor }]}>
+                          {getInitials(claim.customer_name || 'Customer')}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
+                        <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
+                      </View>
+                      {claim.session_code ? (
+                        <View style={[styles.sessionBadge, { backgroundColor: iconBgColor, borderColor: boxBorderColor }]}>
+                          <Text style={[styles.sessionText, { color: merchantColor }]}>{claim.session_code}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* Inputs */}
+                  <View style={styles.inputRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="cash-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                          keyboardType="numeric"
+                          value={billAmount}
+                          onChangeText={setBillAmount}
+                          placeholder="10"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="star-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={[styles.inputField, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : null]}
+                          keyboardType="numeric"
+                          value={stampAmount}
+                          onChangeText={setStampAmount}
+                          placeholder="1"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Staff Acting Badge */}
+                  <View style={styles.staffPillRow}>
+                    <View style={styles.staffPill}>
+                      <Ionicons name="person-circle" size={14} color="#64748B" />
+                      <Text style={styles.staffPillText}>
+                        Issuing as <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{user?.name || 'Staff'}</Text>
+                      </Text>
+                    </View>
+                    {user?.branch_name ? (
+                      <View style={styles.branchPill}>
+                        <Ionicons name="location-outline" size={12} color="#64748B" />
+                        <Text style={styles.branchPillText}>{user.branch_name}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Action Buttons */}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity style={styles.declineBtn} onPress={handleDecline} disabled={isLoading} activeOpacity={0.8}>
+                      <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
+                      <Text style={styles.declineBtnText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.laterBtn} onPress={handleMinimize} disabled={isLoading} activeOpacity={0.8}>
+                      <Ionicons name="time-outline" size={14} color="#64748B" />
+                      <Text style={styles.laterBtnText}>Later</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.confirmBtn, { backgroundColor: merchantColor, borderColor: merchantColor }]} 
+                      onPress={handleConfirmClassic} 
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color={contrastTextColor} />
+                      ) : (
+                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps</Text>
+                      )}
+                    </TouchableOpacity>
                   </View>
                 </>
               );
@@ -3037,5 +3338,69 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#2563EB',
+  },
+  quickBillCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+  },
+  quickBillLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  quickBillInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  quickBillCurrency: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  quickBillInputField: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    padding: 0,
+  },
+  quickBillChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quickBillChip: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+  },
+  quickBillChipActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  quickBillChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+  },
+  quickBillChipTextActive: {
+    color: '#FFFFFF',
   },
 });

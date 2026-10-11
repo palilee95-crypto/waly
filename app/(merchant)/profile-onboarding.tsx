@@ -86,6 +86,8 @@ const DAY_LABELS: Record<DayKey, string> = {
   sun: 'Sunday',
 };
 
+const DAYS_OF_WEEK: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
 const TIME_PICKER_OPTIONS = [
   '06:00 AM', '06:30 AM', '07:00 AM', '07:30 AM',
   '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM',
@@ -195,7 +197,27 @@ export default function ProfileOnboardingScreen() {
             if (locRes.phone && !phone) setPhone(locRes.phone);
             const savedHours = locRes.hours || locRes.operating_hours;
             if (savedHours && typeof savedHours === 'object') {
-              setSchedule({ ...DEFAULT_SCHEDULE, ...savedHours });
+              const cleanSchedule: Record<DayKey, DaySchedule> = { ...DEFAULT_SCHEDULE };
+              const keyMap: Record<string, DayKey> = {
+                mon: 'mon', monday: 'mon',
+                tue: 'tue', tuesday: 'tue',
+                wed: 'wed', wednesday: 'wed',
+                thu: 'thu', thursday: 'thu',
+                fri: 'fri', friday: 'fri',
+                sat: 'sat', saturday: 'sat',
+                sun: 'sun', sunday: 'sun',
+              };
+              for (const [key, val] of Object.entries(savedHours)) {
+                const normalized = keyMap[key.toLowerCase()];
+                if (normalized && val && typeof val === 'object') {
+                  cleanSchedule[normalized] = {
+                    open: (val as any).open || DEFAULT_SCHEDULE[normalized].open,
+                    close: (val as any).close || DEFAULT_SCHEDULE[normalized].close,
+                    closed: (val as any).closed !== undefined ? !!(val as any).closed : false,
+                  };
+                }
+              }
+              setSchedule(cleanSchedule);
               setHoursPreset('custom');
             }
           }
@@ -215,13 +237,13 @@ export default function ProfileOnboardingScreen() {
     setHoursPreset(preset);
     if (preset === 'daily') {
       const updated = { ...schedule };
-      (Object.keys(updated) as DayKey[]).forEach((day) => {
+      DAYS_OF_WEEK.forEach((day) => {
         updated[day] = { open: '10:00 AM', close: '10:00 PM', closed: false };
       });
       setSchedule(updated);
     } else if (preset === 'weekday_sat') {
       const updated = { ...schedule };
-      (Object.keys(updated) as DayKey[]).forEach((day) => {
+      DAYS_OF_WEEK.forEach((day) => {
         if (day === 'sun') {
           updated[day] = { open: '10:00 AM', close: '07:00 PM', closed: true };
         } else {
@@ -843,7 +865,7 @@ export default function ProfileOnboardingScreen() {
 
                     {/* Schedule Table */}
                     <View style={styles.scheduleCard}>
-                      {(Object.keys(schedule) as DayKey[]).map((day) => {
+                      {DAYS_OF_WEEK.map((day) => {
                         const s = schedule[day];
                         return (
                           <View key={day} style={styles.dayCardItem}>

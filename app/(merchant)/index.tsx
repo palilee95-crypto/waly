@@ -15,6 +15,7 @@ import {
   TextInput,
   Platform,
   DeviceEventEmitter,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -298,6 +299,13 @@ export default function MerchantDashboard() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchMerchantData(), fetchPendingClaims()]);
+    setRefreshing(false);
+  }, [user]);
+
   useFocusEffect(
     useCallback(() => {
       fetchMerchantData();
@@ -307,16 +315,21 @@ export default function MerchantDashboard() {
   useEffect(() => {
     fetchMerchantData();
 
+    // Listen to local completion events from NfcClaimModal
+    const txnCompleteSub = DeviceEventEmitter.addListener('merchant_transaction_completed', () => {
+      fetchMerchantData();
+      fetchPendingClaims();
+    });
+
     // Subscribe to merchants, transactions, subscriptions & nfc_claims
     if (user && user.merchant_id) {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
         fetchMerchantData();
       }).catch(() => {});
 
+      // Realtime transactions - refresh on new records
       pb.collection('transactions').subscribe('*', () => {
         fetchMerchantData();
-      }, {
-        filter: `merchant = '${user.merchant_id}'`
       }).catch(() => {});
 
       pb.collection('subscriptions').subscribe('*', () => {
@@ -333,6 +346,7 @@ export default function MerchantDashboard() {
     }
 
     return () => {
+      txnCompleteSub.remove();
       if (user && user.merchant_id) {
         pb.collection('merchants').unsubscribe(user.merchant_id).catch(() => {});
       }
@@ -377,7 +391,11 @@ export default function MerchantDashboard() {
       return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
     })
     .reduce((acc, tx) => {
-      const amt = tx.bill_amount ?? tx.metadata?.bill_amount ?? tx.metadata?.amount ?? 0;
+      let meta: any = {};
+      try {
+        meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
+      } catch (e) {}
+      const amt = tx.bill_amount ?? meta.bill_amount ?? meta.subtotal ?? meta.amount ?? 0;
       return acc + Number(amt);
     }, 0);
 
@@ -414,6 +432,14 @@ export default function MerchantDashboard() {
           { paddingBottom: 110, minHeight: '100%' },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FFC700"
+            colors={['#FFC700']}
+          />
+        }
       >
         {/* Dark Background - full black, spanning full width */}
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
