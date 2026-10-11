@@ -63,7 +63,7 @@ onRecordCreate((e) => {
         customer.set("email", "shadow_cust_" + digits + "@risev.app");
         customer.set("name", customerName || ("Customer " + digits.slice(-4)));
         customer.set("role", "customer");
-        customer.set("verified", true);
+        customer.set("verified", false);
         customer.set("birthday", "2000-01-01 00:00:00.000Z");
         customer.set("total_points", 0);
         customer.setPassword($security.randomString(20));
@@ -270,7 +270,7 @@ onRecordUpdate((e) => {
         customer.set("email", "shadow_cust_" + digits + "@risev.app");
         customer.set("name", customerName || ("Customer " + digits.slice(-4)));
         customer.set("role", "customer");
-        customer.set("verified", true);
+        customer.set("verified", false);
         customer.set("birthday", "2000-01-01 00:00:00.000Z");
         customer.set("total_points", 0);
         customer.setPassword($security.randomString(20));

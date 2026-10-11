@@ -97,7 +97,7 @@ export default function LoginScreen() {
     checkPhone(fullPhone)
       .then((res) => {
         if (res.exists) {
-          const isFullyRegistered = res.verified === true || res.is_shadow === false;
+          const isFullyRegistered = !res.is_shadow && res.verified === true;
           if (isFullyRegistered) {
             setEmail(res.email || fullPhone);
             setStep('password');
@@ -211,7 +211,7 @@ export default function LoginScreen() {
       const fullPhone = getFullPhone();
       const res = await checkPhone(fullPhone);
       if (res.exists) {
-        const isFullyRegistered = res.verified === true || res.is_shadow === false;
+        const isFullyRegistered = !res.is_shadow && res.verified === true;
         if (isFullyRegistered) {
           setEmail(res.email || fullPhone);
           setStep('password');
