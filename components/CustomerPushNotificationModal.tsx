@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   isPushSupported,
   getPushPermissionStatus,
@@ -29,6 +30,67 @@ import {
   sendCustomerTestNotification,
 } from '@/lib/push-notifications';
 
+const texts = {
+  en: {
+    successTitle: 'Notifications Enabled! 🎉',
+    successSub: 'Appointment reminders (12h, 3h & 30m) and reward alerts will be sent directly to your device.',
+    statusActive: 'STATUS: ACTIVE ✅',
+    activeTitle: 'Live Appointment Notifications',
+    activeSubtitle: 'This device is ready to receive real-time alerts for your appointment slots & rewards.',
+    scheduleTitle: 'Appointment Reminder Schedule',
+    scheduleDesc: 'Sent automatically 12 hours, 3 hours, and 30 minutes before your slot.',
+    testNoticeSent: 'Test Notice Sent!',
+    testNoticeBtn: 'Test Notification Now 🔔',
+    closeBtn: 'Close',
+    onboardingBadge: 'IMPORTANT REMINDER 🔔',
+    onboardingTitle: 'Enable Appointment & Reward Notifications',
+    onboardingSubtitle: 'Never miss your appointment! Get automated reminders directly on your phone screen without WhatsApp.',
+    benefit1Title: 'Appointment Reminders',
+    benefit1Desc: 'Automated alerts 12 hours, 3 hours & 30 minutes before your slot arrives.',
+    benefit2Title: 'Rewards & NFC Stamps',
+    benefit2Desc: 'Instant alerts when stamps are added & vouchers are ready to redeem.',
+    benefit3Title: 'Easy Navigation',
+    benefit3Desc: 'Quick links to Waze & Google Maps when your turn begins.',
+    iosGuideTitle: 'iPhone User Guide 📱',
+    iosGuideShare: 'To enable notifications on iPhone: Tap the Share button in Safari',
+    iosGuideAddHome: 'Add to Home Screen (+)',
+    iosGuideOpen: 'Open RISEV from your phone home screen.',
+    deniedNotice: 'Notifications are blocked in your browser. Tap the lock icon (🔒) in the URL bar and select',
+    deniedNoticeAllow: 'Allow Notifications',
+    enableNowBtn: 'Enable Notifications Now',
+    dismissBtn: 'Not Now',
+  },
+  ms: {
+    successTitle: 'Notifikasi Diaktifkan! 🎉',
+    successSub: 'Peringatan temujanji (12 jam, 3 jam & 30 minit) dan makluman ganjaran akan dihantar terus ke peranti anda.',
+    statusActive: 'STATUS: AKTIF ✅',
+    activeTitle: 'Notifikasi Temujanji Langsung',
+    activeSubtitle: 'Peranti ini sedia menerima amaran masa-nyata untuk slot temujanji & ganjaran anda.',
+    scheduleTitle: 'Jadual Peringatan Temujanji',
+    scheduleDesc: 'Dihantar secara automatik 12 jam, 3 jam, dan 30 minit sebelum slot tiba.',
+    testNoticeSent: 'Notis Ujian Telah Dihantar!',
+    testNoticeBtn: 'Uji Notifikasi Sekarang 🔔',
+    closeBtn: 'Tutup',
+    onboardingBadge: 'PERINGATAN PENTING 🔔',
+    onboardingTitle: 'Aktifkan Notifikasi Temujanji & Ganjaran',
+    onboardingSubtitle: 'Jangan terlepas slot anda! Dapatkan makluman automatik terus pada skrin telefon anda tanpa Meta WhatsApp.',
+    benefit1Title: 'Peringatan Temujanji',
+    benefit1Desc: 'Alert automatik 12 jam, 3 jam & 30 minit sebelum slot anda tiba.',
+    benefit2Title: 'Ganjaran & Setem NFC',
+    benefit2Desc: 'Makluman serta-merta bila setem bertambah & baucar sedia ditebus.',
+    benefit3Title: 'Navigasi Mudah',
+    benefit3Desc: 'Pautan pantas ke Waze & Google Maps bila giliran anda bermula.',
+    iosGuideTitle: 'Panduan Pengguna iPhone 📱',
+    iosGuideShare: 'Untuk aktifkan notifikasi di iPhone: Tekan butang Kongsi di Safari',
+    iosGuideAddHome: 'Add to Home Screen (+)',
+    iosGuideOpen: 'Buka RISEV dari skrin utama telefon anda.',
+    deniedNotice: 'Notifikasi disekat dalam pelayar. Sila tekan ikon mangga (🔒) di bahagian atas alamat URL dan pilih',
+    deniedNoticeAllow: 'Benarkan Notifikasi',
+    enableNowBtn: 'Aktifkan Notifikasi Sekarang',
+    dismissBtn: 'Nanti Dahulu',
+  }
+};
+
 interface CustomerPushNotificationModalProps {
   visible?: boolean;
   onClose?: () => void;
@@ -39,6 +101,8 @@ export default function CustomerPushNotificationModal({
   onClose: controlledOnClose,
 }: CustomerPushNotificationModalProps = {}) {
   const { user } = useAuth();
+  const { locale } = useLanguage();
+  const t = texts[locale === 'ms' ? 'ms' : 'en'];
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -208,10 +272,8 @@ export default function CustomerPushNotificationModal({
               <View style={styles.successIconBox}>
                 <Ionicons name="checkmark-circle" size={54} color="#10B981" />
               </View>
-              <Text style={styles.successTitle}>Notifikasi Diaktifkan! 🎉</Text>
-              <Text style={styles.successSub}>
-                Peringatan temujanji (12 jam, 3 jam & 30 minit) dan makluman ganjaran akan dihantar terus ke peranti anda.
-              </Text>
+              <Text style={styles.successTitle}>{t.successTitle}</Text>
+              <Text style={styles.successSub}>{t.successSub}</Text>
             </View>
           ) : isAlreadyActiveState ? (
             // ── ALREADY ACTIVE & TESTING STATE ──
@@ -235,12 +297,10 @@ export default function CustomerPushNotificationModal({
 
               <View style={styles.titleWrap}>
                 <View style={[styles.pillBadge, { backgroundColor: '#D1FAE5' }]}>
-                  <Text style={[styles.pillBadgeText, { color: '#047857' }]}>STATUS: AKTIF ✅</Text>
+                  <Text style={[styles.pillBadgeText, { color: '#047857' }]}>{t.statusActive}</Text>
                 </View>
-                <Text style={styles.mainTitle}>Notifikasi Temujanji Hidup</Text>
-                <Text style={styles.mainSubtitle}>
-                  Peranti ini sedia menerima amaran masa-nyata untuk slot temujanji & ganjaran anda.
-                </Text>
+                <Text style={styles.mainTitle}>{t.activeTitle}</Text>
+                <Text style={styles.mainSubtitle}>{t.activeSubtitle}</Text>
               </View>
 
               <View style={styles.benefitsContainer}>
@@ -249,10 +309,8 @@ export default function CustomerPushNotificationModal({
                     <Ionicons name="alarm-outline" size={18} color="#D97706" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.benefitTitle}>Jadual Peringatan Temujanji</Text>
-                    <Text style={styles.benefitDesc}>
-                      Dihantar secara automatik 12 jam, 3 jam, dan 30 minit sebelum slot tiba.
-                    </Text>
+                    <Text style={styles.benefitTitle}>{t.scheduleTitle}</Text>
+                    <Text style={styles.benefitDesc}>{t.scheduleDesc}</Text>
                   </View>
                 </View>
               </View>
@@ -269,12 +327,12 @@ export default function CustomerPushNotificationModal({
                   ) : testSent ? (
                     <>
                       <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                      <Text style={styles.primaryEnableBtnText}>Notis Ujian Telah Dihantar!</Text>
+                      <Text style={styles.primaryEnableBtnText}>{t.testNoticeSent}</Text>
                     </>
                   ) : (
                     <>
                       <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
-                      <Text style={styles.primaryEnableBtnText}>Uji Notifikasi Sekarang 🔔</Text>
+                      <Text style={styles.primaryEnableBtnText}>{t.testNoticeBtn}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -284,7 +342,7 @@ export default function CustomerPushNotificationModal({
                   onPress={handleDismiss}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.secondaryDismissBtnText}>Tutup</Text>
+                  <Text style={styles.secondaryDismissBtnText}>{t.closeBtn}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -316,14 +374,10 @@ export default function CustomerPushNotificationModal({
               {/* Title & Badge */}
               <View style={styles.titleWrap}>
                 <View style={styles.pillBadge}>
-                  <Text style={styles.pillBadgeText}>PERINGATAN PENTING 🔔</Text>
+                  <Text style={styles.pillBadgeText}>{t.onboardingBadge}</Text>
                 </View>
-                <Text style={styles.mainTitle}>
-                  Aktifkan Notifikasi Temujanji & Ganjaran
-                </Text>
-                <Text style={styles.mainSubtitle}>
-                  Jangan terlepas slot anda! Dapatkan makluman automatik terus pada skrin telefon anda tanpa Meta WhatsApp.
-                </Text>
+                <Text style={styles.mainTitle}>{t.onboardingTitle}</Text>
+                <Text style={styles.mainSubtitle}>{t.onboardingSubtitle}</Text>
               </View>
 
               {/* 3 Value Propositions / Features */}
@@ -333,10 +387,8 @@ export default function CustomerPushNotificationModal({
                     <Ionicons name="time-outline" size={18} color="#D97706" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.benefitTitle}>Peringatan Temujanji</Text>
-                    <Text style={styles.benefitDesc}>
-                      Alert automatik 12 jam, 3 jam & 30 minit sebelum slot anda tiba.
-                    </Text>
+                    <Text style={styles.benefitTitle}>{t.benefit1Title}</Text>
+                    <Text style={styles.benefitDesc}>{t.benefit1Desc}</Text>
                   </View>
                 </View>
 
@@ -345,10 +397,8 @@ export default function CustomerPushNotificationModal({
                     <Ionicons name="gift-outline" size={18} color="#4F46E5" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.benefitTitle}>Ganjaran & Setem NFC</Text>
-                    <Text style={styles.benefitDesc}>
-                      Makluman serta-merta bila setem bertambah & baucar sedia ditebus.
-                    </Text>
+                    <Text style={styles.benefitTitle}>{t.benefit2Title}</Text>
+                    <Text style={styles.benefitDesc}>{t.benefit2Desc}</Text>
                   </View>
                 </View>
 
@@ -357,10 +407,8 @@ export default function CustomerPushNotificationModal({
                     <Ionicons name="navigate-outline" size={18} color="#059669" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.benefitTitle}>Navigasi Mudah</Text>
-                    <Text style={styles.benefitDesc}>
-                      Pautan pantas ke Waze & Google Maps bila giliran anda bermula.
-                    </Text>
+                    <Text style={styles.benefitTitle}>{t.benefit3Title}</Text>
+                    <Text style={styles.benefitDesc}>{t.benefit3Desc}</Text>
                   </View>
                 </View>
               </View>
@@ -370,9 +418,9 @@ export default function CustomerPushNotificationModal({
                 <View style={styles.iosNoticeBox}>
                   <Ionicons name="phone-portrait-outline" size={18} color="#2563EB" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.iosNoticeTitle}>Panduan Pengguna iPhone 📱</Text>
+                    <Text style={styles.iosNoticeTitle}>{t.iosGuideTitle}</Text>
                     <Text style={styles.iosNoticeText}>
-                      Untuk aktifkan notifikasi di iPhone: Tekan butang Kongsi (<Ionicons name="share-outline" size={13} color="#2563EB" />) di Safari ➔ Pilih <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Add to Home Screen (+)</Text> ➔ Buka RISEV dari skrin utama telefon anda.
+                      {t.iosGuideShare} (<Ionicons name="share-outline" size={13} color="#2563EB" />) ➔ <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{t.iosGuideAddHome}</Text> ➔ {t.iosGuideOpen}
                     </Text>
                   </View>
                 </View>
@@ -383,7 +431,7 @@ export default function CustomerPushNotificationModal({
                 <View style={styles.deniedNoticeBox}>
                   <Ionicons name="information-circle" size={18} color="#DC2626" />
                   <Text style={styles.deniedNoticeText}>
-                    Notifikasi disekat dalam pelayar. Sila tekan ikon mangga (🔒) di bahagian atas alamat URL dan pilih <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Allow / Benarkan Notifikasi</Text>.
+                    {t.deniedNotice} <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{t.deniedNoticeAllow}</Text>.
                   </Text>
                 </View>
               )}
@@ -402,7 +450,7 @@ export default function CustomerPushNotificationModal({
                     <>
                       <Ionicons name="notifications" size={18} color="#FFFFFF" />
                       <Text style={styles.primaryEnableBtnText}>
-                        Aktifkan Notifikasi Sekarang
+                        {t.enableNowBtn}
                       </Text>
                     </>
                   )}
@@ -414,7 +462,7 @@ export default function CustomerPushNotificationModal({
                   activeOpacity={0.7}
                   disabled={loading}
                 >
-                  <Text style={styles.secondaryDismissBtnText}>Nanti Dahulu</Text>
+                  <Text style={styles.secondaryDismissBtnText}>{t.dismissBtn}</Text>
                 </TouchableOpacity>
               </View>
             </>
