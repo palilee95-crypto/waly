@@ -161,6 +161,7 @@ export default function BookingsScreen() {
   const [securityDeposit, setSecurityDeposit] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<any>(null);
+  const [photoCleared, setPhotoCleared] = useState(false);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceCategory, setNewServiceCategory] = useState('Haircut');
   const [newServicePrice, setNewServicePrice] = useState('');
@@ -907,6 +908,7 @@ export default function BookingsScreen() {
     setSecurityDeposit('');
     setPhotoUri(null);
     setPhotoFile(null);
+    setPhotoCleared(false);
     setNewServiceName('');
     setNewServiceCategory('Haircut');
     setNewServicePrice('');
@@ -933,6 +935,7 @@ export default function BookingsScreen() {
     setSecurityDeposit(s.security_deposit ? String(s.security_deposit) : '');
     setPhotoUri(s.image_url || null);
     setPhotoFile(null);
+    setPhotoCleared(false);
     setNewServiceName(s.name);
     setNewServiceCategory(s.category || 'Haircut');
     setNewServicePrice(String(s.price || ''));
@@ -1019,11 +1022,13 @@ export default function BookingsScreen() {
     setAddModalStep(1);
     setPhotoUri(null);
     setPhotoFile(null);
+    setPhotoCleared(false);
     setNewServiceName('');
     setNewServicePrice('');
   };
 
   const handlePickPhoto = async () => {
+    setPhotoCleared(false);
     if (Platform.OS === 'web') {
       try {
         const input = document.createElement('input');
@@ -1033,6 +1038,7 @@ export default function BookingsScreen() {
           const file = e.target?.files?.[0];
           if (file) {
             setPhotoFile(file);
+            setPhotoCleared(false);
             const reader = new FileReader();
             reader.onload = (event: any) => {
               setPhotoUri(event.target?.result as string);
@@ -1061,6 +1067,7 @@ export default function BookingsScreen() {
         if (!result.canceled && result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
           setPhotoUri(asset.uri);
+          setPhotoCleared(false);
           setPhotoFile({
             uri: asset.uri,
             name: `service_${Date.now()}.jpg`,
@@ -1114,41 +1121,39 @@ export default function BookingsScreen() {
 
         if (user?.merchant_id && !editingService.id.startsWith('srv-')) {
           const matchingBranch = branchesList.find(b => b.name === selectedLocation);
-          try {
-            const formData = new FormData();
-            formData.append('name', newServiceName.trim());
-            formData.append('category', newServiceCategory);
-            formData.append('price', String(priceNum));
-            formData.append('duration_minutes', String(durNum));
-            formData.append('item_type', addItemType);
-            formData.append('requires_staff', String(requiresStaff));
-            formData.append('total_units', String(unitsNum));
-            formData.append('max_pax', String(paxNum));
-            if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
-            if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
-            formData.append('is_active', String(isOnlineAvailable));
-            formData.append('assigned_staff', JSON.stringify(assignedStaff));
-            if (matchingBranch?.id) {
-              formData.append('branch', matchingBranch.id);
-            }
-            if (photoFile) {
-              formData.append('image', photoFile);
-            } else if (photoUri && !photoUri.startsWith('data:') && !photoUri.startsWith('http')) {
-              formData.append('image_url', photoUri);
-            }
+          const shouldClearPhoto = photoCleared || (!photoUri && !photoFile);
 
-            const rec = await pb.collection('merchant_services').update(editingService.id, formData);
-            if (rec.image) {
-              finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+          try {
+            if (photoFile) {
+              // 1. New file upload -> use FormData
+              const formData = new FormData();
+              formData.append('name', newServiceName.trim());
+              formData.append('category', newServiceCategory);
+              formData.append('price', String(priceNum));
+              formData.append('duration_minutes', String(durNum));
+              formData.append('item_type', addItemType);
+              formData.append('requires_staff', String(requiresStaff));
+              formData.append('total_units', String(unitsNum));
+              formData.append('max_pax', String(paxNum));
+              if (peakNum !== undefined) formData.append('peak_price', String(peakNum));
+              if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
+              formData.append('is_active', String(isOnlineAvailable));
+              formData.append('assigned_staff', JSON.stringify(assignedStaff));
+              if (matchingBranch?.id) {
+                formData.append('branch', matchingBranch.id);
+              }
+              formData.append('image', photoFile);
+
+              const rec = await pb.collection('merchant_services').update(editingService.id, formData);
+              if (rec.image) {
+                finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+              } else if (rec.image_url) {
+                finalImageUrl = rec.image_url;
+              }
               updatedService.image_url = finalImageUrl;
-            } else if (rec.image_url) {
-              finalImageUrl = rec.image_url;
-              updatedService.image_url = finalImageUrl;
-            }
-          } catch (pbErr: any) {
-            console.warn('FormData update failed, trying fallback JSON:', pbErr);
-            try {
-              const rec = await pb.collection('merchant_services').update(editingService.id, {
+            } else {
+              // 2. No new file -> update via clean JSON payload
+              const updateData: Record<string, any> = {
                 name: newServiceName.trim(),
                 category: newServiceCategory,
                 price: priceNum,
@@ -1161,9 +1166,62 @@ export default function BookingsScreen() {
                 security_deposit: depositNum,
                 is_active: isOnlineAvailable,
                 assigned_staff: assignedStaff,
-                image_url: photoUri || ''
-              });
-              if (rec.image_url) updatedService.image_url = rec.image_url;
+                ...(matchingBranch?.id ? { branch: matchingBranch.id } : {})
+              };
+
+              if (shouldClearPhoto) {
+                // Explicitly delete file and blank URL in PocketBase
+                updateData.image = null;
+                updateData.image_url = '';
+                finalImageUrl = '';
+              } else if (photoUri && !photoUri.startsWith('http')) {
+                updateData.image_url = photoUri;
+              }
+
+              const rec = await pb.collection('merchant_services').update(editingService.id, updateData);
+              if (shouldClearPhoto) {
+                finalImageUrl = '';
+              } else if (rec.image) {
+                finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+              } else if (rec.image_url) {
+                finalImageUrl = rec.image_url;
+              }
+              updatedService.image_url = finalImageUrl;
+            }
+          } catch (pbErr: any) {
+            console.warn('Primary update failed, trying fallback JSON:', pbErr);
+            try {
+              const fallbackData: Record<string, any> = {
+                name: newServiceName.trim(),
+                category: newServiceCategory,
+                price: priceNum,
+                duration_minutes: durNum,
+                item_type: addItemType,
+                requires_staff: requiresStaff,
+                total_units: unitsNum,
+                max_pax: paxNum,
+                peak_price: peakNum,
+                security_deposit: depositNum,
+                is_active: isOnlineAvailable,
+                assigned_staff: assignedStaff,
+              };
+              if (shouldClearPhoto) {
+                fallbackData.image = null;
+                fallbackData.image_url = '';
+                finalImageUrl = '';
+              } else if (photoUri) {
+                fallbackData.image_url = photoUri;
+              }
+
+              const rec = await pb.collection('merchant_services').update(editingService.id, fallbackData);
+              if (shouldClearPhoto) {
+                finalImageUrl = '';
+              } else if (rec.image) {
+                finalImageUrl = `${pb.baseUrl}/api/files/merchant_services/${rec.id}/${rec.image}`;
+              } else if (rec.image_url) {
+                finalImageUrl = rec.image_url;
+              }
+              updatedService.image_url = finalImageUrl;
             } catch (jsonErr: any) {
               console.warn('Fallback JSON update failed, trying basic fields:', jsonErr);
               await pb.collection('merchant_services').update(editingService.id, {
@@ -1176,8 +1234,13 @@ export default function BookingsScreen() {
                 total_units: unitsNum,
                 max_pax: paxNum,
                 is_active: isOnlineAvailable,
-                assigned_staff: assignedStaff
+                assigned_staff: assignedStaff,
+                ...(shouldClearPhoto ? { image: null, image_url: '' } : {})
               });
+              if (shouldClearPhoto) {
+                finalImageUrl = '';
+                updatedService.image_url = '';
+              }
             }
           }
         }
@@ -2806,9 +2869,11 @@ export default function BookingsScreen() {
                         onPress={() => {
                           setPhotoUri(null);
                           setPhotoFile(null);
+                          setPhotoCleared(true);
                         }} 
                         style={styles.btnRemovePhoto}
                         activeOpacity={0.8}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                       >
                         <Ionicons name="close" size={14} color="#FFF" />
                       </TouchableOpacity>
@@ -4989,6 +5054,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 16,
     position: 'relative',
+    overflow: 'visible',
   },
   photoImage: {
     width: 80,
@@ -4999,12 +5065,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
+    elevation: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    // @ts-ignore
+    cursor: 'pointer',
   },
   btnAddPhotoBox: {
     width: 80,
