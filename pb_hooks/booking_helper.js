@@ -252,9 +252,25 @@ function processCompletedBooking(rec) {
   }
 
   // 4. Resolve items summary
-  var itemsSummary = rec.get("items_summary");
-  if (typeof itemsSummary === "string") {
-    try { itemsSummary = JSON.parse(itemsSummary); } catch (e) {}
+  var itemsSummary = [];
+  try {
+    var rawItemsStr = (typeof rec.getString === "function") ? rec.getString("items_summary") : "";
+    if (rawItemsStr && typeof rawItemsStr === "string" && rawItemsStr.trim()) {
+      itemsSummary = JSON.parse(rawItemsStr);
+    } else {
+      var rawVal = rec.get("items_summary");
+      if (typeof rawVal === "string" && rawVal.trim()) {
+        itemsSummary = JSON.parse(rawVal);
+      } else if (Array.isArray(rawVal) && rawVal.length > 0 && typeof rawVal[0] === "number") {
+        var str = "";
+        for (var i = 0; i < rawVal.length; i++) str += String.fromCharCode(rawVal[i]);
+        itemsSummary = JSON.parse(str);
+      } else if (Array.isArray(rawVal)) {
+        itemsSummary = rawVal;
+      }
+    }
+  } catch (itErr) {
+    itemsSummary = [];
   }
   var serviceNames = "Service Booking";
   if (Array.isArray(itemsSummary) && itemsSummary.length > 0) {

@@ -57,20 +57,22 @@ onRecordCreate((e) => {
       } catch (mErr) {}
     }
 
-    let serviceTitle = "Servis";
+    const { parseJsonArrayField } = require(`${__hooks}/booking_reminders_logic.js`);
+    let serviceTitle = "";
     try {
-      let items = booking.get("items_summary");
-      if (typeof items === "string") {
-        try { items = JSON.parse(items); } catch (_) {}
-      }
-      if (Array.isArray(items) && items.length > 0 && items[0] && items[0].name) {
-        serviceTitle = items[0].name;
+      const items = parseJsonArrayField(booking, "items_summary");
+      if (items.length > 0 && items[0] && items[0].name) {
+        serviceTitle = ("" + items[0].name).trim();
       }
     } catch (itErr) {}
 
+    const serviceLabel = (serviceTitle && serviceTitle.toLowerCase() !== "servis")
+      ? `Slot ${serviceTitle}`
+      : "Slot temujanji";
+
     const payload = {
       title: `Tempahan Berjaya Disahkan! 🎉`,
-      body: `Slot [${serviceTitle}] anda di ${merchantName} pada ${bDateStr} jam ${bTimeStr} telah disahkan.`,
+      body: `${serviceLabel} anda di ${merchantName} pada ${bDateStr} jam ${bTimeStr} telah disahkan.`,
       url: merchantSlug ? `/b/${merchantSlug}` : '/(customer)',
       tag: `booking-created-${booking.id}`,
       renotify: true

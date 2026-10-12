@@ -145,9 +145,25 @@ onRecordCreate((e) => {
 
   // 3. Calculate slot duration and end time with 10-minute turnaround buffer
   let totalDurationMinutes = 30; // default
-  let itemsSummary = rec.get("items_summary");
-  if (typeof itemsSummary === "string") {
-    try { itemsSummary = JSON.parse(itemsSummary); } catch (pErr) { itemsSummary = []; }
+  let itemsSummary = [];
+  try {
+    let rawItemsStr = (typeof rec.getString === "function") ? rec.getString("items_summary") : "";
+    if (rawItemsStr && typeof rawItemsStr === "string" && rawItemsStr.trim()) {
+      itemsSummary = JSON.parse(rawItemsStr);
+    } else {
+      let rawVal = rec.get("items_summary");
+      if (typeof rawVal === "string" && rawVal.trim()) {
+        itemsSummary = JSON.parse(rawVal);
+      } else if (Array.isArray(rawVal) && rawVal.length > 0 && typeof rawVal[0] === "number") {
+        let str = "";
+        for (let i = 0; i < rawVal.length; i++) str += String.fromCharCode(rawVal[i]);
+        itemsSummary = JSON.parse(str);
+      } else if (Array.isArray(rawVal)) {
+        itemsSummary = rawVal;
+      }
+    }
+  } catch (pErr) {
+    itemsSummary = [];
   }
   if (Array.isArray(itemsSummary) && itemsSummary.length > 0) {
     let sumDur = 0;
@@ -561,9 +577,25 @@ routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
       } catch (e) {}
     }
 
-    let itemsSummary = rec.get("items_summary");
-    if (typeof itemsSummary === "string") {
-      try { itemsSummary = JSON.parse(itemsSummary); } catch (e) {}
+    let itemsSummary = [];
+    try {
+      let rawItemsStr = (typeof rec.getString === "function") ? rec.getString("items_summary") : "";
+      if (rawItemsStr && typeof rawItemsStr === "string" && rawItemsStr.trim()) {
+        itemsSummary = JSON.parse(rawItemsStr);
+      } else {
+        let rawVal = rec.get("items_summary");
+        if (typeof rawVal === "string" && rawVal.trim()) {
+          itemsSummary = JSON.parse(rawVal);
+        } else if (Array.isArray(rawVal) && rawVal.length > 0 && typeof rawVal[0] === "number") {
+          let str = "";
+          for (let i = 0; i < rawVal.length; i++) str += String.fromCharCode(rawVal[i]);
+          itemsSummary = JSON.parse(str);
+        } else if (Array.isArray(rawVal)) {
+          itemsSummary = rawVal;
+        }
+      }
+    } catch (e) {
+      itemsSummary = [];
     }
 
     const payload = {

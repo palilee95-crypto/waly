@@ -49,6 +49,63 @@ function parseBookingDateTime(dateStr, timeStr) {
   return new Date(bookingUtcMs);
 }
 
+function parseJsonArrayField(record, fieldName) {
+  if (!record) return [];
+  try {
+    let str = "";
+    if (typeof record.getString === "function") {
+      str = record.getString(fieldName);
+    }
+    if (!str) {
+      let rawVal = record.get(fieldName);
+      if (typeof rawVal === "string") {
+        str = rawVal;
+      } else if (Array.isArray(rawVal) && rawVal.length > 0 && typeof rawVal[0] === "number") {
+        try {
+          str = String.fromCharCode.apply(null, rawVal);
+        } catch (_) {}
+      }
+    }
+
+    if (!str || typeof str !== "string" || !str.trim()) {
+      return [];
+    }
+
+    let parsed = str.trim();
+    while (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch (_) {
+        break;
+      }
+    }
+
+    // Self-healing: if an array of byte numbers was previously stored into DB
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "number") {
+      try {
+        let decodedStr = "";
+        for (var i = 0; i < parsed.length; i++) {
+          decodedStr += String.fromCharCode(parsed[i]);
+        }
+        while (typeof decodedStr === "string") {
+          try {
+            decodedStr = JSON.parse(decodedStr);
+          } catch (_) {
+            break;
+          }
+        }
+        if (Array.isArray(decodedStr)) {
+          parsed = decodedStr;
+        }
+      } catch (_) {}
+    }
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
 function hasReminder(arr, tag) {
   if (!arr || !arr.length) return false;
   for (var i = 0; i < arr.length; i++) {
@@ -102,18 +159,17 @@ function processBookingReminders() {
       return;
     }
 
-    // Get current reminders_sent array
+    // Get current reminders_sent array safely
+    const rawList = parseJsonArrayField(booking, "reminders_sent");
     let remindersSent = [];
-    try {
-      let rawReminders = booking.get("reminders_sent");
-      if (typeof rawReminders === "string" && rawReminders.trim()) {
-        try { rawReminders = JSON.parse(rawReminders); } catch (_) {}
+    for (var rIdx = 0; rIdx < rawList.length; rIdx++) {
+      var rItem = rawList[rIdx];
+      if (typeof rItem === "string" && rItem.trim()) {
+        var cleanTag = rItem.trim();
+        if (remindersSent.indexOf(cleanTag) === -1) {
+          remindersSent.push(cleanTag);
+        }
       }
-      if (Array.isArray(rawReminders)) {
-        remindersSent = Array.prototype.slice.call(rawReminders);
-      }
-    } catch (e) {
-      remindersSent = [];
     }
 
     const customerPhone = booking.getString("customer_phone");
@@ -132,16 +188,17 @@ function processBookingReminders() {
     }
 
     // Fetch primary service title
-    let serviceTitle = "Servis";
+    let serviceTitle = "";
     try {
-      let items = booking.get("items_summary");
-      if (typeof items === "string") {
-        try { items = JSON.parse(items); } catch (_) {}
-      }
-      if (Array.isArray(items) && items.length > 0 && items[0] && items[0].name) {
-        serviceTitle = items[0].name;
+      const items = parseJsonArrayField(booking, "items_summary");
+      if (items.length > 0 && items[0] && items[0].name) {
+        serviceTitle = ("" + items[0].name).trim();
       }
     } catch (itErr) {}
+
+    const serviceLabel = (serviceTitle && serviceTitle.toLowerCase() !== "servis")
+      ? `Slot ${serviceTitle}`
+      : "Slot temujanji";
 
     const targetUrl = merchantSlug ? `/b/${merchantSlug}` : '/(customer)';
     let needSave = false;
@@ -150,7 +207,7 @@ function processBookingReminders() {
     if (diffMinutes >= 105 && diffMinutes <= 135 && !hasReminder(remindersSent, "2h")) {
       const payload = {
         title: `2 Jam Lagi! Bersiap Sedia 💈`,
-        body: `Slot [${serviceTitle}] anda di ${merchantName} bermula jam ${bTimeStr}. Sedia berjumpa anda!`,
+        body: `${serviceLabel} anda di ${merchantName} bermula jam ${bTimeStr}. Sedia berjumpa anda!`,
         url: targetUrl,
         tag: `booking-2h-${booking.id}`,
         renotify: true
@@ -182,7 +239,7 @@ function processBookingReminders() {
 
     if (needSave) {
       try {
-        booking.set("reminders_sent", remindersSent);
+        booking.set("reminders_sent", JSON.stringify(remindersSent));
         $app.save(booking);
       } catch (saveErr) {
         console.log(`[BOOKING REMINDER SAVE ERROR] Booking ${booking.id}:`, saveErr.message || saveErr);
@@ -196,5 +253,6 @@ function processBookingReminders() {
 module.exports = {
   processBookingReminders,
   parseBookingDateTime,
-  getMYTDateStrings
+  getMYTDateStrings,
+  parseJsonArrayField
 };
