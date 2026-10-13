@@ -183,8 +183,14 @@ export default function ProfileOnboardingScreen() {
         if (m.pwa_brand_color) setSelectedBrandColor(m.pwa_brand_color);
         if (m.logo) setLogoUri(`${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`);
         if (m.banner) setBannerUri(`${pb.baseUrl}/api/files/merchants/${m.id}/${m.banner}`);
-        if (m.metadata?.sub_category) setSelectedCategoryId(m.metadata.sub_category);
+        if (m.metadata?.sub_category) {
+          setSelectedCategoryId(m.metadata.sub_category);
+        } else if (m.category) {
+          const match = ALL_CATEGORIES_LIST.find((c) => mapSubCategoryToBase(c.id) === m.category);
+          if (match) setSelectedCategoryId(match.id);
+        }
         if (m.metadata?.tagline) setTagline(m.metadata.tagline);
+        if (m.google_review_url) setGoogleReviewUrl(m.google_review_url);
         if (m.metadata?.phone) setPhone(m.metadata.phone);
         else if (user.phone) setPhone(user.phone);
 
@@ -193,6 +199,7 @@ export default function ProfileOnboardingScreen() {
           const locRes = await pb.collection('store_locations').getFirstListItem(`merchant = "${m.id}"`);
           if (locRes) {
             if (locRes.address) setAddress(locRes.address);
+            else if (m.description) setAddress(m.description);
             if (locRes.city) setCity(locRes.city);
             if (locRes.phone && !phone) setPhone(locRes.phone);
             const savedHours = locRes.hours || locRes.operating_hours;
@@ -209,19 +216,41 @@ export default function ProfileOnboardingScreen() {
               };
               for (const [key, val] of Object.entries(savedHours)) {
                 const normalized = keyMap[key.toLowerCase()];
-                if (normalized && val && typeof val === 'object') {
-                  cleanSchedule[normalized] = {
-                    open: (val as any).open || DEFAULT_SCHEDULE[normalized].open,
-                    close: (val as any).close || DEFAULT_SCHEDULE[normalized].close,
-                    closed: (val as any).closed !== undefined ? !!(val as any).closed : false,
-                  };
+                if (normalized && val) {
+                  if (typeof val === 'object') {
+                    cleanSchedule[normalized] = {
+                      open: (val as any).open || DEFAULT_SCHEDULE[normalized].open,
+                      close: (val as any).close || DEFAULT_SCHEDULE[normalized].close,
+                      closed: (val as any).closed !== undefined ? !!(val as any).closed : false,
+                    };
+                  } else if (typeof val === 'string') {
+                    const isClosed = val.trim().toLowerCase() === 'closed';
+                    if (isClosed) {
+                      cleanSchedule[normalized] = {
+                        open: DEFAULT_SCHEDULE[normalized].open,
+                        close: DEFAULT_SCHEDULE[normalized].close,
+                        closed: true,
+                      };
+                    } else if (val.includes('-')) {
+                      const parts = val.split('-').map((s) => s.trim());
+                      cleanSchedule[normalized] = {
+                        open: parts[0] || DEFAULT_SCHEDULE[normalized].open,
+                        close: parts[1] || DEFAULT_SCHEDULE[normalized].close,
+                        closed: false,
+                      };
+                    }
+                  }
                 }
               }
               setSchedule(cleanSchedule);
               setHoursPreset('custom');
             }
+          } else if (m.description) {
+            setAddress(m.description);
           }
-        } catch (e) {}
+        } catch (e) {
+          if (m.description) setAddress(m.description);
+        }
       } else {
         if (user?.name) setStoreName(`${user.name}'s Store`);
         if (user?.phone) setPhone(user.phone);
@@ -437,6 +466,7 @@ export default function ProfileOnboardingScreen() {
       const formData = new FormData();
       formData.append('name', storeName.trim());
       formData.append('category', baseCategory);
+      formData.append('description', address.trim());
       formData.append('pwa_brand_color', selectedBrandColor);
       formData.append('metadata', JSON.stringify(updatedMetadata));
       if (googleReviewUrl.trim()) {
@@ -458,6 +488,17 @@ export default function ProfileOnboardingScreen() {
           existingLoc = await pb.collection('store_locations').getFirstListItem(`merchant = "${merchantId}"`);
         } catch (e) {}
 
+        const dualHours: Record<string, any> = {};
+        DAYS_OF_WEEK.forEach((d) => {
+          const s = schedule[d];
+          dualHours[d] = {
+            open: s.open,
+            close: s.close,
+            closed: s.closed,
+          };
+          dualHours[DAY_LABELS[d]] = s.closed ? 'Closed' : `${s.open} - ${s.close}`;
+        });
+
         const locPayload = {
           merchant: merchantId,
           name: storeName.trim() || 'Main Outlet',
@@ -465,7 +506,7 @@ export default function ProfileOnboardingScreen() {
           city: city.trim(),
           country: 'Malaysia',
           phone: phone.trim(),
-          hours: schedule,
+          hours: dualHours,
           is_active: true,
         };
 

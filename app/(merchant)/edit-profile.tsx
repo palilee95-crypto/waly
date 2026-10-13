@@ -22,6 +22,70 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useRouter } from 'expo-router';
 import { handleSmartBack } from '@/lib/navigation';
 import { pb } from '@/lib/pocketbase';
+import { ALL_CATEGORIES_LIST, CategoryItemType } from '../(customer)/_components/AllCategoriesModal';
+
+const BRAND_COLOR_OPTIONS = [
+  { id: 'gold', name: 'Risev Gold', hex: '#FFC700', bg: '#FFFBEA', text: '#000000' },
+  { id: 'berry', name: 'Berry Gelato', hex: '#FF6B8B', bg: '#FFF0F3', text: '#FFFFFF' },
+  { id: 'emerald', name: 'Matcha Green', hex: '#10B981', bg: '#ECFDF5', text: '#FFFFFF' },
+  { id: 'ocean', name: 'Ocean Sapphire', hex: '#0284C7', bg: '#F0F9FF', text: '#FFFFFF' },
+  { id: 'obsidian', name: 'Midnight Obsidian', hex: '#18181B', bg: '#F4F4F5', text: '#FFFFFF' },
+];
+
+const POPULAR_CITIES = [
+  'Jitra, Kedah',
+  'Alor Setar, Kedah',
+  'Sungai Petani, Kedah',
+  'Kulim, Kedah',
+  'George Town, Penang',
+  'Bayan Lepas, Penang',
+  'Ipoh, Perak',
+  'Kuala Lumpur',
+  'Petaling Jaya, Selangor',
+  'Shah Alam, Selangor',
+  'Subang Jaya, Selangor',
+  'Bangi, Selangor',
+  'Johor Bahru, Johor',
+  'Melaka',
+  'Kota Bharu, Kelantan',
+  'Kuantan, Pahang',
+];
+
+const CATEGORY_GROUPS = [
+  { id: 'all', label: 'All (20)' },
+  { id: 'fnb', label: 'F&B & Cafe', ids: ['cafe', 'restaurant', 'dessert', 'beverage'] },
+  { id: 'beauty', label: 'Beauty & Spa', ids: ['barber', 'beauty', 'spa', 'muslimah_spa'] },
+  { id: 'auto_tech', label: 'Auto & Tech', ids: ['carwash', 'workshop', 'gadget'] },
+  { id: 'retail_services', label: 'Services & Retail', ids: ['groceries', 'boutique', 'laundry', 'optician', 'florist', 'pet', 'gym', 'sports', 'studio', 'other'] },
+];
+
+function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other' {
+  switch (subId) {
+    case 'cafe':
+    case 'restaurant':
+    case 'dessert':
+    case 'beverage':
+      return 'food';
+    case 'barber':
+    case 'beauty':
+    case 'spa':
+    case 'muslimah_spa':
+      return 'beauty';
+    case 'gym':
+    case 'sports':
+    case 'optician':
+      return 'health';
+    case 'laundry':
+    case 'boutique':
+    case 'groceries':
+    case 'florist':
+      return 'retail';
+    case 'studio':
+      return 'entertainment';
+    default:
+      return 'other';
+  }
+}
 
 export default function EditProfileScreen() {
   const { user, isOwner, staffPermissions } = useAuth();
@@ -34,14 +98,20 @@ export default function EditProfileScreen() {
   const [merchant, setMerchant] = useState<any>(null);
   const [locationRecord, setLocationRecord] = useState<any>(null);
 
-  // Form States
+  // Form States (Aligned with 3-Step Onboarding)
   const [storeName, setStoreName] = useState('');
+  const [tagline, setTagline] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [googleReviewUrl, setGoogleReviewUrl] = useState('');
   const [monthlySalesGoal, setMonthlySalesGoal] = useState('10000');
   const [inactiveThresholdDays, setInactiveThresholdDays] = useState('30');
   const [address, setAddress] = useState('');
+  const [city, setCity] = useState('Jitra, Kedah');
   const [category, setCategory] = useState<'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other'>('food');
+  const [selectedCatGroup, setSelectedCatGroup] = useState('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('cafe');
+  const [selectedBrandColor, setSelectedBrandColor] = useState('#FFC700');
   const [lat, setLat] = useState('6.2443');
   const [lng, setLng] = useState('100.4217');
 
@@ -66,6 +136,26 @@ export default function EditProfileScreen() {
   const [satClosed, setSatClosed] = useState(false);
   const [sunHours, setSunHours] = useState('09:00 - 21:00');
   const [sunClosed, setSunClosed] = useState(false);
+
+  const handleApplyPreset = (preset: 'daily' | 'weekday_sat') => {
+    if (preset === 'daily') {
+      setMonHours('10:00 AM - 10:00 PM'); setMonClosed(false);
+      setTueHours('10:00 AM - 10:00 PM'); setTueClosed(false);
+      setWedHours('10:00 AM - 10:00 PM'); setWedClosed(false);
+      setThuHours('10:00 AM - 10:00 PM'); setThuClosed(false);
+      setFriHours('10:00 AM - 10:00 PM'); setFriClosed(false);
+      setSatHours('10:00 AM - 10:00 PM'); setSatClosed(false);
+      setSunHours('10:00 AM - 10:00 PM'); setSunClosed(false);
+    } else if (preset === 'weekday_sat') {
+      setMonHours('09:00 AM - 07:00 PM'); setMonClosed(false);
+      setTueHours('09:00 AM - 07:00 PM'); setTueClosed(false);
+      setWedHours('09:00 AM - 07:00 PM'); setWedClosed(false);
+      setThuHours('09:00 AM - 07:00 PM'); setThuClosed(false);
+      setFriHours('09:00 AM - 07:00 PM'); setFriClosed(false);
+      setSatHours('09:00 AM - 07:00 PM'); setSatClosed(false);
+      setSunHours('10:00 AM - 07:00 PM'); setSunClosed(true);
+    }
+  };
 
   useEffect(() => {
     fetchProfileData();
@@ -295,14 +385,25 @@ export default function EditProfileScreen() {
       const mRec = await pb.collection('merchants').getOne(user.merchant_id);
       setMerchant(mRec);
 
-      // Populate merchant fields
+      // Populate merchant fields (aligned with onboarding)
       setStoreName(mRec.name || '');
+      setTagline(mRec.metadata?.tagline || '');
       setBusinessEmail(mRec.metadata?.email || mRec.website || user.email || '');
       setPhoneNumber(mRec.metadata?.phone || user.phone || '');
+      setGoogleReviewUrl(mRec.google_review_url || '');
+      setSelectedBrandColor(mRec.pwa_brand_color || '#FFC700');
       setMonthlySalesGoal(String(mRec.metadata?.monthly_sales_goal || '10000'));
       setInactiveThresholdDays(String(mRec.inactive_threshold_days || '30'));
-      setAddress(mRec.description || '');
-      setCategory(mRec.category || 'food');
+
+      // Category synchronization
+      if (mRec.metadata?.sub_category) {
+        setSelectedCategoryId(mRec.metadata.sub_category);
+        setCategory(mapSubCategoryToBase(mRec.metadata.sub_category));
+      } else if (mRec.category) {
+        setCategory(mRec.category);
+        const match = ALL_CATEGORIES_LIST.find((c) => mapSubCategoryToBase(c.id) === mRec.category);
+        if (match) setSelectedCategoryId(match.id);
+      }
 
       const logoUrl = mRec.logo 
         ? `${pb.baseUrl}/api/files/merchants/${mRec.id}/${mRec.logo}`
@@ -322,46 +423,65 @@ export default function EditProfileScreen() {
       if (locList.length > 0) {
         const loc = locList[0];
         setLocationRecord(loc);
+        setAddress(loc.address || mRec.description || '');
+        setCity(loc.city || 'Jitra, Kedah');
         setLat(String(loc.lat || '6.2443'));
         setLng(String(loc.lng || '100.4217'));
 
-        // Parse hours
+        // Parse hours (supporting both object format {open, close, closed} and string format "08:00 - 22:00")
         const hours = loc.hours || {};
-        const parseDay = (day: string, defaultVal: string) => {
-          const val = hours[day] || defaultVal;
-          return {
-            closedVal: val === 'Closed',
-            hoursStr: val === 'Closed' ? defaultVal : val,
-          };
+        const parseDay = (fullDay: string, shortDay: string, defaultVal: string) => {
+          const raw = hours[fullDay] ?? hours[shortDay] ?? hours[fullDay.toLowerCase()];
+          if (!raw) return { closedVal: false, hoursStr: defaultVal };
+          if (typeof raw === 'object') {
+            const isClosed = raw.closed !== undefined ? !!raw.closed : false;
+            const open = raw.open || '08:00';
+            const close = raw.close || '22:00';
+            return {
+              closedVal: isClosed,
+              hoursStr: `${open} - ${close}`,
+            };
+          }
+          if (typeof raw === 'string') {
+            const isClosed = raw.trim().toLowerCase() === 'closed';
+            return {
+              closedVal: isClosed,
+              hoursStr: isClosed ? defaultVal : raw.trim(),
+            };
+          }
+          return { closedVal: false, hoursStr: defaultVal };
         };
 
-        const mon = parseDay('Monday', '08:00 - 22:00');
+        const mon = parseDay('Monday', 'mon', '08:00 - 22:00');
         setMonHours(mon.hoursStr);
         setMonClosed(mon.closedVal);
 
-        const tue = parseDay('Tuesday', '08:00 - 22:00');
+        const tue = parseDay('Tuesday', 'tue', '08:00 - 22:00');
         setTueHours(tue.hoursStr);
         setTueClosed(tue.closedVal);
 
-        const wed = parseDay('Wednesday', '08:00 - 22:00');
+        const wed = parseDay('Wednesday', 'wed', '08:00 - 22:00');
         setWedHours(wed.hoursStr);
         setWedClosed(wed.closedVal);
 
-        const thu = parseDay('Thursday', '08:00 - 22:00');
+        const thu = parseDay('Thursday', 'thu', '08:00 - 22:00');
         setThuHours(thu.hoursStr);
         setThuClosed(thu.closedVal);
 
-        const fri = parseDay('Friday', '08:00 - 22:00');
+        const fri = parseDay('Friday', 'fri', '08:00 - 22:00');
         setFriHours(fri.hoursStr);
         setFriClosed(fri.closedVal);
 
-        const sat = parseDay('Saturday', '09:00 - 23:00');
+        const sat = parseDay('Saturday', 'sat', '09:00 - 23:00');
         setSatHours(sat.hoursStr);
         setSatClosed(sat.closedVal);
 
-        const sun = parseDay('Sunday', '09:00 - 21:00');
+        const sun = parseDay('Sunday', 'sun', '09:00 - 21:00');
         setSunHours(sun.hoursStr);
         setSunClosed(sun.closedVal);
+      } else {
+        setAddress(mRec.description || '');
+        setCity('Jitra, Kedah');
       }
     } catch (err) {
       console.warn("Failed to load profile data:", err);
@@ -490,13 +610,24 @@ export default function EditProfileScreen() {
 
     setIsSaving(true);
     try {
+      const selectedCatObj = ALL_CATEGORIES_LIST.find((c) => c.id === selectedCategoryId);
+      const baseCategory = mapSubCategoryToBase(selectedCategoryId);
+
       const formData = new FormData();
       formData.append('name', storeName.trim());
-      formData.append('category', category);
+      formData.append('category', baseCategory);
       formData.append('description', address.trim());
+      formData.append('pwa_brand_color', selectedBrandColor);
+      if (googleReviewUrl.trim()) {
+        formData.append('google_review_url', googleReviewUrl.trim());
+      }
       
       const updatedMetadata = {
         ...(merchant?.metadata || {}),
+        sub_category: selectedCategoryId,
+        sub_category_name: selectedCatObj?.name || 'Store',
+        icon: selectedCatObj?.icon || 'storefront',
+        tagline: tagline.trim(),
         phone: phoneNumber.trim(),
         email: businessEmail.trim(),
         monthly_sales_goal: parseFloat(monthlySalesGoal) || 10000,
@@ -512,12 +643,31 @@ export default function EditProfileScreen() {
       }
 
       const updatedMerchant = await pb.collection('merchants').update(merchant.id, formData);
+      setMerchant(updatedMerchant);
 
       // Sync locations and hours
       const latVal = parseFloat(lat) || 0;
       const lngVal = parseFloat(lng) || 0;
 
+      const parseTimeRange = (str: string, defaultOpen: string, defaultClose: string) => {
+        if (!str || !str.includes('-')) return { open: defaultOpen, close: defaultClose };
+        const parts = str.split('-').map((s) => s.trim());
+        return {
+          open: parts[0] || defaultOpen,
+          close: parts[1] || defaultClose,
+        };
+      };
+
+      const monTimes = parseTimeRange(monHours, '08:00', '22:00');
+      const tueTimes = parseTimeRange(tueHours, '08:00', '22:00');
+      const wedTimes = parseTimeRange(wedHours, '08:00', '22:00');
+      const thuTimes = parseTimeRange(thuHours, '08:00', '22:00');
+      const friTimes = parseTimeRange(friHours, '08:00', '22:00');
+      const satTimes = parseTimeRange(satHours, '09:00', '23:00');
+      const sunTimes = parseTimeRange(sunHours, '09:00', '21:00');
+
       const updatedHours = {
+        // Human string format (backwards compatible)
         "Monday": monClosed ? "Closed" : monHours.trim(),
         "Tuesday": tueClosed ? "Closed" : tueHours.trim(),
         "Wednesday": wedClosed ? "Closed" : wedHours.trim(),
@@ -525,22 +675,35 @@ export default function EditProfileScreen() {
         "Friday": friClosed ? "Closed" : friHours.trim(),
         "Saturday": satClosed ? "Closed" : satHours.trim(),
         "Sunday": sunClosed ? "Closed" : sunHours.trim(),
+
+        // Structured format (used by onboarding and explore)
+        mon: { open: monTimes.open, close: monTimes.close, closed: monClosed },
+        tue: { open: tueTimes.open, close: tueTimes.close, closed: tueClosed },
+        wed: { open: wedTimes.open, close: wedTimes.close, closed: wedClosed },
+        thu: { open: thuTimes.open, close: thuTimes.close, closed: thuClosed },
+        fri: { open: friTimes.open, close: friTimes.close, closed: friClosed },
+        sat: { open: satTimes.open, close: satTimes.close, closed: satClosed },
+        sun: { open: sunTimes.open, close: sunTimes.close, closed: sunClosed },
       };
 
       if (locationRecord) {
-        await pb.collection('store_locations').update(locationRecord.id, {
+        const updatedLoc = await pb.collection('store_locations').update(locationRecord.id, {
+          name: storeName.trim(),
           address: address.trim(),
+          city: city.trim(),
+          country: 'Malaysia',
           phone: phoneNumber.trim(),
           lat: latVal,
           lng: lngVal,
           hours: updatedHours,
         });
+        setLocationRecord(updatedLoc);
       } else {
-        await pb.collection('store_locations').create({
+        const createdLoc = await pb.collection('store_locations').create({
           merchant: merchant.id,
-          name: 'Main Outlet',
+          name: storeName.trim() || 'Main Outlet',
           address: address.trim(),
-          city: 'Jitra',
+          city: city.trim() || 'Jitra, Kedah',
           country: 'Malaysia',
           phone: phoneNumber.trim(),
           hours: updatedHours,
@@ -548,6 +711,7 @@ export default function EditProfileScreen() {
           lng: lngVal,
           is_active: true
         });
+        setLocationRecord(createdLoc);
       }
 
       setShowSuccessModal(true);
@@ -606,6 +770,13 @@ export default function EditProfileScreen() {
       </SafeAreaView>
     );
   }
+
+  const selectedCatObj = ALL_CATEGORIES_LIST.find((c) => c.id === selectedCategoryId);
+  const filteredCategories = ALL_CATEGORIES_LIST.filter((cat) => {
+    if (selectedCatGroup === 'all') return true;
+    const grp = CATEGORY_GROUPS.find((g) => g.id === selectedCatGroup);
+    return grp?.ids ? grp.ids.includes(cat.id) : true;
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -685,7 +856,7 @@ export default function EditProfileScreen() {
 
         {/* Store Name Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>{t('store_name')}</Text>
+          <Text style={styles.inputLabel}>{t('store_name')} *</Text>
           <View style={styles.inputFieldWrapper}>
             <Ionicons name="storefront-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
             <TextInput
@@ -701,9 +872,27 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
+        {/* Store Tagline Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>STORE TAGLINE (OPTIONAL)</Text>
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={tagline}
+              onChangeText={setTagline}
+              placeholder="e.g. Gentlemen Cuts & Hot Towel Shave"
+              placeholderTextColor="#94A3B8"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
+        </View>
+
         {/* Business Email Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>{t('business_email')}</Text>
+          <Text style={styles.inputLabel}>{t('business_email')} *</Text>
           <View style={styles.inputFieldWrapper}>
             <Ionicons name="mail-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
             <TextInput
@@ -738,6 +927,26 @@ export default function EditProfileScreen() {
               })}
             />
           </View>
+        </View>
+
+        {/* Google Review URL */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>GOOGLE REVIEW LINK (OPTIONAL)</Text>
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="star" size={18} color="#F59E0B" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              placeholder="https://g.page/r/your-google-business/review"
+              placeholderTextColor="#94A3B8"
+              value={googleReviewUrl}
+              onChangeText={setGoogleReviewUrl}
+              autoCapitalize="none"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
+          <Text style={styles.fieldHint}>Encourage customers who tap their card to leave a 5-star Google review for bonus rewards.</Text>
         </View>
 
         {/* Inactive Customer Threshold Input */}
@@ -778,41 +987,135 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* Category Selector Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>{t('store_category')}</Text>
-          <View style={styles.categoryChipsRow}>
-            {[
-              { id: 'food' },
-              { id: 'retail' },
-              { id: 'beauty' },
-              { id: 'health' },
-              { id: 'entertainment' },
-              { id: 'other' },
-            ].map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[
-                  styles.categoryChip,
-                  category === cat.id && styles.categoryChipActive,
-                ]}
-                onPress={() => setCategory(cat.id as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  styles.categoryChipText,
-                  category === cat.id && styles.categoryChipTextActive
-                ]}>
-                  {t(cat.id)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* Category Selector Input (Aligned with 3-Step Onboarding) */}
+        <View style={[styles.inputContainer, { marginTop: 14 }]}>
+          <Text style={styles.inputLabel}>CHOOSE YOUR BUSINESS CATEGORY *</Text>
+          <Text style={styles.categorySubText}>
+            Aligned with 3-step onboarding. Sets where you appear in customer search, discover tabs, and filter tags.
+          </Text>
+
+          {/* Currently Selected Category Summary Card */}
+          {selectedCatObj && (
+            <View style={styles.selectedCategorySummary}>
+              <View style={[styles.categoryIconCircle, { backgroundColor: selectedCatObj.bg }]}>
+                <Ionicons name={selectedCatObj.icon as any} size={20} color={selectedCatObj.color} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.selectedCatTitle}>{selectedCatObj.name}</Text>
+                <Text style={styles.selectedCatSubtitle}>{selectedCatObj.group} • Base: {mapSubCategoryToBase(selectedCatObj.id).toUpperCase()}</Text>
+              </View>
+              <View style={styles.activePillBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Text style={styles.activePillText}>Active</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Category Group Filter Tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catGroupScroll}
+          >
+            {CATEGORY_GROUPS.map((grp) => {
+              const isActive = selectedCatGroup === grp.id;
+              return (
+                <TouchableOpacity
+                  key={grp.id}
+                  style={[styles.catGroupPill, isActive && styles.catGroupPillActive]}
+                  onPress={() => setSelectedCatGroup(grp.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.catGroupPillText, isActive && styles.catGroupPillTextActive]}>
+                    {grp.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Category Grid */}
+          <View style={styles.categoryGrid}>
+            {filteredCategories.map((cat) => {
+              const isSelected = selectedCategoryId === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.categoryCard,
+                    isSelected && styles.categoryCardSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedCategoryId(cat.id);
+                    setCategory(mapSubCategoryToBase(cat.id));
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.categoryIconCircle, { backgroundColor: cat.bg }]}>
+                    <Ionicons name={cat.icon as any} size={18} color={cat.color} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.categoryCardLabel,
+                      isSelected && styles.categoryCardLabelSelected,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {cat.name}
+                  </Text>
+
+                  {isSelected ? (
+                    <View style={styles.selectedCheckBadge}>
+                      <Ionicons name="checkmark" size={12} color="#000000" />
+                    </View>
+                  ) : (
+                    <View style={styles.unselectedRadio} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Primary Brand Accent Color (Aligned with Onboarding Step 1) */}
+        <View style={[styles.inputContainer, { marginTop: 14 }]}>
+          <Text style={styles.inputLabel}>PRIMARY BRAND ACCENT COLOR</Text>
+          <Text style={styles.categorySubText}>
+            Applied to your stamp card, storefront buttons, and highlights.
+          </Text>
+
+          <View style={styles.brandColorRow}>
+            {BRAND_COLOR_OPTIONS.map((col) => {
+              const isChosen = selectedBrandColor === col.hex;
+              return (
+                <TouchableOpacity
+                  key={col.id}
+                  style={[
+                    styles.brandColorPill,
+                    isChosen && styles.brandColorPillActive,
+                  ]}
+                  onPress={() => setSelectedBrandColor(col.hex)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.brandColorDot, { backgroundColor: col.hex }]} />
+                  <Text
+                    style={[
+                      styles.brandColorName,
+                      isChosen && { fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+                    ]}
+                  >
+                    {col.name}
+                  </Text>
+                  {isChosen && <Ionicons name="checkmark" size={14} color="#0F172A" style={{ marginLeft: 4 }} />}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* Address Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>{t('address')}</Text>
+          <Text style={styles.inputLabel}>{t('address')} *</Text>
           <View style={styles.inputFieldWrapper}>
             <Ionicons name="location-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
             <TextInput
@@ -828,10 +1131,79 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
+        {/* City / Area Input with Quick Pick Chips */}
+        <View style={[styles.inputContainer, { marginTop: 6 }]}>
+          <Text style={styles.inputLabel}>CITY / AREA *</Text>
+          <View style={styles.inputFieldWrapper}>
+            <Ionicons name="business-outline" size={18} color="#94A3B8" style={styles.inputFieldIcon} />
+            <TextInput
+              style={styles.textInputWithIcon}
+              value={city}
+              onChangeText={setCity}
+              placeholder="e.g. Jitra, Kedah"
+              placeholderTextColor="#94A3B8"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
+            />
+          </View>
+
+          <Text style={[styles.categorySubText, { marginTop: 8 }]}>Quick pick popular cities:</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cityChipsScroll}
+          >
+            {POPULAR_CITIES.map((c) => {
+              const isSelected = city === c;
+              return (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.cityChip, isSelected && styles.cityChipActive]}
+                  onPress={() => setCity(c)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="location-sharp"
+                    size={12}
+                    color={isSelected ? '#000000' : '#64748B'}
+                  />
+                  <Text style={[styles.cityChipText, isSelected && styles.cityChipTextActive]}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* Daily Operating Hours Section */}
         <View style={styles.sectionHeaderRow}>
           <Ionicons name="time" size={18} color="#050505" />
           <Text style={styles.sectionLabel}>{t('operating_hours')}</Text>
+        </View>
+
+        {/* Operating Hours Quick Presets (Aligned with Onboarding Step 2) */}
+        <View style={styles.presetRow}>
+          <TouchableOpacity
+            style={styles.presetBtn}
+            onPress={() => handleApplyPreset('daily')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.presetBtnText}>
+              ⚡ Everyday (10am–10pm)
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.presetBtn}
+            onPress={() => handleApplyPreset('weekday_sat')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.presetBtnText}>
+              🏢 Mon–Sat (Sun Off)
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.hoursCardList}>
@@ -1382,6 +1754,210 @@ const styles = StyleSheet.create({
   },
   categoryChipTextActive: {
     color: '#050505',
+  },
+  categorySubText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  selectedCategorySummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+  },
+  selectedCatTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  selectedCatSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  activePillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  activePillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#059669',
+  },
+  catGroupScroll: {
+    gap: 6,
+    paddingBottom: 10,
+  },
+  catGroupPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  catGroupPillActive: {
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+  },
+  catGroupPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  catGroupPillTextActive: {
+    color: '#FFFFFF',
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  categoryCard: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  categoryCardSelected: {
+    borderColor: '#FFC700',
+    backgroundColor: '#FFFBEB',
+  },
+  categoryIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryCardLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#334155',
+    marginLeft: 8,
+  },
+  categoryCardLabelSelected: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+  },
+  selectedCheckBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFC700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unselectedRadio: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  brandColorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  brandColorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  brandColorPillActive: {
+    backgroundColor: '#FFFBEA',
+    borderColor: '#FFC700',
+  },
+  brandColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  brandColorName: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  cityChipsScroll: {
+    gap: 6,
+    marginTop: 6,
+    paddingBottom: 4,
+  },
+  cityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+  },
+  cityChipActive: {
+    backgroundColor: '#FFC700',
+  },
+  cityChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  cityChipTextActive: {
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  presetBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  presetBtnText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+  },
+  fieldHint: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 4,
+    paddingHorizontal: 2,
+    lineHeight: 16,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
