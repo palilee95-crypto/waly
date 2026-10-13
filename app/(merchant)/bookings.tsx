@@ -59,6 +59,8 @@ interface ServiceItem {
   is_active: boolean;
   image_url?: string;
   assigned_staff?: string[];
+  commission_type?: 'none' | 'percentage' | 'fixed';
+  commission_rate?: number;
 }
 
 function getContrastColor(hexColor: string): string {
@@ -159,6 +161,8 @@ export default function BookingsScreen() {
   const [maxPax, setMaxPax] = useState<string>('4');
   const [peakPrice, setPeakPrice] = useState<string>('');
   const [securityDeposit, setSecurityDeposit] = useState<string>('');
+  const [itemCommissionType, setItemCommissionType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [itemCommissionRate, setItemCommissionRate] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<any>(null);
   const [photoCleared, setPhotoCleared] = useState(false);
@@ -906,6 +910,8 @@ export default function BookingsScreen() {
     setMaxPax('4');
     setPeakPrice('');
     setSecurityDeposit('');
+    setItemCommissionType('none');
+    setItemCommissionRate('');
     setPhotoUri(null);
     setPhotoFile(null);
     setPhotoCleared(false);
@@ -933,6 +939,8 @@ export default function BookingsScreen() {
     setMaxPax(String(s.max_pax || '4'));
     setPeakPrice(s.peak_price ? String(s.peak_price) : '');
     setSecurityDeposit(s.security_deposit ? String(s.security_deposit) : '');
+    setItemCommissionType(s.commission_type || 'none');
+    setItemCommissionRate(s.commission_rate ? String(s.commission_rate) : '');
     setPhotoUri(s.image_url || null);
     setPhotoFile(null);
     setPhotoCleared(false);
@@ -1097,6 +1105,7 @@ export default function BookingsScreen() {
       const paxNum = parseInt(maxPax) || 1;
       const peakNum = peakPrice ? (parseFloat(peakPrice) || 0) : undefined;
       const depositNum = securityDeposit ? (parseFloat(securityDeposit) || 0) : undefined;
+      const commRateNum = itemCommissionRate ? (parseFloat(itemCommissionRate) || 0) : 0;
       
       let finalImageUrl = photoUri || '';
 
@@ -1116,7 +1125,9 @@ export default function BookingsScreen() {
           security_deposit: depositNum,
           is_active: isOnlineAvailable,
           image_url: finalImageUrl,
-          assigned_staff: assignedStaff
+          assigned_staff: assignedStaff,
+          commission_type: itemCommissionType,
+          commission_rate: commRateNum
         };
 
         if (user?.merchant_id && !editingService.id.startsWith('srv-')) {
@@ -1139,6 +1150,8 @@ export default function BookingsScreen() {
               if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
               formData.append('is_active', String(isOnlineAvailable));
               formData.append('assigned_staff', JSON.stringify(assignedStaff));
+              formData.append('commission_type', itemCommissionType);
+              formData.append('commission_rate', String(commRateNum));
               if (matchingBranch?.id) {
                 formData.append('branch', matchingBranch.id);
               }
@@ -1166,6 +1179,8 @@ export default function BookingsScreen() {
                 security_deposit: depositNum,
                 is_active: isOnlineAvailable,
                 assigned_staff: assignedStaff,
+                commission_type: itemCommissionType,
+                commission_rate: commRateNum,
                 ...(matchingBranch?.id ? { branch: matchingBranch.id } : {})
               };
 
@@ -1267,7 +1282,9 @@ export default function BookingsScreen() {
         security_deposit: depositNum,
         is_active: isOnlineAvailable,
         image_url: finalImageUrl,
-        assigned_staff: assignedStaff
+        assigned_staff: assignedStaff,
+        commission_type: itemCommissionType,
+        commission_rate: commRateNum
       };
 
       if (user?.merchant_id) {
@@ -1290,6 +1307,8 @@ export default function BookingsScreen() {
           if (depositNum !== undefined) formData.append('security_deposit', String(depositNum));
           formData.append('is_active', String(isOnlineAvailable));
           formData.append('assigned_staff', JSON.stringify(assignedStaff));
+          formData.append('commission_type', itemCommissionType);
+          formData.append('commission_rate', String(commRateNum));
 
           if (photoFile) {
             formData.append('image', photoFile);
@@ -1324,6 +1343,8 @@ export default function BookingsScreen() {
               security_deposit: depositNum,
               is_active: isOnlineAvailable,
               assigned_staff: assignedStaff,
+              commission_type: itemCommissionType,
+              commission_rate: commRateNum,
               image_url: photoUri || ''
             });
             newService.id = rec.id;
@@ -1341,7 +1362,9 @@ export default function BookingsScreen() {
               total_units: unitsNum,
               max_pax: paxNum,
               is_active: isOnlineAvailable,
-              assigned_staff: assignedStaff
+              assigned_staff: assignedStaff,
+              commission_type: itemCommissionType,
+              commission_rate: commRateNum
             });
             newService.id = rec.id;
           }
@@ -2088,7 +2111,17 @@ export default function BookingsScreen() {
                         <Text style={styles.catalogItemSubtitle}>
                           {s.category} • ⏱️ {s.duration_minutes > 0 ? `${s.duration_minutes} min` : 'Product'}
                         </Text>
-                        <Text style={styles.catalogItemPrice}>RM {Number(s.price || 0).toFixed(2)}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                          <Text style={styles.catalogItemPrice}>RM {Number(s.price || 0).toFixed(2)}</Text>
+                          {s.commission_type && s.commission_type !== 'none' && (
+                            <View style={styles.catalogCommBadge}>
+                              <Ionicons name="cash-outline" size={11} color="#059669" />
+                              <Text style={styles.catalogCommBadgeText}>
+                                Comm: {s.commission_type === 'percentage' ? `${s.commission_rate || 0}%` : `RM ${s.commission_rate || 0}`}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
 
                       <View style={styles.catalogRightWrap}>
@@ -2857,6 +2890,72 @@ export default function BookingsScreen() {
                     </View>
                   </View>
                 )}
+
+                {/* Staff Commission Card (For Products, Add-ons & Services) */}
+                <View style={styles.commissionConfigCard}>
+                  <View style={styles.commissionHeaderRow}>
+                    <View style={styles.commissionIconBox}>
+                      <Ionicons name="cash-outline" size={18} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.commissionSectionTitle}>Staff Commission</Text>
+                      <Text style={styles.commissionSectionSub}>
+                        {addItemType === 'product' || addItemType === 'addon'
+                          ? 'Staff commission when selling this product'
+                          : 'Custom commission override for this service'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Type Selector: None / Percentage (%) / Fixed (RM) */}
+                  <View style={styles.commissionTypePills}>
+                    {(['none', 'percentage', 'fixed'] as const).map((typeKey) => (
+                      <TouchableOpacity
+                        key={typeKey}
+                        style={[
+                          styles.commissionTypePill,
+                          itemCommissionType === typeKey && styles.commissionTypePillActive
+                        ]}
+                        onPress={() => setItemCommissionType(typeKey)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[
+                          styles.commissionTypePillText,
+                          itemCommissionType === typeKey && styles.commissionTypePillTextActive
+                        ]}>
+                          {typeKey === 'none' ? 'None' : typeKey === 'percentage' ? 'Percentage (%)' : 'Fixed (RM)'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Rate Input when enabled */}
+                  {itemCommissionType !== 'none' && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={styles.wizardInputLabel}>
+                        {itemCommissionType === 'percentage' ? 'Commission Percentage (%)' : 'Fixed Commission Amount (RM)'}
+                      </Text>
+                      <View style={styles.commissionInputRow}>
+                        <Text style={styles.commissionInputPrefix}>
+                          {itemCommissionType === 'percentage' ? '%' : 'RM'}
+                        </Text>
+                        <TextInput
+                          style={styles.commissionTextInput}
+                          placeholder={itemCommissionType === 'percentage' ? 'e.g. 10' : 'e.g. 5.00'}
+                          placeholderTextColor="#94A3B8"
+                          keyboardType="numeric"
+                          value={itemCommissionRate}
+                          onChangeText={setItemCommissionRate}
+                        />
+                      </View>
+                      <Text style={styles.commissionHintText}>
+                        {itemCommissionType === 'percentage'
+                          ? `Staff earns ${itemCommissionRate || '0'}% of this item's price.`
+                          : `Staff earns flat RM ${itemCommissionRate || '0'} per unit.`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 {/* Available for Online Booking Toggle */}
                 <View style={styles.toggleRowCard}>
@@ -6209,5 +6308,114 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
+  },
+  // Staff Commission Card & Badges
+  commissionConfigCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  commissionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  commissionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commissionSectionTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  commissionSectionSub: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  commissionTypePills: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  commissionTypePill: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commissionTypePillActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  commissionTypePillText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  commissionTypePillTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  commissionInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 46,
+  },
+  commissionInputPrefix: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    marginRight: 6,
+  },
+  commissionTextInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+    paddingVertical: 0,
+  },
+  commissionHintText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#059669',
+    marginTop: 6,
+  },
+  catalogCommBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  catalogCommBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#059669',
   },
 });

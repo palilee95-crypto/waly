@@ -55,6 +55,8 @@ interface ServiceItem {
   max_pax?: number;
   peak_price?: number;
   security_deposit?: number;
+  commission_type?: 'none' | 'percentage' | 'fixed';
+  commission_rate?: number;
 }
 
 function getServiceItemIcon(type?: string): string {
@@ -1318,9 +1320,14 @@ export default function CustomerBookingPwaScreen() {
         const serviceNameStr = selectedServices.map(s => s.name).join(', ');
         const staffNameStr = selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available');
         const itemsSummaryData = selectedServices.map(s => ({
+          id: s.id,
+          service_id: s.id,
           name: s.name,
           price: s.price,
-          duration_minutes: s.duration_minutes || 30
+          duration_minutes: s.duration_minutes || 30,
+          item_type: s.item_type || 'service',
+          commission_type: s.commission_type || 'none',
+          commission_rate: s.commission_rate || 0
         }));
 
         const finalNotes = [

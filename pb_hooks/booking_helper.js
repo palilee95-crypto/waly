@@ -350,11 +350,82 @@ function processCompletedBooking(rec) {
         empType = staffRec.getString("employment_type") || "full_time";
       }
 
-      if (commType === "percentage") {
-        commissionAmount = Math.round((totalPrice * commRate / 100) * 100) / 100;
-      } else if (commType === "fixed_per_job") {
-        commissionAmount = commRate;
+      // 6.1 Per-Item Product & Service Commission Calculation
+      var totalCommission = 0;
+      var commissionBreakdown = [];
+      var remainingServicePrice = 0;
+
+      if (Array.isArray(itemsSummary) && itemsSummary.length > 0) {
+        for (var i = 0; i < itemsSummary.length; i++) {
+          var itm = itemsSummary[i];
+          if (!itm) continue;
+          var itmPrice = parseFloat(itm.price) || 0;
+          var itmQty = parseInt(itm.quantity, 10) || 1;
+          var itmLineTotal = itmPrice * itmQty;
+
+          // Check if item has specific commission
+          var itemCommType = itm.commission_type || "none";
+          var itemCommRate = parseFloat(itm.commission_rate) || 0;
+
+          // If not in summary, attempt lookup from merchant_services
+          var itemId = itm.id || itm.service_id;
+          if (itemId && itemCommType === "none") {
+            try {
+              var srvRec = $app.findRecordById("merchant_services", itemId);
+              if (srvRec) {
+                itemCommType = srvRec.getString("commission_type") || "none";
+                itemCommRate = parseFloat(srvRec.get("commission_rate")) || 0;
+              }
+            } catch (srvErr) {}
+          }
+
+          var itmCommAmount = 0;
+          if (itemCommType === "percentage") {
+            itmCommAmount = Math.round((itmLineTotal * itemCommRate / 100) * 100) / 100;
+          } else if (itemCommType === "fixed") {
+            itmCommAmount = Math.round((itemCommRate * itmQty) * 100) / 100;
+          }
+
+          if (itmCommAmount > 0) {
+            totalCommission += itmCommAmount;
+            commissionBreakdown.push({
+              name: itm.name || "Product",
+              item_type: itm.item_type || "product",
+              price: itmLineTotal,
+              commission_type: itemCommType,
+              commission_rate: itemCommRate,
+              commission_amount: itmCommAmount
+            });
+          } else {
+            // Accumulate for staff base commission
+            remainingServicePrice += itmLineTotal;
+          }
+        }
+      } else {
+        remainingServicePrice = totalPrice;
       }
+
+      // Base staff commission on remaining services
+      var baseServiceCommission = 0;
+      if (commType === "percentage") {
+        baseServiceCommission = Math.round((remainingServicePrice * commRate / 100) * 100) / 100;
+      } else if (commType === "fixed_per_job" && remainingServicePrice > 0) {
+        baseServiceCommission = commRate;
+      }
+
+      if (baseServiceCommission > 0) {
+        totalCommission += baseServiceCommission;
+        commissionBreakdown.push({
+          name: "Standard Service",
+          item_type: "service",
+          price: remainingServicePrice,
+          commission_type: commType,
+          commission_rate: commRate,
+          commission_amount: baseServiceCommission
+        });
+      }
+
+      commissionAmount = Math.round(totalCommission * 100) / 100;
 
       // Read current booking metadata
       var bMeta = {};
@@ -373,6 +444,7 @@ function processCompletedBooking(rec) {
         bMeta.commission_rate = commRate;
         bMeta.bill_amount = totalPrice;
         bMeta.commission_amount = commissionAmount;
+        bMeta.commission_breakdown = commissionBreakdown;
         bMeta.commission_payout_status = bMeta.commission_payout_status || "unpaid";
         bMeta.commission_calculated_at = new Date().toISOString();
 

@@ -750,4 +750,49 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
   }
 });
 
+// Auto-ensure commission_type and commission_rate fields exist on merchant_services upon bootstrap
+onBootstrap((e) => {
+  e.next();
+  try {
+    const col = $app.findCollectionByNameOrId("merchant_services");
+    if (col) {
+      let changed = false;
+      let hasCommType = false;
+      let hasCommRate = false;
+      try { hasCommType = !!col.fields.getByName("commission_type"); } catch (fErr) {}
+      try { hasCommRate = !!col.fields.getByName("commission_rate"); } catch (fErr) {}
+
+      if (!hasCommType) {
+        col.fields.add(new Field({
+          "id": "sel_comm_type_srv",
+          "name": "commission_type",
+          "type": "select",
+          "system": false,
+          "required": false,
+          "values": ["none", "percentage", "fixed"]
+        }));
+        changed = true;
+      }
+
+      if (!hasCommRate) {
+        col.fields.add(new Field({
+          "id": "num_comm_rate_srv",
+          "name": "commission_rate",
+          "type": "number",
+          "system": false,
+          "required": false
+        }));
+        changed = true;
+      }
+
+      if (changed) {
+        $app.save(col);
+        console.log("[BOOTSTRAP] Added commission_type & commission_rate to merchant_services");
+      }
+    }
+  } catch (bErr) {
+    console.log("[BOOTSTRAP MS NOTE]", bErr.message || bErr);
+  }
+});
+
 
