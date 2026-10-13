@@ -30,14 +30,46 @@ export default function CustomerProfile() {
 
 
   const [optInMarketing, setOptInMarketing] = useState(true);
+  const [cardsCount, setCardsCount] = useState(0);
+  const [vouchersCount, setVouchersCount] = useState(0);
+  const [vouchersTotalValue, setVouchersTotalValue] = useState(0);
 
   React.useEffect(() => {
     if (!user) return;
     pb.collection('loyalty_cards')
       .getFullList({ filter: `customer = '${user.id}'` })
       .then((cards) => {
+        setCardsCount(cards.length);
         const hasOptedOut = cards.some((c: any) => c.opt_in_marketing === false);
         setOptInMarketing(!hasOptedOut);
+      })
+      .catch(() => {});
+
+    pb.collection('vouchers')
+      .getFullList({
+        filter: `customer = '${user.id}' && status = 'active'`,
+        expand: 'reward,campaign',
+      })
+      .then((vouchers) => {
+        setVouchersCount(vouchers.length);
+        let totalVal = 0;
+        vouchers.forEach((v: any) => {
+          let meta: any = {};
+          try {
+            meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
+          } catch (e) {}
+          const rawVal = parseFloat(
+            v.discount_value ||
+            v.expand?.reward?.discount_value ||
+            v.expand?.campaign?.discount_value ||
+            meta.discount_value ||
+            '0'
+          );
+          if (!isNaN(rawVal) && rawVal > 0) {
+            totalVal += rawVal;
+          }
+        });
+        setVouchersTotalValue(totalVal);
       })
       .catch(() => {});
   }, [user]);
@@ -252,195 +284,326 @@ export default function CustomerProfile() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* ── Yellow S-Curve Header (Idea 1) ── */}
-        <View style={{ backgroundColor: '#FFFFFF' }}>
-          {/* Yellow Block */}
-          <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 24, paddingBottom: 48, paddingTop: 16 }}>
-            {/* Header Top Row */}
-            <View style={[isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Image
-                  source={require('../../assets/risev logo.png')}
-                  style={{ width: 90, height: 32, resizeMode: 'contain' }}
-                />
-                <View style={{ width: 1, height: 16, backgroundColor: 'rgba(0,0,0,0.2)' }} />
-                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>My Profile</Text>
-              </View>
-              
-              <TouchableOpacity style={styles.roundHeaderBtn} onPress={() => setSupportModalVisible(true)} activeOpacity={0.8}>
+        {/* ── Apple iOS Pure White Header ── */}
+        <View style={styles.headerContainer}>
+          <View style={[styles.headerTopRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+            <View style={styles.headerBrandRow}>
+              {router.canGoBack() && (
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  style={styles.roundHeaderBtn}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Back"
+                >
+                  <Ionicons name="chevron-back" size={18} color="#000000" />
+                </TouchableOpacity>
+              )}
+              <Image
+                source={require('../../assets/risev logo.png')}
+                style={styles.headerLogo}
+              />
+              <View style={styles.headerLogoDivider} />
+              <Text style={styles.headerTitle}>My Profile</Text>
+            </View>
+
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={styles.roundHeaderBtn}
+                onPress={handleOpenEdit}
+                activeOpacity={0.8}
+                accessibilityLabel="Edit Profile"
+              >
+                <Ionicons name="create-outline" size={18} color="#000000" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.roundHeaderBtn}
+                onPress={() => setSupportModalVisible(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Help & Support"
+              >
                 <Ionicons name="help-buoy-outline" size={18} color="#000000" />
               </TouchableOpacity>
             </View>
-            
-            {/* User Profile Integrated in Header */}
-            <View style={[isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { flexDirection: 'row', alignItems: 'center', gap: 20 }]}>
-              <Image source={{ uri: avatarUrl }} style={{ width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: '#FFFFFF' }} />
-              
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={{ fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.5, marginBottom: -2 }}>
-                  {user?.name || 'Ahmad Fazli'}
-                </Text>
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#000000', opacity: 0.65, letterSpacing: 0.2 }}>
-                  {user?.phone || '+60 12-345 6789'}
-                </Text>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 }}>
-                  {/* Premium Pill Badges */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 4 }}>
-                    <Ionicons name="shield-checkmark" size={12} color="#FFC700" />
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5, marginTop: 1 }}>
-                      {(user?.tier || 'BRONZE').toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
-                    <Ionicons name="star" size={12} color="#EAB308" />
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5, marginTop: 1 }}>
-                      {user?.total_points || 0} PTS
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-          
-          {/* White Bottom S-Curve overlapping */}
-          <View style={{ backgroundColor: '#FFC700' }}>
-            <View style={{ height: 40, backgroundColor: '#FFFFFF', borderTopLeftRadius: 40 }} />
           </View>
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { paddingTop: 0 }]}
+          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
-
-          {/* Premium Merchant Switch Card (Idea 2) */}
-          <View style={[styles.switchCard, { backgroundColor: '#0F172A', borderColor: '#1E293B', shadowColor: '#FFC700', shadowOpacity: 0.1, shadowRadius: 20 }]}>
-            <View style={styles.switchHeader}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="storefront" size={22} color="#FFC700" />
-              </View>
-              <View style={styles.switchInfo}>
-                <Text style={[styles.switchTitle, { color: '#FFFFFF' }]}>Business Owner?</Text>
-                <Text style={[styles.switchSubtitle, { color: '#94A3B8' }]}>Switch to merchant console to scan stamps and manage reward plans.</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={[styles.switchButton, { backgroundColor: '#FFC700' }]} onPress={handleSwitchToMerchant} activeOpacity={0.8}>
-              <Text style={[styles.switchButtonText, { color: '#000000' }]}>Switch to Merchant Mode</Text>
-              <Ionicons name="arrow-forward" size={16} color="#000000" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Menu Options List */}
-          <View style={styles.menuList}>
-            <Text style={styles.menuSectionHeader}>Account Settings</Text>
-            
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7} onPress={handleOpenEdit}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="person-outline" size={18} color="#000000" />
+          {/* ── Executive Member Identity Card ── */}
+          <View style={styles.memberCard}>
+            <View style={styles.memberProfileRow}>
+              <TouchableOpacity
+                style={styles.avatarWrapper}
+                onPress={handleOpenEdit}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: avatarUrl }} style={styles.memberAvatar} />
+                <View style={styles.avatarPencilBadge}>
+                  <Ionicons name="camera" size={11} color="#FFFFFF" />
                 </View>
-                <Text style={styles.menuItemText}>Edit Profile Information</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#64748B" />
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              activeOpacity={0.7} 
-              onPress={() => router.push('/(customer)/history')}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="time-outline" size={18} color="#000000" />
-                </View>
-                <Text style={styles.menuItemText}>Stamp History & Logs</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#64748B" />
-            </TouchableOpacity>
+              <View style={styles.memberInfoCol}>
+                <Text style={styles.memberNameText} numberOfLines={1}>
+                  {user?.name || 'Risev Member'}
+                </Text>
+                <Text style={styles.memberPhoneText}>
+                  {user?.phone || '+60 12-345 6789'}
+                </Text>
 
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7} onPress={() => setPrivacyModalVisible(true)}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#000000" />
-                </View>
-                <Text style={styles.menuItemText}>Privacy & Terms of Service</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#64748B" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7} onPress={() => setSupportModalVisible(true)}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="help-buoy-outline" size={18} color="#000000" />
-                </View>
-                <Text style={styles.menuItemText}>Help & Customer Support</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#64748B" />
-            </TouchableOpacity>
-
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="megaphone-outline" size={18} color="#000000" />
-                </View>
-                <View style={{ gap: 2 }}>
-                  <Text style={styles.menuItemText}>WhatsApp Promotions</Text>
-                  <Text style={{ fontSize: 10, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', maxWidth: Platform.OS === 'web' ? '100%' : 220 }} numberOfLines={1}>
-                    Receive discounts & stamps blasts on WhatsApp
+                <View style={styles.memberTierBadge}>
+                  <Ionicons name="shield-checkmark" size={12} color="#FFCC00" />
+                  <Text style={styles.memberTierText}>
+                    {(user?.tier || 'BRONZE').toUpperCase()} MEMBER
                   </Text>
                 </View>
               </View>
-              <Switch
-                value={optInMarketing}
-                onValueChange={handleToggleMarketing}
-                trackColor={{ false: '#E5E7EB', true: '#A3A3A3' }}
-                thumbColor={optInMarketing ? '#000000' : '#9CA3AF'}
-              />
+            </View>
+
+            {/* 3-Column Loyalty Snapshot Row */}
+            <View style={styles.statsSnapshotRow}>
+              <View style={styles.statCol}>
+                <View style={styles.statIconBadge}>
+                  <Ionicons name="star" size={13} color="#FFCC00" />
+                </View>
+                <Text style={styles.statNumber}>{user?.total_points || 0}</Text>
+                <Text style={styles.statLabel}>Total Points</Text>
+              </View>
+
+              <View style={styles.statDivider} />
+
+              <TouchableOpacity
+                style={styles.statCol}
+                onPress={() => router.push('/(customer)/my-cards')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statIconBadge}>
+                  <Ionicons name="card-outline" size={13} color="#000000" />
+                </View>
+                <Text style={styles.statNumber}>{cardsCount}</Text>
+                <Text style={styles.statLabel}>Stamp Cards</Text>
+              </TouchableOpacity>
+
+              <View style={styles.statDivider} />
+
+              <TouchableOpacity
+                style={styles.statCol}
+                onPress={() => router.push('/(customer)/vouchers')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statIconBadge}>
+                  <Ionicons name="ticket-outline" size={13} color="#000000" />
+                </View>
+                <Text style={styles.statNumber}>{vouchersCount}</Text>
+                <Text style={styles.statLabel}>My Vouchers</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Logout Action Button */}
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          {/* ── Business Owner / Switch to Merchant Card (Concept 2: Compact Risev Yellow Hero Card) ── */}
+          <View style={styles.merchantCard}>
+            <View style={styles.merchantHeaderRow}>
+              <View style={styles.merchantIconSquircle}>
+                <Ionicons name="storefront" size={18} color="#FFCC00" />
+              </View>
+              <View style={styles.merchantTextCol}>
+                <Text style={styles.merchantTitle}>Business Owner?</Text>
+                <Text style={styles.merchantSubtitle}>
+                  More stamps, more bookings. 10x more repeat customers.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.merchantCtaBtn}
+              onPress={handleSwitchToMerchant}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.merchantCtaText}>Manage My Business</Text>
+              <Ionicons name="arrow-forward" size={15} color="#FFCC00" />
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Inset Grouped Settings Sections ── */}
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeaderTitle}>Account & Wallet</Text>
+            
+            <View style={styles.groupedContainer}>
+              <TouchableOpacity
+                style={styles.groupedCell}
+                activeOpacity={0.7}
+                onPress={handleOpenEdit}
+              >
+                <View style={styles.cellLeft}>
+                  <View style={styles.cellIconBg}>
+                    <Ionicons name="person-outline" size={18} color="#000000" />
+                  </View>
+                  <Text style={styles.cellTitle}>Edit Profile Information</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+
+              <View style={styles.cellDivider} />
+
+              <TouchableOpacity 
+                style={styles.groupedCell} 
+                activeOpacity={0.7} 
+                onPress={() => router.push('/(customer)/history')}
+              >
+                <View style={styles.cellLeft}>
+                  <View style={styles.cellIconBg}>
+                    <Ionicons name="time-outline" size={18} color="#000000" />
+                  </View>
+                  <Text style={styles.cellTitle}>Stamp History & Logs</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeaderTitle}>Preferences & Support</Text>
+
+            <View style={styles.groupedContainer}>
+              <View style={styles.groupedCell}>
+                <View style={styles.cellLeft}>
+                  <View style={styles.cellIconBg}>
+                    <Ionicons name="notifications-outline" size={18} color="#000000" />
+                  </View>
+                  <View style={{ gap: 2, flex: 1, paddingRight: 8 }}>
+                    <Text style={styles.cellTitle}>Push Notifications</Text>
+                    <Text style={styles.cellSubtitle} numberOfLines={1}>
+                      Receive instant alerts for rewards, stamps & promos
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={optInMarketing}
+                  onValueChange={handleToggleMarketing}
+                  trackColor={{ false: '#E2E8F0', true: '#000000' }}
+                  thumbColor={optInMarketing ? '#FFCC00' : '#FFFFFF'}
+                />
+              </View>
+
+              <View style={styles.cellDivider} />
+
+              <TouchableOpacity
+                style={styles.groupedCell}
+                activeOpacity={0.7}
+                onPress={() => setSupportModalVisible(true)}
+              >
+                <View style={styles.cellLeft}>
+                  <View style={styles.cellIconBg}>
+                    <Ionicons name="help-buoy-outline" size={18} color="#000000" />
+                  </View>
+                  <Text style={styles.cellTitle}>Help & Customer Support</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+
+              <View style={styles.cellDivider} />
+
+              <TouchableOpacity
+                style={styles.groupedCell}
+                activeOpacity={0.7}
+                onPress={() => setPrivacyModalVisible(true)}
+              >
+                <View style={styles.cellLeft}>
+                  <View style={styles.cellIconBg}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color="#000000" />
+                  </View>
+                  <Text style={styles.cellTitle}>Privacy & Terms of Service</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── Logout Action Button ── */}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+            activeOpacity={0.8}
+          >
             <Ionicons name="log-out-outline" size={18} color="#EF4444" />
             <Text style={styles.logoutText}>Log Out Account</Text>
           </TouchableOpacity>
         </ScrollView>
 
-      {/* Custom Premium Log Out Confirmation Modal */}
+      {/* Apple Native Bottom Sheet Log Out Confirmation (Option 1) */}
       <Modal
         visible={logoutModalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setLogoutModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBg}>
-              <Ionicons name="log-out" size={28} color="#EF4444" />
+        <TouchableOpacity
+          style={styles.logoutSheetOverlay}
+          activeOpacity={1}
+          onPress={() => setLogoutModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.logoutSheetCard,
+              isDesktop && { maxWidth: 440, alignSelf: 'center', marginBottom: 'auto', marginTop: 'auto', borderRadius: 32 }
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* iOS Drag Handle */}
+            <View style={styles.logoutSheetHandle} />
+
+            {/* Soft Retention Icon Squircle */}
+            <View style={styles.logoutIconSquircle}>
+              <Ionicons name={vouchersCount > 0 ? "ticket-outline" : "log-out-outline"} size={26} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Log Out Account</Text>
-            <Text style={styles.modalSubtitle}>
-              Are you sure you want to log out of your RISEV account? You will need to verify your mobile number again to sign back in.
+
+            <Text style={styles.logoutSheetTitle}>We'll Miss You!</Text>
+            <Text style={styles.logoutSheetSubtitle}>
+              {vouchersCount > 0 ? (
+                <>
+                  Don't forget you have{' '}
+                  <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                    {vouchersCount} {vouchersCount === 1 ? 'voucher' : 'vouchers'}
+                  </Text>
+                  {vouchersTotalValue > 0 ? (
+                    <>
+                      {' '}worth{' '}
+                      <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                        RM {vouchersTotalValue % 1 === 0 ? vouchersTotalValue : vouchersTotalValue.toFixed(2)}
+                      </Text>
+                    </>
+                  ) : null}{' '}
+                  waiting in your wallet.
+                </>
+              ) : (
+                "Are you sure you want to log out of your RISEV account? You can sign back in anytime with your credentials."
+              )}
             </Text>
-            <View style={styles.modalActionsRow}>
+
+            {/* Stacked Apple Action Pills */}
+            <View style={styles.logoutActionsCol}>
               <TouchableOpacity
-                style={styles.modalCancelBtn}
+                style={styles.logoutConfirmPill}
+                onPress={confirmLogout}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.logoutConfirmPillText}>Log Out</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.logoutCancelPill}
                 onPress={() => setLogoutModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                onPress={confirmLogout}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalConfirmText}>Log Out</Text>
+                <Text style={styles.logoutCancelPillText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Custom Premium Edit Profile Modal */}
@@ -592,9 +755,9 @@ export default function CustomerProfile() {
                 We collect your phone number and email address to manage reward programs, secure your credentials, and display transactions logs. We implement strict data integrity measures and do not sell your personal details to third-party advertisers.
               </Text>
               
-              <Text style={styles.privacyHeading}>3. WhatsApp Protocols</Text>
+              <Text style={styles.privacyHeading}>3. Push Notifications & Alerts</Text>
               <Text style={styles.privacyText}>
-                RISEV uses an automated messaging relay to dispatch OTP authentication codes and stamp completion logs to your WhatsApp instance. By registering, you opt in to receive transactional messages.
+                RISEV dispatches real-time push notifications for stamp rewards, voucher redemptions, and exclusive promotions. You can customize your notification preferences at any time in your profile settings.
               </Text>
             </ScrollView>
 
@@ -694,248 +857,419 @@ export default function CustomerProfile() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Consistent pure white background
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 60,
-    marginTop: 8,
+  headerContainer: {
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
-  logoContainer: {
-    alignItems: 'center',
-    gap: 1,
-  },
-  logoText: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    letterSpacing: -0.5,
-  },
-  logoSubtext: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  headerRight: {
+  headerTopRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerLogo: {
+    width: 88,
+    height: 28,
+    resizeMode: 'contain',
+  },
+  headerLogoDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   roundHeaderBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
     elevation: 1,
-    position: 'relative',
-  },
-  badgeDot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
-    right: 10,
-    top: 10,
-  },
-  avatarMini: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 110, // Safe clearance padding for bottom navbar
-    gap: 24,
-  },
-  introSection: {
-    gap: 6,
-  },
-  title: {
-    fontSize: 26,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    lineHeight: 22,
-  },
-  // User Profile Card
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    paddingTop: 16,
+    paddingBottom: 130, // Safe clearance for floating bottom dock
     gap: 16,
   },
-  avatarLarge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-  },
-  userInfo: {
-    gap: 2,
-  },
-  name: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-  },
-  phone: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-  },
-  memberBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  memberBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-  },
-  // Switch to Merchant Card
-  switchCard: {
+  // Executive Member Identity Card
+  memberCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     borderWidth: 1.5,
-    borderColor: '#000000', // Black focus border matching image 2 style
-    gap: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.02,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 2,
+    gap: 16,
   },
-  switchHeader: {
+  memberProfileRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 16,
   },
-  switchInfo: {
+  avatarWrapper: {
+    position: 'relative',
+  },
+  memberAvatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  avatarPencilBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  memberInfoCol: {
     flex: 1,
+    gap: 4,
+  },
+  memberNameText: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.4,
+  },
+  memberPhoneText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  memberTierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 99,
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  memberTierText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.5,
+  },
+  // 3-Column Loyalty Snapshot Row
+  statsSnapshotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
     gap: 2,
   },
-  switchTitle: {
-    fontSize: 15,
+  statIconBadge: {
+    marginBottom: 2,
+  },
+  statNumber: {
+    fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
-  switchSubtitle: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
+  statLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
-    lineHeight: 18,
   },
-  switchButton: {
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  // Merchant Switch Card (Concept 2: Compact Risev Yellow Hero Card)
+  merchantCard: {
+    backgroundColor: '#FFCC00',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#F2BD00',
+    gap: 11,
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  merchantHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  merchantIconSquircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  merchantTextCol: {
+    flex: 1,
+    gap: 1.5,
+  },
+  merchantTitle: {
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.3,
+  },
+  merchantSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'rgba(0, 0, 0, 0.72)',
+    lineHeight: 15,
+  },
+  merchantCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000', // Solid black action button matching mockup
-    height: 44,
-    borderRadius: 12,
+    backgroundColor: '#000000',
+    height: 38,
+    borderRadius: 99,
+    gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  merchantCtaText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  // Inset Grouped Settings
+  sectionGroup: {
     gap: 8,
   },
-  switchButtonText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  // Menu Options List
-  menuList: {
-    gap: 12,
-  },
-  menuSectionHeader: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
+  sectionHeaderTitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#64748B',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 0.8,
+    paddingLeft: 4,
   },
-  menuItem: {
+  groupedContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  groupedCell: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    height: 52,
     paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    paddingVertical: 14,
+    minHeight: 52,
   },
-  menuItemLeft: {
+  cellLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  cellIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  menuItemText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+  cellTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
     color: '#000000',
+  },
+  cellSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  cellDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 60,
   },
   // Logout Button
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF5F5', // Red theme logout
+    backgroundColor: '#FFF5F5',
     borderWidth: 1.5,
     borderColor: '#FEE2E2',
-    height: 52,
+    height: 50,
     borderRadius: 16,
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   logoutText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#EF4444',
+  },
+  // Apple Native Bottom Sheet Log Out Styles
+  logoutSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  logoutSheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  logoutSheetHandle: {
+    width: 38,
+    height: 4.5,
+    borderRadius: 99,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 16,
+  },
+  logoutIconSquircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FEE2E2',
+    marginBottom: 6,
+  },
+  logoutSheetTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  logoutSheetSubtitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  logoutActionsCol: {
+    width: '100%',
+    gap: 10,
+    marginTop: 18,
+  },
+  logoutConfirmPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EF4444',
+    height: 52,
+    borderRadius: 999,
+    gap: 8,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  logoutConfirmPillText: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  logoutCancelPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    height: 52,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  logoutCancelPillText: {
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   modalOverlay: {
     flex: 1,

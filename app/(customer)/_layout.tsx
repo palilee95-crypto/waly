@@ -232,9 +232,10 @@ const AnimatedTabButton = ({ isFocused, onPress, iconName, label }: any) => {
     }).start();
   }, [isFocused]);
 
+  const targetWidth = label && label.length > 6 ? 94 : 84;
   const width = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [40, 82]
+    outputRange: [40, targetWidth]
   });
   
   const labelOpacity = anim.interpolate({
@@ -535,6 +536,7 @@ export default function CustomerLayout() {
   return (
     <View style={styles.container}>
       <Tabs
+        backBehavior="history"
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,

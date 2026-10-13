@@ -16,7 +16,12 @@ export default function PwaInstallPrompt() {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
-    // 1. Check if app is already running as standalone PWA
+    // 1. Check if app is already running as standalone PWA or on auth routes
+    const isAuthRoute =
+      window.location.pathname.includes('login') ||
+      window.location.pathname.includes('(auth)');
+    if (isAuthRoute) return;
+
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone ||

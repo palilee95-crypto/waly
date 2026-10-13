@@ -61,6 +61,14 @@ routerAdd("POST", "/api/risev/register", (e) => {
   }
 
   const trimmedEmail = String(email).trim().toLowerCase();
+  let digits = String(phone).replace(/[^\d]/g, '');
+  if (digits.startsWith('0')) digits = '6' + digits;
+  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+  const cleanPhone = '+' + digits;
+  const rawDigits = digits;
+  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+  const phoneFilter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
+
   const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!basicEmailRegex.test(trimmedEmail)) {
     return e.json(400, { message: "Please enter a valid email address." });
@@ -94,14 +102,6 @@ routerAdd("POST", "/api/risev/register", (e) => {
     return e.json(400, { message: "Invalid email extension. Did you mean .com instead of ." + emailDomain.split('.').pop() + "?" });
   }
 
-  let digits = String(phone).replace(/[^\d]/g, '');
-  if (digits.startsWith('0')) digits = '6' + digits;
-  if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-  const cleanPhone = '+' + digits;
-  const rawDigits = digits;
-  const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
-  const phoneFilter = `phone = '${cleanPhone}' || phone = '${rawDigits}' || phone = '${localDigits}'`;
-
   // Check phone uniqueness with normalized digits
   let existingUser = null;
   try {
@@ -112,7 +112,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
   let isQuickUpgrade = false;
   if (existingUser) {
     const existingEmail = existingUser.getString("email") || "";
-    if (existingEmail.endsWith("@risev.app") || existingEmail.includes("@risev.app")) {
+    if (existingEmail.endsWith("@risev.app") || existingEmail.includes("@risev.app") || existingEmail.endsWith("@user.risev.net")) {
       isQuickUpgrade = true;
     } else {
       return e.json(400, { message: "Phone number is already registered" });
@@ -121,7 +121,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
 
   // Check email uniqueness
   try {
-    const emailUser = $app.findFirstRecordByData("users", "email", email);
+    const emailUser = $app.findFirstRecordByData("users", "email", trimmedEmail);
     if (!isQuickUpgrade || (existingUser && emailUser.id !== existingUser.id)) {
       return e.json(400, { message: "Email address is already registered" });
     }
@@ -154,7 +154,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
       user = new Record(collection);
       user.set("phone", cleanPhone);
     }
-    user.set("email", email);
+    user.set("email", trimmedEmail);
     user.set("name", name || `User ${cleanPhone.slice(-4)}`);
     const existingRole = user.getString("role");
     if (existingRole === "both" || existingRole === "merchant") {
@@ -175,7 +175,7 @@ routerAdd("POST", "/api/risev/register", (e) => {
       console.log("[Register Mail Error] Failed to send verification email:", mailErr.message || mailErr);
     }
 
-    return e.json(200, { success: true, message: "Registration successful" });
+    return e.json(200, { success: true, message: "Registration successful", verified: isEmailOptional });
   } catch (createErr) {
     return e.json(500, { message: "Failed to create user: " + createErr.message });
   }

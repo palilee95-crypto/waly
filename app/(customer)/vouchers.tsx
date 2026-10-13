@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   useWindowDimensions,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,7 +57,8 @@ const isLightColor = (color: string) => {
 export default function VouchersScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'active' | 'used'>('active');
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'used'>('active');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherItem | null>(null);
   const [useModalVisible, setUseModalVisible] = useState(false);
   const [vouchers, setVouchers] = useState<VoucherItem[]>([]);
@@ -294,7 +296,22 @@ export default function VouchersScreen() {
     };
   }, [useModalVisible, selectedVoucher?.id, selectedVoucher?.status]);
 
-  const filteredVouchers = vouchers.filter((v) => v.status === activeTab);
+  const availableCount = vouchers.filter((v) => v.status === 'active').length;
+  const historyCount = vouchers.filter((v) => v.status === 'used').length;
+  const totalCount = vouchers.length;
+
+  const filteredVouchers = vouchers.filter((v) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (q) {
+      const matchMerchant = v.merchantName.toLowerCase().includes(q);
+      const matchTitle = v.title.toLowerCase().includes(q);
+      const matchCategory = (v.category || '').toLowerCase().includes(q);
+      const matchCode = (v.code || '').toLowerCase().includes(q);
+      if (!matchMerchant && !matchTitle && !matchCategory && !matchCode) return false;
+    }
+    if (activeTab === 'all') return true;
+    return v.status === activeTab;
+  });
 
   const handleUseVoucher = (voucher: VoucherItem) => {
     setSelectedVoucher(voucher);
@@ -311,25 +328,240 @@ export default function VouchersScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* ── Yellow S-Curve Header (Idea 1) ── */}
-        <View style={{ backgroundColor: '#FFFFFF' }}>
-          {/* Yellow Block */}
-          <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 32 }}>
-            <View style={[{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-              {/* Logo row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
-                <Image source={require('../../assets/risev logo.png')} style={{ width: 110, height: 38, resizeMode: 'contain' }} />
+        {/* Apple Wallet Native Executive Header with Segmented Filter Tabs */}
+        <View style={{
+          backgroundColor: '#FFFFFF',
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+          zIndex: 10,
+        }}>
+          <View style={[
+            { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+            isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+          ]}>
+            {/* Top Row: Back button (if available) + Large Title + Active Vouchers Badge */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {router.canGoBack() && (
+                  <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                )}
+                <Text style={{
+                  fontSize: 28,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#000000',
+                  letterSpacing: -0.8,
+                }}>
+                  My Vouchers
+                </Text>
               </View>
-              {/* Title */}
-              <Text style={{ fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1, marginBottom: 4 }}>My Vouchers</Text>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#806400', lineHeight: 18 }}>
-                Redeem and present rewards vouchers at partner stores to enjoy discounts.
-              </Text>
+
+              {/* Active Vouchers Count Badge */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: '#F8FAFC',
+                paddingHorizontal: 11,
+                paddingVertical: 5.5,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.06)',
+              }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFCC00' }} />
+                <Text style={{
+                  fontSize: 11.5,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                }}>
+                  {availableCount} Active
+                </Text>
+              </View>
             </View>
-          </View>
-          {/* S-Curve: white strip with concave top-left arc */}
-          <View style={{ height: 28, backgroundColor: '#FFC700' }}>
-            <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
+
+            {/* Muted Subtitle */}
+            <Text style={{
+              fontSize: 12.5,
+              fontFamily: 'PlusJakartaSans_500Medium',
+              color: 'rgba(0, 0, 0, 0.55)',
+              lineHeight: 18,
+              marginBottom: 12,
+            }}>
+              Redeem and present rewards vouchers at partner stores.
+            </Text>
+
+            {/* Apple iOS Search Bar */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#F8FAFC',
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              height: 46,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.06)',
+              marginBottom: 12,
+            }}>
+              <Ionicons name="search" size={18} color="rgba(0, 0, 0, 0.45)" />
+              <TextInput
+                style={{
+                  flex: 1,
+                  marginLeft: 10,
+                  fontSize: 14,
+                  fontFamily: 'PlusJakartaSans_500Medium',
+                  color: '#000000',
+                }}
+                placeholder="Search voucher or store..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={18} color="rgba(0, 0, 0, 0.4)" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Segmented Filter Pills (All / Available / History) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+            >
+              {/* Tab 1: All */}
+              <TouchableOpacity
+                onPress={() => setActiveTab('all')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: activeTab === 'all' ? '#000000' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: activeTab === 'all' ? '#000000' : 'rgba(0, 0, 0, 0.08)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: activeTab === 'all' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: activeTab === 'all' ? '#FFFFFF' : '#000000',
+                }}>
+                  All
+                </Text>
+                <View style={{
+                  backgroundColor: activeTab === 'all' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: activeTab === 'all' ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Tab 2: Available */}
+              <TouchableOpacity
+                onPress={() => setActiveTab('active')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: activeTab === 'active' ? '#000000' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: activeTab === 'active' ? '#000000' : 'rgba(0, 0, 0, 0.08)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: activeTab === 'active' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: activeTab === 'active' ? '#FFFFFF' : '#000000',
+                }}>
+                  Available
+                </Text>
+                <View style={{
+                  backgroundColor: activeTab === 'active' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: activeTab === 'active' ? '#FFFFFF' : '#000000',
+                  }}>
+                    {availableCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Tab 3: History */}
+              <TouchableOpacity
+                onPress={() => setActiveTab('used')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: activeTab === 'used' ? '#000000' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: activeTab === 'used' ? '#000000' : 'rgba(0, 0, 0, 0.08)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: activeTab === 'used' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: activeTab === 'used' ? '#FFFFFF' : '#000000',
+                }}>
+                  History
+                </Text>
+                <View style={{
+                  backgroundColor: activeTab === 'used' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: activeTab === 'used' ? '#FFFFFF' : '#000000',
+                  }}>
+                    {historyCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
 
@@ -337,32 +569,8 @@ export default function VouchersScreen() {
           contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
         >
-
-          {/* Simple Tab Filters (Matches new payment/topup mockup styling) */}
-          <View style={styles.tabsRow}>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'active' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('active')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
-                Available Vouchers ({vouchers.filter(v => v.status === 'active').length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'used' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('used')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.tabText, activeTab === 'used' && styles.tabTextActive]}>
-                History
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           {/* Birthday Rewards Section */}
-          {activeTab === 'active' && birthdayRewards.filter((b) => b.status === 'active').length > 0 && (
+          {(activeTab === 'all' || activeTab === 'active') && birthdayRewards.filter((b) => b.status === 'active').length > 0 && (
             <View style={styles.birthdaySection}>
               <View style={styles.birthdaySectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -706,7 +914,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 110, // Safe padding to clear bottom tab bar
+    paddingBottom: 130, // Safe padding to clear bottom tab bar
     gap: 20,
   },
   introSection: {

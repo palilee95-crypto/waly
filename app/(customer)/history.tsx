@@ -122,7 +122,11 @@ export default function StampHistoryScreen() {
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
         {/* Navigation Header */}
         <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+          <TouchableOpacity 
+            style={styles.backBtn} 
+            onPress={() => router.canGoBack() ? router.back() : router.replace('/(customer)/profile')} 
+            activeOpacity={0.7}
+          >
             <Ionicons name="chevron-back" size={20} color="#000000" />
             <Text style={styles.backBtnText}>Profile</Text>
           </TouchableOpacity>

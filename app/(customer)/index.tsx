@@ -39,12 +39,12 @@ import {
 const { width } = Dimensions.get('window');
 
 const CATEGORIES = [
-  { id: 'barber', name: 'Barber', icon: 'cut', inactiveBg: '#FEF9C3', activeBg: '#FACC15', iconColor: '#0F172A', shadowColor: '#F59E0B' },
-  { id: 'beauty', name: 'Beauty', icon: 'flower', inactiveBg: '#FFF0F5', activeBg: '#FB7185', iconColor: '#E11D48', shadowColor: '#F43F5E' },
-  { id: 'carwash', name: 'Car Wash', icon: 'car-sport', inactiveBg: '#F0F9FF', activeBg: '#38BDF8', iconColor: '#0284C7', shadowColor: '#0284C7' },
-  { id: 'cafe', name: 'Cafe', icon: 'cafe', inactiveBg: '#FFFBEB', activeBg: '#F59E0B', iconColor: '#92400E', shadowColor: '#D97706' },
-  { id: 'restaurant', name: 'Restaurant', icon: 'restaurant', inactiveBg: '#FEF2F2', activeBg: '#F87171', iconColor: '#DC2626', shadowColor: '#DC2626' },
-  { id: 'more', name: 'More', icon: 'ellipsis-horizontal', inactiveBg: '#F8FAFC', activeBg: '#94A3B8', iconColor: '#475569', shadowColor: '#94A3B8' },
+  { id: 'barber', name: 'Barber', icon: 'cut', iconOutline: 'cut-outline' },
+  { id: 'beauty', name: 'Beauty', icon: 'flower', iconOutline: 'flower-outline' },
+  { id: 'carwash', name: 'Car Wash', icon: 'car-sport', iconOutline: 'car-sport-outline' },
+  { id: 'cafe', name: 'Cafe', icon: 'cafe', iconOutline: 'cafe-outline' },
+  { id: 'restaurant', name: 'Restaurant', icon: 'restaurant', iconOutline: 'restaurant-outline' },
+  { id: 'more', name: 'More', icon: 'ellipsis-horizontal', iconOutline: 'ellipsis-horizontal' },
 ];
 
 function formatUpcomingDate(dateStr?: string) {
@@ -1181,14 +1181,22 @@ export default function CustomerDashboard() {
               </TouchableOpacity>
             </View>
 
-            {/* 🏷️ 4. QUICK CATEGORY CHIPS (3D Neumorphic Soft Clay Squircle) */}
-            <View style={styles.categoriesRow}>
+            {/* 🏷️ 4. QUICK CATEGORY CHIPS (Fresha × Apple iOS Compact Pill Chips) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryPillsScroll}
+              style={{ marginTop: 8, marginBottom: 4 }}
+            >
               {CATEGORIES.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    style={styles.categoryItem}
+                    style={[
+                      styles.categoryPill,
+                      isSelected ? styles.categoryPillSelected : styles.categoryPillDefault,
+                    ]}
                     onPress={() => {
                       setSelectedCategory(cat.id);
                       if (cat.id === 'more') {
@@ -1197,70 +1205,25 @@ export default function CustomerDashboard() {
                         router.push({ pathname: '/(customer)/explore', params: { category: cat.id } });
                       }
                     }}
-                    activeOpacity={0.8}
+                    activeOpacity={0.75}
                   >
-                    <View
-                      style={[
-                        styles.neuClayCategoryBox,
-                        {
-                          backgroundColor: isSelected ? cat.activeBg : cat.inactiveBg,
-                          shadowColor: cat.shadowColor,
-                          shadowOpacity: isSelected ? 0.5 : 0.22,
-                          shadowRadius: isSelected ? 12 : 6,
-                          elevation: isSelected ? 7 : 3,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={cat.icon as any}
-                        size={22}
-                        color={isSelected ? '#0F172A' : cat.iconColor}
-                      />
-                    </View>
+                    <Ionicons
+                      name={(isSelected ? cat.icon : cat.iconOutline) as any}
+                      size={16}
+                      color={isSelected ? '#FFFFFF' : '#000000'}
+                    />
                     <Text
                       style={[
-                        styles.categoryLabel,
-                        isSelected && styles.categoryLabelSelected,
+                        styles.categoryPillText,
+                        isSelected ? styles.categoryPillTextSelected : styles.categoryPillTextDefault,
                       ]}
-                      numberOfLines={1}
                     >
                       {cat.name}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
-            </View>
-
-            {/* 💡 NEXT VISIT SUGGESTION (Statistical Return Interval) */}
-            {nextVisitPrediction && nextVisitPrediction.has_sufficient_history && nextVisitPrediction.estimated_next_visit_date ? (
-              <View style={[styles.sectionContainer, { marginTop: 4, marginBottom: 12 }]}>
-                <View style={{
-                  backgroundColor: '#FEF9C3',
-                  borderRadius: 20,
-                  padding: 16,
-                  borderWidth: 1.5,
-                  borderColor: '#FDE047',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 12,
-                }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF08A', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="calendar" size={22} color="#854D0E" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Routine Visit Suggestion
-                    </Text>
-                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginTop: 2 }}>
-                      Estimated next visit around {nextVisitPrediction.estimated_next_visit_date}
-                    </Text>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#713F12', marginTop: 1 }}>
-                      Based on your typical {nextVisitPrediction.typical_interval_days}-day return cadence
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ) : null}
+            </ScrollView>
 
             {/* 🎯 "PICKED FOR YOU" INTELLIGENT RECOMMENDATION FEED */}
             {(() => {
@@ -1435,6 +1398,181 @@ export default function CustomerDashboard() {
                 </View>
               );
             })()}
+
+            {/* ⚡ CUSTOMER QUICK ACTIONS HUB (Apple iOS Native 4-Icon Row) */}
+            <View style={{
+              marginTop: 4,
+              marginBottom: 10,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 22,
+              paddingVertical: 14,
+              paddingHorizontal: 8,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.06)',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 2,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              {/* 1. My Booking */}
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center' }}
+                onPress={() => router.push('/(customer)/bookings' as any)}
+                activeOpacity={0.75}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}>
+                  {upcomingBooking && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: '#FFCC00',
+                      borderWidth: 1.5,
+                      borderColor: '#FFFFFF',
+                    }} />
+                  )}
+                  <Ionicons name="calendar-outline" size={22} color="#000000" />
+                </View>
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                  marginTop: 6,
+                  textAlign: 'center',
+                }} numberOfLines={1}>
+                  My Booking
+                </Text>
+              </TouchableOpacity>
+
+              {/* 2. My Voucher */}
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center' }}
+                onPress={() => router.push('/(customer)/vouchers' as any)}
+                activeOpacity={0.75}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="ticket-outline" size={22} color="#000000" />
+                </View>
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                  marginTop: 6,
+                  textAlign: 'center',
+                }} numberOfLines={1}>
+                  My Voucher
+                </Text>
+              </TouchableOpacity>
+
+              {/* 3. Explore Merchant */}
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center' }}
+                onPress={() => router.push('/(customer)/explore' as any)}
+                activeOpacity={0.75}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="compass-outline" size={22} color="#000000" />
+                </View>
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                  marginTop: 6,
+                  textAlign: 'center',
+                }} numberOfLines={1}>
+                  Explore
+                </Text>
+              </TouchableOpacity>
+
+              {/* 4. My Stamp Card */}
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center' }}
+                onPress={() => router.push('/(customer)/my-cards' as any)}
+                activeOpacity={0.75}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: 'rgba(0, 0, 0, 0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}>
+                  {loyaltyCards && loyaltyCards.length > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      backgroundColor: '#FFCC00',
+                      borderWidth: 1.5,
+                      borderColor: '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 3,
+                    }}>
+                      <Text style={{
+                        fontSize: 9.5,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: '#000000',
+                      }}>
+                        {loyaltyCards.length}
+                      </Text>
+                    </View>
+                  )}
+                  <Ionicons name="gift-outline" size={22} color="#000000" />
+                </View>
+                <Text style={{
+                  fontSize: 11,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                  marginTop: 6,
+                  textAlign: 'center',
+                }} numberOfLines={1}>
+                  Stamp Card
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* ❤️ FAVORITE STORES SECTION (Max 5 Stores Carousel) */}
             <View style={styles.sectionContainer}>
@@ -2538,37 +2676,49 @@ const styles = StyleSheet.create({
   },
 
   /* 🏷️ 3D NEUMORPHIC SOFT CLAY CATEGORY CHIPS */
-  categoriesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: 2,
-  },
-  categoryItem: {
-    alignItems: 'center',
+  categoryPillsScroll: {
+    paddingHorizontal: 16,
     gap: 8,
-    flex: 1,
-  },
-  neuClayCategoryBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 22,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    shadowOffset: { width: 0, height: 5 },
   },
-  categoryLabel: {
-    fontSize: 11.5,
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  categoryPillDefault: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  categoryPillSelected: {
+    backgroundColor: '#000000',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  categoryPillText: {
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#475569',
-    textAlign: 'center',
   },
-  categoryLabelSelected: {
+  categoryPillTextDefault: {
+    color: '#000000',
+  },
+  categoryPillTextSelected: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
 
   /* 📦 SECTION GENERAL */

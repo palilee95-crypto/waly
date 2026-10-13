@@ -875,6 +875,19 @@
     .pass-container {
       padding: 16px;
       background: #FFFFFF;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    #step-4 {
+      min-height: 100%;
+    }
+
+    .pass-arrival-section {
+      margin-top: auto;
+      padding-top: 16px;
     }
 
     .pass-nav-circle-btn {
@@ -1979,37 +1992,14 @@
             </div>
           </div>
 
-          <!-- 5. Arrival Check-In Button (Pure Black Pill Button) -->
-          <button class="btn-arrived-pill" onclick="alert('Arrival confirmed!')">
-            <div class="btn-arrived-pill-icon">📍</div>
-            <span>I HAVE ARRIVED</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
-
-          <!-- Helper Text -->
-          <div class="arrived-subtext">Tap the button below as soon as you step inside the store.</div>
-
-          <!-- 6. Compact Appointment Reminder Card -->
-          <div class="pass-reminder-card">
-            <div class="pass-reminder-icon-box">
-              <div style="position: absolute; top: 1px; right: 2px; font-size: 8px;">✨</div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-            </div>
-            <div style="flex: 1;">
-              <div style="font-size: 13px; font-weight: 700; color: #000000;">Appointment Reminder Active</div>
-              <div style="font-size: 11px; font-weight: 500; color: rgba(0, 0, 0, 0.55); margin-top: 2px; line-height: 1.3;">Notifications will be sent 12 hours, 3 hours, and 30 minutes before your appointment.</div>
-            </div>
-            <button class="btn-reminder-active-pill" onclick="alert('Reminder is active')">Active ✓</button>
-          </div>
-
-          <!-- Save App PWA Box -->
-          <div class="pwa-install-box">
-            <div class="pwa-icon">📱</div>
-            <div style="flex: 1;">
-              <div class="pwa-title">Save Scoop creamy App</div>
-              <div class="pwa-sub">Get instant slot reminders & fast re-booking</div>
-            </div>
-            <button class="btn-install-yellow" onclick="alert('Add to Home Screen')">Install</button>
+          <!-- 5. Arrival Check-In Action Section -->
+          <div class="pass-arrival-section">
+            <button class="btn-arrived-pill" onclick="alert('Arrival confirmed!')">
+              <div class="btn-arrived-pill-icon">📍</div>
+              <span>I HAVE ARRIVED</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+            <div class="arrived-subtext" style="margin-bottom: 0;">Tap the button above as soon as you step inside the store.</div>
           </div>
 
         </div>
@@ -2087,6 +2077,11 @@
       const stickyDarkBar = document.getElementById('stickyDarkBar');
       const darkBarSub = document.getElementById('darkBarSub');
       const darkBarTotal = document.getElementById('darkBarTotal');
+
+      const viewScroll = document.querySelector('.view-scroll');
+      if (viewScroll) {
+        viewScroll.style.paddingBottom = currentStep === 4 ? '12px' : (currentStep === 0 ? '70px' : '90px');
+      }
 
       if (currentStep === 0) {
         if (headerNav) headerNav.style.display = 'none';

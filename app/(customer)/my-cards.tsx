@@ -49,6 +49,8 @@ type LoyaltyCardItem = {
   linkedRewardId?: string;
   enable_stamps?: boolean;
   enable_points?: boolean;
+  merchantSlug?: string;
+  merchantCity?: string;
 };
 
 // --- Sub-component for Hoverable Wallet Card ---
@@ -242,10 +244,12 @@ export default function MyCardsScreen() {
   const [pulledOutCardId, setPulledOutCardId] = useState<string | null>(null);
   const [pinnedCards, setPinnedCards] = useState<string[]>([]);
 
+  const [filterTab, setFilterTab] = useState<'all' | 'progress' | 'redeem'>('all');
+
   useEffect(() => {
     setCurrentPage(1);
     setDisplayPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, filterTab]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage === currentPage || isPaginating) return;
@@ -330,6 +334,8 @@ export default function MyCardsScreen() {
           linkedRewardId: program?.linked_reward,
           enable_stamps: program?.enable_stamps,
           enable_points: program?.enable_points,
+          merchantSlug: merchant?.pwa_slug || merchant?.slug || merchant?.id,
+          merchantCity: merchant?.city || merchant?.location || '',
           gradientColors: program?.card_color ? [program.card_color, '#000000'] : ['#EC4899', '#8B5CF6'],
           cardIcon: program?.card_icon || 'coffee',
           stampColor: program?.stamp_color || '#3B82F6',
@@ -542,27 +548,113 @@ export default function MyCardsScreen() {
   const isDesktop = windowWidth >= 768;
 
   const CARDS_PER_PAGE = 4;
-  const filteredCards = loyaltyCards.filter(item => item.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
+  const readyToRedeemCount = loyaltyCards.filter(item => item.collectedStamps >= item.totalStamps).length;
+  const inProgressCount = loyaltyCards.filter(item => item.collectedStamps < item.totalStamps).length;
+  const totalCount = loyaltyCards.length;
+
+  const filteredCards = loyaltyCards.filter(item => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = item.merchantName.toLowerCase().includes(q) || (item.rewardName || '').toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (filterTab === 'redeem') return item.collectedStamps >= item.totalStamps;
+    if (filterTab === 'progress') return item.collectedStamps < item.totalStamps;
+    return true;
+  });
   const totalPages = Math.ceil(filteredCards.length / CARDS_PER_PAGE);
   const paginatedCards = filteredCards.slice((displayPage - 1) * CARDS_PER_PAGE, displayPage * CARDS_PER_PAGE);
 
   return (
     <View style={styles.root}>
       <SafeAreaView style={[styles.container, isDesktop && { paddingLeft: 260 }]} edges={['top']}>
-        {/* Yellow Header Foreground (Z-Index 10 so cards scroll UNDER this part) */}
-        <View style={{ backgroundColor: '#FFC700', borderBottomRightRadius: 28, zIndex: 10 }}>
-          <View style={[{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+        {/* Apple Wallet Native Executive Header with Segmented Filter Tabs */}
+        <View style={{
+          backgroundColor: '#FFFFFF',
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+          zIndex: 10,
+        }}>
+          <View style={[
+            { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+            isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
+          ]}>
             
-            {/* Page Titles inside the Yellow Header */}
-            <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', letterSpacing: -1 }}>All Stamp Cards</Text>
+            {/* Top Row: Back button (if available) + Large Title + Active Cards Badge */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {router.canGoBack() && (
+                  <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                )}
+                <Text style={{
+                  fontSize: 28,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#000000',
+                  letterSpacing: -0.8,
+                }}>
+                  Stamp Cards
+                </Text>
+              </View>
 
-            {/* Search Bar */}
-            <View style={{ marginTop: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 16, height: 48, shadowColor: '#B38B00', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }}>
-              <Ionicons name="search" size={20} color="#94A3B8" />
+              {/* Active Cards Count Badge */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: '#F8FAFC',
+                paddingHorizontal: 11,
+                paddingVertical: 5.5,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.06)',
+              }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFCC00' }} />
+                <Text style={{
+                  fontSize: 11.5,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#000000',
+                }}>
+                  {totalCount} {totalCount === 1 ? 'Card' : 'Cards'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Apple iOS Search Bar */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#F8FAFC',
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              height: 46,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 0, 0, 0.06)',
+              marginBottom: 12,
+            }}>
+              <Ionicons name="search" size={18} color="rgba(0, 0, 0, 0.45)" />
               <TextInput
-                style={{ flex: 1, marginLeft: 12, fontSize: 15, fontFamily: 'PlusJakartaSans_500Medium', color: '#1A1400' }}
-                placeholder="Search merchant name..."
-                placeholderTextColor="#94A3B8"
+                style={{
+                  flex: 1,
+                  marginLeft: 10,
+                  fontSize: 14,
+                  fontFamily: 'PlusJakartaSans_500Medium',
+                  color: '#000000',
+                }}
+                placeholder="Search merchant or reward..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
@@ -570,21 +662,141 @@ export default function MyCardsScreen() {
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                  <Ionicons name="close-circle" size={18} color="rgba(0, 0, 0, 0.4)" />
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Segmented Filter Pills (All / In Progress / Ready to Redeem) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+            >
+              {/* Tab 1: All */}
+              <TouchableOpacity
+                onPress={() => setFilterTab('all')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: filterTab === 'all' ? '#000000' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: filterTab === 'all' ? '#000000' : 'rgba(0, 0, 0, 0.08)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: filterTab === 'all' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: filterTab === 'all' ? '#FFFFFF' : '#000000',
+                }}>
+                  All
+                </Text>
+                <View style={{
+                  backgroundColor: filterTab === 'all' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: filterTab === 'all' ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Tab 2: In Progress */}
+              <TouchableOpacity
+                onPress={() => setFilterTab('progress')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: filterTab === 'progress' ? '#000000' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: filterTab === 'progress' ? '#000000' : 'rgba(0, 0, 0, 0.08)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: filterTab === 'progress' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: filterTab === 'progress' ? '#FFFFFF' : '#000000',
+                }}>
+                  In Progress
+                </Text>
+                <View style={{
+                  backgroundColor: filterTab === 'progress' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_700Bold',
+                    color: filterTab === 'progress' ? '#FFFFFF' : '#000000',
+                  }}>
+                    {inProgressCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Tab 3: Ready to Redeem */}
+              <TouchableOpacity
+                onPress={() => setFilterTab('redeem')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 7,
+                  paddingHorizontal: 13,
+                  borderRadius: 999,
+                  backgroundColor: filterTab === 'redeem' ? '#000000' : (readyToRedeemCount > 0 ? '#FFFBEB' : '#F8FAFC'),
+                  borderWidth: 1,
+                  borderColor: filterTab === 'redeem' ? '#000000' : (readyToRedeemCount > 0 ? '#FDE047' : 'rgba(0, 0, 0, 0.08)'),
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: filterTab === 'redeem' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                  color: filterTab === 'redeem' ? '#FFFFFF' : '#000000',
+                }}>
+                  Ready to Redeem 🎁
+                </Text>
+                <View style={{
+                  backgroundColor: filterTab === 'redeem' ? '#FFCC00' : (readyToRedeemCount > 0 ? '#FFCC00' : 'rgba(0, 0, 0, 0.06)'),
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 10.5,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: '#000000',
+                  }}>
+                    {readyToRedeemCount}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+
           </View>
         </View>
 
-        {/* White swoop Background (Z-Index 1 so cards scroll OVER this part) */}
-        <View style={{ height: 28, backgroundColor: '#FFC700', zIndex: 1 }}>
-          <View style={{ position: 'absolute', bottom: 0, right: 0, left: 0, top: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28 }} />
-        </View>
-
         <ScrollView
-          style={{ marginTop: -28, zIndex: 5 }}
-          contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+          style={{ flex: 1, zIndex: 5 }}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: 16 }, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}
           onScroll={() => {
             if (pulledOutCardId) setPulledOutCardId(null);
@@ -673,88 +885,173 @@ export default function MyCardsScreen() {
       >
         <View style={[styles.detailOverlay, isDesktop && { justifyContent: 'center', alignItems: 'center' }]}>
           {selectedCard && (
-            <View style={[styles.detailContent, isDesktop && { maxWidth: 500, width: '90%', borderRadius: 32, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, borderTopWidth: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.2, shadowRadius: 25, elevation: 10 }]}>
+            <View style={[styles.detailContent, isDesktop && { maxWidth: 520, width: '90%', borderRadius: 32, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, borderTopWidth: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.2, shadowRadius: 25, elevation: 10 }]}>
+              {/* Apple iOS Drag Pill Indicator */}
+              <View style={styles.sheetHandleBar} />
+
+              {/* Modal Header: Merchant Name, Category, City & Circular Close */}
               <View style={styles.detailHeader}>
-                <Text style={styles.detailModalTitle}>
-                  {selectedCard.enable_stamps === false && selectedCard.enable_points === true
-                    ? 'VIP Points Card Details'
-                    : 'Stamp Card Details'}
-                </Text>
-                <TouchableOpacity onPress={() => setDetailModalVisible(false)} style={styles.closeBtn}>
-                  <Ionicons name="close" size={24} color="#000000" />
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.detailMerchantName} numberOfLines={1}>
+                    {selectedCard.merchantName}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <Text style={styles.detailCategoryText} numberOfLines={1}>
+                      {selectedCard.category.toUpperCase()}
+                    </Text>
+                    {selectedCard.merchantCity ? (
+                      <>
+                        <Text style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.3)' }}>•</Text>
+                        <Ionicons name="location-sharp" size={11} color="rgba(0, 0, 0, 0.55)" />
+                        <Text style={styles.detailCityText} numberOfLines={1}>
+                          {selectedCard.merchantCity}
+                        </Text>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setDetailModalVisible(false)} 
+                  style={styles.sheetCloseBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={18} color="#000000" />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-                {/* 3D Flippable Loyalty Card & Hint */}
+              <ScrollView 
+                style={{ flex: 1 }} 
+                showsVerticalScrollIndicator={false} 
+                contentContainerStyle={{ gap: 16, paddingBottom: 16 }}
+              >
+                {/* 3D Flippable Loyalty Card & Tap Hint */}
                 <View>
                   <FlippableLoyaltyCard 
                     card={selectedCard} 
                     user={user} 
                     autoFlipDelay={500}
                   />
-                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6, opacity: 0.8 }}>
-                    <Ionicons name="swap-horizontal" size={14} color="#6B7280" />
-                    <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>Tap card to flip</Text>
+                  <View style={styles.flipHintRow}>
+                    <Ionicons name="swap-horizontal" size={13} color="rgba(0, 0, 0, 0.45)" />
+                    <Text style={styles.flipHintText}>Tap card to flip for details & barcode</Text>
                   </View>
                 </View>
 
-                {/* Points & Tier Info Section (Hidden in Stamps-Only Mode) */}
+                {/* Stamp Progress & Milestones Tracker (Hidden in Points-Only Mode) */}
+                {selectedCard.enable_stamps !== false && (() => {
+                  const isCompleted = selectedCard.collectedStamps >= selectedCard.totalStamps;
+                  const progressPercent = Math.min(100, Math.max(0, Math.round((selectedCard.collectedStamps / selectedCard.totalStamps) * 100)));
+                  const remainingStamps = Math.max(0, selectedCard.totalStamps - selectedCard.collectedStamps);
+
+                  return (
+                    <View style={styles.progressTrackerCard}>
+                      <View style={styles.progressTrackerHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="ribbon-outline" size={15} color="#000000" />
+                          <Text style={styles.progressTrackerTitle}>STAMP PROGRESS</Text>
+                        </View>
+                        <View style={styles.progressBadge}>
+                          <Text style={styles.progressBadgeText}>
+                            {selectedCard.collectedStamps} / {selectedCard.totalStamps} STAMPS
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Visual Progress Bar */}
+                      <View style={styles.modalProgressBarTrack}>
+                        <View style={[styles.modalProgressBarFill, { width: `${progressPercent}%` }]} />
+                      </View>
+
+                      {/* Milestone State */}
+                      {isCompleted ? (
+                        <View style={styles.rewardUnlockedBadge}>
+                          <View style={styles.rewardUnlockedIconBg}>
+                            <Ionicons name="gift" size={16} color="#000000" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.rewardUnlockedTitle}>Reward Ready to Redeem! 🎉</Text>
+                            <Text style={styles.rewardUnlockedSub} numberOfLines={2}>
+                              {selectedCard.rewardName}
+                            </Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={styles.rewardPendingRow}>
+                          <Ionicons name="gift-outline" size={15} color="rgba(0, 0, 0, 0.7)" />
+                          <Text style={styles.rewardPendingText}>
+                            Collect <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{remainingStamps} more stamps</Text> to unlock <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>{selectedCard.rewardName}</Text>
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* 2-Column Grid: Points Balance & Membership Tier (Hidden in Stamps-Only Mode) */}
                 {selectedCard.enable_points !== false && (
-                  <View style={styles.pointsTierCard}>
-                    <View style={styles.pointsTierInfo}>
-                      <Text style={styles.pointsTierTitle}>Points Balance</Text>
-                      <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
+                  <View style={styles.statsGridRow}>
+                    {/* Points Balance Column */}
+                    <View style={styles.statsCard}>
+                      <Text style={styles.statsLabel}>POINTS BALANCE</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
+                        <Text style={styles.statsValue}>{selectedCard.points}</Text>
+                        <Text style={styles.statsUnit}>PTS</Text>
+                      </View>
                     </View>
-                    <View style={[styles.tierBadge, { backgroundColor: '#FFC700' }]}>
-                      <Ionicons name="sparkles" size={13} color="#1A1400" />
-                      <Text style={[styles.tierBadgeText, { color: '#1A1400' }]}>VIP MEMBER</Text>
+
+                    {/* Membership Tier Column */}
+                    <View style={styles.statsCard}>
+                      <Text style={styles.statsLabel}>MEMBERSHIP</Text>
+                      <View style={styles.tierValueRow}>
+                        <View style={styles.tierDot} />
+                        <Text style={styles.tierValueText}>
+                          {(selectedCard.tier || 'VIP').toUpperCase()} MEMBER
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 )}
 
-                {/* Pin to Home Button */}
-                <TouchableOpacity 
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: pinnedCards.includes(selectedCard.id) ? '#F1F5F9' : '#000000',
-                    padding: 16,
-                    borderRadius: 16,
-                    gap: 8,
-                  }}
-                  onPress={() => togglePinCard(selectedCard.id)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name={pinnedCards.includes(selectedCard.id) ? "pin" : "pin-outline"} 
-                    size={20} 
-                    color={pinnedCards.includes(selectedCard.id) ? "#0F172A" : "#FFFFFF"} 
-                  />
-                  <Text style={{
-                    fontFamily: 'PlusJakartaSans_700Bold',
-                    fontSize: 14,
-                    color: pinnedCards.includes(selectedCard.id) ? "#0F172A" : "#FFFFFF"
-                  }}>
-                    {pinnedCards.includes(selectedCard.id) ? "Unpin from Home" : "Pin to Home Dashboard"}
-                  </Text>
-                </TouchableOpacity>
+                {/* Quick Actions Row: Book Appointment & Pin to Home */}
+                <View style={styles.quickActionsRow}>
+                  <TouchableOpacity
+                    style={styles.bookAppointmentBtn}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setDetailModalVisible(false);
+                      const targetSlug = selectedCard.merchantSlug || selectedCard.merchantId;
+                      if (targetSlug) {
+                        router.push(`/b/${targetSlug}` as any);
+                      } else {
+                        Alert.alert('Store Unavailable', 'Merchant booking page is not available.');
+                      }
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.bookAppointmentBtnText}>Book Appointment</Text>
+                  </TouchableOpacity>
 
-                {/* Stamp Completion Reward panel (Hidden in Points-Only Mode) */}
-                {selectedCard.enable_stamps !== false && (
-                  <View style={styles.rewardDetailPanel}>
-                    <View style={styles.rewardIconBg}>
-                      <Ionicons name="gift" size={22} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.rewardDetailInfo}>
-                      <Text style={styles.rewardDetailTitle}>{selectedCard.rewardName}</Text>
-                      <Text style={styles.rewardDetailSub}>
-                        Get rewarded instantly once you earn {selectedCard.totalStamps} stamp points.
-                      </Text>
-                    </View>
-                  </View>
-                )}
+                  <TouchableOpacity
+                    style={[
+                      styles.pinToggleBtn,
+                      pinnedCards.includes(selectedCard.id) && styles.pinToggleBtnActive
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={() => togglePinCard(selectedCard.id)}
+                  >
+                    <Ionicons 
+                      name={pinnedCards.includes(selectedCard.id) ? "pin" : "pin-outline"} 
+                      size={16} 
+                      color={pinnedCards.includes(selectedCard.id) ? "#000000" : "rgba(0, 0, 0, 0.7)"} 
+                    />
+                    <Text style={[
+                      styles.pinToggleBtnText,
+                      pinnedCards.includes(selectedCard.id) && styles.pinToggleBtnTextActive
+                    ]}>
+                      {pinnedCards.includes(selectedCard.id) ? "Pinned" : "Pin to Home"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Points Catalog Section (Hidden in Stamps-Only Mode) */}
                 {selectedCard.enable_points !== false && (
@@ -797,16 +1094,23 @@ export default function MyCardsScreen() {
                 )}
               </ScrollView>
 
-              <TouchableOpacity
-                style={styles.modalScanBtn}
-                onPress={() => {
-                  setDetailModalVisible(false);
-                  setQrModalVisible(true);
-                }}
-              >
-                <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.modalScanBtnText}>Show QR to Scan</Text>
-              </TouchableOpacity>
+              {/* Sticky Bottom Thumb-Zone Action Bar */}
+              <View style={styles.stickyModalFooter}>
+                <TouchableOpacity
+                  style={styles.stickyScanBtn}
+                  activeOpacity={0.88}
+                  onPress={() => {
+                    setDetailModalVisible(false);
+                    setQrModalVisible(true);
+                  }}
+                >
+                  <View style={styles.scanIconPill}>
+                    <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.stickyScanBtnText}>SHOW QR TO SCAN</Text>
+                  <Ionicons name="arrow-forward" size={18} color="rgba(255, 255, 255, 0.7)" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -1158,204 +1462,322 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  // Details Modal styles
+  // Details Modal styles (Apple Bottom Sheet x Fresha)
   detailOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   detailContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    borderTopWidth: 2,
-    borderTopColor: '#000000',
-    padding: 24,
-    gap: 20,
-    maxHeight: '95%',
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    maxHeight: '92%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  sheetHandleBar: {
+    width: 38,
+    height: 4.5,
+    borderRadius: 99,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    alignSelf: 'center',
+    marginBottom: 14,
   },
   detailHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  detailMerchantName: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.3,
+  },
+  detailCategoryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: 'rgba(0, 0, 0, 0.55)',
+    letterSpacing: 0.4,
+  },
+  detailCityText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'rgba(0, 0, 0, 0.55)',
+  },
+  sheetCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtn: {
+    padding: 4,
   },
   detailModalTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
-  closeBtn: {
-    padding: 4,
-  },
-  largeCardView: {
-    borderRadius: 24,
-    padding: 24,
-    gap: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  largeCardHeader: {
+  flipHintRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
   },
-  largeCardMerchant: {
-    fontSize: 18,
+  flipHintText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11.5,
+    color: 'rgba(0, 0, 0, 0.45)',
+  },
+  progressTrackerCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    gap: 12,
+  },
+  progressTrackerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  progressTrackerTitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  progressBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 99,
+  },
+  progressBadgeText: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
-    letterSpacing: 1.2,
+    letterSpacing: 0.3,
   },
-  largeCardNumber: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.45)',
-    marginTop: 4,
-    letterSpacing: 0.5,
+  modalProgressBarTrack: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 99,
+    overflow: 'hidden',
   },
-  goldBadge: {
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  goldBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  nfcIcon: {
-    transform: [{ rotate: '90deg' }],
-  },
-  largeStampsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 14,
-    width: '100%',
+  modalProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFCC00',
+    borderRadius: 99,
   },
   largeStampEarned: {
-    width: '17%',
-    aspectRatio: 1,
-    borderRadius: 99,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  largeStampGift: {
-    width: '17%',
-    aspectRatio: 1,
-    borderRadius: 99,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   largeStampEmpty: {
-    width: '17%',
-    aspectRatio: 1,
-    borderRadius: 99,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  largeStampNumber: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
-  largeCardFooter: {
+  rewardUnlockedBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
-  holderCol: {
-    gap: 2,
+  rewardUnlockedIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  holderLabel: {
-    fontSize: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 0.5,
-  },
-  holderValue: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  brandBadge: {
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  brandBadgeText: {
+  rewardUnlockedTitle: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    opacity: 0.9,
+    color: '#92400E',
   },
-  largeProgressPercentage: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
+  rewardUnlockedSub: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#B45309',
+    marginTop: 1,
   },
-  rewardDetailPanel: {
+  rewardPendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    gap: 8,
+    paddingTop: 2,
   },
-  rewardIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rewardDetailInfo: {
+  rewardPendingText: {
     flex: 1,
-    marginLeft: 16,
-    gap: 4,
-  },
-  rewardDetailTitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#000000',
-  },
-  rewardDetailSub: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    color: 'rgba(0, 0, 0, 0.6)',
     lineHeight: 16,
   },
-  modalScanBtn: {
+  statsGridRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    justifyContent: 'center',
+  },
+  statsLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: 'rgba(0, 0, 0, 0.45)',
+    letterSpacing: 0.5,
+  },
+  statsValue: {
+    fontSize: 22,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  statsUnit: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: 'rgba(0, 0, 0, 0.5)',
+  },
+  tierValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  tierDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFCC00',
+  },
+  tierValueText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.3,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bookAppointmentBtn: {
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#000000',
-    height: 52,
-    borderRadius: 16,
-    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    gap: 7,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     elevation: 3,
   },
-  modalScanBtnText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
+  bookAppointmentBtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  pinToggleBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    gap: 6,
+  },
+  pinToggleBtnActive: {
+    backgroundColor: '#FFCC00',
+    borderColor: '#FFCC00',
+  },
+  pinToggleBtnText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: 'rgba(0, 0, 0, 0.75)',
+  },
+  pinToggleBtnTextActive: {
+    color: '#000000',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  stickyModalFooter: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: '#FFFFFF',
+  },
+  stickyScanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#000000',
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  scanIconPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickyScanBtnText: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
   },
   // QR overlay
   qrOverlay: {

@@ -1517,7 +1517,13 @@ export default function CustomerBookingPwaScreen() {
       )}
 
       {/* Main Body Scroll */}
-      <ScrollView style={[styles.mainScroll, { backgroundColor: themeStyles.baseBgColor }]} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        style={[styles.mainScroll, { backgroundColor: themeStyles.baseBgColor }]}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: currentStep === 4 ? 20 : 120,
+        }}
+      >
         
         {/* ======================================================== */}
         {/* SCREEN 0: STOREFRONT BUSINESS PROFILE LANDING            */}
@@ -2821,8 +2827,9 @@ export default function CustomerBookingPwaScreen() {
         {/* ======================================================== */}
         {/* SCREEN 4: DIGITAL PASS & CONFIRMATION (APPLE WALLET x FRESHA) */}
         {currentStep === 4 && (
-          <View style={styles.stepContainer}>
-            {/* Top Navigation Row (Back & Options) */}
+          <View style={[styles.stepContainer, { flex: 1, justifyContent: 'space-between' }]}>
+            <View>
+              {/* Top Navigation Row (Back & Options) */}
             <View style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
@@ -3226,181 +3233,62 @@ export default function CustomerBookingPwaScreen() {
                 </View>
               </View>
             </View>
-
-            {/* 5. Arrival Check-In Button (Pure Black Pill Button) */}
-            <TouchableOpacity
-              onPress={handleArrived}
-              activeOpacity={0.88}
-              style={{
-                backgroundColor: '#000000',
-                borderRadius: 999,
-                minHeight: 56,
-                paddingVertical: 16,
-                paddingHorizontal: 22,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 10,
-                elevation: 4,
-              }}
-            >
-              <View style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Ionicons name="location" size={18} color="#FFFFFF" />
-              </View>
-              <Text style={{
-                fontSize: 15,
-                fontFamily: 'PlusJakartaSans_800ExtraBold',
-                color: '#FFFFFF',
-                letterSpacing: 0.5,
-              }}>
-                {hasArrived ? '✓ ARRIVAL CONFIRMED' : 'I HAVE ARRIVED'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            {/* Helper Text */}
-            <Text style={{
-              fontSize: 12,
-              fontFamily: 'PlusJakartaSans_500Medium',
-              color: 'rgba(0, 0, 0, 0.55)',
-              textAlign: 'center',
-              marginTop: 10,
-              marginBottom: 16,
-            }}>
-              Tap the button below as soon as you step inside the store.
-            </Text>
-
-            {/* 6. Compact Appointment Reminder Card (English) */}
-            {isPushSupported() && (
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1,
-                borderColor: 'rgba(0, 0, 0, 0.08)',
-                borderRadius: 20,
-                padding: 14,
-                marginBottom: 14,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 2,
-              }}>
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 14,
-                  backgroundColor: '#F8FAFC',
-                  borderWidth: 1,
-                  borderColor: 'rgba(0, 0, 0, 0.06)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                }}>
-                  {/* Subtle Yellow Sparkle Accent */}
-                  <View style={{ position: 'absolute', top: 2, right: 3 }}>
-                    <Text style={{ fontSize: 9 }}>✨</Text>
-                  </View>
-                  <Ionicons name="notifications" size={20} color="#000000" />
-                </View>
-                <View style={{ flex: 1, paddingRight: 6 }}>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
-                    {isPushSubscribed
-                      ? (locale === 'ms' ? 'Peringatan Temujanji Aktif' : 'Appointment Reminder Active')
-                      : (locale === 'ms' ? 'Peringatan Temujanji' : 'Appointment Reminder')}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 2, lineHeight: 15 }}>
-                    {isPushSubscribed
-                      ? (locale === 'ms'
-                          ? 'Notifikasi akan dihantar 2 jam & 30 minit sebelum slot.'
-                          : 'Notifications will be sent 2 hours & 30 mins before your slot.')
-                      : (locale === 'ms'
-                          ? 'Terima push noti automatik 2 jam & 30 minit sebelum slot.'
-                          : 'Get automatic push reminders 2 hours & 30 mins before your slot.')}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: '#FFCC00',
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 14,
-                  }}
-                  onPress={handleSubscribePushReminder}
-                  disabled={isSubscribingPush || isPushSubscribed}
-                  activeOpacity={0.8}
-                >
-                  {isSubscribingPush ? (
-                    <ActivityIndicator size="small" color="#000000" />
-                  ) : (
-                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
-                      {isPushSubscribed
-                        ? (locale === 'ms' ? 'Aktif ✓' : 'Active ✓')
-                        : (locale === 'ms' ? 'Aktifkan 🔔' : 'Enable 🔔')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Save Merchant App PWA Card */}
-            <View style={{
-              backgroundColor: '#FFFFFF',
-              borderWidth: 1,
-              borderColor: 'rgba(0, 0, 0, 0.08)',
-              borderRadius: 20,
-              padding: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <View style={{
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                backgroundColor: '#FFFDF0',
-                borderWidth: 1,
-                borderColor: '#FEF08A',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Ionicons name="phone-portrait-outline" size={20} color="#000000" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
-                  Save {merchant?.store_name || 'Scoop creamy'} App
-                </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.55)', marginTop: 2 }}>
-                  Get instant slot reminders & fast re-booking
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#000000',
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                  borderRadius: 12,
-                }}
-                onPress={() => showToast('Tap Share ➔ Add to Home Screen')}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Install</Text>
-              </TouchableOpacity>
             </View>
 
+            {/* 5. Arrival Check-In Action Section (Anchored to Bottom) */}
+            <View style={{ marginTop: 'auto', paddingTop: 16 }}>
+              <TouchableOpacity
+                onPress={handleArrived}
+                activeOpacity={0.88}
+                style={{
+                  backgroundColor: '#000000',
+                  borderRadius: 999,
+                  minHeight: 56,
+                  paddingVertical: 16,
+                  paddingHorizontal: 22,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 10,
+                  elevation: 4,
+                }}
+              >
+                <View style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="location" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={{
+                  fontSize: 15,
+                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                  color: '#FFFFFF',
+                  letterSpacing: 0.5,
+                }}>
+                  {hasArrived ? '✓ ARRIVAL CONFIRMED' : 'I HAVE ARRIVED'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Helper Text */}
+              <Text style={{
+                fontSize: 12,
+                fontFamily: 'PlusJakartaSans_500Medium',
+                color: 'rgba(0, 0, 0, 0.55)',
+                textAlign: 'center',
+                marginTop: 10,
+                marginBottom: 8,
+              }}>
+                Tap the button above as soon as you step inside the store.
+              </Text>
+            </View>
           </View>
         )}
 
