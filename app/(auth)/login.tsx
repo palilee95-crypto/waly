@@ -133,6 +133,9 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
   const [datePickerModalVisible, setDatePickerModalVisible] = useState(false);
+  const [pickerDay, setPickerDay] = useState<number>(15);
+  const [pickerMonth, setPickerMonth] = useState<number>(6);
+  const [pickerYear, setPickerYear] = useState<number>(2000);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -278,19 +281,22 @@ export default function LoginScreen() {
   };
 
   const openBirthdayPicker = () => {
-    if (Platform.OS === 'web') {
-      const el = document.getElementById('risev-birthday-input');
-      if (el) {
-        if (typeof (el as any).showPicker === 'function') {
-          (el as any).showPicker();
-        } else {
-          (el as any).focus();
-          (el as any).click();
-        }
+    if (birthday) {
+      const parts = birthday.split('-');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d) && d >= 1 && d <= 31) setPickerDay(d);
+        if (!isNaN(m) && m >= 1 && m <= 12) setPickerMonth(m);
+        if (!isNaN(y) && y >= 1920) setPickerYear(y);
       }
     } else {
-      setDatePickerModalVisible(true);
+      setPickerDay(15);
+      setPickerMonth(6);
+      setPickerYear(2000);
     }
+    setDatePickerModalVisible(true);
   };
 
   const handleGetStarted = async () => {
@@ -589,7 +595,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ flex: 1, justifyContent: (step === 'register-name' || step === 'register-email' || step === 'verify-email' || step === 'register-password' || step === 'password') ? 'space-between' : 'center' }}>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
             {/* Main Clean Container (Full-screen native flow on phone, register-name, register-email, verify-email, register-password, password) */}
             <View style={[
               styles.mainCard,
@@ -1010,7 +1016,11 @@ export default function LoginScreen() {
                     </View>
 
                     {/* Birthday Celebration Card with Yellow border */}
-                    <View style={styles.birthdayCard}>
+                    <TouchableOpacity 
+                      style={styles.birthdayCard}
+                      onPress={openBirthdayPicker}
+                      activeOpacity={0.88}
+                    >
                       <View style={styles.birthdayCardTopRow}>
                         <View style={styles.birthdayGiftSquircle}>
                           <Ionicons name="gift" size={24} color="#000000" />
@@ -1027,60 +1037,28 @@ export default function LoginScreen() {
                         <Text style={styles.birthdayCardRequiredText}>Required · Day and month only</Text>
                         {birthday ? (
                           <View style={styles.birthdayActiveGroup}>
-                            <TouchableOpacity
-                              onPress={openBirthdayPicker}
-                              style={styles.birthdayChipBtn}
-                              activeOpacity={0.8}
-                            >
+                            <View style={styles.birthdayChipBtn}>
                               <Text style={styles.birthdayChipText}>🎉 {formatBirthdayDayMonth(birthday)}</Text>
                               <Ionicons name="chevron-forward" size={13} color="#000000" />
-                            </TouchableOpacity>
+                            </View>
                             <TouchableOpacity
-                              onPress={() => setBirthday('')}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setBirthday('');
+                              }}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Ionicons name="close-circle" size={16} color="#94A3B8" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <TouchableOpacity
-                            onPress={openBirthdayPicker}
-                            style={styles.birthdayAddBtn}
-                            activeOpacity={0.7}
-                          >
+                          <View style={styles.birthdayAddBtn}>
                             <Text style={styles.birthdayAddBtnText}>Add birthday</Text>
                             <Ionicons name="chevron-forward" size={14} color="#000000" />
-                          </TouchableOpacity>
+                          </View>
                         )}
                       </View>
-
-                      {/* Hidden Web HTML5 Date Picker */}
-                      {Platform.OS === 'web' && (
-                        React.createElement('input', {
-                          type: 'date',
-                          id: 'risev-birthday-input',
-                          max: new Date().toISOString().split('T')[0],
-                          min: '1920-01-01',
-                          value: ddMmYyyyToIso(birthday),
-                          onChange: (e: any) => {
-                            const iso = e.target.value;
-                            if (iso) {
-                              setBirthday(isoToDdMmYyyy(iso));
-                              setErrorMsg('');
-                            } else {
-                              setBirthday('');
-                            }
-                          },
-                          style: {
-                            position: 'absolute',
-                            opacity: 0,
-                            pointerEvents: 'none',
-                            width: 0,
-                            height: 0,
-                          },
-                        })
-                      )}
-                    </View>
+                    </TouchableOpacity>
 
                     {/* Primary Button: Continue -> */}
                     {(() => {
@@ -1538,6 +1516,147 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Universal Birthday Picker Modal */}
+      <Modal
+        visible={datePickerModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDatePickerModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.birthdayModalOverlay}
+          activeOpacity={1}
+          onPress={() => setDatePickerModalVisible(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={styles.birthdayModalCard}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <View style={styles.birthdayModalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.birthdayIconSquircle}>
+                  <Ionicons name="gift" size={20} color="#000000" />
+                </View>
+                <View>
+                  <Text style={styles.birthdayModalTitle}>Select Your Birthday</Text>
+                  <Text style={styles.birthdayModalSub}>Required · Day and month only</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDatePickerModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.birthdayModalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 3 Interactive Column Selectors (Day, Month, Year) */}
+            <View style={styles.birthdayPickerColumnsRow}>
+              {/* Day Column */}
+              <View style={styles.pickerCol}>
+                <Text style={styles.pickerColLabel}>DAY</Text>
+                <View style={styles.pickerSelectorBox}>
+                  <TouchableOpacity
+                    onPress={() => setPickerDay(prev => prev > 1 ? prev - 1 : 31)}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-up" size={18} color="#000000" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValueBig}>{String(pickerDay).padStart(2, '0')}</Text>
+                  <TouchableOpacity
+                    onPress={() => setPickerDay(prev => prev < 31 ? prev + 1 : 1)}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-down" size={18} color="#000000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Month Column */}
+              <View style={[styles.pickerCol, { flex: 1.4 }]}>
+                <Text style={styles.pickerColLabel}>MONTH</Text>
+                <View style={styles.pickerSelectorBox}>
+                  <TouchableOpacity
+                    onPress={() => setPickerMonth(prev => prev > 1 ? prev - 1 : 12)}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-up" size={18} color="#000000" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValueBig}>
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][pickerMonth - 1] || 'Jan'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setPickerMonth(prev => prev < 12 ? prev + 1 : 1)}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-down" size={18} color="#000000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Year Column */}
+              <View style={[styles.pickerCol, { flex: 1.2 }]}>
+                <Text style={styles.pickerColLabel}>YEAR</Text>
+                <View style={styles.pickerSelectorBox}>
+                  <TouchableOpacity
+                    onPress={() => setPickerYear(prev => prev < new Date().getFullYear() ? prev + 1 : 1920)}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-up" size={18} color="#000000" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValueBig}>{pickerYear}</Text>
+                  <TouchableOpacity
+                    onPress={() => setPickerYear(prev => prev > 1920 ? prev - 1 : new Date().getFullYear())}
+                    style={styles.pickerArrowBtn}
+                  >
+                    <Ionicons name="chevron-down" size={18} color="#000000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Quick Month Chips */}
+            <View style={styles.monthChipsGrid}>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((mName, idx) => {
+                const mNum = idx + 1;
+                const isSelected = pickerMonth === mNum;
+                return (
+                  <TouchableOpacity
+                    key={mName}
+                    onPress={() => setPickerMonth(mNum)}
+                    style={[styles.monthChip, isSelected && styles.monthChipSelected]}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.monthChipText, isSelected && styles.monthChipTextSelected]}>
+                      {mName}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Action Buttons */}
+            <TouchableOpacity
+              style={styles.birthdayConfirmBtn}
+              onPress={() => {
+                const formatted = `${String(pickerDay).padStart(2, '0')}-${String(pickerMonth).padStart(2, '0')}-${pickerYear}`;
+                setBirthday(formatted);
+                setErrorMsg('');
+                setDatePickerModalVisible(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.birthdayConfirmBtnText}>
+                Confirm ({String(pickerDay).padStart(2, '0')} {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][pickerMonth - 1]} {pickerYear})  →
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Password Reset Confirmation Modal */}
       <Modal
         visible={resetModalVisible}
@@ -1627,7 +1746,7 @@ const styles = StyleSheet.create({
   },
   mainCardBorderlessPhone: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
@@ -1740,7 +1859,8 @@ const styles = StyleSheet.create({
   },
   heroSectionRegister: {
     position: 'relative',
-    marginBottom: 16,
+    minHeight: 220,
+    marginBottom: 8,
   },
   heroLogoRegister: {
     width: 135,
@@ -2154,8 +2274,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   registerNameSection: {
-    gap: 16,
-    marginTop: 26,
+    gap: 14,
+    marginTop: 6,
   },
   phoneVerifiedCard: {
     flexDirection: 'row',
@@ -3019,5 +3139,135 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+  birthdayModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 99999,
+  },
+  birthdayModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
+    width: '92%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 28,
+    elevation: 8,
+  },
+  birthdayModalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  birthdayIconSquircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  birthdayModalTitle: {
+    fontSize: 17,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  birthdayModalSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  birthdayModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  birthdayPickerColumnsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  pickerCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pickerColLabel: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  pickerSelectorBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  pickerArrowBtn: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerValueBig: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    marginVertical: 4,
+  },
+  monthChipsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 18,
+    justifyContent: 'center',
+  },
+  monthChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  monthChipSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  monthChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  monthChipTextSelected: {
+    color: '#FFFFFF',
+  },
+  birthdayConfirmBtn: {
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  birthdayConfirmBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });

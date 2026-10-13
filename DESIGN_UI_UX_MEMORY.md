@@ -329,8 +329,12 @@ Visualizing the user's appointment state with high clarity:
       - Top Right Hero Asset: 3D floating rewards illustration (`@/assets/login-reward-hero.png`, `width: 210, height: 230`, `zIndex: 1`), text layered on top (`zIndex: 2`).
       - Headline: `"Let’s make\nit yours."` (31px, `PlusJakartaSans_800ExtraBold`, Pure Black).
       - Subtitle: `"Just one more step before\ncollecting your stamps."` (14px, `#64748B`).
+    - **Unified Natural Flow & Proportional Spacing (Option 1 Implementation)**:
+      - Eliminated `justifyContent: 'space-between'` which previously created an unnatural ~250px dead white void on tall iPhone displays.
+      - Container uses natural linear flow (`mainCardBorderlessPhone: { justifyContent: 'flex-start' }`).
+      - Header `heroSectionRegister` has `minHeight: 220, marginBottom: 8`, providing clean vertical clearance for the floating 3D reward asset and title.
+      - Form `registerNameSection` connects smoothly with `marginTop: 6, gap: 14`, pulling the phone verified card, name input, and birthday card directly underneath the header.
     - **Phone Verified Card with Explicit Change Action**:
-      - Position: Lowered form section (`marginTop: 26`, `gap: 16`) to provide clean breathing room from the 3D hero illustration and header text.
       - Squircle container (`backgroundColor: '#F8FAFC'`, `borderRadius: 18`, border `1px solid #E2E8F0`, padding 14px).
       - Left: Outline mobile phone icon (`Ionicons name="phone-portrait-outline" size={24}`) + `"Phone verified"` (14px bold) + masked phone `+60 •••• {last4}` (13px, `#64748B`).
       - Right: Clear rounded badge with `"Change ›"` (`phoneChangeBadge`), tapping it instantly returns to phone login step (`setStep('phone')`).
@@ -340,8 +344,15 @@ Visualizing the user's appointment state with high clarity:
     - **Birthday Celebration Card (Strictly Required)**:
       - Yellow border squircle (`backgroundColor: '#FFFFFF'`, `borderRadius: 18`, `borderWidth: 1.5`, `borderColor: '#FFCC00'`, padding 16px).
       - Top row: Bright yellow squircle (`50×50px`, `borderRadius: 16`, `#FFCC00`) with black gift icon + Title `"Your birthday deserves a little extra."` (14.5px bold) + description `"Add your birthday to discover special treats from participating stores."` (12px, `#64748B`).
-      - Bottom row: Left subtext `"Required · Day and month only"` (12px bold, `#0F172A`) + interactive `"Add birthday ›"` (or `"🎉 {formattedDate} ›"` when selected). Strictly required to advance.
-      - Web & Mobile date pickers: Triggers native HTML5 date picker on web (`showPicker()`) or native picker modal on iOS/Android.
+      - Bottom row: Left subtext `"Required · Day and month only"` (12px bold, `#0F172A`) + interactive `"Add birthday ›"` (or `"🎉 {formattedDate} ›"` with clear button when selected).
+      - **Universal Birthday Picker Modal (`datePickerModalVisible`)**:
+        - The entire birthday card is an interactive `TouchableOpacity` that immediately triggers the modal, ensuring seamless tapping on any mobile screen.
+        - Modal design system:
+          - Brand yellow gift squircle header with title `"Select Your Birthday"`.
+          - 3 interactive column counter boxes for DAY (1–31), MONTH (Jan–Dec), and YEAR.
+          - 12 quick Month chips (Jan–Dec) with pure black active indicator.
+          - Pure black confirmation capsule button `"Confirm ({day} {month} {year}) →"`.
+        - 100% cross-platform reliability on iOS Safari, mobile web, and native React Native environments (eliminates WebKit hidden input blockers).
     - **Primary Action CTA**:
       - Solid Pure Black capsule `"Continue  →"` (`height: 58`, `borderRadius: 999`, `#000000`).
       - Strictly disabled until **both** valid name ($\ge 2$ chars) and valid birthday are entered.
