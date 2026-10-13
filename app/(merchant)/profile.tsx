@@ -22,7 +22,7 @@ import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-ico
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 import UpgradeModal from './_components/UpgradeModal';
@@ -796,65 +796,67 @@ export default function ProfileScreen() {
     };
   };
 
-  useEffect(() => {
-    const fetchMerchant = async () => {
-      if (!user || !user.merchant_id) return;
+  const fetchMerchant = React.useCallback(async () => {
+    if (!user || !user.merchant_id) return;
+    try {
+      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+      console.log('[DEBUG] Fetched merchant:', mRec);
+      console.log('[DEBUG] user.id:', user.id);
+      console.log('[DEBUG] merchant.owner:', mRec.owner);
+      setMerchant(mRec);
+
+      // Fetch subscription record (prioritize active record, then latest)
       try {
-        const mRec = await pb.collection('merchants').getOne(user.merchant_id);
-        console.log('[DEBUG] Fetched merchant:', mRec);
-        console.log('[DEBUG] user.id:', user.id);
-        console.log('[DEBUG] merchant.owner:', mRec.owner);
-        setMerchant(mRec);
-
-        // Fetch WhatsApp status only if user is owner (Disabled - WhatsApp service decommissioned)
-        // if (mRec.owner === user.id) {
-        //   fetchWhatsappStatus();
-        // }
-
-        // Fetch subscription record (prioritize active record, then latest)
-        try {
-          const subList = await pb.collection('subscriptions').getList(1, 1, {
-            filter: `merchant = "${user.merchant_id}" && status = "active"`,
+        const subList = await pb.collection('subscriptions').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}" && status = "active"`,
+          sort: '-created',
+        });
+        if (subList.items.length > 0) {
+          setSubscription(subList.items[0]);
+        } else {
+          const fallbackList = await pb.collection('subscriptions').getList(1, 1, {
+            filter: `merchant = "${user.merchant_id}"`,
             sort: '-created',
           });
-          if (subList.items.length > 0) {
-            setSubscription(subList.items[0]);
-          } else {
-            const fallbackList = await pb.collection('subscriptions').getList(1, 1, {
-              filter: `merchant = "${user.merchant_id}"`,
-              sort: '-created',
-            });
-            if (fallbackList.items.length > 0) {
-              setSubscription(fallbackList.items[0]);
-            }
+          if (fallbackList.items.length > 0) {
+            setSubscription(fallbackList.items[0]);
           }
-        } catch (e: any) {
-          console.log("No active subscription row found for profile view:", e.message);
         }
-
-        // Fetch program record for live preview
-        try {
-          const progRec = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user.merchant_id}"`);
-          setProgram(progRec);
-        } catch (e: any) {
-          console.log("No active program row found for profile view");
-        }
-
-        const locs = await pb.collection('store_locations').getFullList({
-          filter: `merchant = "${user.merchant_id}"`,
-          requestKey: null,
-        });
-        if (locs.length > 0) {
-          setLocationRecord(locs[0]);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch merchant profile:', err);
-      } finally {
-        setLoading(false);
+      } catch (e: any) {
+        console.log("No active subscription row found for profile view:", e.message);
       }
-    };
+
+      // Fetch program record for live preview
+      try {
+        const progRec = await pb.collection('loyalty_programs').getFirstListItem(`merchant = "${user.merchant_id}"`);
+        setProgram(progRec);
+      } catch (e: any) {
+        console.log("No active program row found for profile view");
+      }
+
+      const locs = await pb.collection('store_locations').getFullList({
+        filter: `merchant = "${user.merchant_id}"`,
+        requestKey: null,
+      });
+      if (locs.length > 0) {
+        setLocationRecord(locs[0]);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch merchant profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.merchant_id]);
+
+  useEffect(() => {
     fetchMerchant();
-  }, [user]);
+  }, [fetchMerchant]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchMerchant();
+    }, [fetchMerchant])
+  );
 
   useEffect(() => {
     let active = true;
@@ -1218,7 +1220,7 @@ export default function ProfileScreen() {
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('address')}</Text>
               <Text style={styles.detailValue}>
-                {merchant?.description || 'Lot G-12, Premium Galleries, Persiaran KLCC, 50088 Kuala Lumpur'}
+                {locationRecord?.address || merchant?.description || 'Lot G-12, Premium Galleries, Persiaran KLCC, 50088 Kuala Lumpur'}
               </Text>
             </View>
           </View>
