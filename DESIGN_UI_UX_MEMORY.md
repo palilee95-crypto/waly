@@ -417,5 +417,58 @@ Visualizing the user's appointment state with high clarity:
     - **Security & Reassurance**:
       - Risev Yellow shield badge (`#FFCC00`) with bold black checkmark + vertical divider + `"Your account stays protected."` (`12.5px`, `#475569`).
     - **Instant Auto-Login**: Background polling immediately detects verification webhook and transitions to green celebration before seamless dashboard entry.
-
-
+### 5.8 Email Verification Landing Page (`app/confirm-email/[token].tsx`)
+- **Aesthetic Overhaul (Option 1 Implementation)**:
+  - Eliminated legacy dark black background (`#09090B`) and isolated floating yellow card.
+  - Upgraded to modern Pure White `#FFFFFF` native full-height canvas (borderless on mobile, elegant card with subtle shadow on desktop).
+- **Branding & Visual Assets**:
+  - Centered official `risev` logo top header (`width: 145, height: 44`).
+  - Centered 3D celebration asset: `@/assets/email-verify-hero.png` (transparent 3D envelope with checkmark card and radiating rays, `170×160px`).
+- **Typography & Status Feedback**:
+  - Headline: `"You’re all set! 🎉"` (`28px PlusJakartaSans_800ExtraBold`, Pure Black `#000000`).
+  - Subtitle: `"Your email address has been successfully verified. Your digital stamps and rewards are ready to collect."` (`14px PlusJakartaSans_500Medium`, `#475569`).
+  - Status pill: `[ ✓ Email verified & account active ]` (`#F0FDF4`, border `#BBF7D0`, green text `#15803D`).
+- **Primary Action CTA & Seamless Transition**:
+  - Solid Pure Black capsule: `"Continue to Risev  →"` (`height: 58`, radius 999, `#000000`).
+  - Auto-redirect countdown: `"Redirecting automatically in 4s · Tap to continue now"`, transitioning smoothly to login/dashboard.
+### 5.9 Customer Push Notification Modal (`components/CustomerPushNotificationModal.tsx`)
+- **iOS Bottom Sheet Architecture**:
+  - Replaced legacy centered floating box with an authentic native iOS Bottom Sheet on mobile (`borderTopLeftRadius: 36`, `borderTopRightRadius: 36`, `justifyContent: 'flex-end'`).
+  - Native drag handle bar (`#CBD5E1`, 38×4.5px) and subtle top-right close circle `(X)`.
+  - Desktop responsive: Gracefully centers as an elegant dialog (`maxWidth: 440`, `borderRadius: 32`).
+- **3D Hero Visual Asset & Animation**:
+  - High-resolution transparent 3D glossy yellow ringing bell with calendar date badge (`@/assets/notification-bell-hero.png`, 120×120px).
+  - Subtle breathing pulse loop animation (`pulseAnim`).
+- **Header & Value Proposition**:
+  - Pill badge: `IMPORTANT REMINDER` (`#FEF3C7`, dark amber text `#92400E`, 11px ExtraBold).
+  - Title: `"Enable Appointment & Reward Notifications"` (22px PlusJakartaSans_800ExtraBold, Pure Black `#000000`, 28px line-height).
+  - Subtitle: `"Never miss your appointment! Get automated reminders and instant alerts directly on your phone screen without WhatsApp."` (13px `#475569`).
+- **Streamlined 2-Benefit Grouped Card**:
+  - Unified light card container (`#F8FAFC`, border `#E2E8F0`, `borderRadius: 20`, padding 14px):
+    1. 🕒 **Appointment Reminders**: Yellow icon squircle (`#FEF3C7`) + `"Get notified 2 hours and 30 minutes before your visit."`
+    2. 🎁 **Rewards & NFC Stamps**: Yellow icon squircle (`#FEF3C7`) + `"Instant alerts when stamps are added and vouchers are ready to redeem."`
+- **Dual Action Button Hierarchy**:
+  - Primary CTA: Pure Black solid capsule `[ 🔔 Enable Notifications Now ]` (height 54px, radius 999, `#FFFFFF` text).
+### 5.10 Risev Tap Stand Activation & Pairing Screen (`app/nfc.tsx`)
+- **Aesthetic Overhaul (Pure White Apple-Grade Aesthetic)**:
+  - Replaced legacy dark black background (`#000000`) and dark card list with an Apple-grade Pure White `#FFFFFF` canvas.
+- **Top Header**:
+  - Left: Official `risev` black brand logo (`width: 105, height: 32`).
+  - Right: `))) Tap Activation` status indicator with radio wave icon.
+- **Hero Visual Section**:
+  - High-resolution physical Risev acrylic counter stand + smartphone tapping mockup (`@/assets/imej nfc.png`, height 240px) surrounded by radiating gold accents.
+- **Typography**:
+  - Headline: `"Activate Your Risev Tap"` (26px PlusJakartaSans_800ExtraBold, Pure Black).
+  - Subtitle: `"Pair this physical NFC counter stand to your store to start collecting customer visits and loyalty stamps instantly."` (13.5px, `#64748B`, max-width 340).
+- **Unified Serial & Hardware Specs Card**:
+  - Light gray squircle card (`#F8FAFC`, border `#E2E8F0`, `borderRadius: 22`, padding 18px).
+  - Top Row: Label `STAND ACTIVATION SERIAL` + Code `{unclaimedStand.code}` + Pill badge `✓ Official Hardware` (`#DCFCE7`, `#15803D`).
+  - Divider: Thin line `#E2E8F0`.
+  - Bottom 3-Column Grid:
+    1. 👥 `500` · `Customer Capacity`
+    2. ♾️ `Lifetime` · `Hardware License`
+    3. ⚡ `Instant` · `Tap & QR Access`
+- **Dual Action Button Hierarchy**:
+  - Primary CTA: Golden Yellow Risev capsule `[ Store Owner Log In  → ]` (`backgroundColor: '#FFCC00'`, text black `#000000`, height 54, radius 999).
+  - Secondary CTA: Outlined White capsule `[ Create New Store Account (2 min) ]` (`backgroundColor: '#FFFFFF'`, border `1.5px solid #000000`, text black, height 52, radius 999).
+  - Clean footer link: `(?) Need help setting up?` (opens WhatsApp support without cluttered floating FAB).

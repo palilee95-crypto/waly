@@ -1,6 +1,6 @@
 // components/CustomerPushNotificationModal.tsx
 // Persistent prompt modal in customer section to ensure push notifications are enabled.
-// Will continue to prompt the customer as long as notifications are not turned on ("selagi tak on").
+// Matches the iOS Bottom Sheet native aesthetic with the 3D notification bell asset.
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -12,10 +12,10 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  Image,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -33,7 +33,7 @@ import {
 const texts = {
   en: {
     successTitle: 'Notifications Enabled! 🎉',
-    successSub: 'Appointment reminders (12h, 3h & 30m) and reward alerts will be sent directly to your device.',
+    successSub: 'Appointment reminders (2h & 30m) and reward alerts will be sent directly to your device screen.',
     statusActive: 'STATUS: ACTIVE ✅',
     activeTitle: 'Live Appointment Notifications',
     activeSubtitle: 'This device is ready to receive real-time alerts for your appointment slots & rewards.',
@@ -42,15 +42,13 @@ const texts = {
     testNoticeSent: 'Test Notice Sent!',
     testNoticeBtn: 'Test Notification Now 🔔',
     closeBtn: 'Close',
-    onboardingBadge: 'IMPORTANT REMINDER 🔔',
+    onboardingBadge: 'IMPORTANT REMINDER',
     onboardingTitle: 'Enable Appointment & Reward Notifications',
-    onboardingSubtitle: 'Never miss your appointment! Get automated reminders directly on your phone screen without WhatsApp.',
+    onboardingSubtitle: 'Never miss your appointment! Get automated reminders and instant alerts directly on your phone screen without WhatsApp.',
     benefit1Title: 'Appointment Reminders',
-    benefit1Desc: 'Automated alerts 2 hours & 30 minutes before your slot arrives.',
+    benefit1Desc: 'Get notified 2 hours and 30 minutes before your visit.',
     benefit2Title: 'Rewards & NFC Stamps',
-    benefit2Desc: 'Instant alerts when stamps are added & vouchers are ready to redeem.',
-    benefit3Title: 'Easy Navigation',
-    benefit3Desc: 'Quick links to Waze & Google Maps when your turn begins.',
+    benefit2Desc: 'Instant alerts when stamps are added and vouchers are ready to redeem.',
     iosGuideTitle: 'iPhone User Guide 📱',
     iosGuideShare: 'To enable notifications on iPhone: Tap the Share button in Safari',
     iosGuideAddHome: 'Add to Home Screen (+)',
@@ -59,6 +57,7 @@ const texts = {
     deniedNoticeAllow: 'Allow Notifications',
     enableNowBtn: 'Enable Notifications Now',
     dismissBtn: 'Not Now',
+    footerSettings: 'You can change notification preferences anytime in Settings.',
   },
   ms: {
     successTitle: 'Notifikasi Diaktifkan! 🎉',
@@ -71,15 +70,13 @@ const texts = {
     testNoticeSent: 'Notis Ujian Telah Dihantar!',
     testNoticeBtn: 'Uji Notifikasi Sekarang 🔔',
     closeBtn: 'Tutup',
-    onboardingBadge: 'PERINGATAN PENTING 🔔',
+    onboardingBadge: 'PERINGATAN PENTING',
     onboardingTitle: 'Aktifkan Notifikasi Temujanji & Ganjaran',
-    onboardingSubtitle: 'Jangan terlepas slot anda! Dapatkan makluman automatik terus pada skrin telefon anda tanpa Meta WhatsApp.',
+    onboardingSubtitle: 'Jangan terlepas temujanji anda! Dapatkan peringatan automatik dan makluman terus pada skrin telefon anda tanpa WhatsApp.',
     benefit1Title: 'Peringatan Temujanji',
-    benefit1Desc: 'Alert automatik 2 jam & 30 minit sebelum slot anda tiba.',
+    benefit1Desc: 'Dapatkan notifikasi 2 jam dan 30 minit sebelum temujanji anda.',
     benefit2Title: 'Ganjaran & Setem NFC',
-    benefit2Desc: 'Makluman serta-merta bila setem bertambah & baucar sedia ditebus.',
-    benefit3Title: 'Navigasi Mudah',
-    benefit3Desc: 'Pautan pantas ke Waze & Google Maps bila giliran anda bermula.',
+    benefit2Desc: 'Makluman serta-merta bila setem ditambah dan baucar sedia ditebus.',
     iosGuideTitle: 'Panduan Pengguna iPhone 📱',
     iosGuideShare: 'Untuk aktifkan notifikasi di iPhone: Tekan butang Kongsi di Safari',
     iosGuideAddHome: 'Add to Home Screen (+)',
@@ -88,6 +85,7 @@ const texts = {
     deniedNoticeAllow: 'Benarkan Notifikasi',
     enableNowBtn: 'Aktifkan Notifikasi Sekarang',
     dismissBtn: 'Nanti Dahulu',
+    footerSettings: 'Anda boleh mengubah pilihan notifikasi pada bila-bila masa di Tetapan.',
   }
 };
 
@@ -123,8 +121,8 @@ export default function CustomerPushNotificationModal({
   const isControlled = controlledVisible !== undefined;
   const isVisible = isControlled ? controlledVisible : internalVisible;
 
-  // Subtle pulse animation for glowing bell
-  const pulseScale = useRef(new Animated.Value(1)).current;
+  // Subtle ringing pulse animation for 3D bell
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Check storage and browser status
   const evaluateNotificationState = async (autoOpenIfInactive = true) => {
@@ -142,115 +140,105 @@ export default function CustomerPushNotificationModal({
     }
 
     // Condition for "selagi tak on":
-    // If not active in storage OR permission not granted, customer has NOT turned it on yet!
     const isFullyTurnedOn = activeInStorage && currentStatus === 'granted';
 
     if (autoOpenIfInactive && !isControlled) {
       if (!isFullyTurnedOn) {
-        // Customer has NOT turned on notifications yet -> Show popup!
-        setInternalVisible(true);
-      } else {
-        // Already turned on, do not disturb automatically
-        setInternalVisible(false);
+        const dismissedSession = sessionStorage.getItem('risev_customer_push_dismissed_session');
+        if (!dismissedSession) {
+          setInternalVisible(true);
+        }
       }
     }
   };
 
   useEffect(() => {
-    // Initial evaluation with gentle delay to avoid blocking initial UI paint
-    const timer = setTimeout(() => {
-      evaluateNotificationState(true);
-    }, 700);
+    evaluateNotificationState(true);
 
-    return () => clearTimeout(timer);
-  }, [user?.phone, user?.id]);
-
-  // If controlled externally (e.g. user clicked bell icon)
-  useEffect(() => {
-    if (controlledVisible) {
-      evaluateNotificationState(false);
-    }
-  }, [controlledVisible]);
-
-  // Continuous bell pulsation animation
-  useEffect(() => {
-    if (!isVisible) return;
+    // Subtle gentle ringing pulse
     const pulseLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseScale, {
-          toValue: 1.08,
-          duration: 900,
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1200,
           useNativeDriver: true,
         }),
-        Animated.timing(pulseScale, {
+        Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 900,
+          duration: 1200,
           useNativeDriver: true,
         }),
       ])
     );
     pulseLoop.start();
-    return () => pulseLoop.stop();
-  }, [isVisible]);
 
+    return () => pulseLoop.stop();
+  }, [user]);
+
+  // Request & subscribe to push
   const handleEnableNotifications = async () => {
     setLoading(true);
-    setDeniedGuide(false);
 
     try {
-      const customerPhone = user?.phone || '';
-      const result = await subscribeToPushNotifications({ customerPhone });
+      const result = await subscribeToPushNotifications({
+        customerPhone: user?.phone,
+      });
 
-      if (result.success) {
-        // Mark active in storage
+      if (result?.success) {
         await setCustomerPushActive(user?.phone || user?.id, true);
         setIsCustomerActive(true);
-        setSuccess(true);
         setPermissionStatus('granted');
+        setSuccess(true);
+        setDeniedGuide(false);
 
         setTimeout(() => {
           setSuccess(false);
           handleDismiss();
-        }, 1800);
+        }, 2200);
       } else {
-        const updatedStatus = getPushPermissionStatus();
-        setPermissionStatus(updatedStatus);
-        if (updatedStatus === 'denied') {
+        const status = getPushPermissionStatus();
+        setPermissionStatus(status);
+        if (status === 'denied') {
           setDeniedGuide(true);
         }
       }
     } catch (err) {
-      console.warn('[CUSTOMER PUSH MODAL ERROR]', err);
+      console.error('[CustomerPushNotificationModal] error:', err);
+      const status = getPushPermissionStatus();
+      setPermissionStatus(status);
+      if (status === 'denied') {
+        setDeniedGuide(true);
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDismiss = () => {
-    if (isControlled && controlledOnClose) {
-      controlledOnClose();
-    } else {
-      setInternalVisible(false);
     }
   };
 
   const handleSendTestNotification = async () => {
     setTestLoading(true);
     try {
-      const sent = await sendCustomerTestNotification();
-      if (sent) {
+      const ok = await sendCustomerTestNotification();
+      if (ok) {
         setTestSent(true);
         setTimeout(() => setTestSent(false), 3000);
       }
+    } catch (e) {
+      console.warn('Test notice failed', e);
     } finally {
       setTestLoading(false);
     }
   };
 
-  const handleResetForTesting = async () => {
-    await setCustomerPushActive(user?.phone || user?.id, false);
-    setIsCustomerActive(false);
-    evaluateNotificationState(false);
+  const handleDismiss = () => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('risev_customer_push_dismissed_session', 'true');
+    }
+
+    if (isControlled && controlledOnClose) {
+      controlledOnClose();
+    } else {
+      setInternalVisible(false);
+    }
   };
 
   if (!isVisible) return null;
@@ -261,43 +249,53 @@ export default function CustomerPushNotificationModal({
     <Modal
       visible={isVisible}
       transparent={true}
-      animationType="fade"
+      animationType="slide"
       onRequestClose={handleDismiss}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, isDesktop && { maxWidth: 440 }]}>
+      <View style={[styles.modalOverlay, isDesktop && styles.desktopOverlay]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleDismiss}
+        />
+
+        <View style={[styles.bottomSheetCard, isDesktop && styles.desktopCard]}>
+          {/* iOS Bottom Sheet Drag Handle Bar */}
+          <View style={styles.sheetHandleBar} />
+
+          {/* Close Button Circle Top-Right */}
+          <TouchableOpacity
+            style={styles.closeBtnCircle}
+            onPress={handleDismiss}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={18} color="#64748B" />
+          </TouchableOpacity>
+
           {success ? (
             // ── SUCCESS CONFIRMATION STATE ──
             <View style={styles.successWrapper}>
               <View style={styles.successIconBox}>
-                <Ionicons name="checkmark-circle" size={54} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={56} color="#16A34A" />
               </View>
               <Text style={styles.successTitle}>{t.successTitle}</Text>
               <Text style={styles.successSub}>{t.successSub}</Text>
             </View>
           ) : isAlreadyActiveState ? (
             // ── ALREADY ACTIVE & TESTING STATE ──
-            <>
-              <View style={styles.headerGraphicRow}>
-                <View style={[styles.bellAura, { backgroundColor: '#ECFDF5' }]}>
-                  <View style={[styles.bellGradientCircle, { backgroundColor: '#10B981' }]}>
-                    <Ionicons name="notifications" size={26} color="#FFFFFF" />
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.closeBtnCircle}
-                  onPress={handleDismiss}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={18} color="#94A3B8" />
-                </TouchableOpacity>
+            <View style={styles.innerContent}>
+              <View style={styles.heroAssetWrap}>
+                <Image
+                  source={require('@/assets/notification-bell-hero.png')}
+                  style={styles.hero3dImage}
+                  resizeMode="contain"
+                />
               </View>
 
               <View style={styles.titleWrap}>
-                <View style={[styles.pillBadge, { backgroundColor: '#D1FAE5' }]}>
-                  <Text style={[styles.pillBadgeText, { color: '#047857' }]}>{t.statusActive}</Text>
+                <View style={[styles.pillBadge, { backgroundColor: '#DCFCE7' }]}>
+                  <Text style={[styles.pillBadgeText, { color: '#15803D' }]}>{t.statusActive}</Text>
                 </View>
                 <Text style={styles.mainTitle}>{t.activeTitle}</Text>
                 <Text style={styles.mainSubtitle}>{t.activeSubtitle}</Text>
@@ -305,8 +303,8 @@ export default function CustomerPushNotificationModal({
 
               <View style={styles.benefitsContainer}>
                 <View style={styles.benefitRow}>
-                  <View style={[styles.benefitIconBox, { backgroundColor: '#FEF3C7' }]}>
-                    <Ionicons name="alarm-outline" size={18} color="#D97706" />
+                  <View style={styles.benefitIconBox}>
+                    <Ionicons name="time-outline" size={20} color="#000000" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>{t.scheduleTitle}</Text>
@@ -345,30 +343,17 @@ export default function CustomerPushNotificationModal({
                   <Text style={styles.secondaryDismissBtnText}>{t.closeBtn}</Text>
                 </TouchableOpacity>
               </View>
-            </>
+            </View>
           ) : (
-            // ── MAIN NOTIFICATION ONBOARDING STATE ("SELAGI TAK ON") ──
-            <>
-              {/* Top Graphic Bell Header with Pulse Aura */}
-              <View style={styles.headerGraphicRow}>
-                <Animated.View style={[styles.bellAura, { transform: [{ scale: pulseScale }] }]}>
-                  <LinearGradient
-                    colors={['#FEF3C7', '#FDE68A']}
-                    style={styles.bellGradientCircle}
-                  >
-                    <Ionicons name="notifications" size={32} color="#D97706" />
-                  </LinearGradient>
-                </Animated.View>
-
-                {/* Subtle Close Button */}
-                <TouchableOpacity
-                  style={styles.closeBtnCircle}
-                  onPress={handleDismiss}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={18} color="#94A3B8" />
-                </TouchableOpacity>
+            // ── MAIN ONBOARDING BOTTOM SHEET STATE (MATCHES IMAGE 1) ──
+            <View style={styles.innerContent}>
+              {/* 3D Glossy Yellow Bell Hero Asset */}
+              <View style={styles.heroAssetWrap}>
+                <Animated.Image
+                  source={require('@/assets/notification-bell-hero.png')}
+                  style={[styles.hero3dImage, { transform: [{ scale: pulseAnim }] }]}
+                  resizeMode="contain"
+                />
               </View>
 
               {/* Title & Badge */}
@@ -380,11 +365,12 @@ export default function CustomerPushNotificationModal({
                 <Text style={styles.mainSubtitle}>{t.onboardingSubtitle}</Text>
               </View>
 
-              {/* 3 Value Propositions / Features */}
+              {/* Unified Rounded Benefit Card (2 Key Benefits) */}
               <View style={styles.benefitsContainer}>
+                {/* Benefit 1: Appointment Reminders */}
                 <View style={styles.benefitRow}>
-                  <View style={[styles.benefitIconBox, { backgroundColor: '#FEF3C7' }]}>
-                    <Ionicons name="time-outline" size={18} color="#D97706" />
+                  <View style={styles.benefitIconBox}>
+                    <Ionicons name="time-outline" size={20} color="#000000" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>{t.benefit1Title}</Text>
@@ -392,23 +378,17 @@ export default function CustomerPushNotificationModal({
                   </View>
                 </View>
 
+                {/* Subtle Divider */}
+                <View style={styles.benefitDivider} />
+
+                {/* Benefit 2: Rewards & NFC Stamps */}
                 <View style={styles.benefitRow}>
-                  <View style={[styles.benefitIconBox, { backgroundColor: '#EEF2FF' }]}>
-                    <Ionicons name="gift-outline" size={18} color="#4F46E5" />
+                  <View style={styles.benefitIconBox}>
+                    <Ionicons name="gift-outline" size={20} color="#000000" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>{t.benefit2Title}</Text>
                     <Text style={styles.benefitDesc}>{t.benefit2Desc}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.benefitRow}>
-                  <View style={[styles.benefitIconBox, { backgroundColor: '#ECFDF5' }]}>
-                    <Ionicons name="navigate-outline" size={18} color="#059669" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.benefitTitle}>{t.benefit3Title}</Text>
-                    <Text style={styles.benefitDesc}>{t.benefit3Desc}</Text>
                   </View>
                 </View>
               </View>
@@ -436,7 +416,7 @@ export default function CustomerPushNotificationModal({
                 </View>
               )}
 
-              {/* Action Buttons */}
+              {/* Dual Action Buttons */}
               <View style={styles.actionsWrap}>
                 <TouchableOpacity
                   style={[styles.primaryEnableBtn, loading && { opacity: 0.85 }]}
@@ -465,7 +445,10 @@ export default function CustomerPushNotificationModal({
                   <Text style={styles.secondaryDismissBtnText}>{t.dismissBtn}</Text>
                 </TouchableOpacity>
               </View>
-            </>
+
+              {/* Footer Settings Note */}
+              <Text style={styles.footerSettingsText}>{t.footerSettings}</Text>
+            </View>
           )}
         </View>
       </View>
@@ -476,118 +459,154 @@ export default function CustomerPushNotificationModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+    zIndex: 999999,
+  },
+  desktopOverlay: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    zIndex: 999999,
   },
-  modalCard: {
+  bottomSheetCard: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 26,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.16,
     shadowRadius: 28,
     elevation: 24,
+    position: 'relative',
   },
-  headerGraphicRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  desktopCard: {
+    maxWidth: 440,
+    borderRadius: 32,
+    alignSelf: 'center',
+    paddingBottom: 28,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
   },
-  bellAura: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FEF9C3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellGradientCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
+  sheetHandleBar: {
+    width: 38,
+    height: 4.5,
+    borderRadius: 99,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginTop: 4,
+    marginBottom: 4,
   },
   closeBtnCircle: {
+    position: 'absolute',
+    top: 14,
+    right: 18,
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
-  titleWrap: {
-    marginTop: 8,
-    marginBottom: 16,
+  innerContent: {
+    alignItems: 'center',
+    width: '100%',
   },
-  pillBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+  heroAssetWrap: {
+    width: 124,
+    height: 124,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
     marginBottom: 8,
   },
+  hero3dImage: {
+    width: 120,
+    height: 120,
+  },
+  titleWrap: {
+    alignItems: 'center',
+    marginBottom: 16,
+    width: '100%',
+  },
+  pillBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 14,
+    paddingVertical: 5.5,
+    borderRadius: 999,
+    marginBottom: 10,
+    alignSelf: 'center',
+  },
   pillBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#B45309',
-    letterSpacing: 0.5,
+    color: '#92400E',
+    letterSpacing: 0.6,
   },
   mainTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-    lineHeight: 26,
-    marginBottom: 6,
+    color: '#000000',
+    lineHeight: 28,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
   mainSubtitle: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    lineHeight: 18,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 19.5,
+    maxWidth: 340,
+    alignSelf: 'center',
   },
   benefitsContainer: {
+    width: '100%',
     backgroundColor: '#F8FAFC',
-    borderRadius: 18,
-    padding: 14,
-    gap: 12,
-    marginBottom: 16,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   benefitRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: 14,
   },
   benefitIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
   benefitTitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1E293B',
+    color: '#000000',
     marginBottom: 2,
   },
   benefitDesc: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    lineHeight: 15,
+    lineHeight: 16,
+  },
+  benefitDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 12,
   },
   iosNoticeBox: {
     flexDirection: 'row',
@@ -596,9 +615,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BFDBFE',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    padding: 12,
     marginBottom: 14,
+    width: '100%',
   },
   iosNoticeTitle: {
     fontSize: 12,
@@ -619,9 +639,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    padding: 12,
     marginBottom: 14,
+    width: '100%',
   },
   deniedNoticeText: {
     flex: 1,
@@ -631,6 +652,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   actionsWrap: {
+    width: '100%',
     gap: 10,
   },
   primaryEnableBtn: {
@@ -638,50 +660,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0F172A',
-    borderRadius: 16,
-    paddingVertical: 14,
+    backgroundColor: '#000000',
+    borderRadius: 999,
+    height: 54,
+    width: '100%',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 4,
   },
   primaryEnableBtnText: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   secondaryDismissBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    height: 48,
+    width: '100%',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
   },
   secondaryDismissBtnText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  footerSettingsText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
     color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 12,
   },
   successWrapper: {
     alignItems: 'center',
-    paddingVertical: 20,
-    gap: 10,
+    paddingVertical: 28,
+    gap: 12,
+    width: '100%',
   },
   successIconBox: {
     marginBottom: 4,
   },
   successTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
+    color: '#000000',
     textAlign: 'center',
   },
   successSub: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 8,
+    lineHeight: 19,
+    paddingHorizontal: 12,
   },
 });

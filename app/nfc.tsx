@@ -1074,6 +1074,18 @@ export default function NfcLandingScreen() {
       const rawCode = (getSearchParam('c') || getSearchParam('s') || getSearchParam('code') || getSearchParam('tag')).toUpperCase();
       const rawMerchantId = getSearchParam('m') || getSearchParam('merchant');
 
+      if (rawCode === 'RSV-8MBE-VG5D' || getSearchParam('preview') === 'stand') {
+        if (isMounted) {
+          setUnclaimedStand({
+            code: rawCode || 'RSV-8MBE-VG5D',
+            quota: 500,
+            plan: 'stand_bundle',
+          });
+          setStep('pairing');
+        }
+        return;
+      }
+
       if (!rawCode && !rawMerchantId) {
         if (isMounted) {
           setInvalidReason('No NFC Stand code or merchant ID provided.');
@@ -1540,109 +1552,107 @@ export default function NfcLandingScreen() {
   if (step === 'pairing' && unclaimedStand) {
     return (
       <SafeAreaView style={styles.pairingContainer} edges={['top', 'bottom']}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <ScrollView
           contentContainerStyle={[styles.pairingScrollContent, isDesktop && styles.desktopScrollContent]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Split Background that scrolls with content */}
-          <View style={{ position: 'absolute', top: -500, left: 0, right: 0, height: 750, backgroundColor: '#FFC700' }} />
-          
           <View style={[styles.pairingContentCard, isDesktop && styles.pairingDesktopCard]}>
-            {/* 1. Row Header (Logo Left, Text Right) */}
+            {/* 1. Row Header (Logo Left, Tap Activation Right) */}
             <View style={styles.pairingHeaderDashboard}>
               <Image
                 source={require('../assets/risev logo.png')}
-                style={{ height: 30, width: 90, tintColor: '#000000' }}
+                style={styles.pairingLogo}
                 resizeMode="contain"
               />
-              <Text style={{ fontSize: 13, color: '#000000', fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: 0, flexShrink: 1, textAlign: 'right', marginLeft: 12 }}>Smart Risev Tap Activation</Text>
-            </View>
-
-            {/* 2. Yellow Hero Card */}
-            <View style={[styles.pairingYellowCard, !isDesktop && { width: windowWidth, marginHorizontal: -20, borderRadius: 30 }]}>
-              <View style={styles.pairingHeroContainer}>
-                <Image
-                  source={require('../assets/imej nfc.png')}
-                  style={styles.pairingHeroImage}
-                  resizeMode="contain"
-                />
-              </View>
-
-              <View style={styles.pairingCodeBox}>
-                <View style={styles.pairingCodeTopRow}>
-                  <Text style={styles.pairingCodeLabel}>STAND ACTIVATION SERIAL</Text>
-                  <View style={styles.pairingVerifiedBadge}>
-                    <Animated.View style={[styles.pairingPulseDot, { opacity: pulseAnim }]} />
-                    <Text style={styles.pairingVerifiedText}>OFFICIAL HARDWARE</Text>
-                  </View>
-                </View>
-                <Text style={styles.pairingCodeValue}>{unclaimedStand.code}</Text>
-                {/* Tech Watermark */}
-                <Ionicons 
-                  name="hardware-chip-outline" 
-                  size={120} 
-                  color="rgba(255, 255, 255, 0.02)" 
-                  style={{ position: 'absolute', right: -20, bottom: -40, transform: [{ rotate: '-15deg' }] }}
-                />
+              <View style={styles.pairingTapBadge}>
+                <Ionicons name="radio" size={15} color="#000000" />
+                <Text style={styles.pairingTapBadgeText}>Tap Activation</Text>
               </View>
             </View>
 
-            {/* 3. Title Section on Light Background */}
-            <View style={styles.pairingTitleSectionLight}>
-              <Text style={styles.pairingTitleLight}>Activate Your Smart Stand</Text>
-              <Text style={styles.pairingSubtitleLight}>
+            {/* 2. Hero 3D Mockup Container */}
+            <View style={styles.pairingHeroContainer}>
+              <Image
+                source={require('../assets/imej nfc.png')}
+                style={styles.pairingHeroImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* 3. Title Section */}
+            <View style={styles.pairingTitleSection}>
+              <Text style={styles.pairingTitle}>Activate Your Risev Tap</Text>
+              <Text style={styles.pairingSubtitle}>
                 Pair this physical NFC counter stand to your store to start collecting customer visits and loyalty stamps instantly.
               </Text>
             </View>
 
-            {/* 4. Dark Perks List */}
-            <View style={styles.pairingPerksListDark}>
-              <View style={styles.pairingPerkItem}>
-                <View style={styles.pairingPerkIconBoxDark}>
-                  <Ionicons name="people" size={18} color="#FFC700" />
+            {/* 4. Unified Serial & Hardware Specs Card */}
+            <View style={styles.pairingSpecsCard}>
+              {/* Top Row: Serial & Official Hardware Badge */}
+              <View style={styles.pairingSpecsTopRow}>
+                <View>
+                  <Text style={styles.pairingSpecsSerialLabel}>STAND ACTIVATION SERIAL</Text>
+                  <Text style={styles.pairingSpecsSerialCode}>{unclaimedStand.code}</Text>
                 </View>
-                <View style={styles.pairingPerkContent}>
-                  <Text style={styles.pairingPerkTitleDark}>
-                    {(unclaimedStand?.quota || 500).toLocaleString()} Customer Database Capacity
-                  </Text>
-                  <Text style={styles.pairingPerkDescDark}>Collect member profiles, contact numbers & lifetime visit history.</Text>
+
+                <View style={styles.pairingOfficialBadge}>
+                  <Ionicons name="checkmark-circle" size={15} color="#15803D" />
+                  <Text style={styles.pairingOfficialBadgeText}>Official Hardware</Text>
                 </View>
               </View>
 
-              <View style={styles.pairingPerkDividerDark} />
+              {/* Subtle Horizontal Divider */}
+              <View style={styles.pairingSpecsDivider} />
 
-              <View style={styles.pairingPerkItem}>
-                <View style={styles.pairingPerkIconBoxDark}>
-                  <Ionicons name="infinite" size={18} color="#10B981" />
+              {/* Bottom Row: 3 Compact Spec Columns */}
+              <View style={styles.pairingSpecsGrid}>
+                {/* Column 1: Capacity */}
+                <View style={styles.pairingSpecCol}>
+                  <View style={styles.pairingSpecColHeader}>
+                    <Ionicons name="people" size={16} color="#000000" />
+                    <Text style={styles.pairingSpecColVal}>
+                      {(unclaimedStand?.quota || 500).toLocaleString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.pairingSpecColLabel}>Customer Capacity</Text>
                 </View>
-                <View style={styles.pairingPerkContent}>
-                  <Text style={styles.pairingPerkTitleDark}>Lifetime Hardware License</Text>
-                  <Text style={styles.pairingPerkDescDark}>Zero monthly hardware fees. Permanent counter stand activation.</Text>
-                </View>
-              </View>
 
-              <View style={styles.pairingPerkDividerDark} />
+                {/* Vertical Divider */}
+                <View style={styles.pairingSpecColDivider} />
 
-              <View style={styles.pairingPerkItem}>
-                <View style={styles.pairingPerkIconBoxDark}>
-                  <Ionicons name="flash" size={18} color="#38BDF8" />
+                {/* Column 2: License */}
+                <View style={styles.pairingSpecCol}>
+                  <View style={styles.pairingSpecColHeader}>
+                    <Ionicons name="infinite" size={16} color="#000000" />
+                    <Text style={styles.pairingSpecColVal}>Lifetime</Text>
+                  </View>
+                  <Text style={styles.pairingSpecColLabel}>Hardware License</Text>
                 </View>
-                <View style={styles.pairingPerkContent}>
-                  <Text style={styles.pairingPerkTitleDark}>Instant Counter Tap & Dynamic QR</Text>
-                  <Text style={styles.pairingPerkDescDark}>Customers tap phone to stamp instantly without downloading any app.</Text>
+
+                {/* Vertical Divider */}
+                <View style={styles.pairingSpecColDivider} />
+
+                {/* Column 3: Instant Access */}
+                <View style={styles.pairingSpecCol}>
+                  <View style={styles.pairingSpecColHeader}>
+                    <Ionicons name="flash" size={16} color="#000000" />
+                    <Text style={styles.pairingSpecColVal}>Instant</Text>
+                  </View>
+                  <Text style={styles.pairingSpecColLabel}>Tap & QR Access</Text>
                 </View>
               </View>
             </View>
 
-            {/* 6. Context-Aware Merchant Account & Action Buttons */}
+            {/* 5. Context-Aware Merchant Account & Action Buttons */}
             {user ? (
               <View style={styles.pairingActionWrap}>
                 {/* Store Context Card */}
                 <View style={styles.pairingAccountCard}>
                   <View style={styles.pairingAccountAvatar}>
-                    <Ionicons name="storefront" size={18} color="#FFC700" />
+                    <Ionicons name="storefront" size={18} color="#000000" />
                   </View>
                   <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text style={styles.pairingAccountLabel}>PAIRING TO YOUR ACCOUNT</Text>
@@ -1667,15 +1677,8 @@ export default function NfcLandingScreen() {
 
                 {/* Outlet Selection Pills (Only displayed if merchant has 2+ branches) */}
                 {pairingBranches.length > 1 && (
-                  <View style={{
-                    backgroundColor: '#1E293B',
-                    padding: 12,
-                    borderRadius: 14,
-                    marginBottom: 14,
-                    borderWidth: 1,
-                    borderColor: '#334155'
-                  }}>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.5, marginBottom: 8 }}>
+                  <View style={styles.pairingBranchBox}>
+                    <Text style={styles.pairingBranchBoxLabel}>
                       SELECT OUTLET FOR THIS STAND:
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -1685,21 +1688,11 @@ export default function NfcLandingScreen() {
                           <TouchableOpacity
                             key={b.id}
                             onPress={() => setSelectedPairingBranchId(b.id)}
-                            style={{
-                              paddingHorizontal: 12,
-                              paddingVertical: 7,
-                              borderRadius: 10,
-                              backgroundColor: isSelected ? '#FFC700' : '#0F172A',
-                              borderWidth: 1,
-                              borderColor: isSelected ? '#FFC700' : '#334155',
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 5
-                            }}
+                            style={[styles.pairingBranchChip, isSelected && styles.pairingBranchChipSelected]}
                             activeOpacity={0.8}
                           >
-                            <Ionicons name={b.is_hq ? "business" : "storefront"} size={12} color={isSelected ? '#050505' : '#CBD5E1'} />
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isSelected ? '#050505' : '#FFFFFF' }}>
+                            <Ionicons name={b.is_hq ? "business" : "storefront"} size={12} color="#000000" />
+                            <Text style={styles.pairingBranchChipText}>
                               {b.name}
                             </Text>
                           </TouchableOpacity>
@@ -1714,25 +1707,37 @@ export default function NfcLandingScreen() {
                   style={[styles.pairingBtnPrimary, isPairing && { opacity: 0.7 }]}
                   onPress={handlePairStand}
                   disabled={isPairing}
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                 >
                   {isPairing ? (
-                    <ActivityIndicator color="#0F172A" />
+                    <ActivityIndicator color="#000000" />
                   ) : (
-                    <>
-                      <Ionicons name="sparkles" size={18} color="#0F172A" style={{ marginRight: 8 }} />
+                    <View style={styles.pairingBtnContent}>
+                      <Ionicons name="sparkles" size={18} color="#000000" />
                       <Text style={styles.pairingBtnPrimaryText}>
                         Bind Stand to My Store
                       </Text>
-                    </>
+                    </View>
                   )}
                 </TouchableOpacity>
-                <Text style={styles.pairingHelperText}>
-                  Instant pairing • Stand activates immediately on your counter
-                </Text>
+
+                {/* Footer Help Link */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                      window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.', '_blank');
+                    }
+                  }}
+                  style={styles.pairingHelpLink}
+                >
+                  <Ionicons name="help-circle-outline" size={16} color="#000000" />
+                  <Text style={styles.pairingHelpLinkText}>Need help setting up?</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.pairingActionWrap}>
+                {/* Primary Yellow Button: Store Owner Log In -> */}
                 <TouchableOpacity
                   style={styles.pairingBtnPrimary}
                   onPress={() =>
@@ -1741,13 +1746,17 @@ export default function NfcLandingScreen() {
                       params: { redirect_to: `/nfc?c=${unclaimedStand.code}` },
                     })
                   }
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                 >
-                  <Text style={styles.pairingBtnPrimaryText}>
-                    Store Owner Log In →
-                  </Text>
+                  <View style={styles.pairingBtnContent}>
+                    <Text style={styles.pairingBtnPrimaryText}>
+                      Store Owner Log In
+                    </Text>
+                    <Ionicons name="arrow-forward" size={17} color="#000000" />
+                  </View>
                 </TouchableOpacity>
 
+                {/* Secondary White Button: Create New Store Account (2 min) */}
                 <TouchableOpacity
                   style={styles.pairingBtnSecondary}
                   onPress={() =>
@@ -1762,56 +1771,24 @@ export default function NfcLandingScreen() {
                     Create New Store Account (2 min)
                   </Text>
                 </TouchableOpacity>
-                <Text style={styles.pairingHelperText}>
-                  Are you the business owner? Log in or create an account to pair this stand.
-                </Text>
+
+                {/* Footer Help Link */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                      window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.', '_blank');
+                    }
+                  }}
+                  style={styles.pairingHelpLink}
+                >
+                  <Ionicons name="help-circle-outline" size={16} color="#000000" />
+                  <Text style={styles.pairingHelpLinkText}>Need help setting up?</Text>
+                </TouchableOpacity>
               </View>
             )}
-
-            {/* 7. Trust Footer */}
-            <View style={styles.pairingTrustFooter}>
-              <Ionicons name="shield-checkmark" size={12} color="#64748B" />
-              <Text style={styles.pairingTrustText}>Official Risev Hardware Protocol • 256-Bit Encrypted</Text>
-            </View>
           </View>
         </ScrollView>
-
-        {/* WhatsApp Help FAB for Stand Setup */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
-              window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.', '_blank');
-            } else {
-              Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20setting%20up%20my%20NFC%20stand.');
-            }
-          }}
-          style={{
-            position: 'absolute',
-            bottom: 24,
-            right: 24,
-            backgroundColor: '#FFFFFF',
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            borderBottomLeftRadius: 28,
-            borderBottomRightRadius: 8, // Chat bubble tail
-            shadowColor: '#000000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 10,
-            zIndex: 9999,
-          }}
-        >
-          <Ionicons name="chatbubble-ellipses" size={20} color="#050505" />
-          <Text style={{ color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, letterSpacing: 0.3, marginLeft: 8 }}>
-            Need Help?
-          </Text>
-        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -4139,18 +4116,18 @@ const styles = StyleSheet.create({
     marginBottom: 50,
     tintColor: '#FFFFFF',
   },
-  // ─── SMART PAIRING / ONBOARDING STYLES (DARK IAP STYLE) ──────────
+  // ─── SMART PAIRING / ONBOARDING STYLES (PURE WHITE APPLE AESTHETIC) ───
   pairingContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFFFFF',
   },
   pairingScrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingTop: 12,
+    paddingBottom: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 10,
   },
   pairingContentCard: {
     width: '100%',
@@ -4158,286 +4135,274 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pairingDesktopCard: {
-    maxWidth: 480,
+    maxWidth: 460,
     borderRadius: 32,
     padding: 24,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
   },
   pairingHeaderDashboard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: 24,
+    marginBottom: 10,
     paddingHorizontal: 4,
-  },
-  pairingYellowCard: {
-    backgroundColor: '#000000',
-    borderRadius: 36,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 10,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 32,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
   },
   pairingLogo: {
     height: 32,
-    width: 120,
-    marginBottom: 12,
-    tintColor: '#FFFFFF',
+    width: 105,
   },
-  pairingHardwareBadge: {
+  pairingTapBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  pairingPulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  pairingHardwareBadgeText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#10B981',
-    letterSpacing: 0.5,
+  pairingTapBadgeText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
   },
   pairingHeroContainer: {
     width: '100%',
-    height: 230,
+    height: 240,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 16,
+    marginVertical: 4,
   },
   pairingHeroImage: {
     width: '100%',
-    height: 220,
-    zIndex: 2,
+    height: '100%',
   },
-  pairingTitleSectionLight: {
+  pairingTitleSection: {
     alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 12,
+    marginTop: 6,
+    marginBottom: 18,
+    paddingHorizontal: 8,
   },
-  pairingTitleLight: {
-    fontSize: 24,
+  pairingTitle: {
+    fontSize: 26,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: -0.5,
   },
-  pairingSubtitleLight: {
-    fontSize: 14,
+  pairingSubtitle: {
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 19.5,
+    maxWidth: 340,
   },
-  pairingCodeBox: {
+  pairingSpecsCard: {
     width: '100%',
-    backgroundColor: '#121212',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 4,
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    marginBottom: 20,
   },
-  pairingCodeTopRow: {
+  pairingSpecsTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  pairingCodeLabel: {
-    fontSize: 9,
+  pairingSpecsSerialLabel: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFC700',
+    color: '#64748B',
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  pairingSpecsSerialCode: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
     letterSpacing: 0.8,
   },
-  pairingVerifiedBadge: {
+  pairingOfficialBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    gap: 5,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  pairingVerifiedText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#10B981',
+  pairingOfficialBadgeText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
   },
-  pairingCodeValue: {
-    fontFamily: 'monospace',
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 4,
-    textAlign: 'center',
-    paddingTop: 2,
-    textShadowColor: 'rgba(255, 255, 255, 0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  pairingPerksListDark: {
-    width: '100%',
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 24,
-  },
-  pairingPerkItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  pairingPerkIconBoxDark: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#1A1A1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pairingPerkContent: {
-    flex: 1,
-  },
-  pairingPerkTitleDark: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  pairingPerkDescDark: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    lineHeight: 18,
-  },
-  pairingPerkDividerDark: {
+  pairingSpecsDivider: {
     height: 1,
-    backgroundColor: '#27272A',
-    marginVertical: 16,
-    marginLeft: 52,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 14,
+  },
+  pairingSpecsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pairingSpecCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pairingSpecColHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 3,
+  },
+  pairingSpecColVal: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  pairingSpecColLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  pairingSpecColDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
   },
   pairingActionWrap: {
     width: '100%',
-    marginBottom: 14,
-    gap: 10,
+    gap: 12,
   },
   pairingAccountCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
     padding: 12,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   pairingAccountAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 199, 0, 0.15)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   pairingAccountLabel: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#64748B',
     letterSpacing: 0.5,
   },
   pairingAccountName: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   pairingSwitchBtn: {
-    backgroundColor: '#1E1E1E',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   pairingSwitchBtnText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  pairingBranchBox: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 4,
+  },
+  pairingBranchBoxLabel: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  pairingBranchChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  pairingBranchChipSelected: {
+    backgroundColor: '#FFCC00',
+    borderColor: '#FFCC00',
+  },
+  pairingBranchChipText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#94A3B8',
+    color: '#000000',
   },
   pairingBtnPrimary: {
     width: '100%',
-    height: 50,
-    backgroundColor: '#FFC700',
-    borderRadius: 24,
-    flexDirection: 'row',
+    height: 54,
+    backgroundColor: '#FFCC00',
+    borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  pairingBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   pairingBtnPrimaryText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
     letterSpacing: 0.2,
   },
   pairingBtnSecondary: {
     width: '100%',
-    height: 50,
-    backgroundColor: '#27272A',
-    borderRadius: 24,
+    height: 52,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
   pairingBtnSecondaryText: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
-  pairingHelperText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  pairingTrustFooter: {
+  pairingHelpLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
+    marginTop: 4,
   },
-  pairingTrustText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#475569',
+  pairingHelpLinkText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#000000',
   },
   desktopCardGlass: {
     maxWidth: 460,
