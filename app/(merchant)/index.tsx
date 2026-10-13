@@ -204,6 +204,16 @@ export default function MerchantDashboard() {
     const billAmt = parseFloat(inputs.billAmount) || 0;
     const stampAmt = parseInt(String(inputs.stampAmount), 10) || 1;
 
+    const minSpend = parseFloat((loyaltyProgram as any)?.min_spend_amount) || 0;
+    if (stampAmt > 0 && minSpend > 0 && billAmt < minSpend) {
+      alert(
+        locale === 'en'
+          ? `A minimum bill of RM ${minSpend.toFixed(2)} is required to approve stamps. Current bill: RM ${billAmt.toFixed(2)}.`
+          : `Jumlah bil minimum RM ${minSpend.toFixed(2)} diperlukan untuk meluluskan cop pelanggan. Jumlah bil semasa: RM ${billAmt.toFixed(2)}.`
+      );
+      return;
+    }
+
     setProcessingClaimId(claimId);
     try {
       const res = await pb.send('/api/risev/nfc/complete', {

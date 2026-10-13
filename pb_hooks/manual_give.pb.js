@@ -92,6 +92,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     const isPointsEnabled = program.get("enable_points") !== false;
     const actualStampsToAward = isStampsEnabled ? stampAmount : 0;
 
+    const minSpend = parseFloat(program.get("min_spend_amount")) || 0;
+    if (actualStampsToAward > 0 && minSpend > 0 && billAmount < minSpend) {
+      return e.json(400, {
+        message: "Bill amount (RM " + billAmount.toFixed(2) + ") is below minimum spend requirement (RM " + minSpend.toFixed(2) + ") to receive stamps."
+      });
+    }
+
     // 3. Find or create loyalty card & add stamps
     let card = null;
     try {

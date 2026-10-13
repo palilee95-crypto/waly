@@ -69,6 +69,8 @@ interface StaffMember {
   attendance_status?: 'active' | 'on_leave' | 'inactive';
   leave_reason?: string;
   leave_updated_at?: string;
+  rating_avg?: number;
+  rating_count?: number;
   stamps_issued?: number;
   vouchers_redeemed?: number;
   customers_served?: number;
@@ -1017,6 +1019,15 @@ export default function StaffManagementScreen() {
                             <Text style={styles.fullTimeBadgeText}>{locale === 'en' ? 'Full-Time' : 'Tetap'}</Text>
                           </View>
                         )}
+                        {member.rating_avg && member.rating_avg > 0 ? (
+                          <View style={styles.staffRatingPill}>
+                            <Ionicons name="star" size={10} color="#D97706" />
+                            <Text style={styles.staffRatingPillText}>{member.rating_avg}</Text>
+                            {member.rating_count ? (
+                              <Text style={styles.staffRatingCountText}>({member.rating_count})</Text>
+                            ) : null}
+                          </View>
+                        ) : null}
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
@@ -1326,7 +1337,17 @@ export default function StaffManagementScreen() {
 
                       <View style={{ flex: 1, paddingRight: 4 }}>
                         <Text style={styles.staffName}>{member.name}</Text>
-                        <Text style={styles.perfBranchText}>{member.branch_name || 'All Branches (HQ)'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <Text style={styles.perfBranchText}>{member.branch_name || 'All Branches (HQ)'}</Text>
+                          {member.rating_avg && member.rating_avg > 0 ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                              <Ionicons name="star" size={10} color="#D97706" />
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                                {member.rating_avg}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
 
                       <View style={styles.perfMetricsColumn}>
@@ -3546,6 +3567,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#1D4ED8',
+  },
+  staffRatingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  staffRatingPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  staffRatingCountText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#92400E',
   },
 
   // Attendance Badges & Quick Toggle

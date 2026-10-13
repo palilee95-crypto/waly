@@ -71,6 +71,13 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
     const isPointsEnabled = program.get("enable_points") !== false;
     const actualStamps = isStampsEnabled ? stampAmount : 0;
 
+    const minSpend = parseFloat(program.get("min_spend_amount")) || 0;
+    if (actualStamps > 0 && minSpend > 0 && billAmount < minSpend) {
+      return e.json(400, {
+        message: "Bill amount (RM " + billAmount.toFixed(2) + ") is below minimum spend requirement (RM " + minSpend.toFixed(2) + ") to receive stamps."
+      });
+    }
+
     if (isStampsEnabled && (stampAmount < 1 || stampAmount > 100)) {
       return e.json(400, { message: "Invalid stamp amount. Must be between 1 and 100." });
     }

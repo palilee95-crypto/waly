@@ -667,3 +667,87 @@ routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
   }
 });
 
+// -------------------------------------------------------------
+// REST API: Customer Staff Rating Endpoint
+// -------------------------------------------------------------
+routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
+  try {
+    let data = {};
+    try {
+      data = e.requestInfo().body || {};
+    } catch (bErr) {
+      try {
+        data = $apis.requestInfo(e).body || {};
+      } catch (bErr2) {
+        data = {};
+      }
+    }
+
+    const bookingId = (data.booking_id || data.id || "").trim();
+    const rating = parseInt(data.rating, 10) || 0;
+    const feedback = (data.feedback || data.review || "").trim();
+
+    if (!bookingId) {
+      return e.json(400, { error: "Missing booking_id" });
+    }
+    if (rating < 1 || rating > 5) {
+      return e.json(400, { error: "Rating must be an integer between 1 and 5" });
+    }
+
+    let booking;
+    try {
+      booking = $app.findRecordById("service_bookings", bookingId);
+    } catch (err) {
+      return e.json(404, { error: "Booking not found" });
+    }
+
+    let meta = {};
+    try {
+      const raw = booking.getString("metadata");
+      meta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+    } catch (mErr) {}
+
+    const nowIso = new Date().toISOString();
+    meta.staff_rating = rating;
+    meta.staff_review = feedback;
+    meta.staff_reviewed_at = nowIso;
+    booking.set("metadata", JSON.stringify(meta));
+    $app.save(booking);
+
+    // Sync to store_feedbacks
+    const merchantId = booking.getString("merchant");
+    const staffId = meta.staff_id || booking.getString("staff") || "";
+    const staffName = meta.staff_name || "";
+    const custPhone = booking.getString("customer_phone");
+    const custName = booking.getString("customer_name");
+
+    try {
+      const fbCol = $app.findCollectionByNameOrId("store_feedbacks");
+      const fbRec = new Record(fbCol);
+      fbRec.set("id", $security.randomString(15).toLowerCase());
+      fbRec.set("merchant", merchantId);
+      fbRec.set("customer_phone", custPhone);
+      fbRec.set("customer_name", custName);
+      fbRec.set("rating", rating);
+      fbRec.set("feedback", feedback || (staffName ? "Servis oleh " + staffName : ""));
+      fbRec.set("redirected_to_google", false);
+      $app.save(fbRec);
+    } catch (fbErr) {
+      console.log("[RATE STAFF] Error writing store_feedbacks:", fbErr.message || fbErr);
+    }
+
+    return e.json(200, {
+      success: true,
+      booking_id: bookingId,
+      rating: rating,
+      feedback: feedback,
+      staff_id: staffId,
+      reviewed_at: nowIso
+    });
+  } catch (err) {
+    console.log("[RATE STAFF ERROR]", err.message || err);
+    return e.json(500, { error: err.message || ("" + err) });
+  }
+});
+
+

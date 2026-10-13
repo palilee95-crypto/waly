@@ -1197,7 +1197,17 @@ export default function CustomerBookingPwaScreen() {
       }
 
       // 3. Save feedback in database
-      if (merchant?.id) {
+      // 3. Save feedback in database & rate staff
+      if (existingBooking?.id) {
+        pb.send('/api/risev/booking/rate-staff', {
+          method: 'POST',
+          body: {
+            booking_id: existingBooking.id,
+            rating: 5,
+            feedback: '',
+          }
+        }).catch((err) => console.warn('[RATE STAFF 5-STAR ERROR]', err));
+      } else if (merchant?.id) {
         const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
         pb.collection('store_feedbacks').create({
           id: genId,
@@ -1228,16 +1238,27 @@ export default function CustomerBookingPwaScreen() {
     const name = customerName || (user as any)?.name || '';
 
     try {
-      const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
-      await pb.collection('store_feedbacks').create({
-        id: genId,
-        merchant: merchant.id,
-        customer_phone: phone,
-        customer_name: name,
-        rating: reviewRating,
-        feedback: reviewFeedback.trim(),
-        redirected_to_google: false,
-      });
+      if (existingBooking?.id) {
+        await pb.send('/api/risev/booking/rate-staff', {
+          method: 'POST',
+          body: {
+            booking_id: existingBooking.id,
+            rating: reviewRating,
+            feedback: reviewFeedback.trim(),
+          }
+        }).catch((err) => console.warn('[RATE STAFF PRIVATE ERROR]', err));
+      } else {
+        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
+        await pb.collection('store_feedbacks').create({
+          id: genId,
+          merchant: merchant.id,
+          customer_phone: phone,
+          customer_name: name,
+          rating: reviewRating,
+          feedback: reviewFeedback.trim(),
+          redirected_to_google: false,
+        });
+      }
       setReviewSubmitted(true);
     } catch (err: any) {
       console.warn('[STORE FEEDBACK PRIVATE ERROR]', err?.message || err);
@@ -2582,9 +2603,22 @@ export default function CustomerBookingPwaScreen() {
                     )}
 
                     <View style={styles.staffCardBody}>
-                      <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                        {st.name}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor, flex: 1 }]} numberOfLines={1}>
+                          {st.name}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2, marginLeft: 4 }}>
+                          <Ionicons name="star" size={10} color="#D97706" />
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                            {(st as any).rating_avg ? `${(st as any).rating_avg}` : '5.0'}
+                          </Text>
+                          {(st as any).rating_count ? (
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E' }}>
+                              ({(st as any).rating_count})
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
                       <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
                         {st.role_title || (st as any).role || 'Specialist'}
                       </Text>

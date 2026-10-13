@@ -391,6 +391,9 @@ export default function UnifiedRewardsScreen() {
   const [isActive, setIsActive] = useState(true);
   const [requiredStamps, setRequiredStamps] = useState<5 | 10 | 15>(10);
   const [expiryDays, setExpiryDays] = useState('30');
+  const [minSpendAmount, setMinSpendAmount] = useState<string>('0');
+  const [enableMinSpend, setEnableMinSpend] = useState<boolean>(false);
+  const [minSpendFocused, setMinSpendFocused] = useState<boolean>(false);
   const [rewardDesc, setRewardDesc] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<string>('coffee');
   const [iconColor, setIconColor] = useState<string>('#FFFFFF');
@@ -527,6 +530,9 @@ export default function UnifiedRewardsScreen() {
         setIsActive(prog.is_active);
         setRequiredStamps(prog.stamp_goal as any || 10);
         setExpiryDays(String(prog.expiry_days || '30'));
+        const loadedMinSpend = parseFloat(prog.min_spend_amount) || 0;
+        setMinSpendAmount(loadedMinSpend > 0 ? String(loadedMinSpend) : '0');
+        setEnableMinSpend(loadedMinSpend > 0);
         setRewardDesc(prog.reward_description || '');
         setSelectedIcon(prog.card_icon || 'coffee');
         setIconColor(prog.icon_color || '#FFFFFF');
@@ -992,6 +998,7 @@ export default function UnifiedRewardsScreen() {
         icon_color: iconColor,
         points_per_stamp: 10,
         expiry_days: days,
+        min_spend_amount: enableMinSpend ? (parseFloat(minSpendAmount) || 0) : 0,
       };
 
       if (bgFile || bgFileBack) {
@@ -1801,6 +1808,45 @@ export default function UnifiedRewardsScreen() {
                 />
                 <Text style={styles.inputSuffix}>{t('days')}</Text>
               </View>
+
+              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
+
+              {/* Minimum Spend Requirement */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.settingsLabel}>
+                    {locale === 'en' ? 'Minimum Spend per Stamp' : 'Syarat Belanja Minimum'}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {locale === 'en'
+                      ? 'Require customers to reach a minimum bill amount to earn a stamp.'
+                      : 'Syaratkan jumlah bil minimum untuk pelanggan menerima 1 cop.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={enableMinSpend}
+                  onValueChange={setEnableMinSpend}
+                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#10B981' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+
+              {enableMinSpend && (
+                <View style={[styles.inputWrapper, minSpendFocused && styles.inputWrapperFocused, { marginTop: 12 }]}>
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginRight: 6 }}>RM</Text>
+                  <TextInput
+                    style={styles.nestedTextInput}
+                    value={minSpendAmount}
+                    onChangeText={setMinSpendAmount}
+                    keyboardType="numeric"
+                    placeholder="15.00"
+                    placeholderTextColor="#94A3B8"
+                    onFocus={() => setMinSpendFocused(true)}
+                    onBlur={() => setMinSpendFocused(false)}
+                  />
+                  <Text style={styles.inputSuffix}>{locale === 'en' ? 'min. bill' : 'bil minimum'}</Text>
+                </View>
+              )}
 
               <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
 

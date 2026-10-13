@@ -115,6 +115,32 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
     });
   } catch (msErr) {}
 
+  // Pre-calculate staff ratings from service_bookings
+  const staffRatingStats = {};
+  try {
+    const ratedBookings = $app.findRecordsByFilter(
+      "service_bookings",
+      `merchant = "${merchantId}" && status = "completed"`,
+      "-booking_date",
+      1500,
+      0
+    );
+    ratedBookings.forEach(b => {
+      let bMeta = {};
+      try {
+        const raw = b.getString("metadata");
+        bMeta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+      } catch (e) {}
+      const sId = bMeta.staff_id || b.getString("staff") || "";
+      const rScore = parseInt(bMeta.staff_rating, 10);
+      if (sId && rScore >= 1 && rScore <= 5) {
+        if (!staffRatingStats[sId]) staffRatingStats[sId] = { total: 0, count: 0 };
+        staffRatingStats[sId].total += rScore;
+        staffRatingStats[sId].count += 1;
+      }
+    });
+  } catch (rErr) {}
+
   staffMembers.forEach(u => {
     const sPhone = (u.getString("phone") || "").replace(/[^\d]/g, '');
     const sName = (u.getString("name") || "").toLowerCase().trim();
@@ -127,6 +153,10 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       const rawUM = u.get("metadata");
       uMeta = typeof rawUM === "string" ? JSON.parse(rawUM) : (rawUM || {});
     } catch (uErr) { uMeta = {}; }
+
+    const uRatingInfo = staffRatingStats[u.id] || (msId ? staffRatingStats[msId] : null);
+    const avgScore = uRatingInfo && uRatingInfo.count > 0 ? Math.round((uRatingInfo.total / uRatingInfo.count) * 10) / 10 : 0;
+    const rCount = uRatingInfo ? uRatingInfo.count : 0;
 
     const sObj = {
       id: u.id,
@@ -146,6 +176,8 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       attendance_status: u.getString("attendance_status") || (linkedMs ? (linkedMs.get("is_active") === false ? "on_leave" : linkedMs.getString("attendance_status")) : "") || uMeta.attendance_status || "active",
       leave_reason: u.getString("leave_reason") || (linkedMs ? linkedMs.getString("leave_reason") : "") || uMeta.leave_reason || "",
       leave_updated_at: u.getString("leave_updated_at") || (linkedMs ? linkedMs.getString("leave_updated_at") : "") || uMeta.leave_updated_at || "",
+      rating_avg: avgScore,
+      rating_count: rCount,
       stamps_issued: 0,
       vouchers_redeemed: 0,
       customers_served: 0,

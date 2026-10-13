@@ -26,7 +26,7 @@ import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStamp
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
@@ -269,6 +269,17 @@ export default function GiveStampsScreen() {
 
     if (!isPointsOnly && stamps < 1) {
       Alert.alert('Validation Error', 'Stamps to issue must be at least 1.');
+      return;
+    }
+
+    const minSpend = parseFloat((program as any)?.min_spend_amount) || 0;
+    if (!isPointsOnly && stamps > 0 && minSpend > 0 && bill < minSpend) {
+      Alert.alert(
+        locale === 'en' ? 'Minimum Spend Required' : 'Syarat Belanja Minimum',
+        locale === 'en'
+          ? `A minimum bill of RM ${minSpend.toFixed(2)} is required to issue stamps. Current bill: RM ${bill.toFixed(2)}.`
+          : `Jumlah bil minimum RM ${minSpend.toFixed(2)} diperlukan untuk memberikan cop. Jumlah bil semasa: RM ${bill.toFixed(2)}.`
+      );
       return;
     }
 
@@ -691,6 +702,16 @@ export default function GiveStampsScreen() {
               <Text style={styles.label}>
                 {isPointsOnly ? 'BILL AMOUNT (RM) *' : isStampsOnly ? 'BILL AMOUNT (RM) - OPTIONAL (TRACKS SALES)' : 'BILL AMOUNT (RM)'}
               </Text>
+              {Number((program as any)?.min_spend_amount) > 0 && !isPointsOnly ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#EFF6FF', borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                  <Ionicons name="information-circle" size={14} color="#1D4ED8" />
+                  <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1D4ED8' }}>
+                    {locale === 'en'
+                      ? `Min. spend requirement: RM ${Number((program as any).min_spend_amount).toFixed(2)} to earn a stamp`
+                      : `Syarat bil minimum: RM ${Number((program as any).min_spend_amount).toFixed(2)} untuk menerima cop`}
+                  </Text>
+                </View>
+              ) : null}
               <View style={styles.inputWrap}>
                 <Text style={styles.currencyPrefix}>RM</Text>
                 <TextInput
