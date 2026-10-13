@@ -24,7 +24,7 @@ import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Svg, { Path, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -970,6 +970,14 @@ export default function CustomersScreen() {
       pb.collection('transactions').unsubscribe('*').catch(() => {});
     };
   }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTransactions(false);
+      fetchMerchant();
+      fetchBranches();
+    }, [user?.id, user?.merchant_id])
+  );
 
   const getFilteredAndSortedTransactions = () => {
     let result = [...transactions];

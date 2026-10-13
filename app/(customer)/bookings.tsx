@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import pb from '@/lib/pocketbase';
 
@@ -64,9 +64,9 @@ export default function CustomerBookingsScreen() {
   const [selectedPass, setSelectedPass] = useState<CustomerBookingItem | null>(null);
   const [passModalVisible, setPassModalVisible] = useState(false);
 
-  const fetchBookings = useCallback(async () => {
+  const fetchBookings = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       let records: any[] = [];
       if (user?.id) {
         try {
@@ -201,6 +201,12 @@ export default function CustomerBookingsScreen() {
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBookings(bookingsList.length === 0);
+    }, [fetchBookings, bookingsList.length])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

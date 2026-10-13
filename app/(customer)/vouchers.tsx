@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 
@@ -246,6 +246,12 @@ export default function VouchersScreen() {
       pb.collection('vouchers').unsubscribe('*');
     };
   }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchVouchers();
+    }, [user?.id])
+  );
 
   // 2. Active Modal Realtime Watchdog (Direct Record SSE + 1.5s Polling Fallback)
   useEffect(() => {

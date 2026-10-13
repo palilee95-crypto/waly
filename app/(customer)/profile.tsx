@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Platform, Alert, Modal, TextInput, ActivityIndicator, Linking, useWindowDimensions, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, storage } from '@/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { colors } from '@/theme';
@@ -34,8 +34,9 @@ export default function CustomerProfile() {
   const [vouchersCount, setVouchersCount] = useState(0);
   const [vouchersTotalValue, setVouchersTotalValue] = useState(0);
 
-  React.useEffect(() => {
+  const fetchProfileStats = React.useCallback(() => {
     if (!user) return;
+    refreshSession().catch(() => {});
     pb.collection('loyalty_cards')
       .getFullList({ filter: `customer = '${user.id}'` })
       .then((cards) => {
@@ -72,7 +73,17 @@ export default function CustomerProfile() {
         setVouchersTotalValue(totalVal);
       })
       .catch(() => {});
-  }, [user]);
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    fetchProfileStats();
+  }, [fetchProfileStats]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfileStats();
+    }, [fetchProfileStats])
+  );
 
   const handleToggleMarketing = async (value: boolean) => {
     if (!user) return;

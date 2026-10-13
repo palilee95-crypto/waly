@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
@@ -330,6 +330,17 @@ export default function StaffManagementScreen() {
     fetchStaff();
     fetchPermissions();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchStaff(timeframe, sortBy);
+      if (activeTab === 'commission') {
+        fetchCommissions(commissionMonth);
+      } else if (activeTab === 'settings') {
+        fetchPermissions();
+      }
+    }, [user?.id, user?.merchant_id, activeTab, timeframe, sortBy, commissionMonth])
+  );
 
   useEffect(() => {
     if (activeTab === 'performance') {

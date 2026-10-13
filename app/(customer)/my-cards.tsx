@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
@@ -377,6 +377,13 @@ export default function MyCardsScreen() {
       pb.collection('loyalty_cards').unsubscribe('*');
     };
   }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchLoyaltyCards();
+      loadPinnedCards();
+    }, [user?.id])
+  );
 
   const [merchantRewards, setMerchantRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(false);

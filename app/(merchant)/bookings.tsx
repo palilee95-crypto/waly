@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
@@ -527,8 +527,14 @@ export default function BookingsScreen() {
     loadData();
   }, [user]);
 
-  const loadData = async () => {
-    setLoading(true);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData(bookings.length > 0);
+    }, [user?.id, user?.merchant_id, bookings.length])
+  );
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       let mRecord: any = null;
       const targetMerchantId = user?.merchant_id || merchantData?.id;

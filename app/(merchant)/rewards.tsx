@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import UpgradeModal from './_components/UpgradeModal';
@@ -612,6 +612,14 @@ export default function UnifiedRewardsScreen() {
     fetchRewards();
     fetchBirthdayReward();
   }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchMerchantAndProgram();
+      fetchRewards();
+      fetchBirthdayReward();
+    }, [user?.id, user?.merchant_id])
+  );
 
   // Tab 4: Birthday Rewards Handlers
   const handleSaveBirthday = async () => {

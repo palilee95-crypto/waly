@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
 
@@ -46,10 +46,16 @@ export default function StampHistoryScreen() {
     fetchLogs();
   }, []);
 
-  const fetchLogs = async () => {
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchLogs(logs.length === 0);
+    }, [user?.id, logs.length])
+  );
+
+  const fetchLogs = async (showLoading = true) => {
     if (!user) return;
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const res = await pb.collection('transactions').getList<TransactionItem>(1, 50, {
         filter: `customer = "${user.id}"`,
         sort: '-created',
