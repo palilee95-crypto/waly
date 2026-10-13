@@ -472,3 +472,28 @@ Visualizing the user's appointment state with high clarity:
   - Primary CTA: Golden Yellow Risev capsule `[ Store Owner Log In  → ]` (`backgroundColor: '#FFCC00'`, text black `#000000`, height 54, radius 999).
   - Secondary CTA: Outlined White capsule `[ Create New Store Account (2 min) ]` (`backgroundColor: '#FFFFFF'`, border `1.5px solid #000000`, text black, height 52, radius 999).
   - Clean footer link: `(?) Need help setting up?` (opens WhatsApp support without cluttered floating FAB).
+
+### 5.11 Risev NFC Stand Marketplace & Activation Screen (`app/(merchant)/nfc-marketplace.tsx`)
+- **Aesthetic Overhaul (Pure White Apple-Grade Aesthetic)**:
+  - Replaced legacy pitch-black `#000000` dark theme with a clean, high-contrast `#FFFFFF` canvas.
+  - Eliminated dark gradient overlays over the hero mockup (`assets/imej nfc.png`) so the physical Risev acrylic counter stand and smartphone appear vivid and ultra-crisp.
+  - Replaced dark close button with a light squircle (`#F1F5F9`, border `#E2E8F0`, black icon).
+- **Brand Header & Trust Badges**:
+  - Official `risev` logo top-left paired with a `#FFCC00` `NFC BUNDLE` pill badge.
+  - High-impact headline: `"Turn walk-ins into regulars."` (28px PlusJakartaSans_800ExtraBold, Pure Black).
+  - Subtitle: `"Physical smart stands that reward customers on tap. Zero hardware monthly fees."`
+  - Trust Badges: Dual pills (`Lifetime Customer Quota` & `Zero Monthly Fees`) with green checkmarks.
+- **Stand Code Activation Card**:
+  - Light squircle container (`backgroundColor: '#F8FAFC'`, border `1.5px solid #E2E8F0`, `borderRadius: 22`, padding 18px).
+  - Stand icon squircle (`#FFCC00` yellow background, radio/nfc icon) + title `"Already have a Stand?"` + subtitle `"Enter the unique serial code printed on your acrylic stand."`
+  - Monospace uppercase code input (`#FFFFFF`, border `#E2E8F0`, `placeholder: "e.g. RSV-8MBE-VG5D"`).
+  - Golden Yellow Risev redeem button `[ Redeem Stand ]` (`backgroundColor: '#FFCC00'`, black text).
+- **Pricing Packages (Apple-Grade Tiered Selection)**:
+  - Package Cards: Pure White (`#FFFFFF`, border `#E2E8F0`, selected border `2px solid #000000`).
+  - Top Badge: `"POPULAR CHOICE"` pill on highlighted bundle.
+  - Clean typography: Package name (`PlusJakartaSans_800ExtraBold`), quota indicator, strike-through original price, and bold current price.
+  - Feature checklist with green checkmark circles.
+- **Curiosity Capsule & Support Navigation**:
+  - Solid Pure Black capsule: `"Don't have a stand? Get Your Stand Now 🎁"` (`height: 52`, radius 999).
+  - Clean inline setup/help support link: `(?) Need help setting up or ordering? Chat with us` above the footer links.
+  - Excluded `nfc-marketplace` route in `app/(merchant)/_layout.tsx` so the global floating customer support FAB (`Need Help?`) does not overlap bottom CTAs or checkout drawers.

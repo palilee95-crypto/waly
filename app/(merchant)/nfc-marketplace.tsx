@@ -382,7 +382,7 @@ export default function NfcPaywallScreen() {
         activeOpacity={0.8}
       >
         <View style={styles.backBtnCircle}>
-          <Ionicons name="close" size={24} color="#FFFFFF" />
+          <Ionicons name="close" size={20} color="#000000" />
         </View>
       </TouchableOpacity>
 
@@ -529,18 +529,12 @@ export default function NfcPaywallScreen() {
             </TouchableOpacity>
           )}
         
-        {/* Massive Hero Section Fading Into Black */}
+        {/* Pure White Product Hero Showcase */}
         <View style={styles.heroWrapper}>
           <Image 
             source={require('../../assets/imej nfc.png')} 
             style={styles.heroImage} 
             resizeMode="contain" 
-          />
-          {/* Smooth Gradient Fade Overlay */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
-            locations={[0, 0.6, 1]}
-            style={styles.fadeOverlayBottom}
           />
         </View>
 
@@ -553,13 +547,25 @@ export default function NfcPaywallScreen() {
               resizeMode="contain" 
             />
             <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>NFC Bundle</Text>
+              <Text style={styles.proBadgeText}>NFC BUNDLE</Text>
             </View>
           </View>
+          <Text style={styles.mainTitle}>Turn walk-ins into regulars.</Text>
           <Text style={styles.subtitle}>
-            Turn walk-ins into regulars.{"\n"}
-            Includes <Ionicons name="people" size={13} color="#94A3B8" /> <Text style={{ color: '#E2E8F0' }}>Lifetime Customer Quota</Text>
+            Pair this physical NFC counter stand to your store to start collecting customer visits and loyalty stamps instantly.
           </Text>
+
+          {/* Quick Trust Tags */}
+          <View style={styles.trustBadgeRow}>
+            <View style={styles.trustBadge}>
+              <Ionicons name="people" size={13} color="#000000" />
+              <Text style={styles.trustBadgeText}>Lifetime Customer Quota</Text>
+            </View>
+            <View style={styles.trustBadge}>
+              <Ionicons name="shield-checkmark" size={13} color="#15803D" />
+              <Text style={styles.trustBadgeText}>Zero Monthly Fees</Text>
+            </View>
+          </View>
         </View>
 
         {/* Stand Code Redemption Box */}
@@ -568,7 +574,7 @@ export default function NfcPaywallScreen() {
           <View style={styles.activationHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View style={styles.chipIconContainer}>
-                <Ionicons name="hardware-chip-outline" size={18} color="#FFC700" />
+                <Ionicons name="hardware-chip-outline" size={18} color="#000000" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.activationTitle}>
@@ -586,7 +592,7 @@ export default function NfcPaywallScreen() {
               <TextInput
                 style={styles.activationInput}
                 placeholder="STAND-XXXX-XXXX"
-                placeholderTextColor="#64748B"
+                placeholderTextColor="#94A3B8"
                 value={standCodeInput}
                 onChangeText={setStandCodeInput}
                 autoCapitalize="characters"
@@ -595,19 +601,13 @@ export default function NfcPaywallScreen() {
                 onPress={handleRedeemCode}
                 disabled={isRedeemingCode}
                 activeOpacity={0.85}
+                style={styles.redeemBtn}
               >
-                <LinearGradient
-                  colors={['#FACC15', '#EAB308']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.redeemBtn}
-                >
-                  {isRedeemingCode ? (
-                    <ActivityIndicator size="small" color="#000000" />
-                  ) : (
-                    <Text style={styles.redeemBtnText}>Redeem</Text>
-                  )}
-                </LinearGradient>
+                {isRedeemingCode ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <Text style={styles.redeemBtnText}>Redeem</Text>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -630,11 +630,11 @@ export default function NfcPaywallScreen() {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setShowPricingPackages(true);
             }}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
-            <Text style={styles.curiosityBtnText}>Don't have a stand? Get Yours Here</Text>
+            <Text style={styles.curiosityBtnText}>Don't have a stand? Get Your Stand Now 🎁</Text>
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-              <Ionicons name="arrow-down-circle" size={20} color="#FFC700" />
+              <Ionicons name="arrow-down-circle" size={18} color="#FFCC00" />
             </Animated.View>
           </TouchableOpacity>
         )}
@@ -723,6 +723,22 @@ export default function NfcPaywallScreen() {
           </View>
         </View>
         )}
+
+        {/* Support & WhatsApp Link */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20choosing%20an%20NFC%20stand.', '_blank');
+            } else {
+              Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20choosing%20an%20NFC%20stand.');
+            }
+          }}
+          style={styles.helpSupportRow}
+        >
+          <Ionicons name="help-circle-outline" size={16} color="#000000" />
+          <Text style={styles.helpSupportText}>Need help setting up or ordering? Chat with us</Text>
+        </TouchableOpacity>
 
         <View style={styles.footerLinks}>
           <Text style={styles.footerLinkText}>How it works</Text>
@@ -927,7 +943,6 @@ export default function NfcPaywallScreen() {
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
@@ -935,7 +950,7 @@ export default function NfcPaywallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000', // Pure pitch black
+    backgroundColor: '#FFFFFF', // Pure White Apple-grade canvas
   },
   backBtnAbsolute: {
     position: 'absolute',
@@ -947,7 +962,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -956,98 +973,230 @@ const styles = StyleSheet.create({
   },
   heroWrapper: {
     width: '100%',
-    height: 380, // Optimized height to showcase stand while bringing packages into view
+    height: 270,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#000',
+    backgroundColor: '#FFFFFF',
+    marginTop: 10,
   },
   heroImage: {
     width: '100%',
     height: '100%',
-    position: 'absolute',
-  },
-  fadeOverlayBottom: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    height: 180,
-    zIndex: 3,
   },
   titleArea: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: -55, // Smooth blend into gradient
-    zIndex: 10,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   logoImage: {
     height: 28,
     width: 95,
-    tintColor: '#FFFFFF',
   },
   proBadge: {
-    backgroundColor: 'rgba(255, 199, 0, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 199, 0, 0.3)',
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
+    borderRadius: 999,
   },
   proBadgeText: {
-    fontSize: 13,
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFD700',
+    color: '#000000',
     letterSpacing: 0.5,
   },
+  mainTitle: {
+    fontSize: 24,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 6,
+    letterSpacing: -0.4,
+  },
   subtitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#CBD5E1',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  trustBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: 4,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  trustBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  activationCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 22,
+    padding: 18,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  activationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chipIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activationTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.2,
+  },
+  activationSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  activationBody: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  activationInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  activationInput: {
+    flex: 1,
+    height: 50,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    fontFamily: 'monospace',
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 1,
+  },
+  redeemBtn: {
+    height: 50,
+    backgroundColor: '#FFCC00',
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  redeemBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.3,
+  },
+  codeErrorText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#DC2626',
+    marginTop: 8,
+  },
+  codeSuccessText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#15803D',
+    marginTop: 8,
+  },
+  curiosityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    height: 52,
+    marginHorizontal: 20,
+    borderRadius: 999,
+    gap: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  curiosityBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.2,
   },
   packagesContainer: {
     paddingHorizontal: 20,
-    marginTop: 6,
-    gap: 10,
+    marginTop: 10,
+    gap: 12,
   },
   pkgCard: {
     position: 'relative',
-    backgroundColor: '#111114',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1.5,
-    borderColor: '#1C1C1E',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   pkgCardSelected: {
-    borderColor: '#FFC700',
-    backgroundColor: 'rgba(255, 199, 0, 0.04)',
+    borderColor: '#000000',
+    borderWidth: 2,
+    backgroundColor: '#F8FAFC',
   },
   recommendedBadge: {
     position: 'absolute',
-    top: -12,
+    top: -11,
     alignSelf: 'center',
-    backgroundColor: '#FFC700',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 12,
+    paddingVertical: 3.5,
+    borderRadius: 999,
     zIndex: 10,
   },
   recommendedBadgeText: {
-    color: '#000',
+    color: '#000000',
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   pkgRow: {
     flexDirection: 'row',
@@ -1064,50 +1213,50 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioCircleSelected: {
-    borderColor: '#FFC700',
-    backgroundColor: '#FFC700',
+    borderColor: '#000000',
+    backgroundColor: '#000000',
   },
   pkgTitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#E5E5E5',
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
     letterSpacing: -0.3,
   },
   pkgFinalPrice: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#A1A1AA',
+    color: '#000000',
   },
   pkgOriginalPrice: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
     textDecorationLine: 'line-through',
-    color: '#555',
+    color: '#94A3B8',
   },
   discountPill: {
-    backgroundColor: '#2A2A2A',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 8,
   },
   discountPillActive: {
-    backgroundColor: '#FFC700',
+    backgroundColor: '#FFCC00',
   },
   discountPillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#888',
+    color: '#92400E',
   },
   pkgDescriptionBox: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#2C2C2E',
+    borderTopColor: '#E2E8F0',
   },
   pkgDescRow: {
     flexDirection: 'row',
@@ -1116,116 +1265,109 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pkgDescriptionText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#475569',
     lineHeight: 18,
-  },
-  trustBadgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 16,
-    paddingHorizontal: 10,
-  },
-  trustBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 199, 0, 0.06)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 199, 0, 0.15)',
-  },
-  trustBadgeText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFC700',
   },
   disclaimerBox: {
     flexDirection: 'row',
-    backgroundColor: '#131316',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#222225',
-    borderRadius: 12,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
     padding: 14,
-    marginTop: 12,
+    marginTop: 6,
     marginHorizontal: 4,
     gap: 10,
     alignItems: 'flex-start',
   },
   disclaimerText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#64748B',
     lineHeight: 18,
+  },
+  helpSupportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 24,
+    paddingVertical: 4,
+  },
+  helpSupportText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#000000',
   },
   footerLinks: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
-    marginTop: 24,
+    marginTop: 14,
     paddingHorizontal: 20,
+    marginBottom: 20,
   },
   footerLinkText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#666',
+    color: '#94A3B8',
     textDecorationLine: 'underline',
   },
   bottomCtaArea: {
     position: 'absolute',
     bottom: 0,
     width: '100%',
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    backgroundColor: 'rgba(0,0,0,0.85)', // Slight dark blur to contrast button
+    padding: 18,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   massiveBtn: {
-    paddingVertical: 18,
-    borderRadius: 16,
+    height: 54,
+    backgroundColor: '#FFCC00',
+    borderRadius: 999,
     alignItems: 'center',
-    shadowColor: '#EAB308',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
+    justifyContent: 'center',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 4,
   },
   massiveBtnText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
-
-  /* MODAL STYLES */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   sheetCard: {
-    backgroundColor: '#111111',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     borderTopWidth: 1,
-    borderTopColor: '#262626',
+    borderTopColor: '#E2E8F0',
     maxHeight: '88%',
   },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
+    borderBottomColor: '#F1F5F9',
   },
   sheetTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   sheetCloseBtn: {
     position: 'absolute',
@@ -1245,18 +1387,18 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#94A3B8',
+    color: '#64748B',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   textInput: {
-    backgroundColor: '#161618',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#2C2C2E',
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     padding: 16,
-    color: '#FFF',
+    color: '#000000',
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
   },
@@ -1267,88 +1409,70 @@ const styles = StyleSheet.create({
   },
   payOption: {
     flex: 1,
-    backgroundColor: '#161618',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#2C2C2E',
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: 'center',
     gap: 8,
   },
   payOptionActive: {
-    borderColor: '#FFC700',
-    backgroundColor: 'rgba(255,199,0,0.08)',
-    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
   },
   payOptionText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
+    color: '#0F172A',
   },
   sheetFooter: {
     padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    backgroundColor: '#111111',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#1E1E1E',
+    borderTopColor: '#F1F5F9',
   },
   finalPayBtn: {
-    paddingVertical: 18,
-    borderRadius: 16,
+    height: 54,
+    backgroundColor: '#FFCC00',
+    borderRadius: 999,
     alignItems: 'center',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 8 },
+    justifyContent: 'center',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowRadius: 12,
+    elevation: 4,
   },
   finalPayBtnText: {
     color: '#000000',
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.5,
-  },
-  curiosityBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#18181B',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginHorizontal: 30,
-    marginTop: 20,
-    borderRadius: 40,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#27272A',
-  },
-  curiosityBtnText: {
-    color: '#FFC700',
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
     letterSpacing: 0.2,
   },
   successOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
   successCard: {
     width: '100%',
-    backgroundColor: '#111111',
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
     padding: 30,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#262626',
+    borderColor: '#E2E8F0',
   },
   successIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFC700',
+    backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -1356,100 +1480,15 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFF',
+    color: '#000000',
     marginBottom: 8,
   },
   successSub: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 20,
-  },
-
-  // Stand Activation Code Card (Dark Aesthetic)
-  activationCard: {
-    backgroundColor: '#111114',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginHorizontal: 20,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#27272A',
-  },
-  activationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  chipIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 199, 0, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activationTitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-  },
-  activationSubtitle: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#A1A1AA',
-    marginTop: 2,
-  },
-  activationBody: {
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  activationInputRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  activationInput: {
-    flex: 1,
-    height: 48,
-    backgroundColor: '#18181B',
-    borderWidth: 1,
-    borderColor: '#27272A',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  redeemBtn: {
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  redeemBtnText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  codeErrorText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#EF4444',
-    marginTop: 8,
-  },
-  codeSuccessText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#10B981',
-    marginTop: 8,
   },
 });

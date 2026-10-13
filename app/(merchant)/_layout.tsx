@@ -991,7 +991,7 @@ export default function MerchantLayout() {
       <NfcClaimModal />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      {!pathname.includes('profile-onboarding') && (
+      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && (
         <TouchableOpacity
           activeOpacity={0.8}
         onPress={() => {
