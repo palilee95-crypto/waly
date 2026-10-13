@@ -586,6 +586,20 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top Header Bar with Home / Landing Navigation Button */}
+      <View style={[styles.topHeaderBar, isDesktop && { maxWidth: 440, alignSelf: 'center', width: '100%' }]}>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity
+          style={styles.landingHomeButton}
+          onPress={() => router.push('/landing' as any)}
+          activeOpacity={0.7}
+          accessibilityLabel="Go to Landing Page"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="home-outline" size={22} color="#0F172A" />
+        </TouchableOpacity>
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -1722,6 +1736,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  topHeaderBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'web' ? 14 : 8,
+    paddingBottom: 4,
+    zIndex: 10,
+  },
+  landingHomeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   scroll: {
     flexGrow: 1,
