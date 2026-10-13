@@ -61,6 +61,14 @@ interface StaffMember {
   merchant_staff_id?: string;
   avatar_url?: string;
   branch_name?: string;
+  employment_type?: 'full_time' | 'part_time';
+  base_salary?: number;
+  hourly_rate?: number;
+  commission_type?: 'none' | 'percentage' | 'fixed_per_job';
+  commission_rate?: number;
+  attendance_status?: 'active' | 'on_leave' | 'inactive';
+  leave_reason?: string;
+  leave_updated_at?: string;
   stamps_issued?: number;
   vouchers_redeemed?: number;
   customers_served?: number;
@@ -68,6 +76,30 @@ interface StaffMember {
   rank?: number;
   has_anomaly?: boolean;
   anomaly_note?: string;
+}
+
+export interface StaffCommissionItem {
+  staff_id: string;
+  staff_name: string;
+  staff_phone: string;
+  role_title: string;
+  employment_type: string;
+  commission_type: string;
+  commission_rate: number;
+  total_jobs: number;
+  total_sales: number;
+  total_commission: number;
+  paid_commission: number;
+  unpaid_commission: number;
+  payout_status: 'paid' | 'unpaid';
+}
+
+export interface CommissionReportSummary {
+  total_jobs: number;
+  total_sales: number;
+  total_commission: number;
+  paid_commission: number;
+  unpaid_commission: number;
 }
 
 export default function StaffManagementScreen() {
@@ -89,16 +121,37 @@ export default function StaffManagementScreen() {
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'performance' | 'settings'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'performance' | 'commission' | 'settings'>('members');
 
-  // Edit Staff Profile & Photo State
+  // Edit Staff Profile & Compensation State
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [editName, setEditName] = useState('');
   const [editRoleTitle, setEditRoleTitle] = useState('');
   const [editAvatarUri, setEditAvatarUri] = useState<string | null>(null);
   const [editAvatarFile, setEditAvatarFile] = useState<any>(null);
+  const [editEmploymentType, setEditEmploymentType] = useState<'full_time' | 'part_time'>('full_time');
+  const [editBaseSalary, setEditBaseSalary] = useState('');
+  const [editHourlyRate, setEditHourlyRate] = useState('');
+  const [editCommissionType, setEditCommissionType] = useState<'none' | 'percentage' | 'fixed_per_job'>('none');
+  const [editCommissionRate, setEditCommissionRate] = useState('');
   const [isSavingStaff, setIsSavingStaff] = useState(false);
+
+  // Attendance & Leave State
+  const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [leaveTargetMember, setLeaveTargetMember] = useState<StaffMember | null>(null);
+  const [selectedLeaveReason, setSelectedLeaveReason] = useState('MC');
+  const [customLeaveReason, setCustomLeaveReason] = useState('');
+  const [isUpdatingAttendance, setIsUpdatingAttendance] = useState(false);
+
+  // Commission Tab State
+  const [commissionMonth, setCommissionMonth] = useState(() => {
+    const d = new Date();
+    return d.toISOString().substring(0, 7);
+  });
+  const [commissionReport, setCommissionReport] = useState<{ summary: CommissionReportSummary; staff: StaffCommissionItem[] } | null>(null);
+  const [loadingCommissions, setLoadingCommissions] = useState(false);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
   // Performance State
   const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
@@ -287,6 +340,118 @@ export default function StaffManagementScreen() {
       fetchPermissions();
     }
   }, [activeTab]);
+
+  const fetchCommissions = async (targetMonth = commissionMonth) => {
+    if (!user?.merchant_id) return;
+    try {
+      setLoadingCommissions(true);
+      const res = await pb.send<{
+        month: string;
+        summary: CommissionReportSummary;
+        staff: StaffCommissionItem[];
+      }>(`/api/risev/merchant/staff/commissions?month=${targetMonth}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      if (res) {
+        setCommissionReport({
+          summary: res.summary,
+          staff: res.staff || []
+        });
+      }
+    } catch (err: any) {
+      console.warn("Failed to fetch commissions:", err);
+    } finally {
+      setLoadingCommissions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'commission') {
+      fetchCommissions(commissionMonth);
+    }
+  }, [activeTab, commissionMonth]);
+
+  const handlePromptAttendanceToggle = (member: StaffMember) => {
+    if (member.attendance_status === 'on_leave') {
+      Alert.alert(
+        locale === 'en' ? "Return to Duty?" : "Kembalikan ke Bertugas?",
+        locale === 'en' 
+          ? `Mark ${member.name} as on duty and available for bookings?`
+          : `Tandakan ${member.name} sebagai bertugas dan boleh menerima tempahan?`,
+        [
+          { text: locale === 'en' ? "Cancel" : "Batal", style: "cancel" },
+          {
+            text: locale === 'en' ? "Set On Duty" : "Tanda Bertugas",
+            onPress: () => handleSaveAttendance(member.id, 'active', '')
+          }
+        ]
+      );
+    } else {
+      setLeaveTargetMember(member);
+      setSelectedLeaveReason('MC');
+      setCustomLeaveReason('');
+      setLeaveModalVisible(true);
+    }
+  };
+
+  const handleSaveAttendance = async (staffId: string, status: 'active' | 'on_leave', reason = '') => {
+    try {
+      setIsUpdatingAttendance(true);
+      await pb.send('/api/risev/merchant/staff/attendance', {
+        method: 'POST',
+        body: { staff_id: staffId, status, reason },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
+      setLeaveModalVisible(false);
+      setLeaveTargetMember(null);
+      fetchStaff();
+    } catch (err: any) {
+      Alert.alert(locale === 'en' ? "Error" : "Ralat", err?.data?.message || err?.message || "Failed to update attendance.");
+    } finally {
+      setIsUpdatingAttendance(false);
+    }
+  };
+
+  const handleMarkCommissionPaid = (staffItem: StaffCommissionItem) => {
+    Alert.alert(
+      locale === 'en' ? "Mark Commission as Paid?" : "Tanda Komisen Telah Dibayar?",
+      locale === 'en'
+        ? `Confirm payment of RM${staffItem.unpaid_commission.toFixed(2)} to ${staffItem.staff_name} for ${commissionMonth}?`
+        : `Sahkan pembayaran RM${staffItem.unpaid_commission.toFixed(2)} kepada ${staffItem.staff_name} bagi bulan ${commissionMonth}?`,
+      [
+        { text: locale === 'en' ? "Cancel" : "Batal", style: "cancel" },
+        {
+          text: locale === 'en' ? "Confirm Paid" : "Sahkan Bayar",
+          onPress: async () => {
+            try {
+              setIsMarkingPaid(true);
+              await pb.send('/api/risev/merchant/staff/commission-payout', {
+                method: 'POST',
+                body: { staff_id: staffItem.staff_id, month: commissionMonth },
+                headers: {
+                  'Authorization': 'Bearer ' + pb.authStore.token
+                }
+              });
+              Alert.alert(
+                locale === 'en' ? "Payment Recorded" : "Bayaran Direkodkan",
+                locale === 'en' ? "Commission marked as paid." : "Komisen telah ditandakan selesai dibayar."
+              );
+              fetchCommissions(commissionMonth);
+            } catch (err: any) {
+              Alert.alert(locale === 'en' ? "Error" : "Ralat", err?.data?.message || err?.message || "Failed to mark paid.");
+            } finally {
+              setIsMarkingPaid(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleTogglePermission = async (key: keyof StaffPermissions, val: boolean) => {
     const updated = { ...permissionsState, [key]: val };
@@ -533,6 +698,11 @@ export default function StaffManagementScreen() {
     setEditRoleTitle(member.role_title || 'Provider');
     setEditAvatarUri(getAvatarUrl(member));
     setEditAvatarFile(null);
+    setEditEmploymentType(member.employment_type || 'full_time');
+    setEditBaseSalary(member.base_salary ? String(member.base_salary) : '');
+    setEditHourlyRate(member.hourly_rate ? String(member.hourly_rate) : '');
+    setEditCommissionType(member.commission_type || 'none');
+    setEditCommissionRate(member.commission_rate ? String(member.commission_rate) : '');
     setEditModalVisible(true);
   };
 
@@ -629,6 +799,26 @@ export default function StaffManagementScreen() {
         } catch (uErr) {}
       }
 
+      // Save compensation & employment tier package
+      try {
+        await pb.send('/api/risev/merchant/staff/compensation', {
+          method: 'POST',
+          body: {
+            staff_id: editingMember.id,
+            employment_type: editEmploymentType,
+            base_salary: parseFloat(editBaseSalary) || 0,
+            hourly_rate: parseFloat(editHourlyRate) || 0,
+            commission_type: editCommissionType,
+            commission_rate: parseFloat(editCommissionRate) || 0
+          },
+          headers: {
+            'Authorization': 'Bearer ' + pb.authStore.token
+          }
+        });
+      } catch (cErr) {
+        console.warn("Compensation update note:", cErr);
+      }
+
       Alert.alert(
         locale === 'en' ? 'Success' : 'Berjaya',
         locale === 'en' ? 'Staff profile updated and synced with booking!' : 'Profil staf dikemaskini dan diselaraskan dengan tempahan!'
@@ -697,6 +887,20 @@ export default function StaffManagementScreen() {
               numberOfLines={1}
             >
               {locale === 'en' ? 'Rankings' : 'Prestasi'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tabBtn, activeTab === 'commission' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('commission')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="cash-outline" size={15} color={activeTab === 'commission' ? '#050505' : '#64748B'} />
+            <Text 
+              style={[styles.tabBtnText, activeTab === 'commission' && styles.tabBtnTextActive]}
+              numberOfLines={1}
+            >
+              {locale === 'en' ? 'Commission' : 'Komisen'}
             </Text>
           </TouchableOpacity>
 
@@ -804,9 +1008,62 @@ export default function StaffManagementScreen() {
                           <Ionicons name="location-sharp" size={10} color="#B45309" />
                           <Text style={styles.staffBranchBadgeText}>{member.branch_name || 'Main HQ'}</Text>
                         </View>
+                        {member.employment_type === 'part_time' ? (
+                          <View style={styles.partTimeBadge}>
+                            <Text style={styles.partTimeBadgeText}>{locale === 'en' ? 'Part-Time' : 'Sambilan'}</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.fullTimeBadge}>
+                            <Text style={styles.fullTimeBadgeText}>{locale === 'en' ? 'Full-Time' : 'Tetap'}</Text>
+                          </View>
+                        )}
                       </View>
-                      <Text style={styles.staffRoleText}>{member.role_title || 'Provider'}</Text>
-                      <Text style={styles.staffPhone}>{member.phone}</Text>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                        <Text style={styles.staffRoleText}>{member.role_title || 'Provider'}</Text>
+                        
+                        {/* 1-Click Attendance Toggle Badge */}
+                        <TouchableOpacity
+                          style={[
+                            styles.attendanceBadge,
+                            member.attendance_status === 'on_leave' ? styles.attendanceBadgeLeave : styles.attendanceBadgeActive
+                          ]}
+                          onPress={() => handlePromptAttendanceToggle(member)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={[
+                            styles.statusDot,
+                            member.attendance_status === 'on_leave' ? styles.statusDotLeave : styles.statusDotActive
+                          ]} />
+                          <Text style={[
+                            styles.attendanceText,
+                            member.attendance_status === 'on_leave' ? styles.attendanceTextLeave : styles.attendanceTextActive
+                          ]}>
+                            {member.attendance_status === 'on_leave'
+                              ? (member.leave_reason ? `${locale === 'en' ? 'Leave' : 'Cuti'} (${member.leave_reason})` : (locale === 'en' ? 'On Leave' : 'Cuti'))
+                              : (locale === 'en' ? 'On Duty' : 'Bertugas')}
+                          </Text>
+                          <Ionicons 
+                            name={member.attendance_status === 'on_leave' ? 'refresh' : 'chevron-down'} 
+                            size={10} 
+                            color={member.attendance_status === 'on_leave' ? '#D97706' : '#16A34A'} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                        <Text style={styles.staffPhone}>{member.phone}</Text>
+                        {member.commission_type && member.commission_type !== 'none' ? (
+                          <View style={styles.commissionRatePill}>
+                            <Ionicons name="cash-outline" size={10} color="#059669" />
+                            <Text style={styles.commissionRatePillText}>
+                              {member.commission_type === 'percentage'
+                                ? `${member.commission_rate}% ${locale === 'en' ? 'Comm.' : 'Komisen'}`
+                                : `RM${(member.commission_rate || 0).toFixed(2)}/job`}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       {member.email ? <Text style={styles.staffEmail}>{member.email}</Text> : null}
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1095,6 +1352,196 @@ export default function StaffManagementScreen() {
                     </TouchableOpacity>
                   );
                 })}
+              </View>
+            )}
+          </View>
+        ) : activeTab === 'commission' ? (
+          /* Staff Commission & Payouts View */
+          <View style={{ gap: 16 }}>
+            {/* Header Banner Card with Month Picker */}
+            <View style={styles.commissionHeaderCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <View style={styles.commissionTrophyBadge}>
+                    <Ionicons name="cash" size={20} color="#050505" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.leaderboardTitle}>
+                      {locale === 'en' ? 'Staff Commission & Payouts' : 'Pusat Komisen & Bayaran Staf'}
+                    </Text>
+                    <Text style={styles.leaderboardSubtitle}>
+                      {locale === 'en'
+                        ? 'Automated monthly service earnings & payout ledger.'
+                        : 'Pengiraan komisen bulanan automatik & rekod bayaran staf.'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Month Navigator */}
+                <View style={styles.monthNavRow}>
+                  <TouchableOpacity
+                    style={styles.monthNavBtn}
+                    onPress={() => {
+                      const [y, m] = commissionMonth.split('-').map(Number);
+                      const prevDate = new Date(Date.UTC(y, m - 2, 1));
+                      const prevStr = prevDate.toISOString().substring(0, 7);
+                      setCommissionMonth(prevStr);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chevron-back" size={16} color="#050505" />
+                  </TouchableOpacity>
+                  <Text style={styles.monthNavLabel}>{commissionMonth}</Text>
+                  <TouchableOpacity
+                    style={styles.monthNavBtn}
+                    onPress={() => {
+                      const [y, m] = commissionMonth.split('-').map(Number);
+                      const nextDate = new Date(Date.UTC(y, m, 1));
+                      const nextStr = nextDate.toISOString().substring(0, 7);
+                      setCommissionMonth(nextStr);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chevron-forward" size={16} color="#050505" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Summary Stats Row */}
+              {commissionReport && (
+                <View style={styles.summaryStatsRow}>
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Services' : 'Servis Siap'}</Text>
+                    <Text style={styles.summaryStatValue}>{commissionReport.summary.total_jobs}</Text>
+                  </View>
+                  <View style={styles.summaryStatDivider} />
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Total Sales' : 'Jualan Staf'}</Text>
+                    <Text style={styles.summaryStatValue}>RM {commissionReport.summary.total_sales.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.summaryStatDivider} />
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Commission' : 'Komisen Layak'}</Text>
+                    <Text style={[styles.summaryStatValue, { color: '#059669' }]}>RM {commissionReport.summary.total_commission.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.summaryStatDivider} />
+                  <View style={styles.summaryStatBox}>
+                    <Text style={styles.summaryStatLabel}>{locale === 'en' ? 'Unpaid' : 'Belum Bayar'}</Text>
+                    <Text style={[styles.summaryStatValue, { color: commissionReport.summary.unpaid_commission > 0 ? '#D97706' : '#10B981' }]}>
+                      RM {commissionReport.summary.unpaid_commission.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Staff Commission Cards */}
+            {loadingCommissions ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator color="#050505" size="large" />
+              </View>
+            ) : !commissionReport || commissionReport.staff.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconBg}>
+                  <Ionicons name="cash-outline" size={32} color="#64748B" />
+                </View>
+                <Text style={styles.emptyTitle}>{locale === 'en' ? 'No Staff Found' : 'Tiada Rekod Staf'}</Text>
+                <Text style={styles.emptySubtitle}>
+                  {locale === 'en' ? 'Add staff members to start tracking service commissions.' : 'Tambah kakitangan untuk mula merekodkan komisen servis.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {commissionReport.staff.map((cStaff) => (
+                  <View key={cStaff.staff_id} style={styles.commCard}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                        <View style={styles.commAvatarPlaceholder}>
+                          <Text style={styles.commAvatarText}>{cStaff.staff_name.substring(0, 2).toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={styles.staffName}>{cStaff.staff_name}</Text>
+                            {cStaff.employment_type === 'part_time' ? (
+                              <View style={styles.partTimeBadge}>
+                                <Text style={styles.partTimeBadgeText}>{locale === 'en' ? 'Part-Time' : 'Sambilan'}</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.fullTimeBadge}>
+                                <Text style={styles.fullTimeBadgeText}>{locale === 'en' ? 'Full-Time' : 'Tetap'}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.commRateFormula}>
+                            {cStaff.commission_type === 'percentage'
+                              ? `${cStaff.commission_rate}% ${locale === 'en' ? 'of service bill' : 'daripada harga servis'}`
+                              : cStaff.commission_type === 'fixed_per_job'
+                              ? `RM ${(cStaff.commission_rate || 0).toFixed(2)} ${locale === 'en' ? 'fixed per completed job' : 'tetap bagi setiap servis'}`
+                              : locale === 'en' ? 'No commission (0%)' : 'Tiada komisen (0%)'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Status Pill */}
+                      {cStaff.total_commission > 0 ? (
+                        cStaff.unpaid_commission <= 0 ? (
+                          <View style={styles.payoutStatusPaid}>
+                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                            <Text style={styles.payoutStatusPaidText}>{locale === 'en' ? 'Paid' : 'Selesai Dibayar'}</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.payoutStatusPending}>
+                            <Ionicons name="time" size={13} color="#D97706" />
+                            <Text style={styles.payoutStatusPendingText}>{locale === 'en' ? 'Unpaid' : 'Belum Bayar'}</Text>
+                          </View>
+                        )
+                      ) : (
+                        <View style={styles.payoutStatusZero}>
+                          <Text style={styles.payoutStatusZeroText}>RM 0.00</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Financial Metrics Row */}
+                    <View style={styles.commMetricsRow}>
+                      <View style={styles.commMetricItem}>
+                        <Text style={styles.commMetricLabel}>{locale === 'en' ? 'Completed' : 'Servis Siap'}</Text>
+                        <Text style={styles.commMetricValue}>{cStaff.total_jobs} {locale === 'en' ? 'jobs' : 'servis'}</Text>
+                      </View>
+                      <View style={styles.commMetricItem}>
+                        <Text style={styles.commMetricLabel}>{locale === 'en' ? 'Sales Generated' : 'Jumlah Jualan'}</Text>
+                        <Text style={styles.commMetricValue}>RM {cStaff.total_sales.toFixed(2)}</Text>
+                      </View>
+                      <View style={styles.commMetricItem}>
+                        <Text style={styles.commMetricLabel}>{locale === 'en' ? 'Total Comm.' : 'Jumlah Komisen'}</Text>
+                        <Text style={[styles.commMetricValue, { color: '#059669' }]}>RM {cStaff.total_commission.toFixed(2)}</Text>
+                      </View>
+                    </View>
+
+                    {/* Action Bar */}
+                    {cStaff.unpaid_commission > 0 && (
+                      <View style={styles.commActionBar}>
+                        <Text style={styles.unpaidDueLabel}>
+                          {locale === 'en' ? 'Pending:' : 'Baki Tertunggak:'}{' '}
+                          <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                            RM {cStaff.unpaid_commission.toFixed(2)}
+                          </Text>
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.markPaidBtn}
+                          onPress={() => handleMarkCommissionPaid(cStaff)}
+                          disabled={isMarkingPaid}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="cash" size={14} color="#FFFFFF" />
+                          <Text style={styles.markPaidBtnText}>
+                            {locale === 'en' ? 'Mark as Paid' : 'Tanda Selesai Bayar'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))}
               </View>
             )}
           </View>
@@ -1683,6 +2130,111 @@ export default function StaffManagementScreen() {
                   {locale === 'en' ? 'Displayed on customer appointment booking cards.' : 'Dipaparkan pada kad tempahan temu janji pelanggan.'}
                 </Text>
               </View>
+
+              {/* Compensation & Tier Section */}
+              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 4 }} />
+              <Text style={[styles.inputMiniLabel, { color: '#D97706', marginBottom: 2 }]}>
+                {locale === 'en' ? 'EMPLOYMENT TIER & COMPENSATION' : 'PAKEJ TIER & MODEL KOMISEN'}
+              </Text>
+
+              {/* Employment Type Toggle */}
+              <View style={styles.segmentedRow}>
+                <TouchableOpacity
+                  style={[styles.segmentedBtn, editEmploymentType === 'full_time' && styles.segmentedBtnActive]}
+                  onPress={() => setEditEmploymentType('full_time')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentedBtnText, editEmploymentType === 'full_time' && styles.segmentedBtnTextActive]}>
+                    {locale === 'en' ? 'Full-Time (Tetap)' : 'Pekerja Tetap'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentedBtn, editEmploymentType === 'part_time' && styles.segmentedBtnActive]}
+                  onPress={() => setEditEmploymentType('part_time')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentedBtnText, editEmploymentType === 'part_time' && styles.segmentedBtnTextActive]}>
+                    {locale === 'en' ? 'Part-Time (Sambilan)' : 'Pekerja Sambilan'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Base Salary / Hourly Rate */}
+              {editEmploymentType === 'full_time' ? (
+                <View>
+                  <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'BASE SALARY (RM / MONTH - OPTIONAL)' : 'GAJI POKOK (RM / BULAN - PILIHAN)'}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editBaseSalary}
+                    onChangeText={setEditBaseSalary}
+                    placeholder="e.g. 2500"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'HOURLY WAGE (RM / HOUR - OPTIONAL)' : 'KADAR UPAH (RM / JAM - PILIHAN)'}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editHourlyRate}
+                    onChangeText={setEditHourlyRate}
+                    placeholder="e.g. 10.00"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                </View>
+              )}
+
+              {/* Commission Model Selector */}
+              <View>
+                <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'COMMISSION STRUCTURE' : 'STRUKTUR KOMISEN'}</Text>
+                <View style={styles.commTypeRow}>
+                  {[
+                    { id: 'none', labelEn: 'None (0%)', labelMs: 'Tiada (0%)' },
+                    { id: 'percentage', labelEn: 'Percentage (%)', labelMs: 'Peratusan (%)' },
+                    { id: 'fixed_per_job', labelEn: 'Fixed (RM)', labelMs: 'Kadar Tetap (RM)' }
+                  ].map((ct) => (
+                    <TouchableOpacity
+                      key={ct.id}
+                      style={[styles.commTypePill, editCommissionType === ct.id && styles.commTypePillActive]}
+                      onPress={() => setEditCommissionType(ct.id as any)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.commTypePillText, editCommissionType === ct.id && styles.commTypePillTextActive]}>
+                        {locale === 'en' ? ct.labelEn : ct.labelMs}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Commission Rate Input */}
+              {editCommissionType !== 'none' && (
+                <View>
+                  <Text style={styles.inputMiniLabel}>
+                    {editCommissionType === 'percentage'
+                      ? (locale === 'en' ? 'COMMISSION PERCENTAGE (%)' : 'KADAR KOMISEN PERATUSAN (%)')
+                      : (locale === 'en' ? 'FIXED AMOUNT PER JOB (RM)' : 'KADAR TETAP SETIAP SERVIS (RM)')}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editCommissionRate}
+                    onChangeText={setEditCommissionRate}
+                    placeholder={editCommissionType === 'percentage' ? "e.g. 10" : "e.g. 5.00"}
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                  <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                    {editCommissionType === 'percentage'
+                      ? (locale === 'en' ? 'Calculated automatically on completed service total.' : 'Dikira automatik daripada jumlah bil servis yang selesai.')
+                      : (locale === 'en' ? 'Awarded flat upon service completion.' : 'Diberikan tetap setiap kali servis diselesaikan.')}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={[styles.modalActionsRow, { marginTop: 20 }]}>
@@ -1704,6 +2256,97 @@ export default function StaffManagementScreen() {
                 ) : (
                   <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>
                     {locale === 'en' ? 'Save & Sync' : 'Simpan'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Attendance & Leave Reason Modal */}
+      <Modal
+        visible={leaveModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isUpdatingAttendance && setLeaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 420, padding: 24 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="calendar-outline" size={18} color="#D97706" />
+                </View>
+                <Text style={[styles.modalTitle, { marginBottom: 0 }]}>
+                  {locale === 'en' ? 'Mark Staff On Leave' : 'Tanda Staf Bercuti'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setLeaveModalVisible(false)}
+                disabled={isUpdatingAttendance}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', marginBottom: 16 }}>
+              {locale === 'en'
+                ? `Slots for ${leaveTargetMember?.name || 'this staff'} will be temporarily hidden from customer appointment bookings.`
+                : `Slot bagi ${leaveTargetMember?.name || 'staf ini'} akan disembunyikan daripada tempahan pelanggan untuk hari ini.`}
+            </Text>
+
+            <Text style={styles.inputMiniLabel}>{locale === 'en' ? 'SELECT REASON' : 'PILIH SEBAB CUTI'}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {[
+                { id: 'MC', label: 'Cuti Sakit (MC)' },
+                { id: 'Cuti Rehat', label: 'Cuti Rehat' },
+                { id: 'Kecemasan', label: 'Kecemasan' },
+                { id: 'Off Day', label: 'Off Day' }
+              ].map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[
+                    styles.leaveReasonChip,
+                    selectedLeaveReason === r.id && styles.leaveReasonChipActive
+                  ]}
+                  onPress={() => setSelectedLeaveReason(r.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.leaveReasonChipText,
+                    selectedLeaveReason === r.id && styles.leaveReasonChipTextActive
+                  ]}>
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={[styles.modalActionsRow, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setLeaveModalVisible(false)}
+                disabled={isUpdatingAttendance}
+              >
+                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: '#D97706' }]}
+                onPress={() => {
+                  if (leaveTargetMember) {
+                    handleSaveAttendance(leaveTargetMember.id, 'on_leave', selectedLeaveReason);
+                  }
+                }}
+                disabled={isUpdatingAttendance}
+              >
+                {isUpdatingAttendance ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>
+                    {locale === 'en' ? 'Confirm Leave' : 'Sahkan Cuti'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -2876,5 +3519,336 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Tier Badges
+  partTimeBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  partTimeBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#7E22CE',
+  },
+  fullTimeBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  fullTimeBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#1D4ED8',
+  },
+
+  // Attendance Badges & Quick Toggle
+  attendanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  attendanceBadgeActive: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  attendanceBadgeLeave: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusDotActive: {
+    backgroundColor: '#16A34A',
+  },
+  statusDotLeave: {
+    backgroundColor: '#D97706',
+  },
+  attendanceText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  attendanceTextActive: {
+    color: '#15803D',
+  },
+  attendanceTextLeave: {
+    color: '#B45309',
+  },
+
+  // Commission Pill on staff cards
+  commissionRatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  commissionRatePillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#065F46',
+  },
+
+  // Commission Tab Styles
+  commissionHeaderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 14,
+  },
+  commissionTrophyBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 2,
+  },
+  monthNavBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthNavLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    paddingHorizontal: 8,
+  },
+  commCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  commAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commAvatarText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#475569',
+  },
+  commRateFormula: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  commMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  commMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  commMetricLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  commMetricValue: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  payoutStatusPaid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  payoutStatusPaidText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
+  },
+  payoutStatusPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  payoutStatusPendingText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  payoutStatusZero: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  payoutStatusZeroText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+  },
+  commActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  unpaidDueLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  markPaidBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  markPaidBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+
+  // Segmented Buttons in Edit Modal
+  segmentedRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    gap: 4,
+  },
+  segmentedBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentedBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentedBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  segmentedBtnTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+
+  // Commission Type Selector in Edit Modal
+  commTypeRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  commTypePill: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  commTypePillActive: {
+    backgroundColor: '#050505',
+    borderColor: '#050505',
+  },
+  commTypePillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  commTypePillTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+
+  // Leave Reason Chips
+  leaveReasonChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  leaveReasonChipActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#D97706',
+  },
+  leaveReasonChipText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  leaveReasonChipTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
   },
 });

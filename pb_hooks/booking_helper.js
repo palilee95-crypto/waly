@@ -306,15 +306,87 @@ function processCompletedBooking(rec) {
     console.log("[BOOKING LOYALTY CARD RESOLVE ERROR]", cErr.message || cErr);
   }
 
-  // 6. Resolve staff user ID if staff record exists
+  // 6. Resolve staff user ID and calculate commission
   var staffUserId = null;
+  var staffName = "Staff";
+  var staffRec = null;
+  var staffUserRec = null;
+  var commissionAmount = 0;
+
   if (staffId) {
     try {
-      var staffRec = $app.findRecordById("merchant_staff", staffId);
+      staffRec = $app.findRecordById("merchant_staff", staffId);
       if (staffRec) {
         staffUserId = staffRec.getString("user");
+        staffName = staffRec.getString("name") || "Staff";
       }
     } catch (stErr) {}
+
+    if (staffUserId) {
+      try { staffUserRec = $app.findRecordById("users", staffUserId); } catch (uErr) {}
+    } else {
+      try {
+        staffUserRec = $app.findRecordById("users", staffId);
+        if (staffUserRec) {
+          staffUserId = staffUserRec.id;
+          staffName = staffUserRec.getString("name") || "Staff";
+        }
+      } catch (uErr) {}
+    }
+
+    // Commission Calculation
+    try {
+      var commType = "none";
+      var commRate = 0;
+      var empType = "full_time";
+
+      if (staffUserRec) {
+        commType = staffUserRec.getString("commission_type") || "none";
+        commRate = parseFloat(staffUserRec.get("commission_rate")) || 0;
+        empType = staffUserRec.getString("employment_type") || "full_time";
+      } else if (staffRec) {
+        commType = staffRec.getString("commission_type") || "none";
+        commRate = parseFloat(staffRec.get("commission_rate")) || 0;
+        empType = staffRec.getString("employment_type") || "full_time";
+      }
+
+      if (commType === "percentage") {
+        commissionAmount = Math.round((totalPrice * commRate / 100) * 100) / 100;
+      } else if (commType === "fixed_per_job") {
+        commissionAmount = commRate;
+      }
+
+      // Read current booking metadata
+      var bMeta = {};
+      try {
+        var rawBM = rec.getString ? rec.getString("metadata") : "";
+        bMeta = typeof rawBM === "string" && rawBM.trim() ? JSON.parse(rawBM) : (rec.get("metadata") || {});
+      } catch (bmErr) { bMeta = {}; }
+      if (!bMeta || typeof bMeta !== "object") bMeta = {};
+
+      if (!bMeta.commission_calculated) {
+        bMeta.commission_calculated = true;
+        bMeta.staff_id = staffUserId || staffId;
+        bMeta.staff_name = staffName;
+        bMeta.employment_type = empType;
+        bMeta.commission_type = commType;
+        bMeta.commission_rate = commRate;
+        bMeta.bill_amount = totalPrice;
+        bMeta.commission_amount = commissionAmount;
+        bMeta.commission_payout_status = bMeta.commission_payout_status || "unpaid";
+        bMeta.commission_calculated_at = new Date().toISOString();
+
+        rec.set("metadata", JSON.stringify(bMeta));
+        try {
+          $app.save(rec);
+          console.log("[BOOKING COMPLETE] Commission snapshot saved for " + staffName + ": RM" + commissionAmount + " (" + commType + " " + commRate + ")");
+        } catch (saveBmErr) {
+          console.log("[BOOKING COMPLETE] Error saving commission snapshot:", saveBmErr.message || saveBmErr);
+        }
+      }
+    } catch (commErr) {
+      console.log("[COMMISSION CALCULATION ERROR]", commErr.message || commErr);
+    }
   }
 
   // 7. Insert transaction record (Unified Sales Ledger)
@@ -340,7 +412,8 @@ function processCompletedBooking(rec) {
       branch_id: branchId || "",
       staff_id: staffId || "",
       items_summary: itemsSummary || [],
-      notes: "Booking completed: " + serviceNames
+      notes: "Booking completed: " + serviceNames,
+      commission_amount: commissionAmount
     };
     newTx.set("metadata", JSON.stringify(txnMeta));
     $app.save(newTx);

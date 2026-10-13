@@ -131,6 +131,47 @@ onRecordCreate((e) => {
   const rawPhone = rec.getString("customer_phone");
   const customerName = (rec.getString("customer_name") || "Customer").trim();
 
+  // Attendance check: block booking if staff is currently on leave
+  if (staffId) {
+    try {
+      let isStaffOnLeave = false;
+      let staffName = "Staff";
+      let staffReason = "";
+
+      try {
+        const msRec = $app.findRecordById("merchant_staff", staffId);
+        if (msRec) {
+          staffName = msRec.getString("name") || "Staff";
+          if (msRec.get("is_active") === false || msRec.getString("attendance_status") === "on_leave") {
+            isStaffOnLeave = true;
+            staffReason = msRec.getString("leave_reason") || "";
+          }
+        }
+      } catch (msErr) {}
+
+      if (!isStaffOnLeave) {
+        try {
+          const uRec = $app.findRecordById("users", staffId);
+          if (uRec) {
+            staffName = uRec.getString("name") || staffName;
+            if (uRec.getString("attendance_status") === "on_leave") {
+              isStaffOnLeave = true;
+              staffReason = uRec.getString("leave_reason") || "";
+            }
+          }
+        } catch (uErr) {}
+      }
+
+      if (isStaffOnLeave) {
+        throw new BadRequestError(`Kakitangan (${staffName}) sedang bercuti${staffReason ? ' (' + staffReason + ')' : ''}. Sila pilih kakitangan atau waktu lain.`);
+      }
+    } catch (valErr) {
+      if (valErr.name === "BadRequestError" || (valErr.message && valErr.message.indexOf("bercuti") !== -1)) {
+        throw valErr;
+      }
+    }
+  }
+
   // 1. Phone standardization
   const cleanPhone = normalizePhone(rawPhone);
   if (cleanPhone) {

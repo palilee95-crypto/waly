@@ -101,17 +101,51 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   const staffMapByName = {};
   const staffMapByPhone = {};
 
+  // Pre-fetch merchant_staff records to link role_title and metadata
+  const msLookupByUser = {};
+  try {
+    const msList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}"`, "created", 200, 0);
+    msList.forEach(ms => {
+      const uid = ms.getString("user");
+      if (uid) msLookupByUser[uid] = ms;
+      const ph = (ms.getString("phone") || "").replace(/[^\d]/g, '');
+      if (ph) msLookupByUser[ph] = ms;
+      const nm = (ms.getString("name") || "").toLowerCase().trim();
+      if (nm) msLookupByUser[nm] = ms;
+    });
+  } catch (msErr) {}
+
   staffMembers.forEach(u => {
     const sPhone = (u.getString("phone") || "").replace(/[^\d]/g, '');
     const sName = (u.getString("name") || "").toLowerCase().trim();
+    const linkedMs = msLookupByUser[u.id] || msLookupByUser[sPhone] || msLookupByUser[sName];
+    const msId = linkedMs ? linkedMs.id : "";
+    const roleTitle = linkedMs ? (linkedMs.getString("role_title") || "Staff") : (u.getString("role_title") || "Staff");
+
+    let uMeta = {};
+    try {
+      const rawUM = u.get("metadata");
+      uMeta = typeof rawUM === "string" ? JSON.parse(rawUM) : (rawUM || {});
+    } catch (uErr) { uMeta = {}; }
+
     const sObj = {
       id: u.id,
+      merchant_staff_id: msId,
       name: u.getString("name"),
+      role_title: roleTitle,
       phone: u.getString("phone"),
       email: u.getString("email"),
       avatar: u.getString("avatar"),
       role: u.getString("role"),
       branch_name: u.getString("branch_name") || "All Branches (HQ)",
+      employment_type: u.getString("employment_type") || (linkedMs ? linkedMs.getString("employment_type") : "") || uMeta.employment_type || "full_time",
+      base_salary: parseFloat(u.get("base_salary")) || (linkedMs ? parseFloat(linkedMs.get("base_salary")) : 0) || parseFloat(uMeta.base_salary) || 0,
+      hourly_rate: parseFloat(u.get("hourly_rate")) || (linkedMs ? parseFloat(linkedMs.get("hourly_rate")) : 0) || parseFloat(uMeta.hourly_rate) || 0,
+      commission_type: u.getString("commission_type") || (linkedMs ? linkedMs.getString("commission_type") : "") || uMeta.commission_type || "none",
+      commission_rate: parseFloat(u.get("commission_rate")) || (linkedMs ? parseFloat(linkedMs.get("commission_rate")) : 0) || parseFloat(uMeta.commission_rate) || 0,
+      attendance_status: u.getString("attendance_status") || (linkedMs ? (linkedMs.get("is_active") === false ? "on_leave" : linkedMs.getString("attendance_status")) : "") || uMeta.attendance_status || "active",
+      leave_reason: u.getString("leave_reason") || (linkedMs ? linkedMs.getString("leave_reason") : "") || uMeta.leave_reason || "",
+      leave_updated_at: u.getString("leave_updated_at") || (linkedMs ? linkedMs.getString("leave_updated_at") : "") || uMeta.leave_updated_at || "",
       stamps_issued: 0,
       vouchers_redeemed: 0,
       customers_served: 0,
@@ -120,6 +154,7 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       anomaly_note: ""
     };
     staffMapById[u.id] = sObj;
+    if (msId) staffMapById[msId] = sObj;
     if (sName) {
       staffMapByName[sName] = sObj;
     }
@@ -836,6 +871,399 @@ routerAdd("POST", "/api/risev/merchant/staff/dismiss-anomaly", (e) => {
   return e.json(200, {
     success: true,
     message: "Activity marked as reviewed."
+  });
+}, $apis.requireAuth("users"));
+
+// Quick toggle attendance status (active / on_leave / inactive)
+routerAdd("POST", "/api/risev/merchant/staff/attendance", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized. Please log in first." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const staffId = (body.staff_id || "").trim();
+  const status = (body.status || "active").toLowerCase();
+  const reason = (body.reason || "").trim();
+
+  if (!staffId) {
+    return e.json(400, { message: "staff_id is required" });
+  }
+
+  if (["active", "on_leave", "inactive"].indexOf(status) === -1) {
+    return e.json(400, { message: "Invalid status. Must be active, on_leave, or inactive" });
+  }
+
+  let staffUser = null;
+  let merchantStaffRec = null;
+
+  try {
+    staffUser = $app.findRecordById("users", staffId);
+  } catch (err) {}
+
+  try {
+    merchantStaffRec = $app.findRecordById("merchant_staff", staffId);
+  } catch (msErr) {}
+
+  if (!staffUser && merchantStaffRec) {
+    const linkedUserId = merchantStaffRec.getString("user");
+    if (linkedUserId) {
+      try { staffUser = $app.findRecordById("users", linkedUserId); } catch (uErr) {}
+    }
+  } else if (staffUser && !merchantStaffRec) {
+    try {
+      const msList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}" && (user = "${staffUser.id}" || phone = "${staffUser.getString("phone")}")`, "-created", 1, 0);
+      if (msList.length > 0) merchantStaffRec = msList[0];
+    } catch (mErr) {}
+  }
+
+  if (!staffUser && !merchantStaffRec) {
+    return e.json(404, { message: "Staff record not found" });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  // Update users record
+  if (staffUser) {
+    let uMeta = {};
+    try {
+      const rawUM = staffUser.get("metadata");
+      uMeta = typeof rawUM === "string" ? JSON.parse(rawUM) : (rawUM || {});
+    } catch (uErr) { uMeta = {}; }
+    uMeta.attendance_status = status;
+    uMeta.leave_reason = status === "on_leave" ? reason : "";
+    uMeta.leave_updated_at = nowIso;
+
+    try { staffUser.set("attendance_status", status); } catch (e) {}
+    try { staffUser.set("leave_reason", status === "on_leave" ? reason : ""); } catch (e) {}
+    try { staffUser.set("leave_updated_at", nowIso); } catch (e) {}
+    staffUser.set("metadata", JSON.stringify(uMeta));
+    try { $app.save(staffUser); } catch (saveErr) {}
+  }
+
+  // Update merchant_staff record
+  if (merchantStaffRec) {
+    try { merchantStaffRec.set("is_active", status === "active"); } catch (e) {}
+    try { merchantStaffRec.set("attendance_status", status); } catch (e) {}
+    try { merchantStaffRec.set("leave_reason", status === "on_leave" ? reason : ""); } catch (e) {}
+    try { $app.save(merchantStaffRec); } catch (saveErr) {}
+  }
+
+  return e.json(200, {
+    success: true,
+    staff_id: staffId,
+    attendance_status: status,
+    leave_reason: status === "on_leave" ? reason : "",
+    leave_updated_at: nowIso
+  });
+}, $apis.requireAuth("users"));
+
+// Configure staff compensation & employment tier
+routerAdd("POST", "/api/risev/merchant/staff/compensation", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized. Please log in first." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const staffId = (body.staff_id || "").trim();
+  const employmentType = body.employment_type === "part_time" ? "part_time" : "full_time";
+  const baseSalary = parseFloat(body.base_salary) || 0;
+  const hourlyRate = parseFloat(body.hourly_rate) || 0;
+  const commissionType = ["percentage", "fixed_per_job"].indexOf(body.commission_type) !== -1 ? body.commission_type : "none";
+  const commissionRate = parseFloat(body.commission_rate) || 0;
+
+  if (!staffId) {
+    return e.json(400, { message: "staff_id is required" });
+  }
+
+  let staffUser = null;
+  let merchantStaffRec = null;
+
+  try { staffUser = $app.findRecordById("users", staffId); } catch (err) {}
+  try { merchantStaffRec = $app.findRecordById("merchant_staff", staffId); } catch (msErr) {}
+
+  if (!staffUser && merchantStaffRec) {
+    const linkedUserId = merchantStaffRec.getString("user");
+    if (linkedUserId) {
+      try { staffUser = $app.findRecordById("users", linkedUserId); } catch (uErr) {}
+    }
+  } else if (staffUser && !merchantStaffRec) {
+    try {
+      const msList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}" && (user = "${staffUser.id}" || phone = "${staffUser.getString("phone")}")`, "-created", 1, 0);
+      if (msList.length > 0) merchantStaffRec = msList[0];
+    } catch (mErr) {}
+  }
+
+  if (!staffUser && !merchantStaffRec) {
+    return e.json(404, { message: "Staff record not found" });
+  }
+
+  if (staffUser) {
+    let uMeta = {};
+    try {
+      const rawUM = staffUser.get("metadata");
+      uMeta = typeof rawUM === "string" ? JSON.parse(rawUM) : (rawUM || {});
+    } catch (uErr) { uMeta = {}; }
+    uMeta.employment_type = employmentType;
+    uMeta.base_salary = baseSalary;
+    uMeta.hourly_rate = hourlyRate;
+    uMeta.commission_type = commissionType;
+    uMeta.commission_rate = commissionRate;
+
+    try { staffUser.set("employment_type", employmentType); } catch (e) {}
+    try { staffUser.set("base_salary", baseSalary); } catch (e) {}
+    try { staffUser.set("hourly_rate", hourlyRate); } catch (e) {}
+    try { staffUser.set("commission_type", commissionType); } catch (e) {}
+    try { staffUser.set("commission_rate", commissionRate); } catch (e) {}
+    staffUser.set("metadata", JSON.stringify(uMeta));
+    try { $app.save(staffUser); } catch (saveErr) {}
+  }
+
+  if (merchantStaffRec) {
+    try { merchantStaffRec.set("employment_type", employmentType); } catch (e) {}
+    try { merchantStaffRec.set("base_salary", baseSalary); } catch (e) {}
+    try { merchantStaffRec.set("hourly_rate", hourlyRate); } catch (e) {}
+    try { merchantStaffRec.set("commission_type", commissionType); } catch (e) {}
+    try { merchantStaffRec.set("commission_rate", commissionRate); } catch (e) {}
+    try { $app.save(merchantStaffRec); } catch (saveErr) {}
+  }
+
+  return e.json(200, {
+    success: true,
+    staff_id: staffId,
+    employment_type: employmentType,
+    base_salary: baseSalary,
+    hourly_rate: hourlyRate,
+    commission_type: commissionType,
+    commission_rate: commissionRate
+  });
+}, $apis.requireAuth("users"));
+
+// Monthly Commission Summary & Aggregation
+routerAdd("GET", "/api/risev/merchant/staff/commissions", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  const query = e.requestInfo().query || {};
+  let targetMonth = (query.month || "").trim();
+  if (!targetMonth || targetMonth.length < 7) {
+    const d = new Date();
+    targetMonth = d.toISOString().substring(0, 7); // e.g. "2026-10"
+  }
+
+  // Fetch all completed bookings for this merchant in this month
+  let bookings = [];
+  try {
+    bookings = $app.findRecordsByFilter(
+      "service_bookings",
+      `merchant = "${merchantId}" && status = "completed" && booking_date >= "${targetMonth}-01" && booking_date <= "${targetMonth}-31"`,
+      "-booking_date",
+      2000,
+      0
+    );
+  } catch (bErr) {
+    bookings = [];
+  }
+
+  // Pre-fetch staff members to ensure all active staff appear in report
+  let staffMembers = [];
+  try {
+    staffMembers = $app.findRecordsByFilter(
+      "users",
+      `merchant_id = "${merchantId}" && id != "${authRecord.id}"`,
+      "name",
+      200,
+      0
+    );
+  } catch (sErr) {}
+
+  const staffSummaryMap = {};
+  staffMembers.forEach(u => {
+    let uMeta = {};
+    try {
+      const rawUM = u.get("metadata");
+      uMeta = typeof rawUM === "string" ? JSON.parse(rawUM) : (rawUM || {});
+    } catch (e) {}
+
+    staffSummaryMap[u.id] = {
+      staff_id: u.id,
+      staff_name: u.getString("name"),
+      staff_phone: u.getString("phone"),
+      role_title: u.getString("role_title") || "Staff",
+      employment_type: u.getString("employment_type") || uMeta.employment_type || "full_time",
+      commission_type: u.getString("commission_type") || uMeta.commission_type || "none",
+      commission_rate: parseFloat(u.get("commission_rate")) || parseFloat(uMeta.commission_rate) || 0,
+      total_jobs: 0,
+      total_sales: 0,
+      total_commission: 0,
+      paid_commission: 0,
+      unpaid_commission: 0
+    };
+  });
+
+  let grandTotalJobs = 0;
+  let grandTotalSales = 0;
+  let grandTotalCommission = 0;
+  let grandTotalPaid = 0;
+  let grandTotalUnpaid = 0;
+
+  bookings.forEach(b => {
+    let meta = {};
+    try {
+      const raw = b.getString("metadata");
+      meta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+    } catch (e) {}
+
+    const staffId = meta.staff_id || b.getString("staff") || "";
+    const bill = parseFloat(b.get("total_price")) || parseFloat(meta.bill_amount) || 0;
+    const comm = parseFloat(meta.commission_amount) || 0;
+    const isPaid = meta.commission_payout_status === "paid";
+
+    grandTotalJobs += 1;
+    grandTotalSales += bill;
+    grandTotalCommission += comm;
+    if (isPaid) {
+      grandTotalPaid += comm;
+    } else {
+      grandTotalUnpaid += comm;
+    }
+
+    if (staffId) {
+      if (!staffSummaryMap[staffId]) {
+        staffSummaryMap[staffId] = {
+          staff_id: staffId,
+          staff_name: meta.staff_name || "Staff",
+          staff_phone: "",
+          role_title: "Staff",
+          employment_type: meta.employment_type || "full_time",
+          commission_type: meta.commission_type || "none",
+          commission_rate: parseFloat(meta.commission_rate) || 0,
+          total_jobs: 0,
+          total_sales: 0,
+          total_commission: 0,
+          paid_commission: 0,
+          unpaid_commission: 0
+        };
+      }
+      const sSum = staffSummaryMap[staffId];
+      sSum.total_jobs += 1;
+      sSum.total_sales += bill;
+      sSum.total_commission += comm;
+      if (isPaid) {
+        sSum.paid_commission += comm;
+      } else {
+        sSum.unpaid_commission += comm;
+      }
+    }
+  });
+
+  const staffReport = Object.keys(staffSummaryMap).map(k => {
+    const s = staffSummaryMap[k];
+    s.total_sales = Math.round(s.total_sales * 100) / 100;
+    s.total_commission = Math.round(s.total_commission * 100) / 100;
+    s.paid_commission = Math.round(s.paid_commission * 100) / 100;
+    s.unpaid_commission = Math.round(s.unpaid_commission * 100) / 100;
+    s.payout_status = s.total_commission > 0 && s.unpaid_commission <= 0 ? "paid" : "unpaid";
+    return s;
+  });
+
+  // Sort by commission earned descending
+  staffReport.sort((a, b) => b.total_commission - a.total_commission || b.total_sales - a.total_sales);
+
+  return e.json(200, {
+    month: targetMonth,
+    summary: {
+      total_jobs: grandTotalJobs,
+      total_sales: Math.round(grandTotalSales * 100) / 100,
+      total_commission: Math.round(grandTotalCommission * 100) / 100,
+      paid_commission: Math.round(grandTotalPaid * 100) / 100,
+      unpaid_commission: Math.round(grandTotalUnpaid * 100) / 100
+    },
+    staff: staffReport
+  });
+}, $apis.requireAuth("users"));
+
+// Mark monthly commission payout as paid
+routerAdd("POST", "/api/risev/merchant/staff/commission-payout", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const staffId = (body.staff_id || "").trim();
+  const targetMonth = (body.month || "").trim();
+
+  if (!staffId || !targetMonth) {
+    return e.json(400, { message: "staff_id and month are required" });
+  }
+
+  let bookings = [];
+  try {
+    bookings = $app.findRecordsByFilter(
+      "service_bookings",
+      `merchant = "${merchantId}" && status = "completed" && booking_date >= "${targetMonth}-01" && booking_date <= "${targetMonth}-31"`,
+      "-booking_date",
+      2000,
+      0
+    );
+  } catch (bErr) {
+    bookings = [];
+  }
+
+  let updatedCount = 0;
+  const nowIso = new Date().toISOString();
+
+  bookings.forEach(b => {
+    let meta = {};
+    try {
+      const raw = b.getString("metadata");
+      meta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+    } catch (e) {}
+
+    const bStaffId = meta.staff_id || b.getString("staff") || "";
+    if (bStaffId === staffId && meta.commission_payout_status !== "paid") {
+      meta.commission_payout_status = "paid";
+      meta.commission_paid_at = nowIso;
+      meta.commission_paid_by = authRecord.id;
+      b.set("metadata", JSON.stringify(meta));
+      try {
+        $app.save(b);
+        updatedCount += 1;
+      } catch (saveErr) {}
+    }
+  });
+
+  return e.json(200, {
+    success: true,
+    message: `Marked commission as paid for ${updatedCount} bookings.`,
+    updated_count: updatedCount,
+    staff_id: staffId,
+    month: targetMonth,
+    paid_at: nowIso
   });
 }, $apis.requireAuth("users"));
 
