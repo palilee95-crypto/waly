@@ -194,3 +194,31 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     return e.json(500, { message: "Failed to manually issue stamps: " + (err.message || err) });
   }
 });
+
+// Auto-ensure min_spend_amount field exists on loyalty_programs upon bootstrap
+onBootstrap((e) => {
+  e.next();
+  try {
+    const col = $app.findCollectionByNameOrId("loyalty_programs");
+    if (col) {
+      let hasField = false;
+      try {
+        hasField = !!col.fields.getByName("min_spend_amount");
+      } catch (fErr) {}
+      if (!hasField) {
+        col.fields.add(new Field({
+          "id": "num_min_spend_lp",
+          "name": "min_spend_amount",
+          "type": "number",
+          "min": 0,
+          "required": false
+        }));
+        $app.save(col);
+        console.log("[BOOTSTRAP] Added min_spend_amount field to loyalty_programs");
+      }
+    }
+  } catch (bErr) {
+    console.log("[BOOTSTRAP LP NOTE]", bErr.message || bErr);
+  }
+});
+
