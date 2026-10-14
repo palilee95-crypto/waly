@@ -352,6 +352,12 @@ export default function CustomerBookingPwaScreen() {
   const [livePodColor, setLivePodColor] = useState<string | null>(null);
   const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(null);
   const [liveTagline, setLiveTagline] = useState<string | null>(null);
+  const [liveAllowStaffSelection, setLiveAllowStaffSelection] = useState<boolean | null>(null);
+
+  // Effective staff selection toggle
+  const allowStaffSelection = liveAllowStaffSelection !== null
+    ? liveAllowStaffSelection
+    : (merchant?.allow_staff_selection !== false);
 
   // Selection states
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -719,6 +725,7 @@ export default function CustomerBookingPwaScreen() {
           if (parsed.podColor !== undefined) setLivePodColor(parsed.podColor);
           if (parsed.coverUrl !== undefined) setLiveCoverUrl(parsed.coverUrl);
           if (parsed.tagline !== undefined) setLiveTagline(parsed.tagline);
+          if (parsed.allowStaffSelection !== undefined) setLiveAllowStaffSelection(parsed.allowStaffSelection);
         }
       } catch (e) {}
     };
@@ -733,6 +740,7 @@ export default function CustomerBookingPwaScreen() {
         if (event.data.podColor !== undefined) setLivePodColor(event.data.podColor);
         if (event.data.coverUrl !== undefined) setLiveCoverUrl(event.data.coverUrl);
         if (event.data.tagline !== undefined) setLiveTagline(event.data.tagline);
+        if (event.data.allowStaffSelection !== undefined) setLiveAllowStaffSelection(event.data.allowStaffSelection);
       }
     };
 
@@ -1318,7 +1326,9 @@ export default function CustomerBookingPwaScreen() {
 
         const totalPrice = calculateTotal();
         const serviceNameStr = selectedServices.map(s => s.name).join(', ');
-        const staffNameStr = selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available');
+        const staffNameStr = !allowStaffSelection
+          ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team')
+          : (selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'));
         const itemsSummaryData = selectedServices.map(s => ({
           id: s.id,
           service_id: s.id,
@@ -1338,7 +1348,7 @@ export default function CustomerBookingPwaScreen() {
         const payloadToSave = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
-          staff: selectedStaff?.id ? selectedStaff.id : null,
+          staff: (!allowStaffSelection || !selectedStaff?.id) ? null : selectedStaff.id,
           customer_name: customerName,
           customer_phone: customerPhone,
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
@@ -2512,136 +2522,140 @@ export default function CustomerBookingPwaScreen() {
         {currentStep === 2 && (
           <View style={styles.stepContainer}>
             
-            {/* Choose Staff Section Header */}
-            <View style={styles.staffHeaderRow}>
-              <View>
-                <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
-                <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>
-                  {staffList.length === 0 ? 'Appointment will be handled by store team.' : "Select who you'd like for your appointment."}
-                </Text>
-              </View>
-              {staffList.length > 3 && (
-                <TouchableOpacity
-                  style={[styles.btnSeeAllStaff, themeStyles.neumorphicInset]}
-                  onPress={() => setShowStaffPicker(!showStaffPicker)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.btnSeeAllStaffText, { color: themeStyles.textPrimaryColor }]}>See All</Text>
-                  <Ionicons name="chevron-forward" size={13} color={themeStyles.textSecondaryColor} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Horizontal Scrollable Staff Cards Grid */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffCardsScroll}>
-              
-              {/* Card 1: Any Available / Store Team Card */}
-              <TouchableOpacity
-                style={[
-                  styles.staffCardItem,
-                  selectedStaff === null ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
-                ]}
-                onPress={() => setSelectedStaff(null)}
-                activeOpacity={0.85}
-              >
-                {/* Active Checkmark Badge */}
-                {selectedStaff === null && (
-                  <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
-                    <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
+            {/* Choose Staff Section Header (conditionally shown if merchant allows staff selection) */}
+            {allowStaffSelection && (
+              <>
+                <View style={styles.staffHeaderRow}>
+                  <View>
+                    <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
+                    <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>
+                      {staffList.length === 0 ? 'Appointment will be handled by store team.' : "Select who you'd like for your appointment."}
+                    </Text>
                   </View>
-                )}
-
-                {/* Top Full-Bleed Banner Box */}
-                <View style={[styles.anyStaffBanner, themeStyles.neumorphicInset]}>
-                  <Ionicons name="people" size={32} color={themeStyles.priceColor} />
+                  {staffList.length > 3 && (
+                    <TouchableOpacity
+                      style={[styles.btnSeeAllStaff, themeStyles.neumorphicInset]}
+                      onPress={() => setShowStaffPicker(!showStaffPicker)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.btnSeeAllStaffText, { color: themeStyles.textPrimaryColor }]}>See All</Text>
+                      <Ionicons name="chevron-forward" size={13} color={themeStyles.textSecondaryColor} />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Inner Content Body */}
-                <View style={styles.staffCardBody}>
-                  <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
-                    {staffList.length === 0 ? 'Store Team' : 'Any Available'}
-                  </Text>
-                  <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                    {staffList.length === 0 ? 'First available staff' : 'First available staff'}
-                  </Text>
-
-                  {/* Earliest Slot Pill */}
-                  <View style={[styles.earliestSlotChip, themeStyles.neumorphicInset]}>
-                    <Ionicons name="flash" size={12} color="#EF4444" />
-                    <View style={{ marginLeft: 4 }}>
-                      <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>Earliest slot</Text>
-                      <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{earliestAvailableSlot}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {/* Individual Real Staff Cards (only renders if merchant has staff) */}
-              {staffList.map((st) => {
-                const isSelected = selectedStaff?.id === st.id;
-                const avatarUri = st.avatar
-                  ? pb.files.getURL(st, st.avatar)
-                  : ((st as any).photo || null);
-
-                return (
+                {/* Horizontal Scrollable Staff Cards Grid */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.staffCardsScroll}>
+                  
+                  {/* Card 1: Any Available / Store Team Card */}
                   <TouchableOpacity
-                    key={st.id}
                     style={[
                       styles.staffCardItem,
-                      isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                      selectedStaff === null ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
                     ]}
-                    onPress={() => setSelectedStaff(st)}
+                    onPress={() => setSelectedStaff(null)}
                     activeOpacity={0.85}
                   >
                     {/* Active Checkmark Badge */}
-                    {isSelected && (
+                    {selectedStaff === null && (
                       <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
                         <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
                       </View>
                     )}
 
-                    {/* Staff Avatar Photo / Placeholder (Full Bleed Edge-to-Edge) */}
-                    {avatarUri ? (
-                      <Image source={{ uri: avatarUri }} style={styles.staffAvatarThumb} resizeMode="cover" />
-                    ) : (
-                      <View style={[styles.staffAvatarThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
-                        <Ionicons name="person" size={32} color={themeStyles.textMutedColor} />
-                      </View>
-                    )}
+                    {/* Top Full-Bleed Banner Box */}
+                    <View style={[styles.anyStaffBanner, themeStyles.neumorphicInset]}>
+                      <Ionicons name="people" size={32} color={themeStyles.priceColor} />
+                    </View>
 
+                    {/* Inner Content Body */}
                     <View style={styles.staffCardBody}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor, flex: 1 }]} numberOfLines={1}>
-                          {st.name}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2, marginLeft: 4 }}>
-                          <Ionicons name="star" size={10} color="#D97706" />
-                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                            {(st as any).rating_avg ? `${(st as any).rating_avg}` : '5.0'}
-                          </Text>
-                          {(st as any).rating_count ? (
-                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E' }}>
-                              ({(st as any).rating_count})
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
+                      <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor }]} numberOfLines={1}>
+                        {staffList.length === 0 ? 'Store Team' : 'Any Available'}
+                      </Text>
                       <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
-                        {st.role_title || (st as any).role || 'Specialist'}
+                        {staffList.length === 0 ? 'First available staff' : 'First available staff'}
                       </Text>
 
-                      {/* Status / Availability Pill */}
-                      <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
-                        <View style={styles.greenDotPulse} />
-                        <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>
-                          Available today
-                        </Text>
+                      {/* Earliest Slot Pill */}
+                      <View style={[styles.earliestSlotChip, themeStyles.neumorphicInset]}>
+                        <Ionicons name="flash" size={12} color="#EF4444" />
+                        <View style={{ marginLeft: 4 }}>
+                          <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>Earliest slot</Text>
+                          <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{earliestAvailableSlot}</Text>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+
+                  {/* Individual Real Staff Cards (only renders if merchant has staff) */}
+                  {staffList.map((st) => {
+                    const isSelected = selectedStaff?.id === st.id;
+                    const avatarUri = st.avatar
+                      ? pb.files.getURL(st, st.avatar)
+                      : ((st as any).photo || null);
+
+                    return (
+                      <TouchableOpacity
+                        key={st.id}
+                        style={[
+                          styles.staffCardItem,
+                          isSelected ? [styles.staffCardSelected, { borderColor: themeStyles.activeBtnBg }] : themeStyles.neumorphicCard
+                        ]}
+                        onPress={() => setSelectedStaff(st)}
+                        activeOpacity={0.85}
+                      >
+                        {/* Active Checkmark Badge */}
+                        {isSelected && (
+                          <View style={[styles.staffCheckmarkBadge, { backgroundColor: themeStyles.activeBtnBg }]}>
+                            <Ionicons name="checkmark" size={14} color={themeStyles.activeBtnText} />
+                          </View>
+                        )}
+
+                        {/* Staff Avatar Photo / Placeholder (Full Bleed Edge-to-Edge) */}
+                        {avatarUri ? (
+                          <Image source={{ uri: avatarUri }} style={styles.staffAvatarThumb} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.staffAvatarThumb, themeStyles.neumorphicInset, { alignItems: 'center', justifyContent: 'center' }]}>
+                            <Ionicons name="person" size={32} color={themeStyles.textMutedColor} />
+                          </View>
+                        )}
+
+                        <View style={styles.staffCardBody}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor, flex: 1 }]} numberOfLines={1}>
+                              {st.name}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2, marginLeft: 4 }}>
+                              <Ionicons name="star" size={10} color="#D97706" />
+                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                                {(st as any).rating_avg ? `${(st as any).rating_avg}` : '5.0'}
+                              </Text>
+                              {(st as any).rating_count ? (
+                                <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E' }}>
+                                  ({(st as any).rating_count})
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                          <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
+                            {st.role_title || (st as any).role || 'Specialist'}
+                          </Text>
+
+                          {/* Status / Availability Pill */}
+                          <View style={[styles.nextSlotChip, themeStyles.neumorphicInset]}>
+                            <View style={styles.greenDotPulse} />
+                            <Text style={[styles.nextSlotText, { color: themeStyles.textPrimaryColor }]}>
+                              Available today
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
 
             {/* Date Picker Header */}
             <View style={styles.datePickerHeaderRow}>
@@ -2850,7 +2864,9 @@ export default function CustomerBookingPwaScreen() {
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>
-                  {selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available')}
+                  {!allowStaffSelection
+                    ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team')
+                    : (selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'))}
                 </Text>
               </View>
               <View style={styles.recapItemRow}>

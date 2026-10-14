@@ -15,7 +15,8 @@ import {
   Clipboard,
   Share,
   Linking,
-  DeviceEventEmitter
+  DeviceEventEmitter,
+  Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -359,18 +360,20 @@ export default function BookingsScreen() {
   const [selectedBgColor, setSelectedBgColor] = useState<string>('#FFFFFF');
   const [selectedPodColor, setSelectedPodColor] = useState<string>('#FFFFFF');
   const [customTagline, setCustomTagline] = useState<string>('Quality Services & Online Booking');
+  const [allowStaffSelection, setAllowStaffSelection] = useState<boolean>(true);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState<number>(Date.now());
   const iframeRef = useRef<any>(null);
 
   // Broadcast preview updates in real-time to the embedded iframe device frame
-  const broadcastPreviewUpdate = (override?: { brandColor?: string; bgColor?: string; podColor?: string; coverUrl?: string | null; tagline?: string }) => {
+  const broadcastPreviewUpdate = (override?: { brandColor?: string; bgColor?: string; podColor?: string; coverUrl?: string | null; tagline?: string; allowStaffSelection?: boolean }) => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
     const colorToSend = override?.brandColor !== undefined ? override.brandColor : selectedBrandColor;
     const bgColorToSend = override?.bgColor !== undefined ? override.bgColor : selectedBgColor;
     const podColorToSend = override?.podColor !== undefined ? override.podColor : selectedPodColor;
     const coverToSend = override?.coverUrl !== undefined ? override.coverUrl : (bannerPreview || customCoverUrl);
     const taglineToSend = override?.tagline !== undefined ? override.tagline : customTagline;
+    const allowStaffToSend = override?.allowStaffSelection !== undefined ? override.allowStaffSelection : allowStaffSelection;
 
     const payload = {
       type: 'RISEV_BOOKING_PREVIEW_UPDATE',
@@ -379,6 +382,7 @@ export default function BookingsScreen() {
       podColor: podColorToSend,
       coverUrl: coverToSend,
       tagline: taglineToSend,
+      allowStaffSelection: allowStaffToSend,
     };
 
     try {
@@ -398,7 +402,7 @@ export default function BookingsScreen() {
 
   useEffect(() => {
     broadcastPreviewUpdate();
-  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
+  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, allowStaffSelection, pwaSlug]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -409,7 +413,7 @@ export default function BookingsScreen() {
     };
     window.addEventListener('message', handleParentMsg);
     return () => window.removeEventListener('message', handleParentMsg);
-  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, pwaSlug]);
+  }, [selectedBrandColor, selectedBgColor, bannerPreview, customCoverUrl, customTagline, allowStaffSelection, pwaSlug]);
 
   const handlePickBanner = async () => {
     if (Platform.OS === 'web') {
@@ -479,6 +483,7 @@ export default function BookingsScreen() {
           formData.append('pwa_pod_color', '#FFFFFF');
           formData.append('pwa_theme', 'light');
           formData.append('subtitle', customTagline);
+          formData.append('allow_staff_selection', String(allowStaffSelection));
           formData.append('pwa_slug', pwaSlug || merchantData?.pwa_slug || 'store');
           updated = await pb.collection('merchants').update(targetMerchantId, formData, { requestKey: null });
           setMerchantData(updated);
@@ -495,6 +500,7 @@ export default function BookingsScreen() {
             pwa_pod_color: '#FFFFFF',
             pwa_theme: 'light',
             subtitle: customTagline,
+            allow_staff_selection: allowStaffSelection,
             pwa_slug: pwaSlug || merchantData?.pwa_slug || 'store',
           };
           if (customCoverUrl) {
@@ -511,6 +517,7 @@ export default function BookingsScreen() {
           podColor: '#FFFFFF',
           tagline: customTagline,
           coverUrl: bannerPreview || customCoverUrl,
+          allowStaffSelection: allowStaffSelection,
         });
       }
       setPreviewRefreshKey(Date.now());
@@ -520,6 +527,21 @@ export default function BookingsScreen() {
       Alert.alert('Error', e?.message || 'Failed to update branding.');
     } finally {
       setIsSavingBranding(false);
+    }
+  };
+
+  const handleToggleAllowStaffSelection = async (newVal: boolean) => {
+    setAllowStaffSelection(newVal);
+    broadcastPreviewUpdate({ allowStaffSelection: newVal });
+    const targetMerchantId = user?.merchant_id || merchantData?.id;
+    if (targetMerchantId) {
+      try {
+        await pb.collection('merchants').update(targetMerchantId, {
+          allow_staff_selection: newVal,
+        }, { requestKey: null });
+      } catch (err: any) {
+        console.warn('Failed to update allow_staff_selection:', err);
+      }
     }
   };
 
@@ -573,6 +595,9 @@ export default function BookingsScreen() {
         if (mRecord.pwa_bg_color) setSelectedBgColor(mRecord.pwa_bg_color);
         if (mRecord.pwa_pod_color) setSelectedPodColor(mRecord.pwa_pod_color);
         if (mRecord.subtitle) setCustomTagline(mRecord.subtitle);
+        if (mRecord.allow_staff_selection !== undefined) {
+          setAllowStaffSelection(mRecord.allow_staff_selection !== false);
+        }
 
         if (!mRecord.pwa_slug && computedSlug) {
           pb.collection('merchants').update(mRecord.id, { pwa_slug: computedSlug }, { requestKey: null }).catch(() => {});
@@ -2405,6 +2430,46 @@ export default function BookingsScreen() {
                     </>
                   )}
                 </TouchableOpacity>
+              </View>
+
+              {/* BOOKING PREFERENCES CARD */}
+              <View style={styles.brandingCustomizerCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <Ionicons name="options-outline" size={20} color="#000" />
+                  <Text style={styles.brandingSectionTitle}>Booking Preferences</Text>
+                </View>
+
+                {/* Staff Selection Toggle Row */}
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="people-outline" size={17} color="#0F172A" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        Allow Staff Selection
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, lineHeight: 17 }}>
+                      When enabled, customers can choose specific staff members. When disabled, customers skip staff selection and book directly with the store team.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={allowStaffSelection}
+                    onValueChange={handleToggleAllowStaffSelection}
+                    trackColor={{ false: '#CBD5E1', true: '#FFCC00' }}
+                    thumbColor={Platform.OS === 'android' ? (allowStaffSelection ? '#000000' : '#FFFFFF') : '#FFFFFF'}
+                    ios_backgroundColor="#CBD5E1"
+                  />
+                </View>
               </View>
 
               {/* Official Booking Link Box */}
