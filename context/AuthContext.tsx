@@ -118,6 +118,7 @@ interface AuthUser {
   email: string;
   avatar?: string;
   birthday?: string;
+  verified?: boolean;
   role: UserRole;
   activeRole: UserRole; // currently active mode
   merchant_id?: string; // linked merchant ID
@@ -330,6 +331,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: record.email || '',
           avatar: record.avatar || undefined,
           birthday: record.birthday ? String(record.birthday).slice(0, 10) : undefined,
+          verified: !!record.verified,
           role: record.role,
           activeRole: role,
           merchant_id: record.merchant_id || undefined,
@@ -353,6 +355,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: freshRecord.email || '',
             avatar: freshRecord.avatar || undefined,
             birthday: freshRecord.birthday ? String(freshRecord.birthday).slice(0, 10) : undefined,
+            verified: !!freshRecord.verified,
             role: freshRecord.role,
             activeRole: role,
             merchant_id: merchantData.id,
@@ -492,6 +495,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name: authRecord.name || '',
       email: authRecord.email || '',
       avatar: authRecord.avatar || undefined,
+      birthday: authRecord.birthday ? String(authRecord.birthday).slice(0, 10) : undefined,
+      verified: !!authRecord.verified,
       role,
       activeRole: role,
       merchant_id: merchantData.id,
@@ -549,6 +554,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name: authRecord.name || '',
       email: authRecord.email || '',
       avatar: authRecord.avatar || undefined,
+      birthday: authRecord.birthday ? String(authRecord.birthday).slice(0, 10) : undefined,
+      verified: !!authRecord.verified,
       role,
       activeRole: role,
       merchant_id: merchantData.id,
@@ -659,6 +666,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: record.email || '',
         avatar: record.avatar || undefined,
         birthday: record.birthday ? String(record.birthday).slice(0, 10) : undefined,
+        verified: !!record.verified,
         role: record.role,
         activeRole: role,
         merchant_id: merchantData.id,

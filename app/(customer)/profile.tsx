@@ -437,6 +437,35 @@ export default function CustomerProfile() {
             </TouchableOpacity>
           </View>
 
+          {/* ── Birthday Reward Claim Prompt for Verified Users with Default/Unset Birthday ── */}
+          {(user?.verified || (user?.email && !user.email.startsWith('shadow_') && !user.email.startsWith('quick_') && !user.email.endsWith('@risev.app'))) && (!user?.birthday || user.birthday === '2000-01-01') && (
+            <TouchableOpacity
+              style={styles.birthdayPromptCard}
+              onPress={handleOpenEdit}
+              activeOpacity={0.88}
+            >
+              <View style={styles.birthdayPromptLeft}>
+                <View style={styles.birthdayPromptIconBox}>
+                  <Ionicons name="gift" size={20} color="#000000" />
+                </View>
+                <View style={styles.birthdayPromptTextCol}>
+                  <View style={styles.birthdayPromptTitleRow}>
+                    <Text style={styles.birthdayPromptTitle}>Set Your Real Birthday 🎂</Text>
+                    <View style={styles.birthdayPromptBadge}>
+                      <Text style={styles.birthdayPromptBadgeText}>REWARD READY</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.birthdayPromptSubtitle}>
+                    Stores give free birthday vouchers & treats! Tap to confirm your date.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.birthdayPromptCta}>
+                <Ionicons name="chevron-forward" size={16} color="#92400E" />
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* ── Inset Grouped Settings Sections ── */}
           <View style={styles.sectionGroup}>
             <Text style={styles.sectionHeaderTitle}>Account & Wallet</Text>
@@ -1106,6 +1135,79 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+  },
+  birthdayPromptCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  birthdayPromptLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  birthdayPromptIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  birthdayPromptTextCol: {
+    flex: 1,
+    gap: 3,
+  },
+  birthdayPromptTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  birthdayPromptTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+  },
+  birthdayPromptBadge: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  birthdayPromptBadgeText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+    letterSpacing: 0.4,
+  },
+  birthdayPromptSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#B45309',
+    lineHeight: 16,
+  },
+  birthdayPromptCta: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Inset Grouped Settings
   sectionGroup: {

@@ -79,12 +79,12 @@ function processBirthdayRewards(options) {
       continue;
     }
 
-    // Find customers whose birthday matches month and day (-MM-DD)
+    // Find customers whose birthday matches month and day (-MM-DD) and are verified
     let customers = [];
     try {
       customers = $app.findRecordsByFilter(
         "users",
-        `birthday ~ "${monthDay}"`,
+        `birthday ~ "${monthDay}" && verified = true`,
         "created",
         500,
         0
@@ -100,6 +100,12 @@ function processBirthdayRewards(options) {
       const bdayRaw = customer.getString("birthday") || "";
       const email = customer.getString("email") || "";
 
+      // Strict verification gate: Only verified accounts are eligible for birthday rewards
+      if (!customer.getBool("verified")) {
+        skipped++;
+        continue;
+      }
+
       // Strict validation on month and day
       const cleanBday = bdayRaw.substring(0, 10);
       if (!cleanBday.endsWith(monthDay)) {
@@ -107,8 +113,9 @@ function processBirthdayRewards(options) {
         continue;
       }
 
-      // Skip unverified placeholder shadow users on default Jan 1
-      if (cleanBday === "2000-01-01" && email.indexOf("shadow_") !== -1) {
+      // Exclude placeholder 2000-01-01 sentinels and shadow accounts
+      const isShadow = email.startsWith("shadow_") || email.startsWith("quick_") || email.endsWith("@risev.app");
+      if (cleanBday === "2000-01-01" || isShadow) {
         skipped++;
         continue;
       }
