@@ -89,7 +89,7 @@ onRecordUpdate((e) => {
       r.set('merchant', merchantId);
       r.set('name', title);
       r.set('description', 'Milestone Reward');
-      r.set('points_cost', 0);
+      r.set('points_cost', 1);
       r.set('stock', 1000000);
       r.set('is_active', true);
       r.set('type', type === 'free_item' ? 'free_item' : 'discount');
