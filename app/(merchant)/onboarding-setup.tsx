@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Dimensions,
   Alert,
   Platform,
   TextInput,
@@ -17,41 +16,41 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
-import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
+
+const STAND_A6_TEMPLATE = require('../../assets/images/stand_a6_template.png');
+
 
 export default function OnboardingSetupScreen() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
-  const isDesktop = windowWidth >= 768;
+  const isDesktopSplit = windowWidth >= 1024;
 
+  const [activeTab, setActiveTab] = useState<'theme' | 'qr_share' | 'preview'>('theme');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [merchant, setMerchant] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
 
-  const webColorInputRef = useRef<any>(null);
-
   // Form States
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('#050505');
   const [brandingWelcomeText, setBrandingWelcomeText] = useState('');
-  const [brandingLogoUrl, setBrandingLogoUrl] = useState('');
   const [brandingBgUrl, setBrandingBgUrl] = useState('');
   const [brandingBgFile, setBrandingBgFile] = useState<any>(null);
   const [brandingBgPreview, setBrandingBgPreview] = useState<string | null>(null);
-  const [brandingLogoFile, setBrandingLogoFile] = useState<any>(null);
-  const [brandingLogoPreview, setBrandingLogoPreview] = useState<string | null>(null);
   const [isDownloadingQr, setIsDownloadingQr] = useState(false);
+  const [isDownloadingA6, setIsDownloadingA6] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(Date.now());
 
   const getOnboardingUrl = () => {
-    const merchantId = user?.merchant_id || '';
+    const merchantId = merchant?.id || user?.merchant_id || (pb.authStore.record as any)?.merchant_id || '';
     return `https://risev.app/nfc?m=${merchantId}`;
   };
 
@@ -72,6 +71,106 @@ export default function OnboardingSetupScreen() {
       window.open(waUrl, '_blank');
     } else {
       Linking.openURL(waUrl);
+    }
+  };
+
+  const handleDownloadA6Stand = async () => {
+    const storeName = (merchant?.name || user?.name || 'STORE NAME').toUpperCase();
+    const url = getOnboardingUrl();
+    const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(url)}&margin=0`;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        setIsDownloadingA6(true);
+
+        const templateUri =
+          typeof STAND_A6_TEMPLATE === 'string'
+            ? STAND_A6_TEMPLATE
+            : (STAND_A6_TEMPLATE?.uri || STAND_A6_TEMPLATE?.default?.uri || STAND_A6_TEMPLATE?.default || '/assets/stand_a6_template.png');
+
+        // 1. Load Template Image
+        const templateImg = new (window as any).Image();
+        templateImg.crossOrigin = 'anonymous';
+        const templateLoaded = new Promise<HTMLImageElement>((resolve, reject) => {
+          templateImg.onload = () => resolve(templateImg);
+          templateImg.onerror = (e: any) => reject(new Error('Failed to load template image: ' + e));
+          templateImg.src = templateUri;
+        });
+
+        // 2. Load QR Code Image
+        const qrImg = new (window as any).Image();
+        qrImg.crossOrigin = 'anonymous';
+        const qrLoaded = new Promise<HTMLImageElement>((resolve, reject) => {
+          qrImg.onload = () => resolve(qrImg);
+          qrImg.onerror = (e: any) => reject(new Error('Failed to load QR image: ' + e));
+          qrImg.src = qrDataUrl;
+        });
+
+        const [loadedTemplate, loadedQr] = await Promise.all([templateLoaded, qrLoaded]);
+
+        // 3. Create high-resolution Canvas (2x scale for 300 DPI print quality: 1282 x 2048)
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = (loadedTemplate.naturalWidth || 641) * scale;
+        canvas.height = (loadedTemplate.naturalHeight || 1024) * scale;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get 2D context');
+
+        // Draw background template
+        ctx.drawImage(loadedTemplate, 0, 0, canvas.width, canvas.height);
+
+        // 4. Draw QR Code inside the white squircle
+        // Template bounds: left=147, top=498, width=346, height=344
+        const padding = 18 * scale;
+        const boxLeft = 147 * scale;
+        const boxTop = 498 * scale;
+        const boxW = 346 * scale;
+        const boxH = 344 * scale;
+        const qrSize = boxW - (padding * 2);
+        const qrX = boxLeft + padding;
+        const qrY = boxTop + Math.round((boxH - qrSize) / 2);
+
+        ctx.drawImage(loadedQr, qrX, qrY, qrSize, qrSize);
+
+        // 5. Draw Merchant Store Name (Clean Bold Text - Gaya 2)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        let fontSize = 24 * scale;
+        ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif`;
+
+        const maxTextWidth = canvas.width - (80 * scale);
+        let measuredWidth = ctx.measureText(storeName).width;
+        if (measuredWidth > maxTextWidth) {
+          fontSize = Math.floor(fontSize * (maxTextWidth / measuredWidth));
+          ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", "Inter", -apple-system, sans-serif`;
+        }
+
+        ctx.fillStyle = '#050505';
+        ctx.fillText(storeName, canvas.width / 2, 942 * scale);
+
+        // 6. Trigger Download
+        canvas.toBlob((blob) => {
+          if (!blob) throw new Error('Blob creation failed');
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          const cleanName = storeName.replace(/[^A-Za-z0-9]/g, '_') || 'STORE';
+          link.href = blobUrl;
+          link.download = `Risev_Stand_A6_${cleanName}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+        }, 'image/png');
+
+      } catch (err: any) {
+        console.error('Failed to generate A6 stand:', err);
+        Alert.alert('Notice', 'Canvas composite fallback: downloading standard QR image.');
+        handleDownloadQr();
+      } finally {
+        setIsDownloadingA6(false);
+      }
+    } else {
+      handleDownloadQr();
     }
   };
 
@@ -105,7 +204,7 @@ export default function OnboardingSetupScreen() {
   };
 
   const handleOpenLivePreview = async () => {
-    const merchantId = user?.merchant_id || '';
+    const merchantId = merchant?.id || user?.merchant_id || (pb.authStore.record as any)?.merchant_id || '';
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const liveUrl = `${window.location.origin}/nfc?m=${merchantId}`;
       window.open(liveUrl, '_blank');
@@ -117,35 +216,58 @@ export default function OnboardingSetupScreen() {
     }
   };
 
+  const fetchProfileData = React.useCallback(async () => {
+    const activeMerchantId = user?.merchant_id || (pb.authStore.record as any)?.merchant_id;
+    let mRec: any = null;
 
-  useEffect(() => {
-    fetchProfileData();
-  }, [user]);
-
-  const fetchProfileData = async () => {
-    if (!user?.merchant_id) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
-      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+      if (activeMerchantId) {
+        mRec = await pb.collection('merchants').getOne(activeMerchantId).catch(() => null);
+      }
+      
+      // Fallback: look up by owner if merchant_id wasn't immediately linked
+      if (!mRec && (user?.id || pb.authStore.record?.id)) {
+        const ownerId = user?.id || pb.authStore.record?.id;
+        try {
+          const list = await pb.collection('merchants').getFullList({
+            filter: `owner = "${ownerId}"`,
+            requestKey: null,
+          });
+          if (list.length > 0) {
+            mRec = list[0];
+          }
+        } catch (findErr) {
+          console.warn('[OnboardingSetup] Fallback owner merchant lookup failed:', findErr);
+        }
+      }
+
+      if (!mRec) {
+        setLoading(false);
+        return;
+      }
+
       setMerchant(mRec);
 
       setBrandingPrimaryColor(mRec.onboarding_primary_color || '#050505');
       setBrandingWelcomeText(mRec.onboarding_welcome_text || '');
-      setBrandingLogoUrl(mRec.onboarding_logo_url || '');
       setBrandingBgUrl(mRec.onboarding_bg_url || '');
 
-      const bgUrl = mRec.background_image
-        ? `${pb.baseUrl}/api/files/merchants/${mRec.id}/${mRec.background_image}`
-        : null;
+      let bgUrl: string | null = null;
+      if (mRec.background_image) {
+        try {
+          bgUrl = pb.files.getURL(mRec, mRec.background_image);
+        } catch {
+          bgUrl = `${pb.baseUrl}/api/files/merchants/${mRec.id}/${mRec.background_image}`;
+        }
+      } else if (mRec.onboarding_bg_url) {
+        bgUrl = mRec.onboarding_bg_url;
+      }
       setBrandingBgPreview(bgUrl);
 
-      // Fetch program for loyalty card mockup
       try {
         const progList = await pb.collection('loyalty_programs').getFullList({
-          filter: `merchant = "${user.merchant_id}"`
+          filter: `merchant = "${mRec.id}"`
         });
         if (progList.length > 0) {
           setProgram(progList[0]);
@@ -158,29 +280,17 @@ export default function OnboardingSetupScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.merchant_id, user?.id]);
 
-  const handlePickBrandingLogo = () => {
-    if (Platform.OS === 'web') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e: any) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (event: any) => {
-            setBrandingLogoFile(file);
-            setBrandingLogoPreview(event.target.result);
-          };
-          reader.readAsDataURL(file);
-        }
-      };
-      input.click();
-    } else {
-      Alert.alert('Not Supported', 'Image upload is web-only in this version.');
-    }
-  };
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfileData();
+    }, [fetchProfileData])
+  );
 
   const handlePickBrandingBg = () => {
     if (Platform.OS === 'web') {
@@ -205,7 +315,8 @@ export default function OnboardingSetupScreen() {
   };
 
   const handleSaveBranding = async () => {
-    if (!user?.merchant_id) return;
+    const targetMerchantId = merchant?.id || user?.merchant_id || (pb.authStore.record as any)?.merchant_id;
+    if (!targetMerchantId) return;
     setIsSaving(true);
     setIsSaved(false);
     try {
@@ -221,8 +332,10 @@ export default function OnboardingSetupScreen() {
         formData.append('onboarding_bg_url', '');
       }
 
-      await pb.collection('merchants').update(user.merchant_id, formData);
+      const updated = await pb.collection('merchants').update(targetMerchantId, formData);
+      setMerchant(updated);
       setIsSaved(true);
+      setPreviewRefreshKey(Date.now());
       setTimeout(() => {
         setIsSaved(false);
       }, 3500);
@@ -233,345 +346,236 @@ export default function OnboardingSetupScreen() {
     }
   };
 
+  // Helper for color contrast
+  const getIsLight = (color: string) => {
+    const hex = (color || '#ffffff').replace('#', '');
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
+    }
+    return true;
+  };
+
+  const isLightBrandColor = getIsLight(brandingPrimaryColor);
+  const brandTextColor = isLightBrandColor ? '#0F172A' : '#FFFFFF';
+  const brandSubtextColor = isLightBrandColor ? '#475569' : 'rgba(255, 255, 255, 0.75)';
+  const brandInputBorderColor = isLightBrandColor ? '#CBD5E1' : 'rgba(255, 255, 255, 0.25)';
+  const brandInputBgColor = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
+
+  // Interactive Customer Onboarding Device Frame (Matching Booking Page Architecture)
+  const renderPhoneMockup = () => {
+    const merchantId = merchant?.id || user?.merchant_id || (pb.authStore.record as any)?.merchant_id || '';
+    const targetUrl = `/nfc?m=${merchantId}`;
+
+    return (
+      <View style={styles.previewContainerCard}>
+        {/* Live Toolbar */}
+        <View style={styles.previewToolbar}>
+          <View style={styles.previewUrlBadge}>
+            <Text style={styles.previewLiveDot}>●</Text>
+            <Text style={styles.previewUrlText} numberOfLines={1} ellipsizeMode="tail">
+              /nfc?m={merchantId}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <TouchableOpacity
+              style={styles.btnToolbarAction}
+              onPress={() => setPreviewRefreshKey(Date.now())}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="reload" size={13} color="#0F172A" />
+              <Text style={styles.btnToolbarActionText}>
+                {locale === 'en' ? 'Reload' : 'Muat Semula'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btnToolbarAction, styles.btnToolbarActionPrimary]}
+              onPress={handleOpenLivePreview}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="open-outline" size={13} color="#000000" />
+              <Text style={styles.btnToolbarActionPrimaryText}>
+                {locale === 'en' ? 'Open ↗' : 'Buka ↗'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Device Frame Viewport */}
+        <View style={styles.deviceFrame}>
+          {/* Speaker Notch Bar */}
+          <View style={styles.deviceSpeakerBar} />
+
+          {Platform.OS === 'web' ? (
+            React.createElement('iframe', {
+              key: previewRefreshKey,
+              src: `${targetUrl}&preview=1&t=${previewRefreshKey}`,
+              style: {
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                backgroundColor: '#FFFFFF',
+                borderRadius: 36,
+              },
+              title: 'Live Customer Onboarding Preview',
+            })
+          ) : (
+            <View style={styles.mobileFallbackPreview}>
+              <Ionicons name="phone-portrait-outline" size={44} color="#FFCC00" />
+              <Text style={styles.mobileFallbackTitle}>Live Customer View</Text>
+              <Text style={styles.mobileFallbackSub}>
+                {locale === 'en'
+                  ? 'Tap below to test your full onboarding portal as customers see it.'
+                  : 'Tekan butang di bawah untuk uji halaman sambutan pelanggan.'}
+              </Text>
+              <TouchableOpacity
+                style={styles.btnOpenFallback}
+                onPress={handleOpenLivePreview}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="open-outline" size={15} color="#000000" />
+                <Text style={styles.btnOpenFallbackText}>
+                  {locale === 'en' ? 'Launch Customer View ➔' : 'Buka Paparan Pelanggan ➔'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFC700" />
+        <ActivityIndicator size="large" color="#FFCC00" />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* Scrollable Dashboard View */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Dark Background Header Block */}
-        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 220, backgroundColor: '#050505', borderBottomLeftRadius: 65, borderBottomRightRadius: 65, zIndex: 0 }} />
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Onboarding Setup</Text>
-          </View>
-          <Image 
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
-        </View>
-
-        {/* Editorial styled subtitle box */}
-        <View style={styles.subtitleContainer}>
-          <Text style={styles.subtitle}>
-            Customize your storefront. Make your loyalty program look and feel like your own brand.
-          </Text>
-        </View>
-
-        {/* LIVE PREVIEW SMARTPHONE MOCKUP */}
-        <View style={styles.previewContainer}>
-          <View style={styles.previewLabelRow}>
-            <View style={styles.previewLine} />
-            <Text style={styles.previewLabel}>LIVE CUSTOMER PREVIEW</Text>
-            <View style={styles.previewLine} />
-          </View>
-          
-          {/* Phone Frame */}
-          <View style={styles.phoneFrame}>
-            {/* Fake Notch */}
-            <View style={styles.notch} />
-
-            {/* Customer View Content */}
-            <View style={styles.phoneContent}>
-              {/* Background Layer */}
-              {brandingBgUrl || brandingBgPreview ? (
-                <Image source={{ uri: brandingBgPreview || brandingBgUrl }} style={[StyleSheet.absoluteFill, { zIndex: -1 }]} resizeMode="cover" />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: brandingPrimaryColor, zIndex: -1 }]} />
-              )}
-
-              {/* Gradient Overlay for better readability */}
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.15)', zIndex: -1 }]} />
-
-              {/* Back Button */}
-              <View style={styles.fakeBackBtn}>
-                <Ionicons name="chevron-back" size={16} color="#0F172A" />
-              </View>
-
-              {/* Mock Loyalty Card */}
-              <View style={styles.cardContainerWrapper}>
-                <View style={{ width: 360, alignSelf: 'center' }}>
-                  <FlippableLoyaltyCard 
-                    card={{
-                      gradientColors: [program?.card_color || '#5C3BCC'],
-                      logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://via.placeholder.com/150',
-                      cardBackground: program?.card_background ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}` : null,
-                      fontColor: program?.font_color || undefined,
-                      cardIcon: program?.card_icon || 'coffee',
-                      merchantName: merchant?.name || user?.name || 'Your Brand',
-                      category: merchant?.category || 'OTHER',
-                      totalStamps: 10,
-                      collectedStamps: 0,
-                    }}
-                    user={user}
-                  />
-                </View>
-              </View>
-
-              {/* Bottom Sheet Claim Form */}
-              {(() => {
-                const getIsLight = (color: string) => {
-                  const hex = (color || '#ffffff').replace('#', '');
-                  if (hex.length === 3) {
-                    const r = parseInt(hex[0] + hex[0], 16);
-                    const g = parseInt(hex[1] + hex[1], 16);
-                    const b = parseInt(hex[2] + hex[2], 16);
-                    return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
-                  }
-                  if (hex.length === 6) {
-                    const r = parseInt(hex.substring(0, 2), 16);
-                    const g = parseInt(hex.substring(2, 4), 16);
-                    const b = parseInt(hex.substring(4, 6), 16);
-                    return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 180;
-                  }
-                  return true;
-                };
-
-                const isLightBrandColor = getIsLight(brandingPrimaryColor);
-                const brandTextColor = isLightBrandColor ? '#0F172A' : '#FFFFFF';
-                const brandSubtextColor = isLightBrandColor ? '#475569' : 'rgba(255, 255, 255, 0.75)';
-                const brandInputBorderColor = isLightBrandColor ? '#CBD5E1' : 'rgba(255, 255, 255, 0.25)';
-                const brandInputBgColor = isLightBrandColor ? '#F8FAFC' : 'rgba(255, 255, 255, 0.08)';
-
-                return (
-                  <>
-                  <View style={[styles.fakeFormCard, { backgroundColor: brandingPrimaryColor }]}>
-                    <View style={[styles.fakeScanBadge, { backgroundColor: isLightBrandColor ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.15)' }]}>
-                      <View style={[styles.fakeScanDot, { backgroundColor: isLightBrandColor ? '#10B981' : '#FFFFFF' }]} />
-                      <Text style={[styles.fakeScanText, { color: isLightBrandColor ? '#10B981' : '#FFFFFF' }]}>VERIFIED NFC SCAN</Text>
-                    </View>
-
-                    <Text style={[styles.fakeFormTitle, { color: brandTextColor }]}>
-                      Claim Your Stamps
-                    </Text>
-
-
-                    <Text style={[styles.fakeInputLabel, { color: brandSubtextColor }]}>PHONE NUMBER</Text>
-                    <View style={[styles.fakeInputCapsule, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor }]}>
-                      <View style={[styles.fakeFlagPocket, { borderColor: brandInputBorderColor }]}>
-                        <Text style={{ fontSize: 13 }}>🇲🇾</Text>
-                        <Text style={styles.fakeCountryCode}>+60</Text>
-                      </View>
-                      <Text style={[styles.fakeInputPlaceholder, { color: brandSubtextColor }]}>11-234 5678</Text>
-                    </View>
-
-                    <View style={[styles.fakeButton, { backgroundColor: isLightBrandColor ? '#050505' : '#FFFFFF' }]}>
-                      <Text style={[styles.fakeButtonText, { color: isLightBrandColor ? '#FFFFFF' : '#0F172A' }]}>
-                        Claim Stamps Now
-                      </Text>
-                      <Ionicons 
-                        name="arrow-forward" 
-                        size={14} 
-                        color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} 
-                      />
-                    </View>
-
-                    {/* Trust Footer */}
-                    <View style={styles.fakeTrustFooter}>
-                      <Ionicons name="lock-closed" size={10} color={brandSubtextColor} />
-                      <Text style={[styles.fakeTrustText, { color: brandSubtextColor }]}>Secure connection by risev.app</Text>
-                    </View>
-                  </View>
-
-                  {/* Risev Logo below the sheet card */}
-                  <Image 
-                    source={require('../../assets/risev logo.png')}
-                    style={styles.fakeRisevLogoPhoneBg}
-                    resizeMode="contain"
-                  />
-                  </>
-                );
-              })()}
-            </View>
-          </View>
-        </View>
-
-        {/* Customer Onboarding QR & Share Hub Card */}
-        <View style={styles.qrShareCard}>
-          <View style={styles.qrShareHeader}>
-            <View style={styles.qrShareIconWrap}>
-              <Ionicons name="qr-code" size={20} color="#050505" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.qrShareTitle}>Customer Onboarding QR & Link</Text>
-              <Text style={styles.qrShareSubtitle}>
-                Place this QR on counter stands or share online for instant customer onboarding.
-              </Text>
-            </View>
-          </View>
-
-          {/* High Definition QR Code Frame */}
-          <View style={styles.qrCodeFrame}>
-            <Image
-              source={{
-                uri: `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(getOnboardingUrl())}`,
-              }}
-              style={styles.qrCodeImage}
-              resizeMode="contain"
-            />
-            <View style={styles.qrScanHintRow}>
-              <Ionicons name="scan-outline" size={13} color="#64748B" />
-              <Text style={styles.qrScanHintText}>Scan with any camera or NFC phone</Text>
-            </View>
-          </View>
-
-          {/* Link Display with Tap-To-Copy */}
-          <TouchableOpacity
-            style={styles.onboardingUrlPill}
-            onPress={handleCopyOnboardingLink}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="link-outline" size={15} color="#94A3B8" />
-            <Text style={styles.onboardingUrlText} numberOfLines={1}>
-              {getOnboardingUrl()}
-            </Text>
-            <View style={[styles.copyPillBadge, copiedLink && { backgroundColor: '#10B981' }]}>
-              <Ionicons name={copiedLink ? "checkmark" : "copy-outline"} size={12} color="#FFFFFF" />
-              <Text style={styles.copyPillBadgeText}>{copiedLink ? 'Copied!' : 'Copy'}</Text>
-            </View>
+      {/* ── Executive Header ── */}
+      <View style={[styles.header, isDesktopSplit && { maxWidth: 1200, alignSelf: 'center', width: '100%' }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12, minWidth: 0 }}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <Ionicons name="arrow-back" size={20} color="#050505" />
           </TouchableOpacity>
-
-          {/* Quick Action Buttons (WhatsApp & Download QR) */}
-          <View style={styles.qrActionGrid}>
-            <TouchableOpacity
-              style={styles.whatsappActionBtn}
-              onPress={handleShareWhatsapp}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-              <Text style={styles.whatsappActionBtnText}>Share via WhatsApp</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.downloadQrActionBtn, isDownloadingQr && { opacity: 0.75 }]}
-              onPress={handleDownloadQr}
-              disabled={isDownloadingQr}
-              activeOpacity={0.85}
-            >
-              {isDownloadingQr ? (
-                <ActivityIndicator size="small" color="#050505" />
-              ) : (
-                <>
-                  <Ionicons name="download-outline" size={16} color="#050505" />
-                  <Text style={styles.downloadQrActionBtnText}>Download QR</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {locale === 'en' ? 'Onboarding Setup' : 'Tetapan Sambutan'}
+            </Text>
+            <Text style={styles.headerSubTitle} numberOfLines={1} ellipsizeMode="tail">
+              {locale === 'en' ? 'Customize storefront styling & welcome flow' : 'Urus tema sambutan & pautan NFC'}
+            </Text>
           </View>
+        </View>
+        <Image 
+          source={require('../../assets/risev logo.png')}
+          style={{ width: 76, height: 22, resizeMode: 'contain', tintColor: '#050505', flexShrink: 0 }}
+        />
+      </View>
 
-          {/* Open Live Web Preview */}
+      {/* ── Segmented Tab Bar (Hidden on Desktop Split View) ── */}
+      {!isDesktopSplit && (
+        <View style={styles.segmentedTabBar}>
           <TouchableOpacity
-            style={styles.livePreviewActionBtn}
-            onPress={handleOpenLivePreview}
+            style={[styles.segmentBtn, activeTab === 'theme' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('theme')}
             activeOpacity={0.85}
           >
-            <Ionicons name="open-outline" size={15} color="#050505" />
-            <Text style={styles.livePreviewActionBtnText}>Open Live Web Preview</Text>
+            <Ionicons name="color-palette" size={15} color={activeTab === 'theme' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.segmentBtnText, activeTab === 'theme' && styles.segmentBtnTextActive]}>
+              {locale === 'en' ? 'Theme' : 'Tema'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'qr_share' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('qr_share')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="qr-code" size={15} color={activeTab === 'qr_share' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.segmentBtnText, activeTab === 'qr_share' && styles.segmentBtnTextActive]}>
+              {locale === 'en' ? 'QR & Links' : 'QR & Pautan'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'preview' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('preview')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="eye" size={15} color={activeTab === 'preview' ? '#FFFFFF' : '#64748B'} />
+            <Text style={[styles.segmentBtnText, activeTab === 'preview' && styles.segmentBtnTextActive]}>
+              {locale === 'en' ? 'Live Preview' : 'Previu'}
+            </Text>
           </TouchableOpacity>
         </View>
+      )}
 
-        {/* 1. Brand Identity Card */}
-        <View style={styles.settingsCard}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="color-palette-outline" size={20} color="#050505" />
-            <Text style={styles.cardHeaderTitle}>Brand Identity</Text>
-          </View>
+      {/* ── Main Content Area (Responsive Split on Desktop) ── */}
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent, 
+          isDesktopSplit && { maxWidth: 1200, alignSelf: 'center', width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 28 }
+        ]} 
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Left Column (Controls & Settings) */}
+        <View style={[styles.controlsColumn, isDesktopSplit && { flex: 1.25 }]}>
+          {/* Desktop Tab Switcher */}
+          {isDesktopSplit && (
+            <View style={[styles.segmentedTabBar, { marginBottom: 16 }]}>
+              <TouchableOpacity
+                style={[styles.segmentBtn, activeTab === 'theme' && styles.segmentBtnActive]}
+                onPress={() => setActiveTab('theme')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="color-palette" size={15} color={activeTab === 'theme' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.segmentBtnText, activeTab === 'theme' && styles.segmentBtnTextActive]}>
+                  {locale === 'en' ? 'Theme & Styling' : 'Tema & Reka Letak'}
+                </Text>
+              </TouchableOpacity>
 
-          {/* Primary Color */}
-          <View style={{ marginBottom: 24 }}>
-            <Text style={styles.fieldLabel}>PRIMARY BRAND COLOR</Text>
-            
-            <View style={styles.colorCapsule}>
-              <View style={[styles.colorIndicator, { backgroundColor: brandingPrimaryColor }]}>
-                {Platform.OS === 'web' && (
-                  <input
-                    type="color"
-                    value={brandingPrimaryColor}
-                    onChange={(e: any) => setBrandingPrimaryColor(e.target.value.toUpperCase())}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      opacity: 0,
-                      cursor: 'pointer',
-                      zIndex: 10,
-                      border: 'none',
-                      padding: 0,
-                      margin: 0,
-                    } as any}
-                  />
-                )}
-              </View>
-              <Text style={styles.hexSymbol}>#</Text>
-              <TextInput
-                style={styles.hexInput}
-                value={brandingPrimaryColor.replace('#', '')}
-                onChangeText={(text) => setBrandingPrimaryColor(text.startsWith('#') ? text : `#${text}`)}
-                placeholder="050505"
-                placeholderTextColor="#94A3B8"
-                autoCapitalize="none"
-                maxLength={7}
-              />
+              <TouchableOpacity
+                style={[styles.segmentBtn, activeTab === 'qr_share' && styles.segmentBtnActive]}
+                onPress={() => setActiveTab('qr_share')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="qr-code" size={15} color={activeTab === 'qr_share' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.segmentBtnText, activeTab === 'qr_share' && styles.segmentBtnTextActive]}>
+                  {locale === 'en' ? 'QR Code & Links' : 'Kod QR & Pautan'}
+                </Text>
+              </TouchableOpacity>
             </View>
+          )}
 
-            {/* Preset Swatches with Checkmarks */}
-            <View style={styles.swatchesRow}>
-              {['#050505', '#F97316', '#10B981', '#5C3BCC', '#D97706', '#DC2626', '#0284C7'].map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.swatch,
-                    { backgroundColor: c },
-                    brandingPrimaryColor.toLowerCase() === c.toLowerCase() && styles.swatchActive
-                  ]}
-                  onPress={() => setBrandingPrimaryColor(c)}
-                  activeOpacity={0.8}
-                >
-                  {brandingPrimaryColor.toLowerCase() === c.toLowerCase() && (
-                    <Ionicons 
-                      name="checkmark" 
-                      size={14} 
-                      color={c.toLowerCase() === '#ffffff' || c.toLowerCase() === '#ffc700' ? '#050505' : '#FFFFFF'} 
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
-              
-              {/* Color Wheel Swatch */}
-              {(() => {
-                const isCustomColor = !['#050505', '#f97316', '#10b981', '#5c3bcc', '#d97706', '#dc2626', '#0284c7'].includes(brandingPrimaryColor.toLowerCase());
-                return (
-                  <View
-                    style={[
-                      styles.swatch,
-                      Platform.OS === 'web' 
-                        ? { 
-                            backgroundImage: 'conic-gradient(from 0deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #7f00ff, #ff00ff, #ff0000)',
-                            boxShadow: isCustomColor 
-                              ? 'inset 0 0 0 2px rgba(255,255,255,1), 0 4px 10px rgba(255, 199, 0, 0.3)' 
-                              : 'inset 0 0 0 1.5px rgba(255,255,255,0.85), 0 2px 5px rgba(0,0,0,0.1)',
-                            borderWidth: 0,
-                            position: 'relative',
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                          } as any
-                        : { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: isCustomColor ? '#FFC700' : '#CBD5E1' },
-                      isCustomColor && styles.swatchActive
-                    ]}
-                  >
+          {/* TAB 1: THEME & BRANDING */}
+          {(activeTab === 'theme' || (isDesktopSplit && activeTab === 'preview')) && (
+            <View style={{ gap: 16 }}>
+
+              {/* Primary Color Customizer */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.cardHeaderTitle}>
+                  {locale === 'en' ? 'Primary Brand Color' : 'Warna Utama Jenama'}
+                </Text>
+                <Text style={styles.cardHeaderSub}>
+                  {locale === 'en' ? 'Used for the customer sheet card, buttons & badges' : 'Warna kad borang, butang tuntut & lencana pelanggan'}
+                </Text>
+
+                <View style={styles.colorPickerRow}>
+                  <View style={[styles.colorBox, { backgroundColor: brandingPrimaryColor }]}>
                     {Platform.OS === 'web' && (
                       <input
                         type="color"
@@ -588,109 +592,329 @@ export default function OnboardingSetupScreen() {
                           border: 'none',
                           padding: 0,
                           margin: 0,
-                          zIndex: 10,
                         } as any}
                       />
                     )}
-                    {isCustomColor ? (
-                      <Ionicons 
-                        name="checkmark" 
-                        size={14} 
-                        color="#FFFFFF" 
-                        style={{ textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-                      />
-                    ) : (
-                      <Ionicons 
-                        name="aperture-outline" 
-                        size={16} 
-                        color={Platform.OS === 'web' ? '#FFFFFF' : '#64748B'} 
-                        style={Platform.OS === 'web' ? { textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}}
-                      />
-                    )}
                   </View>
-                );
-              })()}
-            </View>
-          </View>
 
-          {/* Background Image with Dropzone Layout */}
-          <View style={{ marginBottom: 8 }}>
-            <Text style={styles.fieldLabel}>BACKGROUND IMAGE (9:16)</Text>
-            
-            <View style={styles.bannerPickerBox}>
-              {!!(brandingBgPreview || brandingBgUrl) ? (
-                <View style={{ flex: 1, position: 'relative' }}>
-                  <Image
-                    source={{ uri: brandingBgPreview || brandingBgUrl }}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
+                  <View style={styles.hexInputBox}>
+                    <Text style={styles.hexPrefix}>#</Text>
+                    <TextInput
+                      style={styles.hexInput}
+                      value={brandingPrimaryColor.replace('#', '')}
+                      onChangeText={(val) => setBrandingPrimaryColor(`#${val.replace(/[^0-9A-Fa-f]/g, '')}`)}
+                      maxLength={6}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </View>
+
+                {/* Swatches Grid */}
+                <View style={styles.swatchesRow}>
+                  {['#050505', '#F59E0B', '#15803D', '#5C3BCC', '#DC2626', '#0284C7', '#0F172A'].map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      style={[
+                        styles.swatchCircle,
+                        { backgroundColor: c },
+                        brandingPrimaryColor.toLowerCase() === c.toLowerCase() && styles.swatchCircleActive,
+                      ]}
+                      onPress={() => setBrandingPrimaryColor(c)}
+                      activeOpacity={0.8}
+                    >
+                      {brandingPrimaryColor.toLowerCase() === c.toLowerCase() && (
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Background Wallpaper (9:16) */}
+              <View style={styles.sectionCard}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardHeaderTitle}>
+                    {locale === 'en' ? 'Background Wallpaper (9:16)' : 'Gambar Latar Belakang (9:16)'}
+                  </Text>
+                  {!!(brandingBgPreview || brandingBgUrl) && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setBrandingBgFile(null);
+                        setBrandingBgPreview(null);
+                        setBrandingBgUrl('');
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#DC2626' }}>
+                        {locale === 'en' ? 'Remove' : 'Buang'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <Text style={styles.cardHeaderSub}>
+                  {locale === 'en' 
+                    ? 'Upload your store banner or select from our curated wallpaper collection' 
+                    : 'Muat naik gambar kedai atau pilih dari koleksi wallpaper terpilih'}
+                </Text>
+
+                {/* Image Dropzone Preview */}
+                <View style={styles.bannerDropzone}>
+                  {!!(brandingBgPreview || brandingBgUrl) ? (
+                    <View style={{ flex: 1, width: '100%', height: '100%', position: 'relative' }}>
+                      <Image
+                        source={{ uri: brandingBgPreview || brandingBgUrl }}
+                        style={{ width: '100%', height: '100%', borderRadius: 14 }}
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        style={styles.changeOverlayBtn}
+                        onPress={handlePickBrandingBg}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="camera" size={16} color="#FFFFFF" />
+                        <Text style={styles.changeOverlayText}>
+                          {locale === 'en' ? 'Change Photo' : 'Tukar Gambar'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadTriggerBox}
+                      onPress={handlePickBrandingBg}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.uploadIconCircle}>
+                        <Ionicons name="cloud-upload" size={20} color="#050505" />
+                      </View>
+                      <Text style={styles.uploadMainText}>
+                        {locale === 'en' ? 'Tap to Upload Custom Wallpaper' : 'Sentuh untuk Muat Naik Wallpaper'}
+                      </Text>
+                      <Text style={styles.uploadSubText}>
+                        {locale === 'en' ? 'Recommended: 1080 x 1920 (9:16 portrait)' : 'Disyorkan: Nisbah potret 9:16'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Direct Image URL fallback */}
+                <View style={styles.urlInputRow}>
+                  <Ionicons name="link-outline" size={16} color="#94A3B8" />
+                  <TextInput
+                    style={styles.urlInput}
+                    value={brandingBgUrl}
+                    onChangeText={(val) => {
+                      setBrandingBgUrl(val);
+                      if (val.trim()) {
+                        setBrandingBgPreview(val.trim());
+                      }
+                    }}
+                    placeholder="or paste image URL (https://...)"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
                   />
+                </View>
+              </View>
+
+            </View>
+          )}
+
+          {/* TAB 2: QR & SHARE HUB */}
+          {activeTab === 'qr_share' && (
+            <View style={{ gap: 16 }}>
+              <View style={styles.sectionCard}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="qr-code" size={18} color="#050505" />
+                    <Text style={styles.cardHeaderTitle}>
+                      {locale === 'en' ? 'Counter Stand Poster (A6)' : 'Poster Stand Meja Kaunter (A6)'}
+                    </Text>
+                  </View>
+                  <View style={styles.presetCountBadge}>
+                    <Text style={styles.presetCountText}>300 DPI Print-Ready</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.cardHeaderSub}>
+                  {locale === 'en'
+                    ? 'Official Risev A6 acrylic stand poster with your unique store QR code & name ready to print'
+                    : 'Poster rasmi Risev saiz A6 lengkap dengan kod QR dan nama kedai anda, sedia untuk dicetak'}
+                </Text>
+
+                {/* Interactive A6 Counter Stand Mockup Card */}
+                <View style={styles.standMockupCard}>
+                  <View style={styles.standMockupFrame}>
+                    {/* Background Poster Template */}
+                    <Image
+                      source={STAND_A6_TEMPLATE}
+                      style={styles.standTemplateImg}
+                      resizeMode="cover"
+                    />
+
+                    {/* Dynamic QR Injected into the White Squircle */}
+                    <View style={styles.standQrContainer}>
+                      <Image
+                        source={{
+                          uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getOnboardingUrl())}&margin=0`,
+                        }}
+                        style={styles.standQrImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+
+                    {/* Live Merchant Store Name (Clean Bold Text Style) */}
+                    <View style={styles.standStoreNameContainer}>
+                      <Text style={styles.standStoreNameText} numberOfLines={1}>
+                        {(merchant?.name || user?.name || 'STORE NAME').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.qrHintText}>
+                    {locale === 'en'
+                      ? 'Live Print Preview • A6 (105 × 148 mm)'
+                      : 'Previu Siap Cetak • Saiz A6 (105 × 148 mm)'}
+                  </Text>
+                </View>
+
+                {/* Primary CTA: Big A6 Stand Download */}
+                <TouchableOpacity
+                  style={[styles.downloadA6Btn, isDownloadingA6 && { opacity: 0.7 }]}
+                  onPress={handleDownloadA6Stand}
+                  disabled={isDownloadingA6}
+                  activeOpacity={0.85}
+                >
+                  {isDownloadingA6 ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <ActivityIndicator size="small" color="#050505" />
+                      <Text style={styles.downloadA6BtnText}>
+                        {locale === 'en' ? 'GENERATING A6 POSTER...' : 'MENJANA STAND A6...'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="print" size={18} color="#050505" />
+                        <Text style={styles.downloadA6BtnText}>
+                          {locale === 'en' ? 'DOWNLOAD A6 STAND POSTER' : 'MUAT TURUN STAND MEJA A6'}
+                        </Text>
+                      </View>
+                      <Text style={styles.downloadA6BtnSub}>
+                        {locale === 'en' ? 'High-Res Print Ready (105 × 148 mm • 300 DPI)' : 'Format Siap Cetak (105 × 148 mm • 300 DPI)'}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Secondary Actions: WhatsApp Share & Raw QR */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                   <TouchableOpacity
-                    style={styles.imageOverlay}
-                    onPress={handlePickBrandingBg}
+                    style={styles.whatsappBtn}
+                    onPress={handleShareWhatsapp}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="camera" size={20} color="#FFFFFF" />
-                    <Text style={styles.overlayText}>Change Background</Text>
+                    <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                    <Text style={styles.whatsappBtnText}>WhatsApp</Text>
                   </TouchableOpacity>
+
                   <TouchableOpacity
-                    style={styles.deleteOverlayBtn}
-                    onPress={() => { setBrandingBgFile(null); setBrandingBgPreview(null); setBrandingBgUrl(''); }}
+                    style={[styles.downloadBtn, isDownloadingQr && { opacity: 0.7 }]}
+                    onPress={handleDownloadQr}
+                    disabled={isDownloadingQr}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="trash" size={14} color="#FFFFFF" />
+                    {isDownloadingQr ? (
+                      <ActivityIndicator size="small" color="#050505" />
+                    ) : (
+                      <>
+                        <Ionicons name="qr-code-outline" size={16} color="#050505" />
+                        <Text style={styles.downloadBtnText}>QR Sahaja (PNG)</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickBrandingBg} activeOpacity={0.8}>
-                  <Ionicons name="images-outline" size={32} color="#64748B" />
-                  <Text style={styles.uploadTextBold}>Tap to Select Image</Text>
-                  <Text style={styles.uploadTextSub}>Portrait aspect ratio (9:16) recommended</Text>
-                </TouchableOpacity>
-              )}
-            </View>
 
-            <View style={styles.urlInputBox}>
-              <Ionicons name="link-outline" size={16} color="#94A3B8" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.urlInput}
-                value={brandingBgUrl}
-                onChangeText={setBrandingBgUrl}
-                placeholder="or enter image URL..."
-                placeholderTextColor="#94A3B8"
-                autoCapitalize="none"
-              />
+                {/* Link Bar with 1-Tap Copy */}
+                <TouchableOpacity
+                  style={[styles.linkBar, { marginTop: 12 }]}
+                  onPress={handleCopyOnboardingLink}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="link" size={16} color="#94A3B8" />
+                  <Text style={styles.linkBarText} numberOfLines={1}>
+                    {getOnboardingUrl()}
+                  </Text>
+                  <View style={[styles.copyPill, copiedLink && { backgroundColor: '#16A34A' }]}>
+                    <Ionicons name={copiedLink ? "checkmark" : "copy-outline"} size={12} color="#FFFFFF" />
+                    <Text style={styles.copyPillText}>
+                      {copiedLink ? (locale === 'en' ? 'Copied!' : 'Disalin!') : (locale === 'en' ? 'Copy' : 'Salin')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
+
+          {/* TAB 3: LIVE PREVIEW (Mobile Only) */}
+          {!isDesktopSplit && activeTab === 'preview' && (
+            <View style={{ gap: 16, alignItems: 'center' }}>
+              {renderPhoneMockup()}
+            </View>
+          )}
+
+          {/* Sticky Save Changes CTA (Visible in Theme tab or Desktop) */}
+          {(activeTab === 'theme' || isDesktopSplit) && (
+            <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              isSaving && { opacity: 0.7 },
+              isSaved && { backgroundColor: '#16A34A' }
+            ]}
+            onPress={handleSaveBranding}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            {isSaving ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>
+                  {locale === 'en' ? 'SAVING CHANGES...' : 'MENYIMPAN...'}
+                </Text>
+              </View>
+            ) : isSaved ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>
+                  {locale === 'en' ? 'CHANGES SAVED' : 'BERJAYA DISIMPAN'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Ionicons name="save-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>
+                  {locale === 'en' ? 'SAVE BRANDING' : 'SIMPAN TETAPAN'}
+                </Text>
+              </View>
+            )}
+            </TouchableOpacity>
+          )}
         </View>
 
-
-
-
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[
-            styles.saveBtn,
-            isSaving && { opacity: 0.7 },
-            isSaved && { backgroundColor: '#16A34A', borderColor: '#16A34A' }
-          ]}
-          onPress={handleSaveBranding}
-          disabled={isSaving}
-          activeOpacity={0.8}
-        >
-          {isSaving ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.saveBtnText}>SAVING...</Text>
+        {/* Right Column: Sticky Live Smartphone Mockup (Desktop Split View) */}
+        {isDesktopSplit && (
+          <View style={styles.previewDesktopColumn}>
+            <View style={styles.previewStickyBox}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={styles.previewColumnTitle}>
+                  {locale === 'en' ? 'Interactive Customer View' : 'Pandangan Interaktif Pelanggan'}
+                </Text>
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>Live Reactive</Text>
+                </View>
+              </View>
+              {renderPhoneMockup()}
             </View>
-          ) : isSaved ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.saveBtnText}>SAVED</Text>
-            </View>
-          ) : (
-            <Text style={styles.saveBtnText}>SAVE BRANDING</Text>
-          )}
-        </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -711,731 +935,618 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 60,
-    backgroundColor: 'transparent',
-    zIndex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   backBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: -0.3,
+  },
+  headerSubTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  segmentedTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 4,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#050505',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentBtnText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#64748B',
+  },
+  segmentBtnTextActive: {
     color: '#FFFFFF',
-    letterSpacing: -0.4,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 120,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 160,
   },
-  subtitleContainer: {
-    marginVertical: 4,
-    marginBottom: 24,
-    zIndex: 1,
-    paddingHorizontal: 12,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  previewContainer: {
-    marginTop: 65,
-    marginBottom: 28,
-    alignSelf: 'center',
+  controlsColumn: {
     width: '100%',
-    alignItems: 'center',
   },
-  previewLabelRow: {
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  cardHeaderTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: -0.3,
+  },
+  cardHeaderSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginBottom: 14,
+  },
+  presetCountBadge: {
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  presetCountText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  colorPickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 20,
-    width: '100%',
-    justifyContent: 'center',
+    marginBottom: 14,
   },
-  previewLine: {
-    flex: 0.15,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    maxWidth: 60,
-  },
-  previewLabel: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#94A3B8',
-    letterSpacing: 1.5,
-    textAlign: 'center',
-  },
-  phoneFrame: {
-    width: 260,
-    height: 520,
-    backgroundColor: '#0F172A',
-    borderRadius: 36,
-    borderWidth: 6,
-    borderColor: '#1E293B',
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  notch: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    transform: [{ translateX: -40 }],
-    width: 80,
-    height: 20,
-    backgroundColor: '#1E293B',
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    zIndex: 10,
-  },
-  phoneContent: {
-    flex: 1,
-    backgroundColor: '#E2E8F0',
-    position: 'relative',
-    padding: 12,
-    paddingTop: 32,
-  },
-  fakeBackBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  cardContainerWrapper: {
-    marginTop: -40,
-    marginBottom: -28,
-    transform: [{ scale: 0.65 }],
-  },
-  fakeFormCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  fakeScanBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  fakeScanDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  fakeScanText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#10B981',
-  },
-  fakeFormTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-    marginBottom: 2,
-  },
-  fakeFormDesc: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  fakeInputLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  fakeInputCapsule: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    height: 38,
-    paddingHorizontal: 6,
-    marginBottom: 12,
-  },
-  fakeFlagPocket: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    gap: 4,
-  },
-  fakeCountryCode: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0F172A',
-  },
-  fakeInputPlaceholder: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#94A3B8',
-    marginLeft: 8,
-  },
-  fakeButton: {
-    borderRadius: 12,
-    height: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  fakeButtonText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  fakeTrustFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 10,
-  },
-  fakeTrustText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#94A3B8',
-  },
-  fakeRisevLogo: {
-    height: 11,
+  colorBox: {
     width: 44,
-    alignSelf: 'center',
-    marginTop: 8,
-    opacity: 0.55,
-  },
-  fakeRisevLogoPhoneBg: {
-    height: 16,
-    width: 64,
-    alignSelf: 'center',
-    marginTop: 12,
-    tintColor: '#FFFFFF',
-  },
-  settingsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    height: 44,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 12,
+    borderColor: '#CBD5E1',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  cardHeader: {
+  hexInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    width: 140,
   },
-  cardHeaderTitle: {
+  hexPrefix: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1E293B',
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#64748B',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  colorCapsule: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 24,
-    height: 48,
-    paddingHorizontal: 6,
-    width: 180,
-  },
-  colorIndicator: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  webColorInput: {
-    position: 'absolute',
-    top: -10,
-    left: -10,
-    width: 56,
-    height: 56,
-    opacity: 0,
-    cursor: 'pointer',
-  },
-  hexSymbol: {
-    color: '#94A3B8',
-    fontFamily: 'PlusJakartaSans_700Bold',
-    marginLeft: 12,
-    marginRight: 2,
-    fontSize: 15,
+    marginRight: 4,
   },
   hexInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1E293B',
-    ...Platform.select({
-      web: { outlineStyle: 'none' } as any,
-    }),
+    color: '#050505',
+    ...Platform.select({ web: { outlineStyle: 'none' } as any }),
   },
   swatchesRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
-    marginTop: 14,
-    flexWrap: 'wrap',
-    alignItems: 'center',
   },
-  swatch: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderColor: '#050505',
+  swatchCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  swatchActive: {
+  swatchCircleActive: {
     borderWidth: 2,
-    transform: [{ scale: 1.1 }],
-  },
-  logoPickerBox: {
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderStyle: 'dashed',
-    borderRadius: 20,
-    backgroundColor: '#F8FAFC',
-    overflow: 'hidden',
-    height: 140,
-    width: 140,
-    alignSelf: 'center',
-    marginBottom: 12,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
-    opacity: 0.85,
-  },
-  overlayText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-  },
-  deleteOverlayBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  uploadTrigger: {
+  bannerDropzone: {
+    height: 140,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  uploadTriggerBox: {
     flex: 1,
-    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
   },
-  uploadTextBold: {
+  uploadIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  uploadMainText: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#1E293B',
-    marginTop: 8,
-    textAlign: 'center',
+    color: '#050505',
   },
-  uploadTextSub: {
-    fontSize: 10,
+  uploadSubText: {
+    fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
+    color: '#94A3B8',
     marginTop: 2,
-    textAlign: 'center',
   },
-  urlInputBox: {
+  changeOverlayBtn: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 99,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  changeOverlayText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFFFFF',
+  },
+  urlInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    height: 44,
+    borderRadius: 12,
     paddingHorizontal: 12,
+    height: 42,
+    gap: 8,
   },
   urlInput: {
     flex: 1,
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#1E293B',
-    ...Platform.select({
-      web: { outlineStyle: 'none' } as any,
-    }),
+    color: '#050505',
+    ...Platform.select({ web: { outlineStyle: 'none' } as any }),
   },
-  bannerPickerBox: {
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderStyle: 'dashed',
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    overflow: 'hidden',
-    height: 200,
-    width: '100%',
-    marginBottom: 12,
-    position: 'relative',
-  },
-  textAreaBox: {
-    backgroundColor: '#F8FAFC',
+  qrCodeBox: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    minHeight: 96,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  textArea: {
-    flex: 1,
-    minHeight: 70,
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#1E293B',
-    textAlignVertical: 'top',
-    lineHeight: 20,
-    ...Platform.select({
-      web: { outlineStyle: 'none' } as any,
-    }),
-  },
-  nfcCard: {
-    marginBottom: 24,
-    backgroundColor: '#0F172A',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  standMockupCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  standMockupFrame: {
+    width: 240,
+    height: 383, // 240 * (1024 / 641) ≈ 383.4
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 5,
-  },
-  nfcUrlBox: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    overflow: 'hidden',
-  },
-  nfcUrlText: {
-    fontSize: 12,
-    color: '#38BDF8',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    padding: 12,
-    textAlign: 'center',
-  },
-  copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#38BDF8',
-    paddingVertical: 12,
-    borderRadius: 12,
-    width: '100%',
-    marginTop: 12,
-  },
-  saveBtn: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: '#050505',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  saveBtnText: {
-    color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 15,
-    letterSpacing: 1,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  statusText: {
-    color: '#10B981',
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.5,
-  },
-  statusBadgeGold: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 199, 0, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  statusDotGold: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFC700',
-  },
-  statusTextGold: {
-    color: '#D97706',
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.5,
-  },
-  fieldSub: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  copyBtnGold: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#FFC700',
-    paddingVertical: 12,
-    borderRadius: 14,
-    width: '100%',
-    marginTop: 20,
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 16,
+    elevation: 6,
   },
-
-  // QR Share Hub Card Styles
-  qrShareCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+  standTemplateImg: {
+    width: '100%',
+    height: '100%',
   },
-  qrShareHeader: {
-    flexDirection: 'row',
+  standQrContainer: {
+    position: 'absolute',
+    left: '22.93%',
+    top: '48.63%',
+    width: '53.98%',
+    height: '33.59%',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    justifyContent: 'center',
+    padding: 6,
   },
-  qrShareIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#FFC700',
+  standQrImage: {
+    width: '100%',
+    height: '100%',
+  },
+  standStoreNameContainer: {
+    position: 'absolute',
+    bottom: 18,
+    left: 10,
+    right: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qrShareTitle: {
-    fontSize: 15,
+  standStoreNameText: {
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
+    letterSpacing: 0.6,
+    textAlign: 'center',
   },
-  qrShareSubtitle: {
+  downloadA6Btn: {
+    backgroundColor: '#FFCC00',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#EAB308',
+    shadowColor: '#CA8A04',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  downloadA6BtnText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: 0.4,
+  },
+  downloadA6BtnSub: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#451A03',
+    opacity: 0.85,
+  },
+  qrImage: {
+    width: 220,
+    height: 220,
+    marginBottom: 8,
+  },
+  qrHintText: {
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    marginTop: 2,
-    lineHeight: 16,
   },
-  qrCodeFrame: {
+  linkBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 14,
-  },
-  qrCodeImage: {
-    width: 200,
-    height: 200,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-  },
-  qrScanHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 10,
-  },
-  qrScanHintText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-  },
-  onboardingUrlPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
     borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 14,
+    paddingVertical: 8,
     gap: 8,
+    marginBottom: 8,
   },
-  onboardingUrlText: {
+  linkBarText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#0F172A',
+    color: '#050505',
   },
-  copyPillBadge: {
+  copyPill: {
+    backgroundColor: '#050505',
+    borderRadius: 99,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#050505',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
   },
-  copyPillBadgeText: {
+  copyPillText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  qrActionGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
-  whatsappActionBtn: {
+  whatsappBtn: {
     flex: 1,
+    backgroundColor: '#25D366',
+    borderRadius: 12,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#25D366',
-    paddingVertical: 12,
-    borderRadius: 14,
     gap: 6,
-    shadowColor: '#25D366',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 2,
   },
-  whatsappActionBtnText: {
-    fontSize: 12.5,
+  whatsappBtnText: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#FFFFFF',
   },
-  downloadQrActionBtn: {
+  downloadBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 12,
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    gap: 6,
-  },
-  downloadQrActionBtnText: {
-    fontSize: 12.5,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
-  },
-  livePreviewActionBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#FFC700',
-    paddingVertical: 12,
-    borderRadius: 14,
     gap: 6,
   },
-  livePreviewActionBtnText: {
-    fontSize: 13,
+  downloadBtnText: {
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
+  },
+  saveBtn: {
+    backgroundColor: '#050505',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  saveBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+  },
+  // ── Phone Mockup Styles ──
+  phoneMockupWrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  previewDesktopColumn: {
+    flex: 1,
+  },
+  previewStickyBox: {
+    position: 'sticky' as any,
+    top: 20,
+    alignItems: 'center',
+  },
+  previewColumnTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+  },
+  liveText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#15803D',
+  },
+  // ── Booking Page Style Interactive Preview Card Styles ──
+  previewContainerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 20,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 414,
+    alignSelf: 'center',
+  },
+  previewToolbar: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 12,
+    gap: 6,
+  },
+  previewUrlBadge: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  previewLiveDot: {
+    fontSize: 8,
+    color: '#22C55E',
+  },
+  previewUrlText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  btnToolbarAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  btnToolbarActionText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  btnToolbarActionPrimary: {
+    backgroundColor: '#FFCC00',
+  },
+  btnToolbarActionPrimaryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  deviceFrame: {
+    width: '100%',
+    maxWidth: 390,
+    height: 840,
+    backgroundColor: '#0F172A',
+    borderRadius: 44,
+    padding: 6,
+    borderWidth: 5,
+    borderColor: '#1E293B',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  deviceSpeakerBar: {
+    width: 90,
+    height: 18,
+    backgroundColor: '#000000',
+    borderRadius: 10,
+    alignSelf: 'center',
+    position: 'absolute',
+    top: 10,
+    zIndex: 10,
+  },
+  mobileFallbackPreview: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  mobileFallbackTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  mobileFallbackSub: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  btnOpenFallback: {
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  btnOpenFallbackText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
   },
 });

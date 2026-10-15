@@ -332,6 +332,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           birthday: record.birthday ? String(record.birthday).slice(0, 10) : undefined,
           role: record.role,
           activeRole: role,
+          merchant_id: record.merchant_id || undefined,
           merchant_status: 'active',
           tier: record.tier || undefined,
           total_points: record.total_points || 0,

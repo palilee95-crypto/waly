@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -1392,6 +1392,15 @@ export default function NfcLandingScreen() {
 
   const welcomeText = merchant?.onboarding_welcome_text || `Welcome to ${merchantName}! Tap below to claim your stamps.`;
   const stampGoal = program?.stamp_goal || 10;
+  const subRewardsList: any[] = useMemo(() => {
+    if (!program?.sub_rewards) return [];
+    if (Array.isArray(program.sub_rewards)) return program.sub_rewards;
+    try {
+      return JSON.parse(program.sub_rewards);
+    } catch {
+      return [];
+    }
+  }, [program?.sub_rewards]);
   const currentStamps = approvedStamps !== null ? approvedStamps : (loyaltyCard?.stamps_collected || 0);
 
   // Detect newly-earned stamps and store their 0-based indices for animation
@@ -2753,6 +2762,7 @@ export default function NfcLandingScreen() {
                       const num = idx + 1;
                       const isEarned = num <= currentStamps;
                       const isRewardPos = num === stampGoal;
+                      const milestoneReward = subRewardsList.find((sr: any) => Number(sr.at_stamp) === num);
                       const fontC = cardFontColor;
 
                       if (isEarned) {
@@ -2761,10 +2771,25 @@ export default function NfcLandingScreen() {
                             key={num}
                             style={[
                               styles.largeStampEarned,
-                              { backgroundColor: stampColor },
+                              { backgroundColor: stampColor, position: 'relative' },
                             ]}
                           >
                             {renderStampIcon(cardIcon, 16, '#FFFFFF')}
+                            {milestoneReward && (
+                              <View style={{
+                                position: 'absolute',
+                                top: -4,
+                                right: -4,
+                                backgroundColor: '#FFCC00',
+                                borderRadius: 6,
+                                paddingHorizontal: 2.5,
+                                paddingVertical: 1,
+                                borderWidth: 1,
+                                borderColor: '#000000',
+                              }}>
+                                <Text style={{ fontSize: 7, fontWeight: '900', color: '#000000' }}>🎁</Text>
+                              </View>
+                            )}
                           </View>
                         );
                       } else if (isRewardPos) {
@@ -2777,6 +2802,35 @@ export default function NfcLandingScreen() {
                             ]}
                           >
                             <Text style={{ fontSize: 13 }}>🎁</Text>
+                          </View>
+                        );
+                      } else if (milestoneReward) {
+                        return (
+                          <View
+                            key={num}
+                            style={[
+                              styles.largeStampGift,
+                              { 
+                                borderColor: '#FFCC00', 
+                                backgroundColor: 'rgba(255, 204, 0, 0.15)',
+                                position: 'relative',
+                              },
+                            ]}
+                          >
+                            <Text style={{ fontSize: 13 }}>🎁</Text>
+                            <View style={{
+                              position: 'absolute',
+                              top: -5,
+                              right: -5,
+                              backgroundColor: '#FFCC00',
+                              borderRadius: 6,
+                              paddingHorizontal: 3,
+                              paddingVertical: 0.5,
+                              borderWidth: 1,
+                              borderColor: '#000000',
+                            }}>
+                              <Text style={{ fontSize: 7, fontWeight: '900', color: '#000000' }}>{num}</Text>
+                            </View>
                           </View>
                         );
                       } else {

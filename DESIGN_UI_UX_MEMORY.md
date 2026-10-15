@@ -29,7 +29,7 @@ Use **ONLY** these three core colors throughout all customer booking and discove
 |:---|:---|:---|:---|
 | **Pure White** | `#FFFFFF` | Primary Surface | Page background, cards, tickets, modals, button text on black. |
 | **Pure Black** | `#000000` | Primary Contrast | Primary typography, icons, active borders, main action CTA pill buttons. |
-| **Risev Yellow** | `#FFCC00` | Status & Accent | Selected states, active dots, badges (`CONFIRMED`, `ACTIVE`), progress markers. |
+| **Risev Yellow** | `#FFCC00` | Status & Accent | Selected states, active dots, badges (`CONFIRMED`, `ACTIVE`), progress markers, and **Executive Rule Hero Cards** (kad ringkasan aturan di atas studio). |
 
 ### ⚠️ Opacity & Tint Rules:
 - **Subtle Borders**: `rgba(0, 0, 0, 0.06)` to `rgba(0, 0, 0, 0.08)`.
@@ -497,3 +497,1009 @@ Visualizing the user's appointment state with high clarity:
   - Solid Pure Black capsule: `"Don't have a stand? Get Your Stand Now 🎁"` (`height: 52`, radius 999).
   - Clean inline setup/help support link: `(?) Need help setting up or ordering? Chat with us` above the footer links.
   - Excluded `nfc-marketplace` route in `app/(merchant)/_layout.tsx` so the global floating customer support FAB (`Need Help?`) does not overlap bottom CTAs or checkout drawers.
+
+---
+
+## 21. Merchant Profile & Settings (`app/(merchant)/profile.tsx` — Fresha × Apple iOS × Risev Accent Standard)
+
+- **Pure Fresha × Apple iOS × Risev Accent Alignment**:
+  - Adheres strictly to **The Rule of Three** (`#FFFFFF` Pure White, `#000000` Pure Black, `#FFCC00` Risev Accent).
+  - Eliminates legacy dark background void (`#050505`) in favor of **Pure Daylight Clarity** with native iOS typography and scannability.
+  - Zero rainbow/pastel candy backgrounds: All grouped row icon backgrounds use neutral `#F8FAFC` surfaces with high-contrast `#050505` glyphs.
+
+- **Apple iOS Pure Daylight Header (`headerContainer`)**:
+  - Pure white background (`#FFFFFF`, border bottom `1px solid #F1F5F9`).
+  - Left: Official `risev` brand lockup (`@/assets/risev logo.png`, `width: 90, height: 26`) + vertical divider (`#E2E8F0`) + Large Title `"Store Settings"` / `"Tetapan Kedai"` (`18px PlusJakartaSans_800ExtraBold`, `#000000`).
+  - Right: Dual circular tactile action buttons (`36×36px`, `#F8FAFC`, border `#E2E8F0`, black icon) for `Edit Profile` (`create-outline`) and `Help & Support` WhatsApp quick link (`help-buoy-outline`).
+
+- **Executive Store Identity Card (`storeCard` — Compact & Refined Reference Style)**:
+  - Container: High-end squircle card (`backgroundColor: '#FFFFFF'`, border `1px solid #E2E8F0`, `borderRadius: 20`, padding 15px, subtle shadow `radius: 8`).
+  - **Tappable Header Row (`storeProfileRow`)**:
+    - Avatar: Squircle profile image (`62×62px`, `borderRadius: 16`, border `#E2E8F0`, radiant yellow background).
+    - Store Name: Large bold title (`18.5px PlusJakartaSans_800ExtraBold`, Pure Black `#000000`).
+    - Location Row: Solid location pin icon (`Ionicons name="location-sharp" size={12}`) + address string (`12px PlusJakartaSans_500Medium`, `#475569`).
+    - Location Row: Solid location pin icon (`Ionicons name="location-sharp" size={12}`) + address string (`12px PlusJakartaSans_500Medium`, `#64748B`).
+    - Executive Tier & Expiry Row (`storeTierRow` — Option 2 Executive Black & Gold Pill):
+      - Replaced the awkward 4th orphan line with an aligned horizontal row (`flexDirection: 'row'`, `gap: 7`, `flexWrap: 'wrap'`).
+      - VIP Capsule Pill (`storeVipBadge`): Pure Black surface (`#000000`, border `rgba(255, 204, 0, 0.35)`, `borderRadius: 99`) containing:
+        - Gold crown icon (`MaterialCommunityIcons name="crown-outline" size={12} color="#FFCC00"`)
+        - Gold tier text (`PRO`, 10px `PlusJakartaSans_800ExtraBold`, `#FFCC00`)
+        - Subtle bullet separator (`•`, `rgba(255, 255, 255, 0.35)`)
+        - Live green dot (`#22C55E`) + Pure White status text (`Active`, 10px `PlusJakartaSans_700Bold`, `#FFFFFF`)
+      - Inline Expiry Label (`storeExpInlineText`): `"Exp: 31 Dec 2099"` (`11px PlusJakartaSans_500Medium`, `#94A3B8`) sitting cleanly beside the pill.
+    - Navigational Chevron: Right chevron (`Ionicons name="chevron-forward" size={18} color="#000000"`) indicating the header is interactive and opens store profile editing.
+  - **Hairline Divider (`storeCardDivider`)**: Clean 1px horizontal line (`#F1F5F9`, `marginVertical: 12`).
+  - **3-Column Modern Squircle Metric Tiles (`statTile` — Apple Health / Stripe Style)**:
+    - 3 distinct, soft squircle tiles (`backgroundColor: '#F8FAFC'`, border `1px solid #F1F5F9`, `borderRadius: 14`, padding 10px, `gap: 8`):
+    - Top Row: White squircle icon container (`28×28px`, `#FFFFFF`, border `rgba(0,0,0,0.05)`) on the left + subtle micro-chevron disclosure indicator (`Ionicons name="chevron-forward" size={12} color="#CBD5E1"`) on the top right.
+    - Value & Label: Big bold metric number (`16px PlusJakartaSans_800ExtraBold`, Pure Black / Green for active alerts) + crisp descriptive label (`10.5px PlusJakartaSans_600SemiBold`, `#64748B`).
+    - Tile 1 (NFC Stand): Radio icon `((•))` + count `1` + label `"NFC Stand"` (tap navigates to NFC Marketplace).
+    - Tile 2 (Customers): People icon `👥` + count `34` + label `"Customers"` (tap navigates to Customer Management).
+    - Tile 3 (Tap Alerts): Bell icon `🔔` with active green notification dot + status `"On"` / `"Off"` + label `"Tap Alerts"` (tap toggles push notification state).
+    - Completely eliminates floating lines and awkwardly placed chevrons in favor of a cohesive, modern executive dashboard look.
+
+
+- **Ultra-Slim Horizontal Risev Yellow Switch Bar (`merchantSlimCard`)**:
+  - Replaced the bulky stacked card with an **Ultra-Slim Horizontal Banner** (~54px height):
+  - Left: Black squircle (`#000000`, 34×34px, radius 10) with yellow person icon (`#FFCC00`) + `"Personal Account?"` / `"Akaun Peribadi?"` + 1-line subtitle `"Switch to view loyalty cards & rewards"`.
+  - Right: Tactile Pure Black capsule button `[ Switch → ]` (`#000000`, height 32px, radius 999, white text, `#FFCC00` arrow).
+  - Saves over 85px of vertical space, instantly revealing the top 3-4 setting items in `STORE & OPERATIONS` above the fold on mobile viewports.
+
+- **Apple Black & Gold Luxury Tier Badging (`getSubscriptionBadgeInfo`)**:
+  - Strictly eliminated all legacy cobalt/indigo blue badges (`#4F46E5` / `#2563EB` / `#0284C7`).
+  - Active `PRO` badge is styled in Apple Centurion Black & Gold: Pure Black surface (`#000000`), gold star icon (`#FFCC00`), `#FFCC00` text, and subtle golden border (`rgba(255, 204, 0, 0.4)`).
+  - Consistent across both Store Identity Card and Account & Security Subscription cell.
+
+- **Apple Indented Dividers (`groupedDivider`)**:
+  - Standard Apple iOS indented dividers (`height: 1, backgroundColor: '#F1F5F9', marginLeft: 64`).
+  - Dividers start strictly under the text block, maintaining clean breathing room under the 36px icon squircles.
+  - Eliminated confusing double locks: rows now use standard subtle Apple chevrons (`#CBD5E1`) unless strictly locked by permissions.
+
+- **Apple-Style Human Outcome Copywriting (Store & Operations Subtitles)**:
+  - Eliminated repetitive robotic IT terminology and awkward paragraph truncations:
+  - `Manage Branches`: `"Expand to new outlets & assign managers"` (BM: *"Buka cawangan baharu & tetapkan pengurus"*).
+  - `Manage Staff`: `"Cashier PINs, roles & daily permissions"` (BM: *"Akses PIN juruwang, peranan & had staf"*).
+  - `Smart Booking Management`: `"Client appointments & service calendar"` (BM: *"Temu janji pelanggan & kalendar servis"*).
+  - `Manage Rewards`: `"Stamp cards, point rules & voucher perks"` (BM: *"Kad setem digital, mata ganjaran & baucar"*).
+  - `NFC Claim Alerts`: `"Instant chime & alert when stands are tapped"` (BM: *"Bunyi loceng & amaran bila stand diimbas"*).
+  - Every description is concise (<45 characters), fits on one line without truncation, and clearly communicates the merchant benefit.
+
+- **Apple-Style Human Outcome Copywriting (Growth & Marketing Subtitles)**:
+  - Replaced technical catalog jargon with business outcome value propositions:
+  - `NFC Marketplace`: `"Order official acrylic counter stands & bundles"` (BM: *"Tempah stand akrilik rasmi & pakej perkakasan"*).
+  - `Google Reviews Integration`: `"Turn walk-ins into 5-star Google ratings"` (BM: *"Tukar pelanggan walk-in kepada ulasan 5-bintang"*).
+  - `Onboarding Setup`: `"Brand logo, welcome message & store banner"` (BM: *"Logo kedai, ucapan aluan & sepanduk jenama"*).
+  - `Risev Academy & Video Guides`: `"Quick video playbooks to maximize repeat visits"` (BM: *"Video panduan pantas gandakan pelanggan setia"*).
+
+- **Sleek Docked Support FAB & Clearance**:
+  - The global WhatsApp support button (`💬 Need Help?`) in `_layout.tsx` is docked cleanly at `bottom: 82, right: 16` (just above the 56px bottom tab bar) with a compact pill format (`paddingVertical: 9, paddingHorizontal: 15`).
+  - Completely eliminates content obstruction while remaining 100% accessible to merchants.
+  - Generous bottom scroll clearance (`paddingBottom: 160`) ensures full comfortable scrolling.
+
+---
+
+## 22. Edit Store Profile Standardisation (`app/(merchant)/edit-profile.tsx`)
+
+- **Full Screen Focus & Navigation De-cluttering**:
+  - Hides the bottom tab bar (`tabBarStyle: { display: 'none' }`) and the floating WhatsApp FAB on `edit-profile` route.
+  - Eliminates overlap conflicts where the FAB previously covered phone and target inputs.
+- **Apple Pure White Sticky Header**:
+  - Pure White `#FFFFFF` sticky header with hairline divider (`#F1F5F9`).
+  - Left: Clean back navigation link (`< Profil` / `< Profile`, `14.5px PlusJakartaSans_700Bold #000000`).
+  - Center: Headline `"Sunting Profil Kedai"` / `"Edit Store Profile"` (`16px PlusJakartaSans_800ExtraBold #000000`).
+  - Right: Tactile Pure Black capsule pill `[ ✓ Simpan ]` (`#000000`, gold checkmark, `#FFCC00` 12.5px bold text, live spinner when saving). No need to scroll to the bottom of the page to save.
+- **Hero Storefront Live Preview Card (`heroCard`)**:
+  - Full-width banner preview frame (`145px` height, `borderRadius: 14`, border `#E2E8F0`) with translucent camera chip `[ 📷 Tukar Banner ]` (`rgba(0,0,0,0.72)`).
+  - Overlapping squircle avatar logo (`68×68px`, `borderRadius: 18`, 3px white border, shadow) with Risev Yellow `#FFCC00` camera badge.
+  - Live preview metadata: real-time store name, category badge pill, and address snippet.
+  - Micro-reassurance note: `"Pratonton langsung profil kedai yang dilihat oleh pelanggan."`
+- **Apple Inset Grouped Sections (`groupedCard`)**:
+  - **Group 1: Store Identity (`IDENTITI KEDAI`)**:
+    - Store Name (squircle input with storefront icon).
+    - Business Category (`categorySelectCard` — Option 1):
+      - Replaced legacy 6 flat chips with an executive Apple Category Selector Card displaying the active category with its custom icon, background pill, category name, and industry group.
+      - Tapping the card opens `<AllCategoriesModal mode="merchant" selectedCategoryId={selectedCategoryId} />` (Option 2 Implementation):
+        - Tailored for merchant context: Replaces customer marketplace copywriting ("XX merchants") with rich bilingual business scope descriptions (e.g., Barber: *"Gunting rambut, janggut & dandanan lelaki"*, Cafe: *"Kopi, pastri, kek & sarapan santai"*).
+        - Apple Inset Grouped cards with clean hairline dividers across 5 industry groups.
+        - Active radio button indicator with Pure Black `#000000` circle and Risev signature gold `#FFCC00` checkmark plus `[ DIPILIH ]` / `[ SELECTED ]` micro-badge on the active store category.
+        - Preserves customer mode compatibility for customer exploration pages.
+      - Automatically maps the sub-category (`dessert`, `cafe`, `barber`, etc.) to the base database category (`food`, `beauty`, etc.) via `mapSubCategoryToBase()` while saving `sub_category` and `sub_category_name` in `metadata`.
+    - Structured Full Address & Postcode:
+      - Street Address (Jalan / Lot / Unit) squircle input with location pin icon.
+      - 2-Column row: 5-Digit numeric Postcode (Poskod) with mail icon + City / Area (Bandar) with business icon.
+      - State (Negeri) squircle input with map icon.
+      - Automatically formats `getFullAddress()` (`{address}, {postcode} {city}, {state}`) to synchronize with storefront preview, PocketBase `description`, and `store_locations`.
+  - **Group 2: Contact & Notifications (`HUBUNGAN & NOTIFIKASI`)**:
+    - Business Email with helper: *"Digunakan untuk ringkasan bil, laporan bulanan, dan notifikasi keselamatan."*
+    - Phone Number with helper: *"Nombor rasmi kedai untuk pertanyaan pelanggan dan resit digital WhatsApp."*
+  - **Group 3: Business Goals & Loyalty (`SASARAN BISNES & KESETIAAN`)**:
+    - Monthly Sales Goal with black `RM` currency badge + helper: *"Menetapkan penanda aras kemajuan pada papan pemuka hasil bulanan anda."*
+    - Customer Win-Back Alert / Had Amaran Pelanggan Sepi (Minimalist & Compact Standard Form Row):
+      - Clean label row: `"Customer Win-Back Alert"` / `"Had Amaran Pelanggan Sepi"` with subtle right metadata: `"Default: 30 days"` / `"Piawaian: 30 hari"`.
+      - Conforms 100% to Risev standard `inputFieldWrapper` (matching `Monthly Sales Goal`, `Phone Number`, etc.):
+        - Left icon: `Ionicons name="time-outline"` (`#64748B`, 17px).
+        - Direct numeric input (`keyboardType="numeric"`).
+        - Inline unit label: `"Days"` / `"Hari"`.
+        - Integrated micro-stepper capsule: Quiet, Apple-grade `[ − | + ]` squircle pill right inside the input field wrapper (tactile 26×26px touch targets, increments/decrements in 5-day intervals, 7–180 days).
+      - Compact micro-chips row:
+        - Sleek horizontal chips: `[ 14d (F&B) ]  [ 30d ★ ]  [ 60d ]  [ 90d ]`.
+        - Height 24px, quiet `#F1F5F9` background, turns Pure Black `#000000` with Risev Gold `#FFCC00` text when selected.
+      - Standard 1-line helper text: *"Customers without visits in this period will be flagged for re-engagement perks."*
+      - Perfectly balanced visual rhythm that eliminates visual bulk while preserving both stepper and 1-tap shortcut functionality.
+      - Synchronized with `merchants.inactive_threshold_days` in PocketBase and powers the "Pelanggan Sepi" filter tab in `customers.tsx`.
+  - **Group 4: Daily Operating Hours (`WAKTU OPERASI HARIAN`)**:
+    - Inset card with Monday - Sunday schedule.
+    - Each row contains day name, Open/Closed toggle with Risev Yellow track, and compact time input or disabled `"Tutup"` badge.
+  - **Group 5: Store Map & GPS Location (`LOKASI PETA & GPS`)**:
+    - Header with Pure Black `[ ⌖ Kesan Lokasi GPS ]` button (`#000000`, gold navigation icon, white text).
+    - 2-column Latitude & Longitude inputs.
+    - Leaflet interactive map with custom grayscale styling and yellow pin marker.
+- **Redundant Bottom Action Bar (`bottomActionsRow`)**:
+  - Cancel button (`#FFFFFF`, border `#E2E8F0`, grey text) + Primary Save button (`#000000`, height 48px, `#FFCC00` checkmark & white text) at the bottom for natural closure on mobile.
+
+### 23. Branch Management Redesign & Standardisation (`app/(merchant)/branches.tsx`)
+- **Design Paradigm**: **Konsep A ("Apple Inset Grouped Standard")** — Aligned with `profile.tsx` and `edit-profile.tsx`.
+- **Structural Improvements & Clean Layout Canvas**:
+  - **Removed Bleed & Clutter**: Eliminated the jarring dark header bleed (`#050505`) and the heavy stacked dark promotional banners (`Multi-Branch Engine` & `Brand-Wide Outlets Summary`). Replaced with a unified pure light canvas (`#F8FAFC`).
+  - **Full-Screen Immersion & Overlap Elimination**:
+    - Bottom merchant navigation tab bar suppressed via `CustomMerchantTabBar` route check in `app/(merchant)/_layout.tsx` (`currentRoute === 'branches'`), ensuring complete vertical view real estate.
+    - Floating customer support WhatsApp FAB hidden on `/branches` route to prevent button collisions with registered outlet action cards.
+  - **Apple Pure White Sticky Header**:
+    - Edge-to-edge top bar (`backgroundColor: '#FFFFFF'`, border bottom `#F1F5F9`, `zIndex: 30`, safe area insets).
+    - Left: Quiet tactile back button `[ < Profil ]` / `[ < Profile ]` (`#000000`, 14.5px bold) returning to `/(merchant)/profile`.
+    - Center: Bold, centered screen title `"Pengurusan Cawangan"` / `"Branch Management"` (16px `PlusJakartaSans_800ExtraBold`, `#000000`).
+    - Right: Pure Black action capsule `[ + Tambah ]` / `[ + Add ]` (`#000000`, Risev Gold `#FFCC00` icon and text, 12.5px ExtraBold, radius 999) launching the Add Branch modal.
+- **Executive Brand KPI Summary Card (The Rule of Three)**:
+  - Clean light card (`#FFFFFF`, border `1px solid #E2E8F0`, radius 20, subtle elevation).
+  - Header Row:
+    - Left: Pure Black business icon squircle (`#000000`, Risev Gold `#FFCC00` icon) + Merchant Brand Name (dynamic from `merchants.name` or HQ branch) + active location count subtitle.
+    - Right: Quota badge pill `[ X / Y Cawangan ]` (with infinity `∞` symbol for Business/Enterprise tier).
+  - 3-Column Metrics Grid (Clean divider-separated columns):
+    - `JUMLAH JUALAN`: Aggregated gross sales in RM across all registered branches.
+    - `JUMLAH STAMP`: Combined loyalty stamps issued brand-wide.
+    - `STAF BERTUGAS`: Total active staff count across all outlets.
+  - Multi-Branch Revenue Distribution Track:
+    - Horizontal segmented progress bar dynamically rendered with curated grayscale + Risev Gold palette (`['#000000', '#FFCC00', '#475569', '#94A3B8', '#CBD5E1']`).
+    - Color dot legend displaying percentage distribution per outlet.
+- **Section Header & Registered Outlet Cards**:
+  - Section Header: `"SENARAI CAWANGAN"` with black count pill `[ N ]` (gold text) and a refresh icon button.
+  - Apple Inset Outlet Card Architecture (`#FFFFFF`, border `1px solid #E2E8F0`, radius 20):
+    - Card Header: Branch icon squircle (Pure Black with gold icon for HQ, clean light for branch outlets) + outlet name + amber `[ HQ / UTAMA ]` badge + city/area subtitle.
+    - Quick Action Buttons: Squircle Edit button (`Feather name="edit-2"`) and subtle danger Delete button (`Feather name="trash-2"`) for secondary branches.
+    - **Apple Unified Grouped Inset Box (`unifiedInsetGroup` — Pilihan 1 Implementation)**:
+      - Replaced legacy fragmented box-inside-box stacking and isolated pills with a single, sleek unified inset container (`backgroundColor: '#F8FAFC'`, border `#E2E8F0`, `borderRadius: 16`, hairline dividers):
+      - **Row 1 (Location & Contact)**:
+        - Interactive address link: Location pin icon + full address (or subtle clickable `+ Tetapkan alamat cawangan` / `+ Set outlet address` placeholder opening edit modal) + chevron icon.
+        - Manager & official phone row: `👤 Pengurus: {name}` · `📞 {phone}` in a neat horizontal metadata line.
+      - *Hairline Divider (`#E2E8F0`)*
+      - **Row 2 (Hardware & Review Integrations)**:
+        - Clean Smart Stands badge: `[ ⚡ {N} Stand Aktif ]` (displays active count instead of cryptic raw serial numbers; tapping pops up a clean alert list of assigned stand serials).
+        - Google Review pill: Amber pill `[ ★ Google Review ↗ ]` (direct URL launcher) or quiet `[ + Google Review ]` shortcut.
+      - *Hairline Divider (`#E2E8F0`)*
+      - **Row 3 (Customer Onboarding Link & Touchpoints)**:
+        - Left: Link icon + title `"Pautan Onboarding"` / `"Customer Onboarding"` + subtitle `"Pendaftaran NFC & Kod QR"`.
+        - Right: 2 compact tactile buttons — Pure Black pill `[ 📋 SALIN ]` / `[ 📋 COPY ]` (Risev Gold `#FFCC00` text) + Squircle `[ 🔲 QR ]` code button.
+    - 4-Column Live Performance Strip (Bottom hairline divider):
+      - 4 balanced columns: `Staf`, `Pelawat` (Footfall), `Jualan` (Sales), and `Stamp` with vertical separators.
+- **Branch Manager Selection from Staff Management**:
+  - Replaced legacy blind manual text input with an interactive **Apple Staff Manager Picker**:
+  - **Unified Staff Aggregation**: Fetches active staff members across `/api/risev/merchant/staff`, `merchant_staff` collection, and registered app users (`users`), automatically including the Store Owner (`👑 Owner`).
+  - **Selected Manager Card & Quick Chips**:
+    - Trigger card displaying manager initials avatar, name, role badge (`OWNER` or role title), and official phone number.
+    - Horizontal quick-selection chips for 1-tap switching between staff members.
+    - Auto-populates the branch contact phone number when a staff member with a registered phone is selected.
+  - **Full Staff Picker Modal (`StaffPickerModal`)**:
+    - Bottom sheet modal listing all registered staff members with role descriptions, contact numbers, and gold checkmark indicators.
+    - Includes option to toggle manual/custom name input (`+ Tulis Nama Manual`) for external managers not registered in staff management.
+- **Bottom Primary CTA**:
+  - Solid Pure Black capsule button `[ + Tambah Cawangan Baru ]` (`backgroundColor: '#000000'`, Risev Gold `#FFCC00` icon and text, height 54, radius 16) at the bottom of the scroll view.
+### 24. Staff Management Redesign & Standardisation (`app/(merchant)/staff.tsx`)
+- **Design Paradigm**: **Konsep A ("Apple Inset Team Hub")** — Harmonised with `profile.tsx`, `edit-profile.tsx`, and `branches.tsx`.
+- **Structural Improvements & Clean Layout Canvas**:
+  - **Removed Bleed & Clutter**: Eliminated the legacy dark bleed overlay (`#050505` box) and sticky split headers. Adopted the standard Pure Light canvas (`#F8FAFC`).
+  - **Full-Screen Immersion & Overlap Elimination**:
+    - Bottom merchant navigation tab bar suppressed via `CustomMerchantTabBar` route check in `app/(merchant)/_layout.tsx` (`currentRoute === 'staff'`).
+    - Customer support WhatsApp floating FAB suppressed on `/staff` route, ensuring complete zero-obstruction view of staff cards and action buttons.
+  - **Apple Pure White Sticky Header**:
+    - Edge-to-edge top bar (`backgroundColor: '#FFFFFF'`, border bottom `#F1F5F9`, `zIndex: 10`, shadow elevation).
+    - Left: Tactile back button `[ < ]` returning to `/(merchant)/profile` with screen title `"Pengurusan Staf"` / `"Manage Staff"` and subtitle `"Hab Pasukan & Operasi"` / `"Team Hub & Operations"`.
+    - Right: Pure Black action capsule `[ + Tambah Staf ]` / `[ + Add Staff ]` (`#0F172A`, Risev Gold `#FFCC00` icon, white text) that triggers the Apple Add Staff Modal.
+- **Executive Team KPI Summary Card (The Rule of Three)**:
+  - Clean inset card (`#FFFFFF`, border `#E2E8F0`, `borderRadius: 20`, subtle elevation):
+    - `JUMLAH STAF` / `TOTAL STAFF`: Total registered team members.
+    - `SEDANG BERTUGAS` / `ON DUTY`: Live count with green dot indicator (`#16A34A`) and roster status note.
+    - `KOMISEN BULANAN` / `COMMISSION`: Aggregated month-to-date staff commission in RM with active billing month label.
+- **Apple Segmented Control Tab Bar**:
+  - Inset segmented bar (`backgroundColor: '#F1F5F9'`, `borderRadius: 14`, padding 4, border `#E2E8F0`):
+    - 4 balanced tabs:
+      1. `Pasukan` / `Team` (`Ionicons name="people"`)
+      2. `Prestasi` / `Rankings` (`Ionicons name="trophy"`)
+      3. `Komisen` / `Commission` (`Ionicons name="cash"`)
+      4. `Kebenaran` / `Permissions` (`Ionicons name="shield-checkmark"`)
+    - Zero text truncation on any mobile screen width.
+    - Active tab highlighted in Pure White with soft shadow and bold dark text.
+- **Apple Inset Grouped Staff Cards (`staffCard`)**:
+  - Clean card container (`#FFFFFF`, border `#E2E8F0`, `borderRadius: 18`, padding 16, shadow elevation):
+    - **Top Row**:
+      - High-res avatar with camera overlay badge (tapping triggers photo upload/sync).
+      - Staff name, dynamic customer rating pill (`★ X.X (N)`), amber branch badge (`#FEF3C7` / `#B45309`), designation role badge, and employment type pill (`Full-Time` / `Part-Time`).
+      - Right: 1-Tap Attendance Toggle Pill:
+        - `Bertugas` (green dot, light green background `#DCFCE7`, chevron icon) vs `Cuti` (amber dot, light amber background `#FEF3C7`, reason code e.g. `Cuti (MC)`, refresh icon).
+    - **Middle Row**:
+      - Official phone number with phone icon.
+      - Commission model pill (`10% Komisen` or `RM5.00/job`).
+      - Data privacy polish: Automatically suppresses internal generated shadow emails (e.g. `shadow_staff_...`), displaying only genuine staff emails when present.
+    - **Bottom Action Bar**:
+      - Hairline divider with 3 tactile action buttons:
+        - `[ ✏️ Sunting ]`: Opens Edit Profile & Compensation Tier Modal.
+        - `[ 🛡️ Had Kuasa ]`: Quick shortcut to Permissions tab.
+        - `[ 🗑️ Padam ]`: Triggers custom Remove Staff Confirmation Modal.
+- **Dedicated Apple Add Staff Modal (`addStaffModalVisible`)**:
+  - Replaces the legacy 50%-height form pinned to the screen top.
+  - Dedicated pop-up modal featuring:
+    - Pure Black header pill with Risev Gold person-add icon.
+    - Outlet assignment horizontal chip selector (`All Branches (HQ)` + registered branch outlets).
+    - Formatted phone number input with call icon and auto-focus.
+    - Optional staff full name input.
+    - Action buttons: Cancel and `[ + Daftar Staf ]` with loading spinner.
+- **Performance & Rankings Tab Standardisation (Konsep A — "Apple Inset Podium & Unified Filter")**:
+  - **Eliminated Navy Bleed Card**: Removed the dark `#1E293B` spotlight card completely, restoring 100% adherence to Risev's Pure Light canvas (`#F8FAFC`).
+  - **Zero Duplication**: Eliminated the redundant top performer duplicate card. Rank #1 now prestigiously leads the leaderboard directly as the Champion Hero Card.
+  - **Executive Metric Strip (`perfExecutiveCard`)**:
+    - Compact pure white card with mini gold trophy pill (`#FEF3C7`, `#B45309`), active timeframe tag, and 3 clean columns: `COP` (stamps issued), `JUALAN` (RM gross volume), and `DILAYAN` (customers served) with hairline dividers.
+  - **Unified Filter Controls (`perfFilterCard`)**:
+    - Replaced the 2 bulky stacked filter rows with:
+      - Apple Timeframe Segmented Control (`Hari Ini`, `Minggu`, `Bulan Ini`, `Semua`).
+      - Minimalist Sort Chips row: `[ 🏷️ Cop ]`, `[ 💰 Jualan (RM) ]`, `[ 👥 Pelanggan ]` with tactile dark selection state.
+  - **Champion Hero Podium Card (`championCard`)**:
+    - Prestigious Apple Inset Card (`#FFFFFF`, border `#FDE68A`, soft golden shadow).
+    - Top pill badge: `[ 👑 #1 STAF TERBAIK ]` / `[ 👑 #1 TOP PERFORMER ]` (`#FEF3C7` / `#B45309`).
+    - 48x48 avatar with `#FFC700` gold ring border and mini `[ 1 ]` badge.
+    - Staff name, star rating pill, branch badge, and role title.
+    - 3-metric achievement strip: Stamps Issued, Sales Handled (RM), and Customers.
+  - **Rankings #2+ Cards (`perfStaffCard`)**:
+    - Clean white cards with `🥈 #2`, `🥉 #3`, `#4+` pills, avatar, branch, star rating, stamps, and sales metrics.
+    - Security audit chevron preserved for any staff flagged by Fraud & Unusual Activity Guard.
+- **Commission Tab Standardisation (Konsep A — "Apple Fintech Ledger & Executive Payout Strip")**:
+  - **Executive Payout Strip (`commExecutiveCard`)**:
+    - Compact pure white Apple Inset Card (`#FFFFFF`, border `#E2E8F0`, rounded 20px, soft elevation).
+    - Top row: Mini wallet badge (`#FEF3C7`, `#B45309`), titles, and **Apple Month Navigator Capsule (`monthNavRow`)** (`‹ Okt 2026 ›`) with tactile month switcher.
+    - 4-Column Financial Metric Strip (`commExecutiveStrip`): `SERVIS` (completed jobs), `JUALAN` (RM gross volume), `KOMISEN` (RM total due in `#059669`), and `TERTUNGGAK / DIBAYAR` with color-coded alerts.
+  - **Quick Status Filter Chips (`commFilterChipsRow`)**:
+    - Instant 1-tap filtering: `[ Semua (X) ]`, `[ ⏳ Belum Bayar (Y) ]`, and `[ ✓ Selesai (Z) ]` with counts.
+  - **Apple Inset Staff Ledger Cards (`commStaffCard`)**:
+    - Profile row: Initials avatar (`#F8FAFC`, border `#E2E8F0`), bold name, `[ Tetap ]` / `[ Sambilan ]` employment pill, and formula pill (`⚡ 10% daripada harga servis` / `💵 RM 5.00 tetap`).
+    - Status pills: `[ ✓ Selesai Dibayar ]` (emerald `#DCFCE7`), `[ ⏳ Belum Bayar ]` (amber `#FEF3C7`), or `[ RM 0.00 ]`.
+    - Inner 3-column metric grid (`commInnerMetricsGrid`): Servis Siap, Jualan Staf, Komisen Layak with hairline dividers.
+    - Smart action bar:
+      - Pending balance highlighted in amber with high-contrast tactile button `[ 💵 Tanda Selesai Bayar ]` (`#059669` / `#050505`).
+      - Settled state displays a clean confirmation note: `✓ Semua bayaran bagi bulan [Bulan] telah selesai.`
+- **Staff Management UX & Flow Refinements (Mobile Optimization)**:
+  - **Contextualized KPI Card**: Moved the top `executiveKpiCard` (`TOTAL STAFF`, `ON DUTY`, `COMMISSION`) to be rendered exclusively within the `Team` tab. Reclaims ~90px of vertical viewport space on Rankings, Commission, and Permissions tabs.
+  - **Top-Down Filter Causality (Rankings Tab)**:
+    - Reordered the layout hierarchy so the **Unified Filter Capsule (`perfFilterCard`)** sits at the top of the tab directly under the tab switcher.
+    - Placed the **Executive Metric Strip (`perfExecutiveCard`)** directly below the filter, ensuring users immediately recognize that changing the timeframe updates the metrics.
+    - Eliminated the redundant `perfPeriodTag` (*[ This Month ]*) and `championPeriodPill` (*[ This Month ]*), completely resolving triple-badge repetition.
+  - **Multi-Branch Competition Filter (`branchFilterScroll`)**:
+    - Automatic horizontal chip selector (`[ Semua Cawangan ]`, `[ Cawangan 1 ]`, etc.) rendered when merchant has registered outlets, enabling per-branch leaderboard analysis.
+  - **Interactive Champion Hero Card**:
+    - Wrapped in an interactive card with active opacity feedback and direct tap-to-manage capabilities.
+- **Permissions View**:
+  - Fully preserved and visually aligned with Apple Inset card styling:
+    - Granular staff permission toggles (Financial Analytics, WhatsApp Blasts, Rewards, CRM stamp adjustments, Store Profile).
+    - Fraud & Unusual Activity Guard with alert thresholds.
+
+---
+
+### 25. Rewards & Loyalty Studio Redesign (Konsep A: "Apple Wallet Studio & Daylight Loyalty Hub")
+- **Route**: `app/(merchant)/rewards.tsx`
+- **Design Philosophy**: Adheres strictly to the Risev "Rule of Three" (Pure White `#FFFFFF`, Pure Black `#050505`/`#0F172A`, Risev Gold `#FFCC00`) on a daylight canvas (`#F8FAFC`). Replaces dark carnival ticket aesthetics with an executive Apple Wallet & Daylight Loyalty Studio.
+- **Architectural Enhancements**:
+  1. **Daylight Studio Header (`headerRow`)**:
+     - Removed the legacy 210px pitch-black bleed (`top: -30, height: 210, backgroundColor: '#050505'`).
+     - Pure `#0F172A` title with daylight back button (`#FFFFFF` squircle, border `#E2E8F0`, subtle shadow) and Risev Logo (`tintColor: '#050505'`).
+  2. **Compact Loyalty Modules Status Capsule (`programModuleCapsule`)**:
+     - Replaced the 220px-tall bright yellow billboard (`modulesConfigCard`) with an Apple Inset dual-capsule status container (`64px` height).
+     - Live module indicators for `Stamps` (emerald green `#10B981`) and `Points` (amber `#D97706`) with active toggle switches.
+     - Preserves full validation logic ensuring at least one loyalty engine remains active.
+  3. **Apple Segmented Tab Switcher (`segmentedTabBar`)**:
+     - Replaced the pitch-black capsule pill bar with an Apple Segmented Control (`#F1F5F9` background, `#FFFFFF` active tab card with micro-shadow, `#0F172A` active bold typography).
+     - Smooth 1-tap switching between `Katalog Ganjaran`, `Reka Bentuk Kad`, `Mata & Tahap`, and `Birthday`.
+  4. **The Boarding Pass Reward Card (Shared Architecture from Image 2 / `app/nfc.tsx`)**:
+     - Menggunakan seni bina format **Boarding Pass Ticket** yang sama seperti paparan pelanggan di `app/nfc.tsx`:
+       - **(1) Jalur Jenama Menegak Kiri (`boardingPassBrandBand`, 44px)**: Latar belakang mengikut warna jenama kedai (`merchant.onboarding_primary_color` / `pwa_brand_color`). Teks diputarkan `-90°` memaparkan nama kedai dalam huruf besar tebal dan subteks `REWARD PASS`.
+       - **(2) Badan Utama Putih Tulen (`boardingPassMainBody`)**: Latar belakang `#FFFFFF` dengan padding kemas:
+         - *Baris Atas*: Lencana sedia tebus `[ 🎁 Ready to redeem ]` (`#FFFBEB`, border `#FDE68A`, teks `#B45309`) + tag jenis `[ FREE ITEM ]` / `[ DISCOUNT ]`.
+         - *Baris Tengah*: Label mikro `YOUR REWARD` (huruf besar `#9CA3AF`), tajuk ganjaran hitam pekat `#111827` (`PlusJakartaSans_800ExtraBold`), deskripsi slate `#6B7280`. (Nota: Progress bar hanya dipaparkan pada paparan pelanggan di onboarding/NFC seperti yang disyaratkan).
+         - *Baris Bawah*: Lencana sumber ganjaran (Setem/Mata) + status stok di sebelah kiri, dipadankan dengan butang tindakan squircle Apple iOS `[ ✏️ Sunting ]` dan `[ 🗑️ Padam ]` di sebelah kanan.
+       - **(3) Tiang Berlubang Tiket (`boardingPassPerforationCol`, 18px)**: Takuk potongan separa bulat atas & bawah berlatar kanvas `#F8FAFC` berserta garisan putus-putus berlubang putih (*dashed line*).
+       - **(4) Stub Jenama Kanan (`boardingPassRightStub`, 100px)**: Latar belakang warna jenama kedai, avatar bulat putih (`52×52px`) mengandungi logo rasmi kedai, dan nama kedai dalam huruf besar tebal berpusat di bawah logo.
+  5. **Modal Live Customer Voucher Previews Refined (Daylight Studio Stage)**:
+     - Both `modalVisible` and `showInlineCreateModal` wrap the preview card inside a dedicated Daylight Studio Stage (`#F8FAFC`, `borderRadius: 20`, border `#E2E8F0`).
+     - Refined proportions: Left band `38px`, center body `flex: 1` (~200px), right stub `82px` with a `44px` circular logo frame.
+     - Resolved button clipping: The bottom row cleanly houses `[ 💳 STAMP REWARD ]` and `[ Use Voucher ➔ ]` with over 40px of clearance, ensuring zero clipping or text wrapping on narrow mobile modal dialogs.
+     - Cutout notch color matches `#F8FAFC`, creating crisp, realistic circular ticket cutouts.
+  6. **WhatsApp FAB Suppression**:
+     - Updated `app/(merchant)/_layout.tsx` to hide the global floating WhatsApp FAB on `/rewards`, resolving touch and visual collisions with bottom controls and cards.
+  7. **Zero Backend Disruption**:
+     - 100% backend synchronization with PocketBase `loyalty_programs`, `rewards`, and `birthday_rewards`.
+     - Zero TypeScript errors (`npx tsc --noEmit` = 0).
+  8. **Customer Vouchers Page (`app/(customer)/vouchers.tsx`) Synchronized**:
+     - Upgraded the customer active/history voucher cards list from the legacy pitch-black card (`#0B0F17`) to the standardized 4-part **Boarding Pass Reward Pass** architecture:
+       - Left brand vertical strip (`44px`) with rotated store name & `REWARD PASS`.
+       - Pure white body (`#FFFFFF`) with status tags, `YOUR REWARD` uppercase label, bold title, subtitle, source badge, expiry date, and `Use Voucher ➔` CTA button.
+       - Ticket cutout perforation column (`18px`) with dashed line and pure white cutout notches.
+       - Right brand stub (`100px`) with white circle logo (`52px`) and bold store name.
+     - Automatically derives brand color from `merchant.onboarding_primary_color` / `pwa_brand_color` / `brand_color`.
+
+---
+
+### 26. Card Design Studio Sub-Tabs Optimization (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'card_design'`)
+- **Context & Motivation**:
+  - Sebelumnya, penyuntingan kad setem digital (`card_design`) memaparkan semua tetapan (aturan setem, tamat tempoh, had belanja minimum, pilihan ganjaran tebusan, imej latar depan & belakang, palet warna kad/setem/fon, dan pemilih ikon setem kustom) dalam satu lajur menegak yang sangat panjang (>1,300px tinggi).
+  - Ini menyebabkan *scroll fatigue* yang ketara dan menyukarkan peniaga melihat pratonton langsung kad 3D di bahagian atas semasa membuat pengubahsuaian warna atau ikon.
+- **Architectural Solution — 3 Apple Inset Studio Sub-Tabs**:
+  - Diletakkan terus di bawah pratonton kad 3D langsung (`cardFlipContainer`) menggunakan Apple Inset Segmented Control (`#F1F5F9`, border `#E2E8F0`, `borderRadius: 14`):
+    1. **Aturan (`cardSubTab === 'rules'`)**:
+       - Tetapan teras kad: Jumlah setem yang diperlukan (2–30 setem dengan butang `−` / `+`), tempoh tamat kad (hari), toggle had belanja minimum (`RM`) dan input jumlah belanja minima.
+       - Pemilih ganjaran penamat (Completion Reward selector) berstatus aktif.
+    2. **Warna & Ikon (`cardSubTab === 'colors'`)**:
+       - Sistem warna 3-dalam-1: Latar belakang kad (Card Background Color), bulatan slot setem (Stamp Slot Color), dan warna fon/teks (Font / Text Color) dengan palet pratetap pantas dan input kod Hex tersuai.
+       - Pemilih ikon setem tersuai: Grid 6 ikon popular (`star`, `checkmark`, `heart`, `trophy`, `gift`, `flame`) berserta pemilih warna ikon setem.
+    3. **Imej / Artwork (`cardSubTab === 'images'`)**:
+       - Pengurus muat naik imej latar tersuai: Bahagian depan kad (*Front Face Artwork*) dan bahagian belakang kad (*Back Face Artwork*).
+       - Pratonton visual mini dengan butang padam serta kotak tip resolusi cadangan (1000 × 600 px).
+- **Universal Single-Tap Action Bar**:
+  - Butang utama simpan `[ ✓ Simpan Reka Bentuk ]` (`saveSubmitBtn`, latar belakang `#000000`, ikon dan teks `#FFCC00`, `borderRadius: 16`) diletakkan di luar suis sub-tab tepat di bawah kandungan aktif setiap sub-tab.
+  - Peniaga boleh menekan simpan dengan serta-merta tanpa perlu menatal jauh ke bawah.
+- **Verification**:
+  - 100% lulus semakan jenis TypeScript (`npx tsc --noEmit` = 0).
+  - Semua pengendali sedia ada (`flipCard`, `setRequiredStamps`, `setExpiryDays`, `setEnableMinSpend`, `setMinSpendAmount`, `setLinkedRewardId`, `handlePickCardBg`, `handlePickCardBgBack`, `handleSaveCardConfig`) dipelihara sepenuhnya tanpa sebarang perubahan skema pangkalan data PocketBase.
+
+---
+
+### 27. Stamp Rules Separation & Card Design Streamlining (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx`
+- **Context & Motivation**:
+  - Logik aturan cop (bilangan cop, tempoh luput kad, had belanja minimum, dan pautan ganjaran tamat) sebelum ini tersumbat di bawah tab *Reka Bentuk Kad*.
+  - Ini bercanggah dengan prinsip *separation of concerns*, di mana *Points Rules* mempunyai tab khususnya sendiri (`points_tiers`).
+  - Pengguna mencadangkan agar *Stamp Rules* diasingkan sebagai tab tersendiri, menjadikan tab *Card Design* 100% fokus kepada estetika visual kad sahaja.
+- **Architectural Implementation**:
+  1. **Apple Segmented Tab Switcher with Horizontal Scroll**:
+     - Ditukar kepada bekas `ScrollView horizontal` dengan `showsHorizontalScrollIndicator={false}` dan `segmentedTabBarScroll` (`#F1F5F9`, border `#E2E8F0`, `borderRadius: 14`).
+     - Menyokong 5 tab tersusun kemas tanpa terhimpit atau terpotong pada skrin telefon sempit (iPhone SE hingga Pro Max):
+       - `Reward` (`catalogue`) — *bersyarat mengikut `enablePoints`*
+       - `Stamp Rules` (`stamp_rules`) — *bersyarat mengikut `enableStamps`*
+       - `Card Design` (`card_design`) — *bersyarat mengikut `enableStamps`*
+       - `Points Rules` (`points_tiers`) — *bersyarat mengikut `enablePoints`*
+       - `Birthday` (`birthday`)
+  2. **Dedicated Tab 2: `Stamp Rules` (`stamp_rules`)**:
+     - **Executive Hero Banner Card** (`#0F172A`, border hairline emas & putih):
+       - Memaparkan rumusan langsung aturan: `{requiredStamps} Cop = 1 Ganjaran`, nama ganjaran yang dipautkan, tempoh tamat tempoh kad, dan syarat belanja minimum.
+     - **Total Stamps Required Card**:
+       - Pilihan bilangan cop: 5, 8, 10, 12, 15 cop dengan selector aktif.
+     - **Card Expiry & Lifecycle Card**:
+       - Quick chips (30d, 60d, 90d, 180d, 365d) berserta input hari tersuai.
+     - **Minimum Spend Requirement Card**:
+       - Toggle aktif/tidak berserta quick presets RM (5, 10, 15, 20, 30) dan input RM tersuai.
+     - **Completion Reward Link Card**:
+       - Selector baucar daripada katalog berserta butang `[ + Create New ]` inline modal.
+     - **Dedicated Save Action**:
+       - Butang pantas `[ ✓ Simpan Aturan Cop ]` (`saveSubmitBtn`).
+  3. **Streamlined Tab 3: `Card Design` (`card_design`)**:
+     - 100% fokus kepada visual:
+       - **Live 3D Flip Card Studio** di bahagian atas dengan butang pusing `[ Tap card to flip ]`.
+       - **2 Sub-Tabs Sahaja**:
+         1. `Colors & Icons` (`'colors'`): Warna kad, warna slot cop, warna fon teks, pilihan 6 ikon cop (*Star, Check, Heart, Trophy, Gift, Flame*), dan warna ikon cop.
+         2. `Artwork` (`'images'`): Muat naik imej depan & belakang kad berserta panduan resolusi.
+       - Butang simpan visual khusus: `[ ✓ Simpan Reka Bentuk Kad ]`.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+  - Pengekalan logik pensuisan tab automatik apabila modul setem atau mata dihidupkan/dimatikan.
+
+---
+
+### 28. Apple 2-Row Compact Segmented Tab Bar (Full Width, Zero Scroll) (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx`
+- **Context & Motivation**:
+  - Dengan penambahan tab ke-5 (`Birthday`), bar tab berasaskan teks 1 baris sebelum ini melimpah (*overflow*) dan menyebabkan tab `Birthday` terpotong di sebelah kanan, memerlukan peniaga menatal secara mendatar.
+  - Peniaga meminta susunan tepat: `Reward` ➔ `Card Design` ➔ `Stamp Rule` ➔ `Point Rule` ➔ `Birthday`, dan mahukan kesemua 5 tab kelihatan penuh (*full width*) serentak tanpa perlu skrol.
+- **Implementation (Pilihan 2: Apple Dual-Deck Micro-Icon + Typography)**:
+  - Menggantikan `ScrollView` mendatar dengan **Apple Inset Full-Width Container** (`compactTabBarContainer`):
+    - `flexDirection: 'row'`, `backgroundColor: '#F1F5F9'`, `borderRadius: 16`, `border: 1px solid #E2E8F0`.
+    - Setiap tab mempunyai `flex: 1` membahagikan ruang skrin 100% sama rata pada sebarang resolusi telefon (iPhone SE, standard, hingga Pro Max).
+  - **Seni Bina Setiap Tab (`compactTabBtn`)**:
+    - **Baris 1 (Ikon Mikro 16px)**: Ikon Apple iOS berkontras tajam (`#0F172A` apabila aktif, `#64748B` apabila tidak aktif):
+      1. `Reward`: `gift` / `gift-outline`
+      2. `Card Design`: `card` / `card-outline`
+      3. `Stamp Rule`: `checkbox` / `checkbox-outline`
+      4. `Point Rule`: `star` / `star-outline`
+      5. `Birthday`: `balloon` / `balloon-outline`
+    - **Baris 2 (Teks Mikro 10px)**: Teks padat dengan `numberOfLines={1}`, `adjustsFontSizeToFit`, dan `minimumFontScale={0.85}`:
+      - `Reward` · `Card Design` · `Stamp Rule` · `Point Rule` · `Birthday`
+  - **Kesan Aktif (*Active State*)**:
+    - Pill putih terapung (`#FFFFFF`) dengan bayang mikro iOS (`shadowRadius: 3`, `elevation: 2`), ikon hitam pekat `#0F172A`, dan teks `PlusJakartaSans_800ExtraBold`.
+- **Verification**:
+  - 100% lulus semakan jenis TypeScript (`npx tsc --noEmit` = 0).
+  - Kesemua 5 tab kini kelihatan sepenuhnya dalam satu pandangan (*at a single glance*) dengan sifar skrol mendatar.
+
+---
+
+### 29. Stamp Rules Studio Refinement — Risev Standard Design System (Rule of Three Compliance) (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'stamp_rules'`)
+- **Context & Motivation**:
+  - Berdasarkan audit visual terperinci daripada tangkapan skrin pengguna:
+    1. **Teks Terpotong (*Text Truncation*)**: Subteks pada kad 10 cop *"Industry benchm..."* terpotong pada skrin telefon sempit.
+    2. **Pertindihan Lencana (*Badge Collision*)**: Lencana `POPULAR ★` di bucu atas bertembung dengan lencana tanda semak (*checkmark pill*).
+    3. **Penyimpangan Sistem Warna (*Color System Violation*)**: Penggunaan rona biru luar sistem (`#0284C7`, `#F0F9FF`), hijau (`#34D399`), dan navy gelap (`#0F172A`) yang melanggar piawaian **Rule of Three** Risev.
+    4. **Butang Terkeluar Skrin (*Clipped CTA*)**: Tajuk *"Stamp completion reward description"* yang terlalu panjang menolak butang `+ Create New` sehingga terpotong menjadi `+ Create N...`.
+- **Architectural Enhancements & Rule of Three Implementation**:
+  1. **Executive Hero Banner Card (Risev Yellow `#FFCC00` Signature Standard)**:
+     - **Latar Belakang Kuning Emas Rasmi (`#FFCC00`)**: Sentiasa gunakan warna kuning `#FFCC00` khusus untuk kad ringkasan aturan (*hero highlight card*) seperti ini (bukan untuk semua kad, kad input/tetapan kekal putih).
+     - **Kontras Hitam Pekat (`#000000`)**:
+       - Tipografi tajuk 16.5px `PlusJakartaSans_800ExtraBold` berona `#000000` dengan `adjustsFontSizeToFit` (menghalang teks *"10 Stamps = 1 Free Reward"* terpotong).
+       - Squircle ikon reben: Latar belakang **Pure Black `#000000`** dengan ikon emas `#FFCC00`.
+       - Lencana Luput (*Expiry Badge*): Pil **Pure Black `#000000`** dengan teks emas bold `#FFCC00`.
+       - Syarat Belanja Minima: Label `rgba(0, 0, 0, 0.65)` dan nilai bold `#000000`.
+  2. **3-Pillar Squircle Stamp Goal Cards (5, 10, 15 Cop)**:
+     - **Sifar Pemotongan Teks**: Subteks dipendekkan secara elegan kepada *"Fast Goal / Cepat Capai"* (5), *"Recommended / Pilihan Ramai"* (10), dan *"High Value / Nilai Tinggi"* (15) dengan ketinggian seragam `minHeight: 116`.
+     - **Penyelesaian Pertindihan Lencana**: Lencana `★ POPULAR` diposisikan secara simetri di bahagian tengah atas kad (`top: -10, left: 0, right: 0, alignItems: 'center'`), menghapuskan sepenuhnya pertembungan dengan lencana tanda semak di sudut kanan atas.
+     - **Pilihan Aktif**: Menggunakan **Pure Black `#000000`**, nombor putih pekat `#FFFFFF`, label cop **Risev Gold `#FFCC00`**, dan tanda semak hitam berlatar belakang `#FFCC00`. Kad tidak aktif kekal **Pure White `#FFFFFF`** dengan sempadan `rgba(0, 0, 0, 0.08)`.
+  3. **Completion Reward Header & Unclipped CTA**:
+     - Tajuk dipendekkan kepada *"Completion Reward / Ganjaran Lengkap Cop"* dengan `flexShrink: 1`, menghalang sebarang tolakan butang ke luar skrin.
+     - Butang `Create New` dibina semula sebagai pil **Pure Black `#000000`** dengan ikon tambah `#FFCC00` dan teks putih bold `#FFFFFF` yang 100% tampak penuh pada sebarang resolusi.
+  4. **Active Completion Reward Spotlight Card (Penyingkiran Biru #0284C7)**:
+     - Menggantikan rona biru dengan **Pure White `#FFFFFF`** permukaan berkontras, sempadan hitam pekat `2px solid #000000`, squircle ikon **Pure Black `#000000`** dengan ikon **Risev Gold `#FFCC00`**, dan lencana status **Pure Black `#000000`** dengan teks **`DIPILIH ✓`** berona `#FFCC00`.
+  5. **Cip Pratetap Tempoh Luput & Belanja Minima**:
+     - Kesemua cip pratetap yang dipilih menggunakan **Pure Black `#000000`** dengan teks **Risev Gold `#FFCC00`**, manakala cip tidak aktif menggunakan `#F8FAFC`.
+  6. **Simplifikasi Subteks Ganjaran (*Reward Subtitle Simplification*)**:
+     - Ayat panjang `"Reward for completing [Nama Kad]..."` yang sebelum ini terpotong (*truncated*) telah dipermudahkan kepada **`Stamp Card Reward`** (EN) / **`Ganjaran Kad Cop`** (BM).
+     - Dikemas kini merentasi paparan kad katalog ([rewards.tsx](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/rewards.tsx)), pratonton modal, halaman pelanggan ([slug.tsx](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/b/%5Bslug%5D.tsx)), dan hook penyelarasan backend ([sync_program_reward.pb.js](file:///Users/fazlihadir/Desktop/risev%20app/waly/pb_hooks/sync_program_reward.pb.js)).
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+  - Paparan menepati 100% falsafah **Rule of Three** Risev: *Pure White `#FFFFFF`, Pure Black `#000000`, dan Risev Gold `#FFCC00`*.
+
+---
+
+### 30. Native Full-Page Form Standard (Eliminating Modal Overlays Entirely) (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`modalVisible` & `showInlineCreateModal`)
+- **Context & Motivation**:
+  - Sebelum ini, borang *Create Reward* dan *Edit Reward* menggunakan komponen `<Modal>` React Native. Pada pelayar Web (React Native Web / Chrome), `<Modal>` menyuntik portal berlatar belakang kelabu gelap dan kotak terapung (*floating dialog box* berpusat) dengan `maxWidth: 440px` dan `borderRadius: 28px`.
+  - Ini menghalang borang daripada memenuhi 100% skrin seperti halaman penuh (*full page*).
+- **Architectural Enhancements (Pure Full-Page Architecture via `StyleSheet.absoluteFill`)**:
+  1. **Penyingkiran Penuh `<Modal>`**:
+     - Komponen `<Modal>` dimansuhkan sepenuhnya daripada aliran borang *Create / Edit Reward*.
+     - Digantikan dengan paparan halaman penuh tulen `{showInlineCreateModal && (<View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', zIndex: 9999 }]}> ... </View>)}`.
+     - **Hasil**: Sifar latar belakang gelap, sifar kotak terapung bertirai, 100% memenuhi skrin (*edge-to-edge*) pada Web, iOS, dan Android.
+  2. **Native Full-Page Top Navigation Bar**:
+     - **Kiri**: Butang Apple Back Arrow (`←`) berbentuk bulatan `#F8FAFC` dengan sempadan halus `rgba(0,0,0,0.08)`.
+     - **Tengah**: Tajuk berkontras tajam `Create Reward` / `Edit Reward` (17px `PlusJakartaSans_800ExtraBold`) berserta sub-label kategori.
+     - **Kanan**: Butang pangkah (*close icon*) untuk fleksibiliti navigasi segera.
+  3. **Full-Height Scrollable Form**:
+     - Menghapuskan kekangan `maxHeight: 520px` agar borang dapat berkembang secara natural dengan `paddingBottom: 130` untuk mengelakkan pertembungan dengan bar bawah.
+  4. **Sticky Bottom Action Bar**:
+     - Bar tindakan melekat (*sticky action bar*) di bahagian bawah skrin dengan latar putih dan bayang halus ke atas.
+     - Butang Batal (*Cancel*) di sebelah kiri (pil `#F8FAFC`) dan Butang Utama Cipta/Simpan (*Risev Primary Black Pill*) di sebelah kanan: `#000000`, teks putih bold `#FFFFFF`, dan ikon tanda semak emas `#FFCC00`.
+     - Sentiasa kelihatan tanpa memerlukan pengguna skrol ke bahagian paling bawah untuk menghantar borang.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+  - Paparan kini 100% halaman penuh tulen (*real full page*) tanpa sebarang kotak modal terapung.
+
+---
+
+### 31. Two-Sided Points Loyalty Loop & Cash Redemption Standard (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'points_tiers'`)
+- **Database Schema Enhancements (`pb_migrations/1782807076_add_points_redemption_to_loyalty_programs.js`)**:
+  - `points_per_rm` (number, default: 100): Bilangan mata ganjaran yang diperlukan untuk potongan tunai RM 1.00 pada bil.
+  - `min_redeem_points` (number, default: 0): Had minima mata yang perlu dikumpul pelanggan sebelum layak memulakan penebusan.
+  - `max_redeem_percent` (number, default: 0): Had peratusan potongan maksimum daripada jumlah bil (cth: 50% bil, 0 = tanpa had).
+- **Executive Design Architecture (Risev Rule of Three: `#FFCC00`, `#000000`, `#FFFFFF`)**:
+  1. **Executive Yellow Hero Summary Card (`#FFCC00`)**:
+     - Memaparkan kitaran penuh kesetiaan (*Two-Sided Loyalty Loop*) secara serentak di bahagian atas tab:
+       - **Kiri (Kadar Dapat Mata)**: Kotak hitam `#000000` dengan nombor putih `RM [X] = 1 Mata`.
+       - **Kanan (Kadar Tebus Tunai)**: Kotak hitam `#000000` dengan nombor putih `[Y] Mata = RM 1.00 Diskaun`.
+       - Cip mikro status `AKTIF` berlatar hitam dan teks kuning `#FFCC00`.
+       - Kapsul tip cerapan pintar di bawah kad kuning untuk penerangan segera.
+  2. **Card 1: Kadar Dapatkan Mata (Points Earning Rate)**:
+     - Latar putih `#FFFFFF` pada kanvas siang `#F8FAFC`.
+     - Pilihan pantas (*Quick chips*): `RM 1 = 1 Mata`, `RM 2 = 1 Mata`, `RM 5 = 1 Mata`, `RM 10 = 1 Mata`.
+     - Medan input kustom dengan imbuhan `RM [ ] = 1 Mata`.
+     - Kad simulasi kiraan kutipan mata kaunter masa nyata (`RM 20`, `RM 50`, `RM 100`).
+  3. **Card 2: Nilai Penebusan Mata / Claimable Points (Points Redemption Value)**:
+     - Mengkonfigurasi nilai mata kepada potongan tunai ringgit.
+     - Pilihan pantas (*Quick chips*):
+       - `100 Mata = RM 1.00` (★ Disyorkan Standard Malaysia / 1 pt = 1 sen).
+       - `50 Mata = RM 1.00` (Ganjaran Tinggi / 1 pt = 2 sen).
+       - `20 Mata = RM 1.00` (Sangat Lumayan / 1 pt = 5 sen).
+       - `200 Mata = RM 1.00` (Ekonomi / 1 pt = 0.5 sen).
+     - Input kustom: `[ ★ ] [ Y ] = RM 1.00 Diskaun`.
+     - **Kalkulator Simulasi Penebusan Masa Nyata**:
+       - Mengira nilai potongan serta-merta untuk `100 Mata`, `500 Mata`, dan `1,000 Mata` berasaskan kadar yang ditaip oleh peniaga.
+  4. **Card 3: Syarat & Had Perlindungan Penebusan (Redemption Safeguards)**:
+     - **Minima Mata Untuk Tebus**: Cip pilihan `0 (Tiada Minima)`, `50 Pts`, `100 Pts`, `200 Pts` + input kustom.
+     - **Had Maksima Diskaun Bil (%)**: Cip pilihan `Tanpa Had (100%)`, `Maks 50% Bil`, `Maks 30% Bil`, `Maks 20% Bil` + input kustom.
+     - **Butang Simpan Utama**: Pil `#000000` penuh dengan ikon tanda semak emas `#FFCC00` dan teks putih `Simpan Semua Aturan Mata`.
+  5. **Kad Nasihat Strategi (Strategy Tip Card)**:
+     - Panduan standard industri Malaysia bagi membantu peniaga memilih nisbah mata yang seimbang antara kepuasan pelanggan dan margin keuntungan kedai.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+  - Persistensi data lengkap ke koleksi PocketBase `loyalty_programs`.
+
+---
+
+### 32. Context-Aware Reward Creation & Clean Non-Pro Catalog Decoupling (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`modalVisible` & `showInlineCreateModal`)
+- **Issue Solved**:
+  - Peniaga percuma (*Free Plan*) atau peniaga tanpa katalog servis dalam talian sebelum ini terpaksa melihat kad ungu berstatus terkunci (`Link Product or Service — PRO`) atau teks ralat kosong (`No active products or services found in your catalog`). Ini memberi persepsi bahawa ganjaran tidak boleh digunakan tanpa melanggan PRO atau tanpa mengisi katalog terlebih dahulu.
+- **Architectural Enhancements (Context-Aware Logic)**:
+  1. **Logik Kontekstual `Free item` (Item Percuma)**:
+     - Disediakan medan **Nama Item Percuma / Perincian** (`applicable_items_text`), cth: `"1x Kopi O Ais"`, `"Karipap 3 Ketul"`, atau `"Servis Cuci Luar"`.
+     - Peniaga Free tidak perlu memautkan ke pangkalan data servis/produk.
+     - Kad ungu PRO dan pautan katalog disembunyikan sepenuhnya bagi peniaga Free / tiada katalog bagi mengelakkan kekusutan visual.
+  2. **Logik Kontekstual `Discount` (Diskaun % atau RM)**:
+     - Disediakan pemilih **Skop Diskaun (`discount_scope`)**:
+       - **Pilihan 1: `Semua Pesanan (Seluruh Bil)` (`'all'`)** *(Lalai / Default)*:
+         - Diskaun dipotong daripada keseluruhan bil kaunter tanpa sebarang kekangan katalog.
+       - **Pilihan 2: `Item / Menu Khusus` (`'specific'`)**:
+         - Medan teks manual untuk peniaga Free memasukkan syarat terma item (cth: `"Sah untuk minuman sahaja"`, `"Menu sarapan sahaja"`).
+  3. **Penyembunyian Bersyarat Kad Katalog (`isPro && merchantServicesList.length > 0`)**:
+     - Kad pautan katalog PRO hanya dipaparkan jika peniaga adalah pelanggan PRO **DAN** mempunyai senarai produk aktif dalam katalog.
+     - Tiada lagi kotak amaran kosong atau kekangan yang mengelirukan peniaga asas.
+  4. **Penyelarasan Merentas Sistem (Customer Wallet & NFC Counter)**:
+     - **Kad Baucar Pelanggan (`app/(customer)/vouchers.tsx`)**: Memaparkan terma item secara langsung pada tiket (cth: *"Percuma: Kopi O Ais"*, *"Sah untuk: Minuman Sahaja"*, *"Sah untuk semua pesanan"*).
+     - **Skrin Kaunter NFC (`components/NfcClaimModal.tsx`)**: Staf kaunter serta-merta melihat tag penunjuk item (cth: `📌 Item: Kopi O Ais` atau `📌 Sah: Minuman Sahaja`) semasa imbasan kaunter.
+- **Database Schema (`pb_migrations/1782807077_add_applicable_items_text_and_scope_to_rewards.js`)**:
+  - `applicable_items_text` (text): Teks manual nama item percuma atau terma item khusus.
+  - `discount_scope` (select: `["all", "specific"]`): Skop pemakaian diskaun.
+  - Penyelarasan snapshot metadata pada cangkuk `stamp_complete.pb.js`.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+### 33. Points Studio Zero-Scroll Apple Sub-Tabs Architecture (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'points_tiers'`)
+- **Issue Solved**:
+  - Pada paparan mudah alih (cth: lebar 417px pada skrin telefon), tab Aturan Mata sebelum ini memaparkan Kad Hero, Kad 1 (Kadar Kutipan Mata), Kad 2 (Kadar Penebusan Diskaun Tunai), Kad 3 (Syarat Minima & Had Maksima Diskaun Bil), butang Simpan, serta Kad Tip Strategi dalam satu aliran menegak yang sangat panjang. Ini memaksa peniaga membuat terlalu banyak penatalan (*excessive vertical scrolling*) semata-mata untuk mengkonfigurasi atau mencari butang simpan.
+- **Architectural Enhancements**:
+  1. **Kad Hero Kuning Eksekutif Dwi-Fungsi Interaktif**:
+     - Mengekalkan kad warna kuning tema Risev (`#FFCC00`) di bahagian atas sebagai ringkasan pantas aliran mata.
+     - Kotak **DAPAT MATA** (kiri) dan **TEBUS DISKAUN** (kanan) di dalam Kad Hero kini boleh ditekan (`TouchableOpacity`).
+     - Menekan kotak secara langsung mengaktifkan sub-tab yang berkaitan berserta penunjuk sempadan putih dan dot kuning aktif.
+  2. **Bar Sub-Tab Tersegmen Gaya Apple (Segmented Sub-Tabs)**:
+     - Diletakkan kemas tepat di bawah Kad Hero dengan latar `#F1F5F9`, bucu `borderRadius: 14`, dan 3 butang fokus:
+       - **Sub-Tab 1: `Dapat Mata` (`'earn'`)**: Ikon `arrow-down-circle`, mengandungi konfigurasi belanja per mata, pilihan pantas (RM 1, RM 2, RM 5, RM 10), dan simulasi kutipan kaunter.
+       - **Sub-Tab 2: `Tebus Tunai` (`'redeem'`)**: Ikon `pricetag`, mengandungi konfigurasi mata per RM 1.00 diskaun, pilihan pantas (100 Pts standard, 50 Pts ganjaran tinggi, 20 Pts, 200 Pts), dan jadual simulasi nilai mata.
+       - **Sub-Tab 3: `Syarat & Had` (`'limits'`)**: Ikon `shield-checkmark`, mengandungi had minima penebusan mata (0, 50, 100, 200) serta had siling potongan bil (Tanpa Had, 50%, 30%, 20%) dan Kad Tip Strategi Penebusan Tunai.
+  3. **Butang Simpan Terbina Dalam Setiap Sub-Tab (`renderSaveButton()`)**:
+     - Setiap sub-tab dilengkapi dengan butang simpan `[ ✓ Simpan Aturan Mata ]` (`#000000`, teks putih, ikon emas `#FFCC00`) tepat di bawah kad masing-masing.
+     - Peniaga boleh menyimpan terus aturan sebaik sahaja mengubah nilai tanpa perlu menatal ke bawah.
+  4. **Pengalaman Pengguna (Zero Unnecessary Scrolling)**:
+     - Seluruh konfigurasi kini muat dengan selesa pada skrin peranti mudah alih tanpa perlu skrol panjang.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+### 34. Apple & FinTech Executive Refinement of Points Loyalty Loop (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'points_tiers'`)
+- **Visual Polish & Ergonomic Upgrades**:
+  1. **Kad Hero Kuning Eksekutif `#FFCC00` (`borderRadius: 22`, Bayang Lembut Mewah)**:
+     - **Header Kad**: Ikon *sparkles* dalam squircle hitam, tajuk tebal `PlusJakartaSans_800ExtraBold`, serta lencana status langsung dengan dot hijau bercahaya `● AKTIF` (`#10B981` + teks `#FFCC00`).
+     - **Dua Kotak Sentuh Interaktif (Dapat Mata & Tebus Diskaun)**:
+       - Menggantikan sempadan putih tebal yang kasar dan dot terapung dengan reka bentuk kad Apple Wallet berprofil tinggi.
+       - **Keadaan Aktif**: Kotak hitam tulen `#000000` dengan sempadan tajam 2px, bayang taktil terangkat, dan mikropil emas `[ ✓ EDIT ]` (`#FFCC00`, teks hitam 8.5px) di sudut kanan atas.
+       - **Keadaan Tidak Aktif**: Kotak gelap grafit berkelegapan tinggi `rgba(0,0,0,0.88)` dengan teks `TEKAN` / `TAP` halus, tipografi jelas, dan interaksi 1-sentuhan yang pantas.
+     - **Jalur Kitaran Lengkap Hitam Tulen (`Pure Black Loop Banner`)**:
+       - Menggantikan kotak perang kusam legap dengan kapsul hitam `#000000` berkontras tinggi berlatarkan kuning Risev.
+       - Memaparkan lencana squircle emas `repeat` dan ayat aliran langsung dengan nilai dinamik yang ditonjolkan dalam teks tebal emas `#FFCC00`.
+  2. **Grid Pilihan Pantas Seimbang 2x2 (`2x2 Preset Grid`)**:
+     - Menggantikan paparan preset berbalut tak sekata (`flexWrap`) dengan grid 2x2 yang simetri (`flex: 1` per kad).
+     - Preset terpilih menggunakan latar hitam tulen `#000000`, teks emas `#FFCC00`, dan penerangan kontras jelas.
+  3. **Medan Input Angka Bernilai Tinggi**:
+     - Input berketinggian standard 52px dengan bucu squircle `borderRadius: 14`, sempadan `#CBD5E1`, lencana ikon (RM atau Bintang), dan pil penunjuk sisi hitam-kuning `= 1 Mata` atau `= RM 1.00 Diskaun`.
+  4. **Jadual Simulasi Baucar Tunai Gaya Apple Wallet**:
+     - Memaparkan cip diskaun tunai hijau zamrud `[ -RM 1.00 ]` / `[ -RM 5.00 ]` (`#ECFDF5` + `#047857`) dan cip mata emas kaunter `[ +20 Mata ]` (`#FFFBEB` + `#B45309`).
+  5. **Butang Simpan Taktil Eksekutif**:
+     - Butang hitam tulen `#000000` berketinggian 52px, bucu `borderRadius: 16`, ikon semak bulat emas `#FFCC00`, dan teks tebal putih 14px.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+---
+
+### 35. Tab Permanence & Loyalty Engine Decoupling Architecture (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx`
+- **Context & Motivation**:
+  - Apabila suis enjin kesetiaan `Points` ditutup (*Off*), sebelum ini tab `Reward` (`catalogue`) hilang dari bar segmen Apple 5-tab, menyebabkan peniaga yang hanya mengaktifkan kad cop (*Stamps*) tidak dapat melihat, mencipta, atau menguruskan ganjaran cop mereka.
+- **Architectural Principle (Core Tab Permanence vs Dynamic Engine Tabs)**:
+  1. **Tab Teras Kekal (Permanent Core Tabs - Tidak Pernah Hilang)**:
+     - **`Reward`** (`catalogue`): Hub ganjaran kedai. Wajib sentiasa wujud kerana menyokong ganjaran kad cop (`STAMP REWARD`), ganjaran mata (`POINTS REWARD`), dan diskaun umum.
+     - **`Card Design`** (`card_design`): Reka bentuk kad digital jenama kedai. Sentiasa boleh diakses bila-bila masa.
+     - **`Birthday`** (`birthday`): Tetapan ganjaran hari lahir pelanggan. Sentiasa aktif.
+  2. **Tab Enjin Bersyarat (Dynamic Engine-Governed Tabs)**:
+     - **`Stamp Rule`** (`stamp_rules`): Ditadbir secara eksklusif oleh suis `Stamps`. Hanya hilang apabila `enableStamps === false`.
+     - **`Point Rule`** (`points_tiers`): Ditadbir secara eksklusif oleh suis `Points`. Hanya hilang apabila `enablePoints === false`.
+  3. **Peralihan Tab Selamat (*Safe Tab Fallback*)**:
+     - Apabila `Points` dimatikan, hanya pengguna yang sedang berada di `points_tiers` akan beralih secara automatik ke tab `catalogue` (Reward). Pengguna yang berada di `catalogue` kekal di tab tersebut tanpa diganggu.
+     - Apabila `Stamps` dimatikan, pengguna di `stamp_rules` beralih secara automatik ke tab `catalogue` (Reward).
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+  - Apabila `Points` ditutup (*Off*): Bar tab memaparkan 4 tab (`Reward`, `Card Design`, `Stamp Rule`, `Birthday`) dengan tab `Reward` kekal 100% utuh.
+
+---
+
+### 36. Points Studio De-Cluttering & Apple FinTech Simplification (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (`activeTab === 'points_tiers'`)
+- **Context & Motivation**:
+  - Peniaga mendapati halaman *Point Rule* terlalu sarat (*crowded*) disebabkan kewujudan kotak berganda di dalam kad kuning, pertindihan navigasi antara kotak atas dan bar sub-tab di bawahnya, serta grid preset 2x2 yang memakan ruang menegak yang tinggi.
+- **Implementation (Option 1: Apple FinTech Minimalist)**:
+  1. **Sleek Slim Loop Hero Banner**:
+     - Menggantikan kad kuning 195px bertingkat 3 dengan **Kad Formula Eksekutif Kompak (90px)** berlatarkan `#FFCC00`.
+     - Kapsul hitam tulen `#000000` tunggal yang merumuskan kedua-dua belah kitaran kesetiaan secara simetri:
+       `[ ⬇️ Kumpul: RM 1 = 1 Pt ]  ➔ (repeat) ➔  [ 🏷️ Tebus: 100 Pts = RM 1.00 ]`
+     - Menghapuskan kotak sentuh berganda dan membiarkan bar sub-tab di bawahnya berfungsi sebagai satu-satunya pengawal tab yang sah.
+  2. **Preset Pil 1-Baris Kompak (Single-Row Horizontal Segmented Pills)**:
+     - Menggantikan grid 2x2 bertingkat (140px) dengan barisan pil sebaris kemas gaya Apple iOS (42px).
+     - **Sub-tab Dapat Mata (`earn`)**: Pil pantas `[ RM 1 ] [ RM 2 ] [ RM 5 ] [ RM 10 ]`.
+     - **Sub-tab Tebus Tunai (`redeem`)**: Pil pantas `[ 100 Mata (1¢) ] [ 50 Mata (2¢) ] [ 20 Mata (5¢) ] [ 200 Mata (0.5¢) ]`.
+     - Keadaan terpilih menggunakan latar hitam `#000000` dengan tipografi emas Risev `#FFCC00`.
+  3. **Penjimatan Ruang & Kelegaan Visual**:
+     - Menjimatkan lebih 220px ruang menegak skrin.
+     - Menghapuskan kekeliruan navigasi berganda (*dual-switching conflict*).
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+---
+
+### 37. Stand Merchant Reward Decoupling & Free/Discount Item Manual Entry (`app/(merchant)/rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (Form 1: `modalVisible` & Form 2: `showInlineCreateModal`)
+- **Context & Motivation**:
+  - Peniaga pakej Stand NFC (kuota tap sahaja, tanpa langganan PRO atau POS booking) tiada katalog servis/produk dalam `merchant_services`.
+  - Sebelum ini, kewujudan seksyen *"Pautkan Produk Katalog (PRO Auto-Kira)"* memaparkan item pakej katering/servis besar secara mengelirukan dan tidak relevan untuk baucar kaunter kedai fizikal (cth: aiskrim kon, kopi, karipap).
+- **Implementation (Option 1)**:
+  1. **Pembuangan Blok Pautan Katalog PRO**:
+     - Membuang seksyen *PRO Catalog Linking* daripada kedua-dua borang cipta/sunting ganjaran (`modalVisible` dan `showInlineCreateModal`).
+     - Menghapuskan kekeliruan pemilihan produk katering dan membebaskan ruang borang.
+  2. **Pengukuhan Input Manual Item (`applicable_items_text`)**:
+     - **Item Percuma (`free_item`)**: Peniaga bebas menulis sebarang item/servis (cth: `1x Kon Aiskrim / Kopi Latte / Karipap 3 Ketul / Servis Cuci Luar`).
+     - **Diskaun Khusus (`discount` + `specific`)**: Peniaga menetapkan item/syarat sah (cth: `Sah untuk minuman sahaja / Menu sarapan`).
+     - Dilengkapi label jelas dan nota bantuan bahawa terma ini akan dicetak terus pada baucar pelanggan dan skrin semakan staf kaunter.
+  3. **Kemaskini Pratonton Baucar Langsung (Live Boarding Pass Voucher Preview)**:
+     - Keterangan baucar pada kad pratonton kedua-dua borang kini memaparkan teks item manual (`applicable_items_text`) secara dinamik dalam masa nyata sekiranya penerangan umum tidak diisi.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+---
+
+### 38. Boarding Pass Color-Coded Vertical Spine & 10 Voucher Architecture (`theme/index.ts`, `rewards.tsx`, `vouchers.tsx`)
+- **Routes**:
+  - `theme/index.ts` (`getVoucherSpineTheme`)
+  - `app/(merchant)/rewards.tsx` (Catalogue list card, Form 1 preview, Form 2 preview)
+  - `app/(customer)/vouchers.tsx` (Customer Wallet Boarding Pass cards)
+- **Context & Motivation**:
+  - Sebelum ini, jalur tepi menegak (*vertical spine*) memaparkan nama peniaga yang sering kali terpotong (`RISEV OFFICIAL MERCHA...`). Memandangkan nama peniaga dan logo sudah sedia terpapar pada bahagian kanan kad (*Right Brand Stub*), ia adalah lewah (*redundant*).
+  - Peniaga dan pelanggan memerlukan pengecaman visual serta-merta (*instant visual recognition*) untuk membezakan pelbagai kategori baucar (Free Item, Discount, BOGO, Happy Hour, Flash Sale, dll.) dengan identiti warna tiket penerbangan sebenar.
+- **Implementation (Phase 1)**:
+  1. **Enjin Tema Visual Berpusat (`theme/index.ts`)**:
+     - Memperkenalkan `getVoucherSpineTheme(rewardType, title)` yang memetakan jenis dan kata kunci tajuk kepada 10 kod warna kurasi kontras tinggi:
+       - `free_item` ➔ Emerald Green (`#059669`, teks: `FREE ITEM`)
+       - `discount` ➔ Sunset Orange (`#EA580C`, teks: `DISCOUNT`)
+       - `bogo` ➔ Crimson Ruby (`#E11D48`, teks: `BUY 1 FREE 1`)
+       - `happy_hour` ➔ Royal Purple (`#7C3AED`, teks: `HAPPY HOUR`)
+       - `flash_sale` ➔ Electric Amber (`#D97706`, teks: `FLASH SALE`)
+       - `welcome_gift` ➔ Fresh Teal (`#0D9488`, teks: `WELCOME GIFT`)
+       - `bring_friend` ➔ Electric Blue (`#0284C7`, teks: `BRING A FRIEND`)
+       - `win_back` ➔ Velvet Rose (`#BE185D`, teks: `WE MISS YOU`)
+       - `spend_save` ➔ Forest Green (`#15803D`, teks: `SPEND & SAVE`)
+       - `festive` ➔ Luxury Gold (`#B45309`, teks: `FESTIVE PASS`)
+  2. **Penggantian Jalur Tepi Boarding Pass Menyeluruh**:
+     - Menghapuskan teks terpotong dan menggantikannya dengan teks tegak tebal `PlusJakartaSans_800ExtraBold #FFFFFF` yang bersih dan tidak terpotong.
+     - Diselaraskan serentak di 4 lokasi:
+       1. Kad katalog ganjaran peniaga (`rewards.tsx`).
+       2. Kad pratonton langsung Borang 1 (`rewards.tsx`).
+       3. Kad pratonton langsung Borang 2 (`rewards.tsx`).
+       4. Kad dompet baucar pelanggan (`vouchers.tsx`).
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+---
+
+### 39. Phase 2: PRO Campaign Recipes Grid (8 Formula Pintar) & Upsell Paywall Integration (`theme/index.ts`, `rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (Form 1: `modalVisible` & Form 2: `showInlineCreateModal`)
+- **Context & Motivation**:
+  - Peniaga Stand NFC memerlukan aliran kerja asas (`free_item` & `discount`), manakala peniaga PRO memerlukan formula promosi siap-pakai untuk mengisi waktu lengang (*off-peak*), mencetuskan pembelian segera (*flash sale*), atau memanggil semula pelanggan lama (*win-back*).
+  - Peniaga bukan PRO memerlukan pendedahan visual kepada kelebihan pelan berbayar (*growth flywheel*) dengan perlindungan paywall yang elegan.
+- **Implementation (Phase 2)**:
+  1. **Konfigurasi Formula Kempen Berpusat (`theme/index.ts`)**:
+     - Memperkenalkan pemalar `PRO_CAMPAIGN_RECIPES` mengandungi 8 formula pintar:
+       1. `bogo` (Buy 1 Free 1)
+       2. `happy_hour` (Off-Peak 2pm - 5pm)
+       3. `flash_sale` (Countdown 24h / 48h)
+       4. `welcome_gift` (Hadiah Tap Pertama)
+       5. `bring_friend` (Ganjaran Berdua)
+       6. `win_back` (Pelanggan Sepi >30 Hari)
+       7. `spend_save` (Belanja RM50 Jimat RM10)
+       8. `festive` (Payday 25hb & Sambutan Pesta)
+  2. **Grid Resepi 2-Kolum Bergaya Apple Inset Grouped**:
+     - Dipaparkan tepat di bawah togol jenis ganjaran asas dalam Form 1 dan Form 2.
+     - Lencana status dinamik: `[ 🔒 PRO ONLY ]` (untuk peniaga Stand) dan `[ PRO UNLOCKED ]` (untuk peniaga PRO).
+     - Kad resepi interaktif (`minHeight: 82px`, `borderRadius: 14px`):
+       - Latar putih `#FFFFFF` dengan ikon bertema warna khusus semasa belum dipilih.
+       - Bertukar ke latar hitam pekat `#000000` dengan tipografi emas Risev `#FFCC00` dan teks putih semasa dipilih.
+  3. **Tindakan Paywall & Pengisian Pintar 1-Sentuhan (*1-Click Smart Fill*)**:
+     - **Peniaga Bukan PRO**: Sentuhan mana-mana satu daripada 8 kad membuka `UpgradeModal` secara serta-merta untuk memaparkan pakej naik taraf ke PRO.
+     - **Peniaga PRO**: Sentuhan memilih formula, mengemas kini jenis asas (`free_item` / `discount`), mengisi cadangan teks dan nilai secara automatik, serta mengemas kini jalur warna Boarding Pass dan keterangan pada kad pratonton secara langsung dalam masa nyata.
+- **Verification**:
+  - `npx tsc --noEmit` melepasi semakan dengan **0 ralat**.
+
+---
+
+### 40. Phase 3: Dynamic Campaign Smart Controls & Live Preview Sync (`rewards.tsx`)
+- **Route**: `app/(merchant)/rewards.tsx` (Form 1: `modalVisible` & Form 2: `showInlineCreateModal`)
+- **Context & Motivation**:
+  - Apabila peniaga PRO memilih mana-mana formula kempen pintar (cth: *Happy Hour*, *Flash Sale*, *Spend & Save*), mereka memerlukan tetapan pantas yang relevan (seperti slot waktu lengang atau jam undur) tanpa perlu menaip manual secara rumit.
+- **Implementation (Phase 3)**:
+  1. **Kad Kawalan Pintar Kempen Dinamik (`SmartCampaignControls`)**:
+     - Dipaparkan tepat di antara grid kempen dan medan input jenis ganjaran dengan sempadan hitam berwibawa `#000000` (1.5px), bayang halus, dan lencana tag formula terpilih (cth: `OFF-PEAK`, `FOMO`, `HEMAT`).
+     - Butang cepat `[ ✕ Batal Formula ]` untuk kembali ke ganjaran piawai Stand dengan satu sentuhan.
+  2. **Kawalan Khusus Mengikut Resepi**:
+     - **Happy Hour**:
+       - *Quick Time Presets*: Pil masa pantas `[ 2:00 PM – 5:00 PM ] [ 3:00 PM – 6:00 PM ] [ 11:00 AM – 2:00 PM ]`. Sentuhan melaraskan `applicable_items_text` secara dinamik.
+       - *Valid Days*: Pil segmen hari `[ Isnin – Khamis ] [ Isnin – Jumaat ] [ Setiap Hari ]` (latar `#000000` dengan teks emas `#FFCC00` semasa aktif).
+     - **Flash Sale**:
+       - *Urgency Duration*: Pil undur kilat `[ ⚡ 24 Jam ] [ ⚡ 48 Jam ] [ ⚡ 3 Hari ]` dengan penjelasan mengenai jam undur langsung (*live countdown*) pada baucar pelanggan.
+     - **Spend & Save**:
+       - Kad kalkulator penjimatan hijau lembut (`#F0FDF4`, sempadan `#BBF7D0`) yang memaparkan rumusan penjimatan dinamik `Belanja minima RM XX ➔ Jimat RM YY`.
+     - **BOGO, Welcome Gift, Bring A Friend, We Miss You, Festive**:
+       - Kotak panduan strategik Fresha (`#F8FAFC`, sempadan `#E2E8F0`) yang menerangkan sasaran automasi kempen.
+  3. **Penyelarasan Kad Pratonton Masa Nyata**:
+     - Perubahan parameter pintar mencerminkan jalur warna tiket, tajuk, dan keterangan baucar secara langsung dalam masa nyata.
+- **Verification**:
+---
+
+### 41. Voucher Spine Harmonization to Merchant Brand Color
+- **Files Modified**:
+  - `theme/index.ts` (`getVoucherSpineTheme` enhanced with `brandColor` parameter & YIQ luminance text contrast)
+  - `app/(merchant)/rewards.tsx` (Catalogue cards, Modal 1 live preview, and Modal 2 inline create live preview)
+  - `app/(customer)/vouchers.tsx` (Customer voucher wallet cards)
+- **Problem & Motivation**:
+  - The vertical boarding pass spine previously used arbitrary category colors (e.g. green for free item, ruby for BOGO, purple for happy hour) which clashed with the right stub's merchant brand color, creating a visually noisy and mismatched card appearance.
+  - Standardizing the vertical spine to the merchant's exact brand color creates an ultra-clean, unified, and cohesive branded boarding pass aesthetic where both left and right stubs celebrate the merchant's brand identity.
+- **Solution & Architecture**:
+  1. **Dynamic Theme Engine (`theme/index.ts`)**:
+     - `getVoucherSpineTheme(rewardType, title, brandColor?)`: If `brandColor` is provided, `spineBg` seamlessly defaults to `brandColor`, while preserving the campaign category's vertical typography label (`FREE ITEM`, `BUY 1 FREE 1`, `HAPPY HOUR`, etc.).
+     - Computes YIQ brightness contrast: light brand colors render `#0F172A` deep navy text, while dark/vibrant brand colors render crisp `#FFFFFF` white text with matching subtext opacity.
+  2. **Synchronous Implementation Across 4 Touchpoints**:
+     - Merchant Reward Catalogue List (`rewards.tsx`).
+     - Modal 1 Creation/Edit Live Preview (`rewards.tsx`).
+     - Modal 2 Inline Create Live Preview (`rewards.tsx`).
+     - Customer Voucher Wallet Card List (`vouchers.tsx`).
+- **Verification**:
+  - Verified with `npx tsc --noEmit` yielding **0 errors**.
+
+---
+
+### 42. Copywriting Simplification & The Anti-Jargon Directive
+- **Context & Motivation**:
+  - Merchant feedback highlighted that marketing textbook acronyms such as "BOGO" (Buy One Get One), "FOMO Countdown", and "Basket Tier Incentive" are confusing, alienating, and unnatural to ordinary cafe, salon, and retail business owners.
+  - The copywriting was overhauled to enforce crystal-clear, plain, conversational human phrasing.
+- **Implemented Changes**:
+  1. **`theme/index.ts` (`PRO_CAMPAIGN_RECIPES`)**:
+     - `Buy 1 Free 1 (BOGO)` ➔ `Buy 1 Free 1` (Tag: `1+1 FREE`)
+     - `Happy Hour (Off-Peak)` ➔ `Happy Hour` (Tag: `HAPPY HOUR`)
+     - `Flash Sale (Countdown)` ➔ `Flash Sale` (Tag: `LIMITED TIME`)
+     - `Welcome Gift (First Visit)` ➔ `Welcome Gift` (Tag: `NEW GUEST`)
+     - `Bring A Friend` ➔ `Bring A Friend` (Tag: `WITH FRIEND`)
+     - `We Miss You (>30 Days)` ➔ `We Miss You` (Tag: `COME BACK`)
+     - `Spend & Save` ➔ `Spend & Save` (Tag: `SPEND & SAVE`)
+     - `Payday & Festive Special` ➔ `Holiday & Payday Special` (Tag: `SPECIAL EVENT`)
+  2. **`app/(merchant)/rewards.tsx`**:
+     - `Tempoh Jam Undur (FOMO Countdown):` ➔ `Tempoh tawaran kilat:` (EN: `Limited-time deal duration:`)
+     - `Basket Tier Incentive` ➔ `Spend & Save Summary` (BM: `Rumusan Belanja & Jimat`)
+  3. **Multi-Agent Governance (`UI_UX_AGENTS.md`)**:
+     - Added **"4. The Anti-Jargon & Plain Language Directive"** under Agent 5 (Apple-Style Copywriter) with a permanent Banned Jargon Table.
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+---
+
+### 43. Elimination of Decorative Emojis & Eyebrow Heading Standardization
+- **Context & Motivation**:
+  - User feedback identified that emojis prefixing eyebrow headings (e.g., `🎫 LIVE CUSTOMER VOUCHER PREVIEW`, `💡`, `💰`) degrade the visual professionalism of the interface and conflict with native Apple iOS typography.
+  - Section headers must remain purely typographic, uppercase, with subtle letter-spacing, and completely free of emojis or decorative stickers.
+- **Implemented Changes**:
+  1. **`app/(merchant)/rewards.tsx`**:
+     - Stripped `🎫 ` from `Live Customer Voucher Preview` in both Form 1 (`modalVisible`) and Form 2 (`showInlineCreateModal`).
+     - Removed `💡 ` and `💰 ` emoji prefixes from countdown, helper tips, and spend & save summary containers.
+  2. **Multi-Agent Governance (`UI_UX_AGENTS.md`)**:
+     - Embedded **Rule 5: Pure-Typography Section Heading Rule** into Section 1.3 and updated Agent 7's (Token Sentinel) Banned Pattern Matrix.
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+---
+
+### 44. Birthday Rewards Studio Redesign (Complete Experience: Option A)
+- **Route**: `app/(merchant)/rewards.tsx` (Tab 4: `birthday`)
+- **Motivation & Philosophy**:
+  - Birthday rewards represent a mandatory customer loyalty pillar for every Risev merchant (38%–52% redemption rate in retail/hospitality).
+  - The previous screen was an uninspired blank form with no visual boarding pass preview and raw number inputs.
+- **Implemented Architectural Enhancements**:
+  1. **Top Automated Engine Status Banner**:
+     - Highlights `AUTOMATED BIRTHDAY ENGINE` with an active pulsing status badge (`ALWAYS ACTIVE` `#ECFDF5` / `#10B981`).
+     - Clarifies the value proposition: *"Turn Birthdays Into Guaranteed Visits"*.
+  2. **Real-Time Live Customer Boarding Pass Ticket Preview**:
+     - Exact replica of the customer's digital boarding pass ticket with the merchant's brand color vertical spine (`BIRTHDAY PASS` / `SPECIAL PASS`).
+     - Shows dynamic gift title, validity window, celebration pill, perforation notches, and right brand stub with merchant logo.
+  3. **3 Curated 1-Tap Presets (Zero Blank Slate Friction)**:
+     - `Free Birthday Treat` (1x free drink, dessert, or service — 14 days validity).
+     - `20% Birthday Discount` (20% off total birthday bill — 30 days validity).
+     - `2 Bonus Stamps` (Directly credited to customer stamp card — 30 days validity).
+  4. **Smart Validity Window Chips**:
+     - Replaced raw text inputs with tactile Apple segmented chips: `[ 7 Days ]`, `[ 14 Days ]`, `[ 30 Days (Full Month) ]`.
+  5. **Morning Delivery Schedule & Live Message Bubble Preview**:
+     - Preset morning delivery time chips (`[ 09:00 AM ]`, `[ 10:00 AM ]`, `[ 12:00 PM ]`).
+     - Live customer notification bubble preview demonstrating exact copy sent to customers on their birthday morning.
+  6. **Zero Blank Slate Fallback**:
+     - `fetchBirthdayReward` automatically populates turnkey defaults (`Free Birthday Treat`, 14 days) if no record exists yet, ensuring new merchants immediately see a live, ready-to-save pass.
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.1. 1-Tap Popular Presets: Removed per User Directive
+- **Refinement**:
+  - The `1-TAP POPULAR PRESETS` section was completely removed to achieve a clean, clutter-free configuration interface.
+  - The form now flows seamlessly from the **Customer Birthday Boarding Pass** directly into the **Reward Mechanic** toggle (`Voucher Pass` vs `Bonus Stamps`), eliminating redundant UI elements and keeping all configuration direct and focused.
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.2. Voucher Validity Window: 3 Days Only Policy (Before, Ongoing, Next Day)
+- **Business Rule & Loyalty Standard**:
+  - Birthday vouchers in the Risev ecosystem are strictly valid for **3 days only**:
+    1. **Before**: 1 day prior to birthday (anticipation & planning).
+    2. **Ongoing**: Actual birthday celebration day.
+    3. **Next Day**: 1 day after birthday (courtesy extension / final chance).
+  - Replaced the arbitrary 7, 14, and 30-day preset chips with a connected 3-pillar executive visual widget:
+    - Top badge: `3 DAYS ONLY` (solid black capsule).
+    - Center pillar: `Ongoing` with balloon icon in executive black `#000000` + Risev yellow `#FFCC00` accent.
+    - Flanking pillars: `Before` (arrow-back icon) and `Next Day` (arrow-forward icon).
+  - Both the live **Customer Boarding Pass** and the **Customer Message Preview** reflect this exact 3-day window (`Valid for 3 days: Day before, Birthday, and Next day`).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.3. Birthday Reward Gift Title: PRO Product & Service Catalog Selection
+- **Feature & Workflow**:
+  - Allows merchants with active **PRO** subscriptions to link real menu items (`merchant_services`) directly into the Birthday reward title and pass instead of typing freeform strings.
+  - **PRO Header Trigger**:
+    - Right of `OFFER / GIFT TITLE`, displays a badge button:
+      - `PRO UNLOCKED`: `SELECT PRODUCT / SERVICE` with sparkles icon `#FFCC00`.
+      - `NON-PRO`: `🔒 PRO ONLY` with lock icon `#B45309` (opens `UpgradeModal`).
+  - **Inline Quick Horizontal Pills**:
+    - Under the text input, displays a horizontal capsule list of services and products with icons, titles, and price badges (`RM35`).
+    - 1-tap populates `title` (`Free ${item.name}`), `reward_value` (`${item.name} (RM${price})`), and customer notification message template.
+  - **Linked Item Banner**:
+    - Shows an active pill `Linked Item: [Name] (RM[Price])` with a clear `(x)` button to detach and revert to manual text input.
+  - **Dedicated Full-Screen Catalog Modal (`BirthdayItemPickerModal`)**:
+    - Supports real-time text search, category tags, duration display, and segmented filter tabs (`All Items` · `Services` · `Products`).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.4. Zero Inline Text Bloat & On-Demand Help (?) Tooltip Standard
+- **Design Problem & Solution**:
+  - Permanently embedding 1–3 line explanatory sentences (`styles.helpText`) beneath every input field and toggle creates severe visual clutter ("serabut"), cognitive overload, and degrades executive scan density.
+  - Replaced all permanent subtext with clean, unobtrusive **Question Mark Buttons** `(?)` (`help-circle-outline`, `13.5px`, `#94A3B8`) aligned next to section labels.
+  - Tapping any `(?)` opens the executive **On-Demand Contextual Info Tooltip Modal** (`helpModalInfo`) with a crisp title, deep-dive explanation, and a high-contrast dismiss button ("Got It").
+- **Implemented Screens**:
+  - [app/(merchant)/rewards.tsx](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/rewards.tsx) (Birthday tab: Status banner, Reward Mechanic, Offer / Gift Title, 3-Day Validity Window, and Morning Delivery Schedule).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.5. Refined Airline Boarding Pass Customer Ticket Architecture
+- **Root Cause of Clutter & Collision**:
+  - The previous boarding pass ticket suffered from horizontal compression caused by a 44px rotated left spine, a 90px right stub, and multiple competing badges (`BIRTHDAY SPECIAL`, `BIRTHDAY GIFT`, `CELEBRATION GIFT`, and bottom `BIRTHDAY` tag).
+  - This left only ~160px for the center content on mobile screens, causing the validity text `Valid: 3 Days (Before, Ongoing, Next Day)` to wrap into 6 cramped lines and collide underneath the `Use Pass ➔` button.
+- **Refinement Implementation**:
+  1. **Left Accent Bar (7px)**: Replaced the bulky 44px rotated spine with a sleek, rounded 7px brand-color vertical accent strip, freeing up ~37px of horizontal canvas.
+  2. **Zero Badge Redundancy**: Unified multiple badges into a single, elegant pill (`[ 🎁 BIRTHDAY SPECIAL ]` / `[ ⭐ BIRTHDAY STAMPS ]`) and a micro status tag (`[ IN-STORE PASS ]` / `[ AUTO-CREDIT ]`).
+  3. **Zero Text Wrapping & Collision**:
+     - Validity text simplified to a clean single line: `Valid: 3 Days` (`#059669` green with `time-outline` icon).
+     - Aligned horizontally opposite the black `[ Use Pass ➔ ]` CTA with ample margin, preventing any overlap or vertical stacking.
+  4. **Crisp Right Tear-Off Stub**:
+     - Circular merchant avatar badge with subtle shadow, merchant name (`numberOfLines={2}`), and a barcode `PASS` icon indicating physical counter redemption.
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.6. Apple Grouped List Drill-Down Configuration Standard (Image 1 Benchmark)
+- **Design Philosophy**:
+  - Eliminates "Box Inception" (nested cards inside grey container boxes with inline text inputs) in favor of modular, executive-grade iOS Settings style row cards with interactive drill-down chevrons (`›`).
+- **Section Structure**:
+  1. **Reward Type Row**:
+     - Single white card (`borderRadius: 14`, `borderWidth: 1`, `#E2E8F0`).
+     - Left: Label `Reward Type` + `(?)` info tooltip button.
+     - Right: Capsule toggle `[ 🎁 Voucher ]  [ ⭐ Stamps ]`.
+  2. **Gift Offer Row**:
+     - Dedicated interactive row card with chevron (`›`).
+     - Left: Rich media thumbnail (artisan ice cream / product image in rounded squircle `width: 52, height: 44, borderRadius: 10`) or bonus stamps badge.
+     - Center: Primary item title (`Catering Aiskrim 300pax`, 14px bold) + Subtitle (`Linked menu item · RM850`, 12px `#64748B`).
+     - Action: Opens `BirthdayItemPickerModal` (PRO menu catalog) or `showStampsPicker`.
+  3. **Validity Window Row**:
+     - Interactive row card with chevron (`›`).
+     - Left: Calendar icon in squircle (`calendar-outline`, 24px).
+     - Center: Primary value (`3 Days`, 14px bold) + Subtitle (`Day before · Birthday · Day after`, 12px `#64748B`).
+     - Action: Opens `showValidityPicker` bottom sheet with quick 1-tap options (`3 Days (Recommended)`, `7 Days`, `30 Days`).
+  4. **Send Schedule Row**:
+     - Interactive row card with chevron (`›`).
+     - Left: Clock icon in squircle (`time-outline`, 24px).
+     - Center: Primary value (`09:00 AM`, 14px bold) + Subtitle (`Send on customer's birthday · Store local time`, 12px `#64748B`).
+     - Action: Opens `showSchedulePicker` bottom sheet (`09:00 AM`, `10:00 AM`, `12:00 PM`).
+  5. **Redemption Rules Row**:
+     - Interactive row card with chevron (`›`).
+     - Left: Document icon in squircle (`document-text-outline`, 24px).
+     - Center: Primary value (`Standard rules`, 14px bold) + Subtitle (`Once per customer, per birthday year`, 12px `#64748B`).
+     - Action: Opens `showRulesModal` bottom sheet detailing single redemption, counter QR verification, and auto-expiration safeguards.
+  6. **Primary Save Action**:
+     - Modern full-width black capsule button `[ Save Changes ]` (`height: 50`, `borderRadius: 9999`, bold white typography).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.7. Points Loyalty Redesign: Unified Executive Feed (Image 1 Benchmark)
+- **Route**: `app/(merchant)/rewards.tsx` (Tab 3: `points_tiers` / `Point Rule`)
+- **Design Philosophy**:
+  - Eliminates fragmented sub-tabs (`Earn Rate`, `Redeem Cash`, `Safeguards`) and heavy contrast yellow/black banners.
+  - Consolidates all core loyalty mechanics into a clean, unified vertical feed of Apple Settings style modular white cards (`borderRadius: 16`, border `#E2E8F0`).
+- **Pillar Sections**:
+  1. **Earn Points Card**:
+     - Squircle coin icon (`#FEF08A` yellow background).
+     - Flat preset pills: `[ RM 1 ] [ RM 2 ] [ RM 5 ] [ RM 10 ]`.
+     - Dual-metric split box (`Spend: RM 1` | `Earn: 1 Point`) separated by hairline vertical divider.
+     - Drill-down sheet (`showEarnRateModal`) for custom decimal rates.
+  2. **Redeem Value Card**:
+     - Squircle gift icon (`#FEF08A` yellow background).
+     - Dual-metric split box (`Points: 100 Pts` | `Discount Value: RM 1.00`).
+     - Drill-down sheet (`showRedeemRateModal`) for instant 1%, 2%, or 0.5% cashback options.
+  3. **Preview Example (Live Checkout Calculator)**:
+     - Real-time interactive calculation using user test spend (default RM 100).
+     - Creamy gold status strip (`#FEFCE8`) displaying:
+       - `Points earned`: dynamic points based on spend.
+       - `Discount value`: dynamic discount amount in RM.
+       - `Reward rate`: instant percentage calculation (e.g. `1% of spending`).
+  4. **Rules & Limits Card**:
+     - Security shield squircle icon (`#F1F5F9`).
+     - Drill-down sheet (`showPointsRulesModal`) for minimum redemption thresholds and max bill discount caps.
+  5. **Primary Action**:
+     - Full-width modern black capsule button `[ Save Changes ]` (`height: 52`, `borderRadius: 9999`, bold white `#FFFFFF`).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.
+
+### 44.8. Subscription Header & Hero Cards Redesign (RiseV New Standard UI)
+- **Route**: `app/(merchant)/subscription.tsx`
+- **Design Philosophy**:
+  - Eliminates the legacy pitch-black container block and negative margin sheet overlays in favor of **Pure Daylight Studio Clarity**.
+  - Pairs a pure white daylight canvas with a high-prestige **Executive Black & Gold VIP Pass** and a **Daylight NFC Stand Squircle Card**, creating crisp contrast and professional scannability.
+- **Components**:
+  1. **Daylight Studio Pure White Header**:
+     - Background: Pure White `#FFFFFF`, border bottom `1px solid #F1F5F9`.
+     - Circle Daylight Close Button `(✕)` (`38×38px`, `#F8FAFC`, border `#E2E8F0`, black icon).
+     - Title: `Subscription Plan` (`18px PlusJakartaSans_800ExtraBold`, `#0F172A`) + Subtitle `Manage store tier & quota` (`11px`, `#64748B`).
+     - Right: Official RiseV logo (`@/assets/risev logo.png`, pure black tint).
+  2. **Active Subscription Card (Clear White Compact Style + Dual-Bar Milestones)**:
+     - Pure White `#FFFFFF` surface with subtle border `1px solid #E2E8F0` and diffuse elevation shadow.
+     - Compact layout: padding reduced to `13px`, border radius `18px`.
+     - Radiant yellow squircle (`#FFCC00`, `34×34px`, radius 10) with sparkle glyph.
+     - Plan title (`PRO Plan` in bold `#0F172A`) + subtitle (`Executive VIP Membership` in `#64748B`).
+     - Apple-style status capsule: `[ 🟢 ACTIVE VIP ]` in pastel mint (`#DCFCE7`, border `#86EFAC`, text `#15803D`).
+     - **Dual Quota Milestones Box**:
+       - Row 1: Customer Database (`${customerCount} / 300` or `Unlimited ♾️`).
+       - Row 2: Monthly Bookings (`${monthlyBookingCount} / 30` or `Unlimited ♾️`).
+     - Bottom row: Renewal date + interactive **`Usage Details ›`** triggering Apple-style Bottom Sheet with full feature breakdown (Customers, Bookings, Outlets, Staff, and Active Vouchers).
+  3. **Daylight Stand Card with RiseV Yellow Accent (Card 2)**:
+     - Pure White card (`#FFFFFF`, border `1px solid #E2E8F0`, `borderRadius: 18`).
+     - Left: Signature RiseV Yellow squircle (`40×40px`, `#FFCC00`, `borderRadius: 12`) with black cart icon.
+     - Title: `Don't have a Stand?` (`13.5px PlusJakartaSans_800ExtraBold`, `#0F172A`).
+     - Subtitle: `Get RiseV NFC Bundle · Lifetime Quota` (`11px PlusJakartaSans_500Medium`, `#64748B`).
+     - Right: High-contrast black pill button `[ Order ➔ ]` with gold arrow.
+  4. **Explore Plans & Key Differences Table**:
+     - Header Row: `Explore Plans` + `Compare benefits`.
+     - Segmented Cadence Toggle: `#F1F5F9` capsule with active black pill for `Monthly` and `Annually (Save 20%)`.
+     - Stacked Plan Selector Rows:
+       - Starter (`RM 47` / `RM 38` /month): Radio unselected `⚪`, title & subtitle, dynamic pricing.
+       - PRO (`RM 97` / `RM 78` /month): Radio selected `🔘`, RiseV yellow border `2px solid #FFCC00`, status tags (`Current` / `Popular`).
+     - Key Differences Table:
+       - Compact 6-row comparison table: Customer capacity (300 vs Unlimited ♾️), Booking engine (30/mo vs Unlimited), Business outlets (1 vs 5 Outlets), Staff accounts (Up to 5 vs 10 + Comm), Milestone loyalty (Standard vs All Engines 🎁), and Active vouchers (5 Max vs Unlimited).
+- **Verification**:
+  - Passed `npx tsc --noEmit` with **0 errors**.

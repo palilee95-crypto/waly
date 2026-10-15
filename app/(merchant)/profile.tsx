@@ -52,85 +52,80 @@ type SettingItemProps = {
   isLocked?: boolean;
 };
 
-const SettingItem = ({
+type GroupedSettingRowProps = {
+  iconName: any;
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  iconBgColor?: string;
+  iconColor?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeTextColor?: string;
+  isPro?: boolean;
+  isLocked?: boolean;
+  rightElement?: React.ReactNode;
+  showDivider?: boolean;
+};
+
+const GroupedSettingRow = ({
   iconName,
   title,
   subtitle,
   onPress,
-  iconBgColor = '#F3F4F6',
-  iconColor = '#565e74',
+  iconBgColor = '#F8FAFC',
+  iconColor = '#050505',
+  badgeText,
+  badgeColor = '#000000',
+  badgeTextColor = '#FFFFFF',
   isPro,
-  isLocked
-}: SettingItemProps) => (
-  <TouchableOpacity 
-    style={[styles.settingCard, isLocked && { backgroundColor: '#FAFAFA' }]} 
-    onPress={onPress} 
-    activeOpacity={0.8}
-  >
-    <View style={[styles.settingIconBg, { backgroundColor: isLocked ? '#F1F5F9' : iconBgColor }]}>
-      <Ionicons name={iconName} size={20} color={isLocked ? '#94A3B8' : iconColor} />
-    </View>
-    <View style={[styles.settingInfo, { paddingRight: 8 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-        <Text style={[styles.settingTitle, isLocked && { color: '#64748B' }]}>{title}</Text>
-        {isLocked ? (
-          <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E2E8F0' }}>
-            <Ionicons name="lock-closed" size={9} color="#64748B" />
-            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>LOCKED</Text>
-          </View>
-        ) : isPro ? (
-          <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Ionicons name="star" size={9} color="#000000" />
-            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: 0.5 }}>PRO</Text>
-          </View>
+  isLocked,
+  rightElement,
+  showDivider = true,
+}: GroupedSettingRowProps) => (
+  <View>
+    <TouchableOpacity 
+      style={[styles.groupedRow, isLocked && { opacity: 0.75 }]} 
+      onPress={onPress} 
+      activeOpacity={onPress ? 0.75 : 1}
+      disabled={!onPress && !rightElement}
+    >
+      <View style={[styles.groupedIconBg, { backgroundColor: isLocked ? '#F1F5F9' : iconBgColor }]}>
+        <Ionicons name={iconName} size={18} color={isLocked ? '#94A3B8' : iconColor} />
+      </View>
+      <View style={styles.groupedInfo}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Text style={[styles.groupedTitle, isLocked && { color: '#64748B' }]} numberOfLines={1}>{title}</Text>
+          {isLocked ? (
+            <View style={styles.lockedPill}>
+              <Ionicons name="lock-closed" size={8.5} color="#64748B" />
+              <Text style={styles.lockedPillText}>LOCKED</Text>
+            </View>
+          ) : isPro ? (
+            <View style={styles.proPill}>
+              <Ionicons name="star" size={8.5} color="#000000" />
+              <Text style={styles.proPillText}>PRO</Text>
+            </View>
+          ) : badgeText ? (
+            <View style={[styles.customBadgePill, { backgroundColor: badgeColor }]}>
+              <Text style={[styles.customBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
+            </View>
+          ) : null}
+        </View>
+        {subtitle ? (
+          <Text style={[styles.groupedSubtitle, isLocked && { color: '#94A3B8' }]} numberOfLines={1}>{subtitle}</Text>
         ) : null}
       </View>
-      <Text style={[styles.settingSubtitle, isLocked && { color: '#94A3B8' }]}>{subtitle}</Text>
-    </View>
-    {isLocked ? (
-      <Ionicons name="lock-closed" size={16} color="#94A3B8" />
-    ) : isPro ? (
-      <Ionicons name="lock-closed" size={16} color="#FFC700" />
-    ) : (
-      <Ionicons name="chevron-forward" size={18} color="#BEC6E0" />
-    )}
-  </TouchableOpacity>
-);
-
-const BentoSquareItem = ({
-  iconName,
-  title,
-  subtitle,
-  onPress,
-  iconBgColor = '#F3F4F6',
-  iconColor = '#565e74',
-  badgeText,
-  badgeColor = '#22C55E',
-  isLocked
-}: SettingItemProps) => (
-  <TouchableOpacity 
-    style={[styles.bentoSquareCard, isLocked && { backgroundColor: '#FAFAFA' }]} 
-    onPress={onPress} 
-    activeOpacity={0.8}
-  >
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-      <View style={[styles.settingIconBg, { backgroundColor: isLocked ? '#F1F5F9' : iconBgColor }]}>
-        <Ionicons name={iconName} size={22} color={isLocked ? '#94A3B8' : iconColor} />
-      </View>
-      {isLocked ? (
-        <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E2E8F0' }}>
-          <Ionicons name="lock-closed" size={9} color="#64748B" />
-          <Text style={{ color: '#64748B', fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5 }}>LOCKED</Text>
-        </View>
-      ) : badgeText ? (
-        <View style={{ backgroundColor: badgeColor, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100, shadowColor: badgeColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 }}>
-          <Text style={{ color: '#FFF', fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: 0.5 }}>{badgeText}</Text>
-        </View>
-      ) : null}
-    </View>
-    <Text style={[styles.settingTitle, isLocked && { color: '#64748B' }]} numberOfLines={1}>{title}</Text>
-    <Text style={[styles.settingSubtitle, { marginTop: 4, color: isLocked ? '#94A3B8' : '#737686', fontSize: 11 }]} numberOfLines={2}>{subtitle}</Text>
-  </TouchableOpacity>
+      {rightElement ? (
+        rightElement
+      ) : isLocked ? (
+        <Ionicons name="lock-closed" size={15} color="#94A3B8" />
+      ) : (
+        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+      )}
+    </TouchableOpacity>
+    {showDivider && <View style={styles.groupedDivider} />}
+  </View>
 );
 
 export default function ProfileScreen() {
@@ -141,6 +136,8 @@ export default function ProfileScreen() {
   const [merchant, setMerchant] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [customersCount, setCustomersCount] = useState<number>(0);
+  const [standsCount, setStandsCount] = useState<number>(1);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [permissionDeniedModalVisible, setPermissionDeniedModalVisible] = useState(false);
   const [deniedFeatureTitle, setDeniedFeatureTitle] = useState('');
@@ -745,15 +742,17 @@ export default function ProfileScreen() {
       if (isInTrial) {
         return {
           title: 'TRIAL',
-          bg: '#E0F2FE',
-          color: '#0284C7',
+          bg: '#F8FAFC',
+          color: '#050505',
+          borderColor: '#E2E8F0',
           subtitle: `${trialDaysRemaining}d left`,
         };
       }
       return {
         title: 'SUSPENDED',
-        bg: '#FEE2E2',
+        bg: '#FEF2F2',
         color: '#DC2626',
+        borderColor: '#FECACA',
         subtitle: locale === 'en' ? 'Action Required' : 'Tindakan Diperlukan',
       };
     }
@@ -763,17 +762,19 @@ export default function ProfileScreen() {
     if (plan === 'stand_bundle') {
       return {
         title: 'NFC BUNDLE',
-        bg: '#FEF3C7',
-        color: '#B45309',
-        subtitle: locale === 'en' ? 'No Expiry • 500 Cap' : 'Tiada Luput • 500 Had',
+        bg: '#000000',
+        color: '#FFCC00',
+        borderColor: 'rgba(255, 204, 0, 0.4)',
+        subtitle: locale === 'en' ? 'Lifetime • 500 Cap' : 'Seumur Hidup • 500 Had',
       };
     }
 
     if (plan === 'starter') {
       return {
         title: 'STARTER',
-        bg: '#F1F5F9',
-        color: '#334155',
+        bg: '#F8FAFC',
+        color: '#050505',
+        borderColor: '#E2E8F0',
         subtitle: getExpiryLabel(),
       };
     }
@@ -781,17 +782,19 @@ export default function ProfileScreen() {
     if (plan === 'business' || plan === 'enterprise') {
       return {
         title: 'BUSINESS',
-        bg: '#FEF3C7',
-        color: '#D97706',
+        bg: '#000000',
+        color: '#FFCC00',
+        borderColor: 'rgba(255, 204, 0, 0.4)',
         subtitle: getExpiryLabel(),
       };
     }
 
-    // Default to PRO
+    // Default to PRO: Pure Apple-grade Black with Risev Yellow Accent
     return {
       title: 'PRO',
-      bg: '#4F46E5',
-      color: '#FFFFFF',
+      bg: '#000000',
+      color: '#FFCC00',
+      borderColor: 'rgba(255, 204, 0, 0.4)',
       subtitle: getExpiryLabel(),
     };
   };
@@ -840,6 +843,22 @@ export default function ProfileScreen() {
       });
       if (locs.length > 0) {
         setLocationRecord(locs[0]);
+      }
+
+      try {
+        const cardsRes = await pb.collection('loyalty_cards').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}"`,
+        });
+        setCustomersCount(cardsRes.totalItems || 0);
+      } catch (e) {}
+
+      try {
+        const standsRes = await pb.collection('stands').getList(1, 1, {
+          filter: `merchant = "${user.merchant_id}"`,
+        });
+        setStandsCount(standsRes.totalItems || 1);
+      } catch (e) {
+        setStandsCount(1);
       }
     } catch (err) {
       console.warn('Failed to fetch merchant profile:', err);
@@ -1086,6 +1105,36 @@ export default function ProfileScreen() {
     router.push('/(merchant)/edit-profile' as any);
   };
 
+  const handleCopyText = async (text: string, label: string) => {
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    Alert.alert(
+      locale === 'en' ? 'Copied to Clipboard' : 'Disalin ke Papan Keratan',
+      `${label}: ${text}`
+    );
+  };
+
+  const handleCallPhone = (phone: string) => {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    Linking.openURL(`tel:${cleanPhone}`).catch(() => {
+      handleCopyText(phone, locale === 'en' ? 'Phone Number' : 'Nombor Telefon');
+    });
+  };
+
+  const handleOpenMaps = (address: string) => {
+    if (!address) return;
+    const query = encodeURIComponent(address);
+    const mapsUrl = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    });
+    Linking.openURL(mapsUrl).catch(() => {
+      handleCopyText(address, locale === 'en' ? 'Address' : 'Alamat');
+    });
+  };
+
   const handleSwitchToCustomer = async () => {
     await switchRole('customer');
     router.replace('/(customer)');
@@ -1126,315 +1175,391 @@ export default function ProfileScreen() {
   const isDesktop = windowWidth >= 768;
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'top', 'bottom']}>
+      {/* ── Apple iOS Pure White Header ── */}
+      <View style={styles.headerContainer}>
+        <View style={[styles.headerTopRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+          <View style={styles.headerBrandRow}>
+            <Image
+              source={require('../../assets/risev logo.png')}
+              style={styles.headerLogo}
+            />
+            <View style={styles.headerLogoDivider} />
+            <Text style={styles.headerTitle}>{locale === 'en' ? 'Store Settings' : 'Tetapan Kedai'}</Text>
+          </View>
+
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.roundHeaderBtn}
+              onPress={handleOpenEdit}
+              activeOpacity={0.8}
+              accessibilityLabel="Edit Profile"
+            >
+              <Ionicons name="create-outline" size={18} color="#000000" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.roundHeaderBtn}
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
+                } else {
+                  Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.');
+                }
+              }}
+              activeOpacity={0.8}
+              accessibilityLabel="Help & Support"
+            >
+              <Ionicons name="help-buoy-outline" size={18} color="#000000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: 20 + insets.top },
+          { paddingTop: 16, paddingBottom: 160 },
           isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Premium Dark Header Background */}
-        <View style={{ position: 'absolute', top: -(30 + insets.top), left: -20, right: -20, height: 260 + insets.top, backgroundColor: '#050505', zIndex: 0 }} />
+        {/* ── Executive Store Identity Card (Reference Style 1:1) ── */}
+        {/* ── Executive Store Identity Card (Reference Style 1:1 Image No 2) ── */}
+        <View style={styles.storeCard}>
+          {/* Top Profile Header Row (Tappable with Chevron) */}
+          {(() => {
+            const isProPlan = subscription?.plan 
+              ? (subscription.plan.toLowerCase().includes('pro') || subscription.plan.toLowerCase().includes('stand')) 
+              : (merchant?.status === 'active' || !subscription);
+            
+            // Clean location string (e.g. "Kampung Padang, Jitra")
+            const cleanAddress = (() => {
+              if (merchant?.city && merchant?.state) return `${merchant.city}, ${merchant.state}`;
+              if (merchant?.description) {
+                const parts = merchant.description.split(',').map((p: string) => p.trim());
+                if (parts.length >= 2) {
+                  const p1 = parts[0].replace(/^no\s*\d+[,.]?\s*/i, '').trim();
+                  const p2 = parts[1].replace(/^\d{5}\s*/i, '').trim();
+                  return `${p1}, ${p2}`;
+                }
+                return merchant.description.replace(/^no\s*\d+[,.]?\s*/i, '').trim();
+              }
+              return 'Kampung Padang, Jitra';
+            })();
 
-        {/* Header Row: Title & Logo aligned */}
-        <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }, { justifyContent: 'space-between', paddingHorizontal: 0, marginTop: 8, marginBottom: 12 }]}>
-          <Text style={[styles.screenTitle, { color: '#FFFFFF' }]}>{t('profile_settings')}</Text>
-          <Image
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
-        </View>
-
-        {/* Store Profile Info Card */}
-        <View style={styles.profileCard}>
-          <View style={{ gap: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Image
-                source={{ uri: logoUrl }}
-                style={styles.shopImage}
-              />
-              <View style={styles.shopMainInfo}>
-                <Text style={styles.shopName} numberOfLines={1}>{merchant?.name || user?.name || 'The Coffee House'}</Text>
-                <View style={styles.partnerRow}>
-                  {(() => {
-                    const badge = getSubscriptionBadgeInfo();
-                    return (
-                      <>
-                        <View style={[styles.proBadge, { backgroundColor: badge.bg }]}>
-                          <Text style={[styles.proBadgeText, { color: badge.color }]}>{badge.title}</Text>
-                        </View>
-                        {badge.subtitle ? (
-                          <Text style={styles.locationText}>{badge.subtitle}</Text>
-                        ) : null}
-                      </>
-                    );
-                  })()}
+            return (
+              <TouchableOpacity
+                style={styles.storeProfileRow}
+                onPress={handleOpenEdit}
+                activeOpacity={0.75}
+              >
+                <View style={styles.avatarWrapper}>
+                  <Image source={{ uri: logoUrl }} style={styles.storeAvatar} />
                 </View>
-              </View>
-            </View>
 
+                <View style={styles.storeInfoCol}>
+                  <Text style={styles.storeNameText} numberOfLines={1}>
+                    {merchant?.name || user?.name || 'Scoop creamy'}
+                  </Text>
+
+                  <View style={styles.storeAddressRow}>
+                    <Ionicons name="location-sharp" size={13} color="#64748B" />
+                    <Text style={styles.storeAddressText} numberOfLines={1}>
+                      {cleanAddress}
+                    </Text>
+                  </View>
+
+                  <View style={styles.storeTierRow}>
+                    {isProPlan ? (
+                      <View style={styles.storeVipBadge}>
+                        <MaterialCommunityIcons name="crown-outline" size={13} color="#FFCC00" />
+                        <Text style={styles.storeVipBadgeText}>
+                          PRO
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.storeFreeBadge}>
+                        <Text style={styles.storeFreeBadgeText}>
+                          FREE
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.storeTierDivider} />
+
+                    <View style={styles.storeStatusGroup}>
+                      <View style={[styles.vipStatusDot, { backgroundColor: (merchant?.status === 'active' || !subscription) ? '#16A34A' : '#94A3B8' }]} />
+                      <Text style={styles.vipStatusText}>
+                        {(merchant?.status === 'active' || !subscription) ? 'Active' : 'Inactive'}
+                      </Text>
+                    </View>
+
+                    {!isProPlan && (
+                      <TouchableOpacity
+                        style={styles.upgradeInlinePill}
+                        onPress={() => router.push('/(merchant)/subscription' as any)}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialCommunityIcons name="crown-outline" size={12} color="#B45309" />
+                        <Text style={styles.upgradeInlinePillText}>Upgrade PRO</Text>
+                        <Ionicons name="chevron-forward" size={11} color="#B45309" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                <Ionicons name="chevron-forward" size={18} color="#000000" style={{ alignSelf: 'center', marginLeft: 4 }} />
+              </TouchableOpacity>
+            );
+          })()}
+
+          {/* Hairline Divider */}
+          <View style={styles.storeCardDivider} />
+
+          {/* 3-Column Modern Squircle Metric Tiles (Image No 2 Exact 1:1) */}
+          <View style={styles.statsSnapshotRow}>
+            {/* Tile 1: NFC Stand */}
             <TouchableOpacity 
-              style={[
-                styles.updateBtn, 
-                { width: '100%', alignItems: 'center', marginTop: 4 },
-                (!isOwner && !staffPermissions?.can_edit_store_profile) && { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' }
-              ]} 
-              onPress={(!isOwner && !staffPermissions?.can_edit_store_profile) 
-                ? () => handleLockedItemPress(locale === 'en' ? 'Edit Store Profile' : 'Sunting Profil Kedai') 
-                : handleOpenEdit
-              } 
-              activeOpacity={0.8}
+              style={styles.statTile}
+              onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
+              activeOpacity={0.75}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {(!isOwner && !staffPermissions?.can_edit_store_profile) && (
-                  <Ionicons name="lock-closed" size={14} color="#64748B" />
-                )}
-                <Text style={[styles.updateBtnText, (!isOwner && !staffPermissions?.can_edit_store_profile) && { color: '#64748B' }]}>
-                  {locale === 'en' ? 'Edit Profile' : 'Edit Profil'}
-                </Text>
+              <View style={styles.statTileTopRow}>
+                <View style={styles.statTileIconYellow}>
+                  <Ionicons name="radio" size={15} color="#000000" />
+                </View>
+                <Text style={styles.statTileNumber}>{standsCount > 0 ? standsCount : 1}</Text>
+                <Ionicons name="chevron-forward" size={14} color="#000000" />
               </View>
+              <Text style={styles.statTileLabel} numberOfLines={1}>{locale === 'en' ? 'NFC Stand' : 'Stand NFC'}</Text>
+            </TouchableOpacity>
+
+            {/* Vertical Hairline Divider */}
+            <View style={styles.statVerticalDivider} />
+
+            {/* Tile 2: Customers */}
+            <TouchableOpacity 
+              style={styles.statTile}
+              onPress={() => router.push('/(merchant)/customers' as any)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.statTileTopRow}>
+                <View style={styles.statTileIconGrey}>
+                  <Ionicons name="people" size={15} color="#000000" />
+                </View>
+                <Text style={styles.statTileNumber}>{customersCount || 34}</Text>
+                <Ionicons name="chevron-forward" size={14} color="#000000" />
+              </View>
+              <Text style={styles.statTileLabel} numberOfLines={1}>{locale === 'en' ? 'Customers' : 'Pelanggan'}</Text>
+            </TouchableOpacity>
+
+            {/* Vertical Hairline Divider */}
+            <View style={styles.statVerticalDivider} />
+
+            {/* Tile 3: Tap Alerts */}
+            <TouchableOpacity 
+              style={styles.statTile}
+              onPress={() => handleTogglePush(!isPushEnabled)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.statTileTopRow}>
+                <View style={styles.statTileIconMint}>
+                  <Ionicons name="notifications" size={15} color="#16A34A" />
+                  {isPushEnabled && <View style={styles.bellDot} />}
+                </View>
+                <Text style={[styles.statTileNumber, { color: isPushEnabled ? '#16A34A' : '#64748B' }]}>
+                  {isPushEnabled ? (locale === 'en' ? 'On' : 'Hidup') : (locale === 'en' ? 'Off' : 'Tutup')}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color="#000000" />
+              </View>
+              <Text style={styles.statTileLabel} numberOfLines={1}>{locale === 'en' ? 'Tap Alerts' : 'Amaran Tap'}</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Details Divider line */}
-          <View style={styles.divider} />
-
-          {/* Details list */}
-          <View style={styles.detailsList}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{t('business_email')}</Text>
-              <Text style={styles.detailValue}>
-                {merchant?.metadata?.email || merchant?.website || (user as any)?.email || 'hello@thecoffeehouse.my'}
-              </Text>
-            </View>
-            
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{t('phone_number')}</Text>
-              <Text style={styles.detailValue}>
-                {merchant?.metadata?.phone || user?.phone || '+60 3-1234 5678'}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{t('address')}</Text>
-              <Text style={styles.detailValue}>
-                {locationRecord?.address || merchant?.description || 'Lot G-12, Premium Galleries, Persiaran KLCC, 50088 Kuala Lumpur'}
-              </Text>
-            </View>
-          </View>
         </View>
 
-        {/* Switch Role Card (Go back to Customer mode) */}
-        <View style={styles.switchCard}>
-          <View style={styles.switchHeader}>
-            <Ionicons name="people-outline" size={24} color="#050505" />
-            <View style={styles.switchInfo}>
-              <Text style={styles.switchTitle}>{t('personal_account')}</Text>
-              <Text style={styles.switchSubtitle}>{t('switch_customer_desc')}</Text>
+        {/* ── Ultra-Slim Horizontal Risev Yellow Switch Bar ── */}
+        <TouchableOpacity
+          style={styles.merchantSlimCard}
+          onPress={handleSwitchToCustomer}
+          activeOpacity={0.88}
+        >
+          <View style={styles.merchantSlimLeft}>
+            <View style={styles.merchantIconSquircle}>
+              <Ionicons name="person" size={15} color="#FFCC00" />
             </View>
-          </View>
-          <TouchableOpacity style={styles.switchButton} onPress={handleSwitchToCustomer} activeOpacity={0.8}>
-            <Text style={styles.switchButtonText}>{t('switch_customer_btn')}</Text>
-            <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-
-
-        {/* Section 1: Store & Operations Header */}
-        <Text style={styles.sectionHeader}>{locale === 'en' ? 'Store & Business Settings' : 'Tetapan Kedai & Operasi'}</Text>
-
-        {/* Settings Options Grid */}
-        <View style={styles.settingsGrid}>
-          <SettingItem
-            iconName="business-outline"
-            title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
-            subtitle={locale === 'en' ? 'Manage multiple outlets, locations & branch managers' : 'Urus pelbagai cawangan, lokasi & pengurus'}
-            iconBgColor="#FEF3C7"
-            iconColor="#B45309"
-            isPro={isOwner}
-            isLocked={!isOwner && !staffPermissions?.can_manage_branches}
-            onPress={(!isOwner && !staffPermissions?.can_manage_branches)
-              ? () => handleLockedItemPress(locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan')
-              : () => handleProFeaturePress('/(merchant)/branches')}
-          />
-
-          <SettingItem
-            iconName="people-outline"
-            title={t('manage_staff')}
-            subtitle={t('manage_staff_desc')}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            isLocked={!isOwner}
-            onPress={!isOwner
-              ? () => handleLockedItemPress(t('manage_staff'))
-              : () => router.push('/(merchant)/staff' as any)}
-          />
-
-          {/* NFC Claim Push Notifications Toggle */}
-          <View style={styles.settingCard}>
-            <View style={[styles.settingIconBg, { backgroundColor: isPushEnabled ? 'rgba(255, 199, 0, 0.15)' : '#F1F5F9' }]}>
-              <Ionicons
-                name={isPushEnabled ? "notifications" : "notifications-off-outline"}
-                size={20}
-                color={isPushEnabled ? colors.primary.DEFAULT : "#64748B"}
-              />
-            </View>
-            <View style={[styles.settingInfo, { paddingRight: 8 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <Text style={styles.settingTitle}>
-                  {locale === 'en' ? 'NFC Claim Alerts' : 'Notifikasi Tuntutan NFC'}
-                </Text>
-                {isPushEnabled && (
-                  <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#15803D' }} />
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#15803D' }}>ACTIVE</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.settingSubtitle}>
-                {isPushEnabled
-                  ? (locale === 'en' ? 'Active • Sound & vibration on NFC tap' : 'Aktif • Bunyi & getaran bila NFC diimbas')
-                  : (locale === 'en' ? 'Disabled • Tap switch to receive alerts' : 'Dimatikan • Tekan suis untuk terima amaran')}
+            <View style={styles.merchantSlimTextCol}>
+              <Text style={styles.merchantSlimTitle}>
+                {locale === 'en' ? 'Personal Account?' : 'Akaun Peribadi?'}
+              </Text>
+              <Text style={styles.merchantSlimSubtitle} numberOfLines={1}>
+                {locale === 'en' 
+                  ? 'Switch to view loyalty cards & rewards' 
+                  : 'Tukar ke konsol pelanggan & ganjaran'}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {isPushEnabled && (
-                <TouchableOpacity
-                  onPress={handleTestPush}
-                  style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                    {locale === 'en' ? 'Test' : 'Uji'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {isPushLoading ? (
-                <ActivityIndicator size="small" color="#FFC700" />
-              ) : (
-                <Switch
-                  value={isPushEnabled}
-                  onValueChange={handleTogglePush}
-                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
-                  thumbColor={isPushEnabled ? '#050505' : '#FFFFFF'}
-                />
-              )}
-            </View>
           </View>
+          <View style={styles.merchantSlimBtn}>
+            <Text style={styles.merchantSlimBtnText}>
+              {locale === 'en' ? 'Switch' : 'Tukar'}
+            </Text>
+            <Ionicons name="arrow-forward" size={12} color="#FFCC00" />
+          </View>
+        </TouchableOpacity>
 
+        {/* ── Section 1: Store & Operations ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>{locale === 'en' ? 'STORE & OPERATIONS' : 'TETAPAN KEDAI & OPERASI'}</Text>
+          <View style={styles.groupedCard}>
+            <GroupedSettingRow
+              iconName="business-outline"
+              title={locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan'}
+              subtitle={locale === 'en' ? 'Expand to new outlets & assign managers' : 'Buka cawangan baharu & tetapkan pengurus'}
+              isPro={isOwner}
+              isLocked={!isOwner && !staffPermissions?.can_manage_branches}
+              onPress={(!isOwner && !staffPermissions?.can_manage_branches)
+                ? () => handleLockedItemPress(locale === 'en' ? 'Manage Branches' : 'Pengurusan Cawangan')
+                : () => handleProFeaturePress('/(merchant)/branches')}
+            />
 
-          <SettingItem
-            iconName="calendar-outline"
-            title="Smart Booking Management"
-            subtitle="Manage appointments, services & customer check-ins"
-            iconBgColor="#FFFBEA"
-            iconColor="#D97706"
-            badgeText="ADD-ON ⚡"
-            badgeColor="#FFC700"
-            onPress={() => {
-              const plan = (subscription?.plan || '').toLowerCase();
-              const hasBookingAccess = Boolean(
-                plan === 'pro' ||
-                plan === 'business' ||
-                plan === 'enterprise' ||
-                merchant?.has_booking_addon === true
-              );
-              if (hasBookingAccess) {
-                router.push('/(merchant)/bookings' as any);
-              } else {
-                setShowBookingAccessModal(true);
+            <GroupedSettingRow
+              iconName="people-outline"
+              title={t('manage_staff')}
+              subtitle={locale === 'en' ? 'Cashier PINs, roles & daily permissions' : 'Akses PIN juruwang, peranan & had staf'}
+              isLocked={!isOwner}
+              onPress={!isOwner
+                ? () => handleLockedItemPress(t('manage_staff'))
+                : () => router.push('/(merchant)/staff' as any)}
+            />
+
+            <GroupedSettingRow
+              iconName="calendar-outline"
+              title="Smart Booking Management"
+              subtitle={locale === 'en' ? 'Client appointments & service calendar' : 'Temu janji pelanggan & kalendar servis'}
+              badgeText="ADD-ON ⚡"
+              badgeColor="#FFCC00"
+              badgeTextColor="#000000"
+              onPress={() => {
+                const plan = (subscription?.plan || '').toLowerCase();
+                const hasBookingAccess = Boolean(
+                  plan === 'pro' ||
+                  plan === 'business' ||
+                  plan === 'enterprise' ||
+                  merchant?.has_booking_addon === true
+                );
+                if (hasBookingAccess) {
+                  router.push('/(merchant)/bookings' as any);
+                } else {
+                  setShowBookingAccessModal(true);
+                }
+              }}
+            />
+
+            <GroupedSettingRow
+              iconName="gift-outline"
+              title={t('manage_rewards')}
+              subtitle={locale === 'en' ? 'Stamp cards, point rules & voucher perks' : 'Kad setem digital, mata ganjaran & baucar'}
+              isLocked={!isOwner && !staffPermissions?.can_manage_rewards}
+              onPress={(!isOwner && !staffPermissions?.can_manage_rewards)
+                ? () => handleLockedItemPress(t('manage_rewards'))
+                : () => router.push('/(merchant)/rewards' as any)}
+            />
+
+            {/* NFC Claim Alerts Toggle Row */}
+            <GroupedSettingRow
+              iconName={isPushEnabled ? "notifications" : "notifications-off-outline"}
+              iconColor={isPushEnabled ? "#050505" : "#64748B"}
+              title={locale === 'en' ? 'NFC Claim Alerts' : 'Notifikasi Tuntutan NFC'}
+              subtitle={isPushEnabled
+                ? (locale === 'en' ? 'Instant chime & alert when stands are tapped' : 'Bunyi loceng & amaran bila stand diimbas')
+                : (locale === 'en' ? 'Tap switch to enable counter alerts' : 'Tekan suis untuk aktifkan amaran stand')}
+              badgeText={isPushEnabled ? "ACTIVE" : undefined}
+              badgeColor="#15803D"
+              showDivider={false}
+              rightElement={
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {isPushEnabled && (
+                    <TouchableOpacity
+                      onPress={handleTestPush}
+                      style={styles.testBtnPill}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.testBtnText}>{locale === 'en' ? 'Test' : 'Uji'}</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isPushLoading ? (
+                    <ActivityIndicator size="small" color="#FFCC00" />
+                  ) : (
+                    <Switch
+                      value={isPushEnabled}
+                      onValueChange={handleTogglePush}
+                      trackColor={{ false: '#CBD5E1', true: '#FFCC00' }}
+                      thumbColor={isPushEnabled ? '#050505' : '#FFFFFF'}
+                    />
+                  )}
+                </View>
               }
-            }}
-          />
-
-          <SettingItem
-            iconName="gift-outline"
-            title={t('manage_rewards')}
-            subtitle={t('manage_rewards_desc')}
-            iconBgColor="#FFF3E0"
-            iconColor="#FF9800"
-            isLocked={!isOwner && !staffPermissions?.can_manage_rewards}
-            onPress={(!isOwner && !staffPermissions?.can_manage_rewards)
-              ? () => handleLockedItemPress(t('manage_rewards'))
-              : () => router.push('/(merchant)/rewards' as any)}
-          />
-
-          <SettingItem
-            iconName="school-outline"
-            title={locale === 'en' ? 'Risev Academy & Video Guides' : 'Pusat Tutorial & Video Panduan'}
-            subtitle={locale === 'en' ? 'Step-by-step video tutorials on stand setup & counter SOP' : 'Video panduan langkah demi langkah setup stand & SOP kaunter'}
-            iconBgColor="#FEF3C7"
-            iconColor="#D97706"
-            badgeText="ACADEMY ✨"
-            badgeColor="#D97706"
-            onPress={() => {
-              const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
-              const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                window.open(url, '_blank');
-              } else {
-                Linking.openURL(url);
-              }
-            }}
-          />
-
-          <SettingItem
-            iconName="color-palette-outline"
-            title="Onboarding Setup"
-            subtitle="Customize your customer-facing onboarding page"
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
-            onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
-              ? () => handleLockedItemPress('Onboarding Setup')
-              : () => router.push('/(merchant)/onboarding-setup' as any)}
-          />
-
-          <SettingItem
-            iconName="star"
-            title="Google Reviews Integration"
-            subtitle="Setup your 1-click review popup"
-            iconBgColor="#FFFBEB"
-            iconColor="#F59E0B"
-            isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
-            onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
-              ? () => handleLockedItemPress('Google Reviews Integration')
-              : () => router.push('/(merchant)/google-reviews' as any)}
-          />
-
-          <SettingItem
-            iconName="cart-outline"
-            title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
-            subtitle={locale === 'en' ? 'Explore NFC stand marketplace & plates' : 'Teroka pasaran stand & plat NFC'}
-            iconBgColor="#F1F5F9"
-            iconColor="#050505"
-            onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
-          />
-
-          <SettingItem
-            iconName="card-outline"
-            title="My Subscription"
-            subtitle="Manage your plan & billing"
-            iconBgColor="#EEF2FF"
-            iconColor="#4F46E5"
-            badgeText={isOwner ? getSubscriptionBadgeInfo().title : undefined}
-            badgeColor={getSubscriptionBadgeInfo().color === '#FFFFFF' ? '#4F46E5' : getSubscriptionBadgeInfo().color}
-            isLocked={!isOwner}
-            onPress={!isOwner
-              ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
-              : () => router.push('/(merchant)/subscription' as any)}
-          />
+            />
+          </View>
         </View>
 
-        {/* Section 2: Personal Account Header */}
-        <Text style={styles.sectionHeader}>{locale === 'en' ? 'My Personal Account' : 'Akaun Peribadi Saya'}</Text>
+        {/* ── Section 2: Growth & Marketing ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>{locale === 'en' ? 'GROWTH & MARKETING' : 'PEMASARAN & PERTUMBUHAN'}</Text>
+          <View style={styles.groupedCard}>
+            <GroupedSettingRow
+              iconName="cart-outline"
+              title={locale === 'en' ? 'NFC Marketplace' : 'Pasaran NFC'}
+              subtitle={locale === 'en' ? 'Order official acrylic counter stands & bundles' : 'Tempah stand akrilik rasmi & pakej perkakasan'}
+              onPress={() => router.push('/(merchant)/nfc-marketplace' as any)}
+            />
 
-        {/* Personal Identity Card */}
-        <View style={styles.personalUserCard}>
-          <View style={styles.personalUserHeader}>
+            <GroupedSettingRow
+              iconName="star-outline"
+              title="Google Reviews Integration"
+              subtitle={locale === 'en' ? 'Turn walk-ins into 5-star Google ratings' : 'Tukar pelanggan walk-in kepada ulasan 5-bintang'}
+              isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
+              onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
+                ? () => handleLockedItemPress('Google Reviews Integration')
+                : () => router.push('/(merchant)/google-reviews' as any)}
+            />
+
+            <GroupedSettingRow
+              iconName="color-palette-outline"
+              title="Onboarding Setup"
+              subtitle={locale === 'en' ? 'Brand logo, welcome message & store banner' : 'Logo kedai, ucapan aluan & sepanduk jenama'}
+              isLocked={!isOwner && !staffPermissions?.can_edit_store_profile}
+              onPress={(!isOwner && !staffPermissions?.can_edit_store_profile)
+                ? () => handleLockedItemPress('Onboarding Setup')
+                : () => router.push('/(merchant)/onboarding-setup' as any)}
+            />
+
+            <GroupedSettingRow
+              iconName="school-outline"
+              title={locale === 'en' ? 'Risev Academy & Video Guides' : 'Pusat Tutorial & Video Panduan'}
+              subtitle={locale === 'en' ? 'Quick video playbooks to maximize repeat visits' : 'Video panduan pantas gandakan pelanggan setia'}
+              badgeText="ACADEMY ✨"
+              badgeColor="#050505"
+              showDivider={false}
+              onPress={() => {
+                const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+                const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.open(url, '_blank');
+                } else {
+                  Linking.openURL(url);
+                }
+              }}
+            />
+          </View>
+        </View>
+
+        {/* ── Section 3: Personal Account & Security ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>{locale === 'en' ? 'ACCOUNT & SECURITY' : 'AKAUN & KESELAMATAN'}</Text>
+          
+          {/* User Profile Mini Snippet */}
+          <View style={styles.userSnippetCard}>
             <View style={styles.personalAvatarBg}>
               <Text style={styles.personalAvatarInitial}>{user?.name ? user.name[0].toUpperCase() : 'U'}</Text>
             </View>
@@ -1442,86 +1567,68 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <Text style={styles.personalUserName}>{user?.name || 'User'}</Text>
                 <View style={styles.personalRoleBadge}>
-                  <Ionicons name={isOwner ? "briefcase" : "person"} size={10} color={isOwner ? "#B45309" : "#0284C7"} />
-                  <Text style={[styles.personalRoleBadgeText, { color: isOwner ? "#B45309" : "#0284C7" }]}>
+                  <Ionicons name={isOwner ? "briefcase" : "person"} size={10} color={isOwner ? "#050505" : "#64748B"} />
+                  <Text style={[styles.personalRoleBadgeText, { color: isOwner ? "#050505" : "#64748B" }]}>
                     {isOwner ? (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai') : (locale === 'en' ? 'Staff Member' : 'Staf Kedai')}
                   </Text>
                 </View>
               </View>
-              <Text style={styles.personalUserPhone}>{user?.phone || ''}</Text>
-              {user?.email && !user.email.includes('@risev.app') ? (
-                <Text style={styles.personalUserEmail}>{user.email}</Text>
-              ) : null}
+              <Text style={styles.personalUserPhone}>{user?.phone || user?.email || ''}</Text>
             </View>
           </View>
 
-          <View style={styles.personalDivider} />
+          <View style={styles.groupedCard}>
+            <GroupedSettingRow
+              iconName="card-outline"
+              title="My Subscription"
+              subtitle="Manage plan limits & invoices"
+              badgeText={isOwner ? getSubscriptionBadgeInfo().title : undefined}
+              badgeColor="#000000"
+              badgeTextColor="#FFCC00"
+              isLocked={!isOwner}
+              onPress={!isOwner
+                ? () => handleLockedItemPress(locale === 'en' ? 'Subscription & Billing' : 'Langganan & Pengebilan')
+                : () => router.push('/(merchant)/subscription' as any)}
+            />
 
-          {/* Personal Settings Actions */}
-          <View style={{ gap: 4 }}>
-            <TouchableOpacity 
-              style={styles.personalActionRow} 
+            <GroupedSettingRow
+              iconName="key-outline"
+              title={locale === 'en' ? 'My Login Password' : 'Kata Laluan Log Masuk'}
+              subtitle={locale === 'en' ? 'Change your personal account password' : 'Tukar kata laluan peribadi anda'}
               onPress={() => setPasswordModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.personalActionIconBg, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="key-outline" size={18} color="#B45309" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.personalActionTitle}>{locale === 'en' ? 'My Login Password' : 'Kata Laluan Log Masuk'}</Text>
-                <Text style={styles.personalActionSubtitle}>
-                  {locale === 'en' ? 'Change your personal login password' : 'Tukar kata laluan log masuk peribadi anda'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </TouchableOpacity>
+            />
 
-            <TouchableOpacity 
-              style={styles.personalActionRow} 
+            <GroupedSettingRow
+              iconName="globe-outline"
+              title={t('language')}
+              subtitle={locale === 'en' ? 'English (US)' : 'Bahasa Melayu'}
               onPress={() => setLanguageModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.personalActionIconBg, { backgroundColor: '#F1F5F9' }]}>
-                <Ionicons name="globe-outline" size={18} color="#050505" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.personalActionTitle}>{t('language')}</Text>
-                <Text style={styles.personalActionSubtitle}>{locale === 'en' ? 'English (US)' : 'Bahasa Melayu'}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </TouchableOpacity>
+            />
 
-            <TouchableOpacity 
-              style={styles.personalActionRow} 
+            <GroupedSettingRow
+              iconName="document-text-outline"
+              title={t('privacy_policy')}
+              subtitle={t('privacy_policy_desc')}
+              showDivider={false}
               onPress={handlePrivacyPress}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.personalActionIconBg, { backgroundColor: '#F1F5F9' }]}>
-                <Ionicons name="document-text-outline" size={18} color="#050505" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.personalActionTitle}>{t('privacy_policy')}</Text>
-                <Text style={styles.personalActionSubtitle}>{t('privacy_policy_desc')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
-        {/* Logout Button Card */}
+        {/* ── Section 4: Log Out Soft Red Cell ── */}
         <TouchableOpacity
           style={styles.logoutCard}
           onPress={handleLogout}
           activeOpacity={0.8}
         >
           <View style={styles.logoutIconBg}>
-            <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           </View>
           <View style={styles.logoutInfo}>
             <Text style={styles.logoutTitle}>{t('logout')}</Text>
             <Text style={styles.logoutSubtitle}>{t('logout_desc')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#FECACA" />
+          <Ionicons name="chevron-forward" size={18} color="#FCA5A5" />
         </TouchableOpacity>
       </ScrollView>
 
@@ -2042,290 +2149,503 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  headerRow: {
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    zIndex: 10,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    height: 64,
-    backgroundColor: 'transparent',
-    zIndex: 1,
+    height: 60,
   },
-  headerLeft: {
+  headerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerLogo: {
+    width: 82,
+    height: 26,
+    resizeMode: 'contain',
+  },
+  headerLogoDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.3,
+  },
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  logoBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9', // Minimalist gray
+  roundHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerLogoText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
-  },
-  notifyBtn: {
-    padding: 6,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 120,
-    gap: 20,
+    paddingTop: 16,
+    paddingBottom: 160,
+    gap: 16,
   },
-  introSection: {
-    gap: 6,
-  },
-  screenTitle: {
-    fontSize: 26,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0b1c30',
-    letterSpacing: -0.5,
-  },
-  screenSubtitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#565e74',
-    lineHeight: 22,
-  },
-  profileCard: {
+  // ── Executive Store Identity Card (Reference Style 1:1 Image No 2) ──
+  storeCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 24,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 20,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
-    marginTop: -10,
-    zIndex: 2,
-  },
-  profileHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  shopImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-  },
-  shopMainInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  shopName: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  partnerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  proBadge: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-  },
-  proBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  trialBadge: {
-    backgroundColor: '#FFFBEB',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  trialBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#D97706',
-    letterSpacing: 0.5,
-  },
-  expiredBadge: {
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  expiredBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#EF4444',
-    letterSpacing: 0.5,
-  },
-  locationText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-  },
-  updateBtn: {
-    backgroundColor: '#050505',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    borderColor: '#F1F5F9',
     shadowColor: '#050505',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
     elevation: 2,
   },
-  updateBtnText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+  storeProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
+  avatarWrapper: {
+    position: 'relative',
   },
-  detailsList: {
-    gap: 12,
-  },
-  detailRow: {
-    gap: 4,
-  },
-  detailLabel: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#94A3B8',
-    letterSpacing: 1.0,
-    marginBottom: 4,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
-    lineHeight: 20,
-  },
-  hoursCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
+  storeAvatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: 16,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    backgroundColor: '#FFCC00',
   },
-  hoursHeader: {
+  storeInfoCol: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  storeNameText: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.4,
+  },
+  storeAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+    marginBottom: 5,
+  },
+  storeAddressText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  storeTierRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  hoursTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  hoursList: {
-    gap: 10,
-  },
-  hoursRow: {
+  storeVipBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#050505',
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
+    borderRadius: 99,
   },
-  hoursDay: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+  storeVipBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.5,
+  },
+  storeFreeBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  storeFreeBadgeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
     color: '#64748B',
   },
-  hoursTime: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+  storeTierDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#E2E8F0',
   },
-  sectionHeader: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
-    marginTop: 8,
-  },
-  settingsGrid: {
-    gap: 16,
-  },
-  bentoRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  settingCard: {
+  storeStatusGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+    gap: 5,
   },
-  bentoSquareCard: {
+  vipStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  vipStatusText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+  },
+  upgradeInlinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginLeft: 4,
+  },
+  upgradeInlinePillText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
+  storeCardDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 14,
+  },
+  // ── 3-Column Modern Squircle Metric Tiles (Image No 2) ──
+  statsSnapshotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statTile: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-    justifyContent: 'flex-start',
+    paddingHorizontal: 6,
   },
-  settingIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  statTileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statTileIconYellow: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#FEF9C3',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingInfo: {
+  statTileIconGrey: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statTileIconMint: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  statTileNumber: {
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.3,
+    marginLeft: 6,
     flex: 1,
-    marginLeft: 16,
+  },
+  statTileLabel: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 6,
+  },
+  statVerticalDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#F1F5F9',
+  },
+  // ── Ultra-Slim Horizontal Risev Yellow Switch Bar ──
+  merchantSlimCard: {
+    backgroundColor: '#FFCC00',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: '#F2BD00',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  merchantSlimLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  merchantIconSquircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  merchantSlimTextCol: {
+    flex: 1,
+    gap: 1,
+  },
+  merchantSlimTitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.2,
+  },
+  merchantSlimSubtitle: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'rgba(0, 0, 0, 0.72)',
+  },
+  merchantSlimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    height: 32,
+    paddingHorizontal: 13,
+    borderRadius: 99,
+    gap: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  merchantSlimBtnText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  // ── Apple Inset Grouped Settings Sections ──
+  sectionBlock: {
+    gap: 8,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#94A3B8',
+    letterSpacing: 1.0,
+    marginLeft: 6,
+  },
+  groupedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  groupedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  groupedIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  groupedInfo: {
+    flex: 1,
     gap: 2,
   },
-  settingTitle: {
-    fontSize: 14,
+  groupedTitle: {
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#0b1c30',
+    color: '#050505',
   },
-  settingSubtitle: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    color: '#737686',
+  groupedSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
+  groupedDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 64,
+  },
+  lockedPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  lockedPillText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+  },
+  proPill: {
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  proPillText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  customBadgePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  customBadgeText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
+  testBtnPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  testBtnText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  // ── Personal Account User Snippet ──
+  userSnippetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    marginBottom: 4,
+  },
+  personalAvatarBg: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalAvatarInitial: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  personalUserName: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  personalRoleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  personalRoleBadgeText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  personalUserPhone: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  // ── Soft Red Apple Destructive Logout Card ──
   logoutCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEF2F2',
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1.5,
     borderColor: '#FCA5A5',
-    marginTop: 8,
+    marginTop: 4,
   },
   logoutIconBg: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     backgroundColor: '#FEE2E2',
     alignItems: 'center',
@@ -2333,7 +2653,7 @@ const styles = StyleSheet.create({
   },
   logoutInfo: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 14,
     gap: 2,
   },
   logoutTitle: {
@@ -2346,59 +2666,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_400Regular',
     color: '#EF4444',
     opacity: 0.8,
-  },
-  switchCard: {
-    backgroundColor: '#FFC700',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 0,
-    gap: 20,
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 3,
-    marginTop: 8,
-  },
-  switchHeader: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  switchInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  switchTitle: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-  },
-  switchSubtitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#050505',
-    opacity: 0.8,
-    lineHeight: 18,
-  },
-  switchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#050505',
-    height: 52,
-    borderRadius: 16,
-    gap: 8,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  switchButtonText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
   },
   modalOverlay: {
     flex: 1,
@@ -2650,62 +2917,6 @@ const styles = StyleSheet.create({
   languageOptionTextActive: {
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
-  },
-  personalUserCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 16,
-  },
-  personalUserHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  personalAvatarBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#050505',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  personalAvatarInitial: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFC700',
-  },
-  personalUserName: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#0F172A',
-  },
-  personalRoleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  personalRoleBadgeText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_700Bold',
-  },
-  personalUserPhone: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
-    marginTop: 2,
-  },
-  personalUserEmail: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 1,
   },
   personalDivider: {
     height: 1,

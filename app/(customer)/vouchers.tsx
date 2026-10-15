@@ -18,6 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
+import { getVoucherSpineTheme } from '@/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -101,8 +102,14 @@ export default function VouchersScreen() {
         const discountVal = parsedMeta.discount_value || reward?.discount_value || campaign?.discount_value;
         const discountType = parsedMeta.discount_type || reward?.discount_type || campaign?.discount_type;
 
+        const applicableText = reward?.applicable_items_text || parsedMeta.applicable_items_text;
+        const discountScope = reward?.discount_scope || parsedMeta.discount_scope;
+        const itemNote = applicableText
+          ? (rewardType === 'free_item' ? `Percuma: ${applicableText}` : `Sah untuk: ${applicableText}`)
+          : (discountScope === 'all' && rewardType === 'discount' ? 'Sah untuk semua pesanan' : '');
+
         const displayTitle = reward?.name || reward?.title || campaign?.name || campaign?.title || (discountVal ? `${discountType === 'percent' || discountType === 'percentage' ? discountVal + '%' : 'RM ' + discountVal} OFF` : 'Voucher');
-        const displaySubtitle = reward?.description || campaign?.description || parsedMeta.description || 'Redeem at store';
+        const displaySubtitle = itemNote || reward?.description || campaign?.description || parsedMeta.description || 'Redeem at store';
         const merchantName = merchant?.name || parsedMeta.merchant_name || 'Risev Merchant';
         const logo = merchant?.logo 
           ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}`
@@ -142,7 +149,7 @@ export default function VouchersScreen() {
           expiry: expiryDisplay,
           status: (isUsed || isExpired ? 'used' : 'active') as 'used' | 'active',
           rawStatus: (isUsed ? 'used' : isExpired ? 'expired' : 'active') as 'active' | 'used' | 'expired',
-          color: merchant?.onboarding_primary_color || (reward?.type === 'discount' ? '#7C3AED' : '#004ac6'),
+          color: merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || (reward?.type === 'discount' ? '#7C3AED' : '#050505'),
           rewardImage,
           rewardType,
           discountValue: discountVal,
@@ -203,7 +210,7 @@ export default function VouchersScreen() {
             expiry: bdayExpiryDisplay,
             status: (isBirthdayUsed || isBirthdayExpired ? 'used' : 'active') as 'used' | 'active',
             rawStatus: (isBirthdayUsed ? 'used' : isBirthdayExpired ? 'expired' : 'active') as 'active' | 'used' | 'expired',
-            color: merchant?.onboarding_primary_color || '#0F172A',
+            color: merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || '#050505',
             isBirthday: true,
             merchantId: merchant?.id,
             rewardImage: bdayImage,
@@ -634,7 +641,16 @@ export default function VouchersScreen() {
               </View>
             ) : (
               filteredVouchers.map((item) => {
-                const isLight = isLightColor(item.color || '#0B0F17');
+                const cardBrandColor = item.color || '#050505';
+                const isLightBrand = (() => {
+                  const hex = (cardBrandColor || '#050505').replace('#', '');
+                  const r = parseInt(hex.substring(0, 2), 16) || 0;
+                  const g = parseInt(hex.substring(2, 4), 16) || 0;
+                  const b = parseInt(hex.substring(4, 6), 16) || 0;
+                  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                  return yiq >= 160;
+                })();
+                const brandTextColor = isLightBrand ? '#0F172A' : '#FFFFFF';
                 
                 const isClickable = item.status === 'active';
                 const Container: any = isClickable ? TouchableOpacity : View;
@@ -646,75 +662,230 @@ export default function VouchersScreen() {
                 return (
                   <Container 
                     key={item.id} 
-                    style={[styles.ticketCard, !isClickable && { opacity: 0.65 }]}
+                    style={{
+                      height: 156,
+                      borderRadius: 18,
+                      backgroundColor: '#FFFFFF',
+                      flexDirection: 'row',
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 10,
+                      elevation: 4,
+                      position: 'relative',
+                      opacity: isClickable ? 1 : 0.65,
+                    }}
                     {...containerProps}
                   >
-                    {/* 1. LEFT ZONE: Merchant Identity ONLY */}
-                    <View style={styles.ticketLeftZone}>
-                      <View style={styles.whiteLogoCircle}>
-                        <Image source={{ uri: item.logo }} style={styles.merchantCircleLogo} />
+                    {/* 1. LEFT STUB: Voucher Category Color Spine (Standardized to Merchant Brand Color) */}
+                    {(() => {
+                      const spineTheme = getVoucherSpineTheme(item.isBirthday ? 'festive' : item.rewardType, item.title, cardBrandColor);
+                      return (
+                        <View style={{
+                          width: 44,
+                          backgroundColor: cardBrandColor,
+                          alignItems: 'center',
+                          position: 'relative',
+                          borderTopLeftRadius: 18,
+                          borderBottomLeftRadius: 18,
+                          overflow: 'hidden',
+                        }}>
+                          <View style={{
+                            width: 156,
+                            height: 44,
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            marginLeft: -78,
+                            marginTop: -22,
+                            transform: [{ rotate: '-90deg' }],
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
+                              {spineTheme.spineText}
+                            </Text>
+                            <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_700Bold', color: brandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
+                              {spineTheme.subText}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })()}
+
+                    {/* 2. CENTER ZONE: Reward Information on Pure White */}
+                    <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 11, paddingHorizontal: 12, justifyContent: 'space-between' }}>
+                      {/* Top Row: Ready to redeem pill + Discount tag */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{
+                          backgroundColor: item.status === 'active' ? '#FFFBEB' : '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: item.status === 'active' ? '#FDE68A' : '#E2E8F0',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2.5,
+                          borderRadius: 6,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 3.5,
+                        }}>
+                          <Ionicons name={item.isBirthday ? "balloon" : "gift"} size={10} color={item.status === 'active' ? '#B45309' : '#64748B'} />
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: item.status === 'active' ? '#B45309' : '#64748B' }}>
+                            {item.status !== 'active' ? (item.rawStatus === 'used' ? 'Used' : 'Expired') : (item.isBirthday ? 'Birthday Special' : 'Ready to redeem')}
+                          </Text>
+                        </View>
+
+                        <View style={{
+                          backgroundColor: item.rewardType === 'discount' ? '#0F172A' : '#FFCC00',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2.5,
+                          borderRadius: 6,
+                        }}>
+                          <Text style={{
+                            fontSize: 8,
+                            fontFamily: 'PlusJakartaSans_800ExtraBold',
+                            color: item.rewardType === 'discount' ? '#FFFFFF' : '#050505',
+                            letterSpacing: 0.5,
+                          }}>
+                            {item.rewardType === 'discount'
+                              ? (item.discountValue ? (item.discountType === 'percentage' || item.discountType === 'percent' ? `${item.discountValue}% OFF` : `RM ${item.discountValue} OFF`) : 'DISCOUNT')
+                              : 'FREE ITEM'}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={styles.merchantName} numberOfLines={1}>{item.merchantName}</Text>
-                      <Text style={styles.merchantCategory} numberOfLines={1}>
-                        {item.category || 'food'}
-                      </Text>
-                    </View>
 
-                    {/* CENTER DIVIDER: Ticket Cutout Notches & Perforated Line */}
-                    <View style={styles.dottedDivider}>
-                      <View style={styles.topNotch} />
-                      <View style={styles.dottedLine} />
-                      <View style={styles.bottomNotch} />
-                    </View>
-
-                    {/* 2. CENTER ZONE: Reward Information */}
-                    <View style={styles.ticketCenterZone}>
-                      {/* Top Badge: Ready to redeem */}
-                      <View style={styles.yellowStatusBadge}>
-                        <Ionicons name="gift" size={11} color="#000000" style={{ marginRight: 4 }} />
-                        <Text style={styles.yellowStatusText}>
-                          {item.isBirthday ? 'Birthday Special' : 'Ready to redeem'}
+                      {/* Middle: YOUR REWARD + Title + Subtitle */}
+                      <View style={{ marginVertical: 1 }}>
+                        <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 1, textTransform: 'uppercase' }}>
+                          YOUR REWARD
+                        </Text>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 18 }} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1, lineHeight: 14 }} numberOfLines={1}>
+                          {item.subtitle}
                         </Text>
                       </View>
 
-                      {/* Middle: Reward Title & Description */}
-                      <View style={{ marginVertical: 2 }}>
-                        <Text style={styles.rewardTitle} numberOfLines={2}>{item.title}</Text>
-                        <Text style={styles.rewardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                      </View>
-
-                      {/* Bottom Footer Row: Source Badge + Stock */}
-                      <View style={styles.mainFooterRow}>
-                        <View style={styles.sourceBadgePill}>
-                          <Ionicons name="card" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
-                          <Text style={styles.sourceBadgeText}>STAMP CARD</Text>
+                      {/* Bottom Row: Source Pill & Expiry/Stock + Use Voucher Button */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, marginRight: 6 }}>
+                          <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name={item.isBirthday ? "balloon" : "card"} size={8.5} color="#059669" />
+                            <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }} numberOfLines={1}>
+                              {item.isBirthday ? 'BIRTHDAY' : 'STAMP REWARD'}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 9, color: '#CBD5E1' }}>|</Text>
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', flexShrink: 1 }} numberOfLines={1}>
+                            {item.expiry}
+                          </Text>
                         </View>
 
-                        <Text style={styles.stockLabelText}>
-                          Stock: <Text style={styles.stockValueText}>Unlimited</Text>
-                        </Text>
+                        {/* Customer CTA Button */}
+                        {item.status === 'active' ? (
+                          <View style={{ height: 26, borderRadius: 13, backgroundColor: '#0F172A', paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>Use Voucher ➔</Text>
+                          </View>
+                        ) : (
+                          <View style={{ height: 24, borderRadius: 6, backgroundColor: '#F1F5F9', paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8' }} numberOfLines={1}>
+                              {item.rawStatus === 'used' ? 'REDEEMED' : 'EXPIRED'}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
-                    {/* 3. RIGHT SAFE ZONE: Tag & Use Voucher CTA */}
-                    <View style={styles.ticketRightZone}>
-                      {/* Top Right Tag */}
-                      <Text style={styles.specialRewardTag}>
-                        {item.rewardType === 'discount' 
-                          ? (item.discountValue ? (item.discountType === 'percentage' ? `${item.discountValue}% OFF` : `RM ${item.discountValue}`) : 'DISCOUNT')
-                          : 'FREE ITEM'}
-                      </Text>
+                    {/* 3. PERFORATION COLUMN */}
+                    <View style={{
+                      width: 18,
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      position: 'relative',
+                      zIndex: 3,
+                    }} pointerEvents="none">
+                      <View style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 9,
+                        backgroundColor: cardBrandColor,
+                      }} />
+                      <View style={{
+                        width: 1,
+                        height: '100%',
+                        borderColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        zIndex: 1,
+                      }} />
+                      <View style={{
+                        position: 'absolute',
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        top: -9,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        zIndex: 2,
+                      }} />
+                      <View style={{
+                        position: 'absolute',
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        bottom: -9,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        zIndex: 2,
+                      }} />
+                    </View>
 
-                      {/* Bottom Right CTA Button */}
-                      {item.status === 'active' ? (
-                        <View style={styles.ctaPillBtn}>
-                          <Text style={styles.ctaPillText} numberOfLines={1}>Use Voucher ➔</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.usedBadge}>
-                          <Text style={styles.usedBadgeText}>USED / EXPIRED</Text>
-                        </View>
-                      )}
+                    {/* 4. RIGHT STUB */}
+                    <View style={{
+                      width: 100,
+                      backgroundColor: cardBrandColor,
+                      borderTopRightRadius: 18,
+                      borderBottomRightRadius: 18,
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <View style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 26,
+                        backgroundColor: '#FFFFFF',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 2,
+                        borderColor: isLightBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.12,
+                        shadowRadius: 4,
+                        elevation: 2,
+                        marginBottom: 6,
+                      }}>
+                        <Image source={{ uri: item.logo }} style={{ width: 44, height: 44, borderRadius: 22, resizeMode: 'cover' }} />
+                      </View>
+                      <Text style={{
+                        fontSize: 10.5,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: brandTextColor,
+                        textAlign: 'center',
+                        width: '100%',
+                        letterSpacing: 0.3,
+                      }} numberOfLines={2}>
+                        {(item.merchantName || 'STORE').toUpperCase()}
+                      </Text>
                     </View>
                   </Container>
                 );

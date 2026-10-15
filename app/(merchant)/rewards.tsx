@@ -24,6 +24,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import UpgradeModal from './_components/UpgradeModal';
 import { RewardVisualPickerModal } from '@/components/RewardVisualPickerModal';
 import { getRewardVisualById, getRewardVisualUrl } from '@/lib/rewardVisuals';
+import { getVoucherSpineTheme, PRO_CAMPAIGN_RECIPES, ProCampaignRecipe } from '@/theme';
 
 // Existing Catalogue Reward Interface
 interface Reward {
@@ -38,6 +39,17 @@ interface Reward {
   reward_visual_id?: string;
   discount_type?: string;
   discount_value?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface CardSubReward {
+  id: string;
+  at_stamp: number;
+  reward_title: string;
+  reward_type: 'discount_amount' | 'discount_percent' | 'free_item' | 'voucher_code';
+  reward_value: string;
+  linked_reward?: string;
+  badge_icon?: 'gift' | 'ribbon' | 'star' | 'coffee' | 'heart';
 }
 
 // Icon options for custom stamp card design
@@ -69,12 +81,12 @@ const stampIcons: StampIconOption[] = [
 ];
 
 const colorOptions = [
-  { label: 'Carbon Black', value: '#050505' },
-  { label: 'Deep Indigo', value: '#1E1B4B' },
+  { label: 'RiseV Gold', value: '#FFCC00' },
+  { label: 'Deep Indigo', value: '#1E293B' },
   { label: 'Emerald Green', value: '#064E3B' },
-  { label: 'Wine Crimson', value: '#4C0519' },
+  { label: 'Wine Crimson', value: '#7F1D1D' },
   { label: 'Amber Gold', value: '#78350F' },
-  { label: 'Royal Blue', value: '#1E3A8A' },
+  { label: 'Carbon Black', value: '#050505' },
 ];
 
 const stampColorOptions = [
@@ -100,7 +112,7 @@ export default function UnifiedRewardsScreen() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
   const isMalay = locale === 'ms';
-  const { width } = useWindowDimensions();
+  const { width, height: screenHeight } = useWindowDimensions();
   const isDesktop = width >= 768;
 
   // Color picker refs (web only) — render inputs at top level so picker dialog is centered
@@ -110,14 +122,25 @@ export default function UnifiedRewardsScreen() {
   const iconColorInputRef = React.useRef<any>(null);
 
   // Sub-tabs Selection
-  const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'points_tiers' | 'birthday'>('catalogue');
+  const [activeTab, setActiveTab] = useState<'catalogue' | 'card_design' | 'stamp_rules' | 'points_tiers' | 'birthday'>('catalogue');
+  const [cardSubTab, setCardSubTab] = useState<'colors' | 'images'>('colors');
+  const [isArtworkExpanded, setIsArtworkExpanded] = useState<boolean>(true);
+  const [activeColorPickerModal, setActiveColorPickerModal] = useState<'background' | 'slots' | 'text' | 'icons' | null>(null);
+  const [pointsSubTab, setPointsSubTab] = useState<'earn' | 'redeem' | 'limits'>('earn');
 
   // Loyalty Program Modes (Stamps, Points & Tiers)
   const [enableStamps, setEnableStamps] = useState<boolean>(true);
   const [enablePoints, setEnablePoints] = useState<boolean>(true);
   const [savingLoyaltyModules, setSavingLoyaltyModules] = useState<boolean>(false);
   const [spendPerPoint, setSpendPerPoint] = useState<string>('1');
+  const [pointsPerRm, setPointsPerRm] = useState<string>('100');
+  const [minRedeemPoints, setMinRedeemPoints] = useState<string>('0');
+  const [maxRedeemPercent, setMaxRedeemPercent] = useState<string>('0');
   const [savingPointsRate, setSavingPointsRate] = useState<boolean>(false);
+  const [testSpend, setTestSpend] = useState<string>('100');
+  const [showEarnRateModal, setShowEarnRateModal] = useState<boolean>(false);
+  const [showRedeemRateModal, setShowRedeemRateModal] = useState<boolean>(false);
+  const [showPointsRulesModal, setShowPointsRulesModal] = useState<boolean>(false);
 
   // Shared Loading & Authorization States
   const [merchant, setMerchant] = useState<any>(null);
@@ -128,7 +151,7 @@ export default function UnifiedRewardsScreen() {
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
-  const [catalogueFilter, setCatalogueFilter] = useState<'all' | 'active' | 'draft' | 'discount' | 'free_item'>('all');
+  const [catalogueFilter, setCatalogueFilter] = useState<'all' | 'active' | 'draft' | 'birthday' | 'discount' | 'free_item'>('all');
 
   // Tab 4: Birthday Rewards
   const [birthdayReward, setBirthdayReward] = useState<any>(null);
@@ -140,7 +163,7 @@ export default function UnifiedRewardsScreen() {
     reward_value: '',
     message_template: 'Happy Birthday {{name}}! {{merchant}} has a special treat for you: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}.',
     message_template_b: '',
-    expiry_days: '7',
+    expiry_days: '3',
     send_time: '09:00',
     is_active: true,
   });
@@ -151,11 +174,14 @@ export default function UnifiedRewardsScreen() {
   const [formPointsCost, setFormPointsCost] = useState('0');
   const [formStock, setFormStock] = useState('50');
   const [formType, setFormType] = useState<'free_item' | 'discount'>('free_item');
+  const [formCampaignType, setFormCampaignType] = useState<string | null>(null);
   const [formDiscountType, setFormDiscountType] = useState<'percentage' | 'fixed_amount'>('percentage');
   const [formDiscountValue, setFormDiscountValue] = useState('');
   const [formMinSpend, setFormMinSpend] = useState('');
   const [formMaxDiscount, setFormMaxDiscount] = useState('');
   const [formFreeQty, setFormFreeQty] = useState('1');
+  const [formApplicableItemsText, setFormApplicableItemsText] = useState('');
+  const [formDiscountScope, setFormDiscountScope] = useState<'all' | 'specific'>('all');
   const [formSelectedLinkedItemIds, setFormSelectedLinkedItemIds] = useState<string[]>([]);
   const [formIsActive, setFormIsActive] = useState(true);
   const [imageFile, setImageFile] = useState<any>(null);
@@ -389,12 +415,38 @@ export default function UnifiedRewardsScreen() {
   const [programId, setProgramId] = useState<string | null>(null);
   const [linkedRewardId, setLinkedRewardId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
-  const [requiredStamps, setRequiredStamps] = useState<5 | 10 | 15>(10);
-  const [expiryDays, setExpiryDays] = useState('30');
+  const [requiredStamps, setRequiredStamps] = useState<number>(10);
+  const [subRewards, setSubRewards] = useState<CardSubReward[]>([]);
+  const [expiryDays, setExpiryDays] = useState('90');
   const [minSpendAmount, setMinSpendAmount] = useState<string>('0');
   const [enableMinSpend, setEnableMinSpend] = useState<boolean>(false);
   const [minSpendFocused, setMinSpendFocused] = useState<boolean>(false);
   const [rewardDesc, setRewardDesc] = useState('');
+
+  // V3 Focused Editing Flow States (Reference Image 1: Fresha x Apple iOS x Risev Signature)
+  const [stampSubScreen, setStampSubScreen] = useState<null | 'goal' | 'reward' | 'expiry' | 'min_spend' | 'milestones' | 'simulator'>(null);
+  const [tempGoal, setTempGoal] = useState<number>(10);
+  const [customGoalInput, setCustomGoalInput] = useState<string>('');
+  const [isCustomGoalMode, setIsCustomGoalMode] = useState<boolean>(false);
+
+  const [tempLinkedRewardId, setTempLinkedRewardId] = useState<string | null>(null);
+  const [tempRewardDesc, setTempRewardDesc] = useState<string>('');
+  const [rewardSearchQuery, setRewardSearchQuery] = useState<string>('');
+  const [rewardCategoryFilter, setRewardCategoryFilter] = useState<'all' | 'free_item' | 'discount' | 'custom'>('all');
+
+  const [tempExpiryDays, setTempExpiryDays] = useState<string>('90');
+
+  const [tempEnableMinSpend, setTempEnableMinSpend] = useState<boolean>(false);
+  const [tempMinSpendAmount, setTempMinSpendAmount] = useState<string>('0');
+  const [minSpendPreset, setMinSpendPreset] = useState<'none' | '10' | '20' | 'custom'>('none');
+
+  const [enableMilestones, setEnableMilestones] = useState<boolean>(true);
+  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
+  const [showMilestoneEditorModal, setShowMilestoneEditorModal] = useState<boolean>(false);
+  const [milestoneFormStamp, setMilestoneFormStamp] = useState<number>(3);
+  const [milestoneFormTitle, setMilestoneFormTitle] = useState<string>('');
+  const [milestoneFormType, setMilestoneFormType] = useState<'free_item' | 'discount_percent' | 'discount_amount'>('free_item');
+  const [milestoneFormValue, setMilestoneFormValue] = useState<string>('5');
   const [selectedIcon, setSelectedIcon] = useState<string>('coffee');
   const [iconColor, setIconColor] = useState<string>('#FFFFFF');
   const [customIconHexInput, setCustomIconHexInput] = useState<string>('#FFFFFF');
@@ -429,6 +481,7 @@ export default function UnifiedRewardsScreen() {
   const [showInlineCreateModal, setShowInlineCreateModal] = useState(false);
   const [inlineTitle, setInlineTitle] = useState('');
   const [inlineType, setInlineType] = useState<'free_item' | 'discount'>('free_item');
+  const [inlineCampaignType, setInlineCampaignType] = useState<string | null>(null);
   const [inlineDesc, setInlineDesc] = useState('');
   const [inlineStock, setInlineStock] = useState('50');
   const [inlineImageFile, setInlineImageFile] = useState<any>(null);
@@ -442,10 +495,60 @@ export default function UnifiedRewardsScreen() {
   const [inlineMinSpend, setInlineMinSpend] = useState('');
   const [inlineMaxDiscount, setInlineMaxDiscount] = useState('');
   const [inlineFreeQty, setInlineFreeQty] = useState('1');
+  const [inlineApplicableItemsText, setInlineApplicableItemsText] = useState('');
+  const [inlineDiscountScope, setInlineDiscountScope] = useState<'all' | 'specific'>('all');
   const [selectedLinkedItemIds, setSelectedLinkedItemIds] = useState<string[]>([]);
   const [merchantServicesList, setMerchantServicesList] = useState<any[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [showBirthdayItemPicker, setShowBirthdayItemPicker] = useState(false);
+  const [selectedBirthdayItem, setSelectedBirthdayItem] = useState<any | null>(null);
+  const [birthdayItemSearch, setBirthdayItemSearch] = useState('');
+  const [birthdayItemFilter, setBirthdayItemFilter] = useState<'all' | 'service' | 'product'>('all');
+  const [birthdayGiftMode, setBirthdayGiftMode] = useState<'manual' | 'catalog'>('manual');
+  const [manualGiftInput, setManualGiftInput] = useState('');
+  const [manualGiftDescInput, setManualGiftDescInput] = useState('');
+  const [helpModalInfo, setHelpModalInfo] = useState<{ title: string; desc: string } | null>(null);
+  const [showValidityPicker, setShowValidityPicker] = useState(false);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showStampsPicker, setShowStampsPicker] = useState(false);
+
+  const handleConfirmManualGift = () => {
+    const trimmedTitle = manualGiftInput.trim();
+    if (!trimmedTitle) {
+      Alert.alert(
+        locale === 'en' ? 'Missing Gift Title' : 'Nama Hadiah Diperlukan',
+        locale === 'en' ? 'Please enter the name of the birthday gift.' : 'Sila masukkan nama hadiah hari jadi.'
+      );
+      return;
+    }
+    setSelectedBirthdayItem(null);
+    setBirthdayForm((f) => ({
+      ...f,
+      reward_type: 'voucher_code',
+      title: trimmedTitle,
+      reward_value: trimmedTitle,
+      description: manualGiftDescInput.trim() || (locale === 'en' ? `Special birthday gift: ${trimmedTitle}` : `Hadiah khas hari jadi: ${trimmedTitle}`),
+      message_template: `Happy Birthday {{name}}! ${merchant?.name || 'Us'} has gifted you: ${trimmedTitle}! Show this code at the counter: {{code}}. Valid for 3 days.`,
+    }));
+    setShowBirthdayItemPicker(false);
+  };
+
+  const handleSelectBirthdayItem = (item: any) => {
+    setSelectedBirthdayItem(item);
+    setShowBirthdayItemPicker(false);
+    const itemTitle = `Free ${item.name}`;
+    const itemValue = item.price ? `${item.name} (RM${Number(item.price).toFixed(0)})` : item.name;
+    setBirthdayForm((f) => ({
+      ...f,
+      reward_type: 'voucher_code',
+      title: itemTitle,
+      reward_value: itemValue,
+      description: item.description || `Special birthday gift: complimentary ${item.name}`,
+      message_template: `Happy Birthday {{name}}! ${merchant?.name || 'Us'} has gifted you a complimentary ${item.name}! Show this code at the counter: {{code}}. Valid for 3 days.`,
+    }));
+  };
 
   useEffect(() => {
     if (!user?.merchant_id) return;
@@ -456,6 +559,20 @@ export default function UnifiedRewardsScreen() {
           sort: 'name',
         });
         setMerchantServicesList(sRes.items);
+        const match = sRes.items.find((item: any) =>
+          birthdayForm.title.toLowerCase().includes(item.name.toLowerCase()) ||
+          item.name.toLowerCase().includes(birthdayForm.title.toLowerCase())
+        );
+        if (match) {
+          setSelectedBirthdayItem(match);
+        } else if (birthdayForm.title.toLowerCase().includes('aiskrim') || birthdayForm.title.toLowerCase().includes('catering')) {
+          setSelectedBirthdayItem({
+            id: 'demo_icecream',
+            name: 'Catering Aiskrim 300pax',
+            price: 850,
+            item_type: 'product',
+          });
+        }
       } catch (e) {}
 
       try {
@@ -464,9 +581,11 @@ export default function UnifiedRewardsScreen() {
         });
         if (subRes.items.length > 0) {
           const plan = (subRes.items[0].plan || '').toLowerCase();
-          if (plan === 'pro' || plan === 'business') {
+          if (plan === 'pro' || plan === 'business' || plan === 'growth') {
             setIsPro(true);
           }
+        } else if ((merchant as any)?.is_pro || (merchant as any)?.plan === 'pro' || (user as any)?.is_pro) {
+          setIsPro(true);
         }
       } catch (e) {}
     })();
@@ -526,9 +645,26 @@ export default function UnifiedRewardsScreen() {
         setEnableStamps(prog.enable_stamps !== false);
         setEnablePoints(prog.enable_points !== false);
         setSpendPerPoint(String(prog.spend_per_point || '1'));
+        setPointsPerRm(String(prog.points_per_rm || '100'));
+        setMinRedeemPoints(String(prog.min_redeem_points ?? '0'));
+        setMaxRedeemPercent(String(prog.max_redeem_percent ?? '0'));
         setLinkedRewardId(prog.linked_reward || null);
         setIsActive(prog.is_active);
         setRequiredStamps(prog.stamp_goal as any || 10);
+        if (prog.sub_rewards) {
+          try {
+            const parsed = typeof prog.sub_rewards === 'string' ? JSON.parse(prog.sub_rewards) : prog.sub_rewards;
+            if (Array.isArray(parsed)) {
+              setSubRewards(parsed);
+            } else {
+              setSubRewards([]);
+            }
+          } catch {
+            setSubRewards([]);
+          }
+        } else {
+          setSubRewards([]);
+        }
         setExpiryDays(String(prog.expiry_days || '30'));
         const loadedMinSpend = parseFloat(prog.min_spend_amount) || 0;
         setMinSpendAmount(loadedMinSpend > 0 ? String(loadedMinSpend) : '0');
@@ -593,12 +729,23 @@ export default function UnifiedRewardsScreen() {
           reward_value: rec.reward_value ? String(rec.reward_value) : '',
           message_template: rec.message_template || '',
           message_template_b: rec.message_template_b || '',
-          expiry_days: rec.expiry_days ? String(rec.expiry_days) : '7',
+          expiry_days: rec.expiry_days ? String(rec.expiry_days) : '3',
           send_time: rec.send_time || '09:00',
           is_active: rec.is_active ?? true,
         });
       } else {
         setBirthdayReward(null);
+        setBirthdayForm({
+          title: 'Free Birthday Treat',
+          description: 'Valid during your birthday celebration',
+          reward_type: 'voucher_code',
+          reward_value: 'Free Birthday Drink or Item',
+          message_template: 'Happy Birthday {{name}}! {{merchant}} has a special treat for you: {{title}}. Show this code at the counter: {{code}}. Valid for 3 days (Day before, Birthday & Next day).',
+          message_template_b: '',
+          expiry_days: '3',
+          send_time: '09:00',
+          is_active: true,
+        });
       }
     } catch (err: any) {
       console.warn("Failed to fetch birthday reward:", err.message || err);
@@ -624,12 +771,15 @@ export default function UnifiedRewardsScreen() {
   // Tab 4: Birthday Rewards Handlers
   const handleSaveBirthday = async () => {
     if (!user || !user.merchant_id) return;
-    if (!birthdayForm.title.trim() || !birthdayForm.reward_value.trim()) {
+    const finalTitle = (birthdayForm.title || (selectedBirthdayItem?.name ? `Free ${selectedBirthdayItem.name}` : '')).trim();
+    const finalValue = (birthdayForm.reward_value || finalTitle || 'Birthday Treat').trim();
+
+    if (!finalTitle) {
       Alert.alert(
         'Validation Error',
         birthdayForm.reward_type === 'stamps'
           ? (isMalay ? 'Sila masukkan bilangan cop bonus.' : 'Please enter the number of bonus stamps.')
-          : (isMalay ? 'Sila masukkan tawaran atau hadiah percuma.' : 'Please enter the reward offer or free gift.')
+          : (isMalay ? 'Sila masukkan atau pilih tawaran hadiah hari jadi.' : 'Please enter or select the birthday gift offer.')
       );
       return;
     }
@@ -646,33 +796,74 @@ export default function UnifiedRewardsScreen() {
 
     setSavingBirthday(true);
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         merchant: user.merchant_id,
-        title: birthdayForm.title.trim(),
-        description: birthdayForm.description.trim(),
+        title: finalTitle,
+        description: birthdayForm.description.trim() || `Special birthday gift: ${finalTitle}`,
         reward_type: birthdayForm.reward_type,
-        reward_value: birthdayForm.reward_value.trim(),
-        message_template: birthdayForm.message_template.trim() || `Happy Birthday {{name}}! Special gift from ${merchant?.name || 'us'}: ${birthdayForm.title.trim()}`,
-        message_template_b: null,
+        reward_value: finalValue,
+        message_template: birthdayForm.message_template.trim() || `Happy Birthday {{name}}! Special gift from ${merchant?.name || 'us'}: ${finalTitle}`,
+        message_template_b: '',
         expiry_days: expiryDays,
         send_time: birthdayForm.send_time,
         is_active: birthdayForm.is_active,
       };
 
-      if (birthdayReward) {
-        await pb.collection('birthday_rewards').update(birthdayReward.id, payload, { requestKey: null });
-        Alert.alert('Success', 'Birthday reward updated.');
+      if (birthdayReward && birthdayReward.id) {
+        const updated = await pb.collection('birthday_rewards').update(birthdayReward.id, payload, { requestKey: null });
+        setBirthdayReward(updated);
       } else {
-        await pb.collection('birthday_rewards').create(payload, { requestKey: null });
-        Alert.alert('Success', 'Birthday reward created.');
+        const created = await pb.collection('birthday_rewards').create(payload, { requestKey: null });
+        setBirthdayReward(created);
       }
-      fetchBirthdayReward();
+      await fetchBirthdayReward();
+      await fetchRewards();
+
+      Alert.alert(
+        locale === 'en' ? 'Birthday Reward Saved' : 'Ganjaran Hari Jadi Disimpan',
+        locale === 'en'
+          ? 'Your birthday reward has been saved and is now active in your Rewards Catalog!'
+          : 'Ganjaran hari jadi telah disimpan dan kini aktif dalam Katalog Ganjaran!',
+        [
+          { text: locale === 'en' ? 'Stay Here' : 'Kekal di Sini', style: 'cancel' },
+          {
+            text: locale === 'en' ? 'View in Catalog' : 'Lihat di Katalog',
+            onPress: () => setActiveTab('catalogue'),
+          },
+        ]
+      );
     } catch (err: any) {
       console.warn('Failed to save birthday reward:', err.message || err);
       Alert.alert('Error', err.message || 'Failed to save birthday reward.');
     } finally {
       setSavingBirthday(false);
     }
+  };
+
+  const handleDeleteBirthday = () => {
+    if (!birthdayReward) return;
+    Alert.alert(
+      locale === 'en' ? 'Remove Birthday Reward' : 'Padam Ganjaran Hari Jadi',
+      locale === 'en'
+        ? 'Are you sure you want to deactivate or remove this birthday reward?'
+        : 'Adakah anda pasti mahu memadam ganjaran hari jadi ini?',
+      [
+        { text: locale === 'en' ? 'Cancel' : 'Batal', style: 'cancel' },
+        {
+          text: locale === 'en' ? 'Delete' : 'Padam',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await pb.collection('birthday_rewards').delete(birthdayReward.id);
+              await fetchBirthdayReward();
+              Alert.alert('Success', locale === 'en' ? 'Birthday reward removed.' : 'Ganjaran hari jadi dipadam.');
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete birthday reward.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Tab 1: Catalogue Handlers
@@ -688,9 +879,12 @@ export default function UnifiedRewardsScreen() {
     setFormMinSpend('');
     setFormMaxDiscount('');
     setFormFreeQty('1');
+    setFormApplicableItemsText('');
+    setFormDiscountScope('all');
     setFormSelectedLinkedItemIds([]);
     setFormIsActive(true);
     setFormRewardVisualId(null);
+    setFormCampaignType(null);
     setImageFile(null);
     setImagePreview(null);
     setModalVisible(true);
@@ -703,11 +897,14 @@ export default function UnifiedRewardsScreen() {
     setFormPointsCost(String(reward.points_cost || 0));
     setFormStock(String(reward.stock || 50));
     setFormType(reward.type === 'discount' ? 'discount' : 'free_item');
+    setFormCampaignType(reward.metadata?.campaign_type || null);
     setFormDiscountType(reward.discount_type || 'percentage');
     setFormDiscountValue(reward.discount_value ? String(reward.discount_value) : '');
     setFormMinSpend(reward.min_spend ? String(reward.min_spend) : '');
     setFormMaxDiscount(reward.max_discount ? String(reward.max_discount) : '');
     setFormFreeQty(reward.free_quantity ? String(reward.free_quantity) : '1');
+    setFormApplicableItemsText(reward.applicable_items_text || '');
+    setFormDiscountScope(reward.discount_scope || 'all');
     setFormIsActive(!!reward.is_active);
     setFormRewardVisualId(reward.reward_visual_id || null);
     setImageFile(null);
@@ -727,6 +924,116 @@ export default function UnifiedRewardsScreen() {
     }
 
     setModalVisible(true);
+  };
+
+  const handleSelectRecipe = (recipe: ProCampaignRecipe) => {
+    if (!isPro) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    if (formCampaignType === recipe.id) {
+      setFormCampaignType(null);
+      return;
+    }
+    setFormCampaignType(recipe.id);
+    setFormType(recipe.baseType as any);
+
+    if (recipe.id === 'bogo') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Buy 1 Free 1 Special' : 'Beli 1 Percuma 1 Khas');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? 'Buy 1 Get 1 Free on selected menu' : 'Beli 1 Percuma 1 untuk menu terpilih'));
+      setFormFreeQty('1');
+    } else if (recipe.id === 'happy_hour') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Happy Hour 20% OFF' : 'Happy Hour Diskaun 20%');
+      setFormDiscountType('percentage');
+      if (!formDiscountValue) setFormDiscountValue('20');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? 'Valid Mon-Thu, 2:00 PM – 5:00 PM' : 'Sah Isnin–Khamis, 2:00 PM – 5:00 PM'));
+      setFormDiscountScope('specific');
+    } else if (recipe.id === 'flash_sale') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Flash Sale 30% OFF' : 'Jualan Kilat 30% OFF');
+      setFormDiscountType('percentage');
+      if (!formDiscountValue) setFormDiscountValue('30');
+      if (!formStock || formStock === '50') setFormStock('30');
+    } else if (recipe.id === 'welcome_gift') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Welcome Gift (First Visit)' : 'Hadiah Aluan Khas');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? '1x Special welcome gift upon first visit' : '1x Hadiah aluan khas lawatan pertama'));
+      setFormFreeQty('1');
+    } else if (recipe.id === 'bring_friend') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Bring A Friend RM10 OFF' : 'Bawa Kawan Jimat RM10');
+      setFormDiscountType('fixed_amount');
+      if (!formDiscountValue) setFormDiscountValue('10');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? 'Valid for orders with 2 or more pax' : 'Sah untuk pesanan 2 orang atau lebih'));
+      setFormDiscountScope('specific');
+    } else if (recipe.id === 'win_back') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'We Miss You! RM5 OFF' : 'Kami Rindu Anda! RM5 OFF');
+      setFormDiscountType('fixed_amount');
+      if (!formDiscountValue) setFormDiscountValue('5');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? 'Exclusive comeback voucher for you' : 'Baucar khas kembali ke kedai'));
+    } else if (recipe.id === 'spend_save') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Spend RM50 Save RM10' : 'Belanja RM50 Jimat RM10');
+      setFormDiscountType('fixed_amount');
+      if (!formDiscountValue) setFormDiscountValue('10');
+      if (!formMinSpend) setFormMinSpend('50');
+    } else if (recipe.id === 'festive') {
+      if (!formTitle || formTitle === 'FREE AISKRIM Premium 3 scoop') setFormTitle(locale === 'en' ? 'Payday & Festive Special' : 'Kempen Gaji & Pesta');
+      setFormDiscountType('percentage');
+      if (!formDiscountValue) setFormDiscountValue('15');
+      setFormApplicableItemsText(prev => prev || (locale === 'en' ? 'Special celebration treat' : 'Tawaran istimewa sambutan'));
+    }
+  };
+
+  const handleSelectInlineRecipe = (recipe: ProCampaignRecipe) => {
+    if (!isPro) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    if (inlineCampaignType === recipe.id) {
+      setInlineCampaignType(null);
+      return;
+    }
+    setInlineCampaignType(recipe.id);
+    setInlineType(recipe.baseType as any);
+
+    if (recipe.id === 'bogo') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Buy 1 Free 1 Special' : 'Beli 1 Percuma 1 Khas');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? 'Buy 1 Get 1 Free on selected menu' : 'Beli 1 Percuma 1 untuk menu terpilih'));
+      setInlineFreeQty('1');
+    } else if (recipe.id === 'happy_hour') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Happy Hour 20% OFF' : 'Happy Hour Diskaun 20%');
+      setInlineDiscountType('percentage');
+      if (!inlineDiscountValue) setInlineDiscountValue('20');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? 'Valid Mon-Thu, 2:00 PM – 5:00 PM' : 'Sah Isnin–Khamis, 2:00 PM – 5:00 PM'));
+      setInlineDiscountScope('specific');
+    } else if (recipe.id === 'flash_sale') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Flash Sale 30% OFF' : 'Jualan Kilat 30% OFF');
+      setInlineDiscountType('percentage');
+      if (!inlineDiscountValue) setInlineDiscountValue('30');
+      if (!inlineStock || inlineStock === '50') setInlineStock('30');
+    } else if (recipe.id === 'welcome_gift') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Welcome Gift (First Visit)' : 'Hadiah Aluan Khas');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? '1x Special welcome gift upon first visit' : '1x Hadiah aluan khas lawatan pertama'));
+      setInlineFreeQty('1');
+    } else if (recipe.id === 'bring_friend') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Bring A Friend RM10 OFF' : 'Bawa Kawan Jimat RM10');
+      setInlineDiscountType('fixed_amount');
+      if (!inlineDiscountValue) setInlineDiscountValue('10');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? 'Valid for orders with 2 or more pax' : 'Sah untuk pesanan 2 orang atau lebih'));
+      setInlineDiscountScope('specific');
+    } else if (recipe.id === 'win_back') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'We Miss You! RM5 OFF' : 'Kami Rindu Anda! RM5 OFF');
+      setInlineDiscountType('fixed_amount');
+      if (!inlineDiscountValue) setInlineDiscountValue('5');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? 'Exclusive comeback voucher for you' : 'Baucar khas kembali ke kedai'));
+    } else if (recipe.id === 'spend_save') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Spend RM50 Save RM10' : 'Belanja RM50 Jimat RM10');
+      setInlineDiscountType('fixed_amount');
+      if (!inlineDiscountValue) setInlineDiscountValue('10');
+      if (!inlineMinSpend) setInlineMinSpend('50');
+    } else if (recipe.id === 'festive') {
+      if (!inlineTitle) setInlineTitle(locale === 'en' ? 'Payday & Festive Special' : 'Kempen Gaji & Pesta');
+      setInlineDiscountType('percentage');
+      if (!inlineDiscountValue) setInlineDiscountValue('15');
+      setInlineApplicableItemsText(prev => prev || (locale === 'en' ? 'Special celebration treat' : 'Tawaran istimewa sambutan'));
+    }
   };
 
   const handlePickImage = () => {
@@ -766,7 +1073,15 @@ export default function UnifiedRewardsScreen() {
       formData.append('min_spend', String(parseFloat(formMinSpend) || 0));
       formData.append('max_discount', String(parseFloat(formMaxDiscount) || 0));
       formData.append('free_quantity', String(parseInt(formFreeQty, 10) || 1));
+      formData.append('applicable_items_text', formApplicableItemsText.trim());
+      formData.append('discount_scope', formType === 'discount' ? formDiscountScope : 'all');
       formData.append('is_active', String(formIsActive));
+      if (formCampaignType) {
+        formData.append('metadata', JSON.stringify({
+          ...(editingReward?.metadata || {}),
+          campaign_type: formCampaignType,
+        }));
+      }
       if (formRewardVisualId) {
         formData.append('reward_visual_id', formRewardVisualId);
       }
@@ -834,6 +1149,18 @@ export default function UnifiedRewardsScreen() {
       Alert.alert("Error", msg);
     } finally {
       setIsDeletingReward(false);
+    }
+  };
+
+  const handleToggleRewardActive = async (reward: Reward) => {
+    const nextVal = !reward.is_active;
+    setRewards(prev => prev.map(r => r.id === reward.id ? { ...r, is_active: nextVal } : r));
+    try {
+      await pb.collection('rewards').update(reward.id, { is_active: nextVal });
+    } catch (err: any) {
+      console.warn("Failed to toggle reward active status:", err);
+      setRewards(prev => prev.map(r => r.id === reward.id ? { ...r, is_active: reward.is_active } : r));
+      Alert.alert(locale === 'en' ? 'Error' : 'Ralat', locale === 'en' ? 'Failed to update reward status.' : 'Gagal mengemaskini status ganjaran.');
     }
   };
 
@@ -922,9 +1249,16 @@ export default function UnifiedRewardsScreen() {
       formData.append('min_spend', String(parseFloat(inlineMinSpend) || 0));
       formData.append('max_discount', String(parseFloat(inlineMaxDiscount) || 0));
       formData.append('free_quantity', String(parseInt(inlineFreeQty, 10) || 1));
+      formData.append('applicable_items_text', inlineApplicableItemsText.trim());
+      formData.append('discount_scope', inlineType === 'discount' ? inlineDiscountScope : 'all');
       formData.append('stock', String(inlineStock ? (parseInt(inlineStock, 10) || 1000000) : 1000000));
       formData.append('points_cost', '0');
       formData.append('is_active', 'true');
+      if (inlineCampaignType) {
+        formData.append('metadata', JSON.stringify({
+          campaign_type: inlineCampaignType,
+        }));
+      }
       if (inlineRewardVisualId) {
         formData.append('reward_visual_id', inlineRewardVisualId);
       }
@@ -961,6 +1295,8 @@ export default function UnifiedRewardsScreen() {
       setInlineMinSpend('');
       setInlineMaxDiscount('');
       setInlineFreeQty('1');
+      setInlineApplicableItemsText('');
+      setInlineDiscountScope('all');
       setSelectedLinkedItemIds([]);
       setInlineImageFile(null);
       setInlineImagePreview(null);
@@ -971,6 +1307,57 @@ export default function UnifiedRewardsScreen() {
     } finally {
       setIsSavingInlineReward(false);
     }
+  };
+
+  const handleSelectStampGoal = (newGoal: number) => {
+    setRequiredStamps(newGoal);
+    setSubRewards(prev => prev.filter(sr => sr.at_stamp < newGoal));
+  };
+
+  const handleAddSubReward = () => {
+    const maxMilestone = requiredStamps - 1;
+    const existingStamps = new Set(subRewards.map(s => Number(s.at_stamp)));
+    let nextAvailable: number | null = null;
+    for (let s = 1; s <= maxMilestone; s++) {
+      if (!existingStamps.has(s)) {
+        nextAvailable = s;
+        break;
+      }
+    }
+
+    if (!nextAvailable) {
+      Alert.alert(
+        locale === 'en' ? 'Limit Reached' : 'Had Dicapai',
+        locale === 'en' 
+          ? `All milestone stamps (1 to ${maxMilestone}) already have configured rewards.` 
+          : `Semua cop pertengahan (1 hingga ${maxMilestone}) telah mempunyai ganjaran.`
+      );
+      return;
+    }
+
+    const newMilestone: CardSubReward = {
+      id: 'sr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      at_stamp: nextAvailable,
+      reward_title: locale === 'en' ? 'Free Drink / Snack' : 'Minuman / Snek Percuma',
+      reward_type: 'free_item',
+      reward_value: '5',
+      badge_icon: 'gift',
+    };
+
+    setSubRewards(prev => [...prev, newMilestone].sort((a, b) => a.at_stamp - b.at_stamp));
+  };
+
+  const handleRemoveSubReward = (id: string) => {
+    setSubRewards(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleUpdateSubReward = (id: string, updates: Partial<CardSubReward>) => {
+    setSubRewards(prev => {
+      return prev.map(s => {
+        if (s.id !== id) return s;
+        return { ...s, ...updates };
+      }).sort((a, b) => a.at_stamp - b.at_stamp);
+    });
   };
 
   const handleSaveCardConfig = async () => {
@@ -999,6 +1386,7 @@ export default function UnifiedRewardsScreen() {
         stamp_goal: requiredStamps,
         reward_description: finalRewardName,
         linked_reward: linkedRewardId || null,
+        sub_rewards: JSON.stringify(subRewards),
         card_color: cardColor,
         stamp_color: stampColor,
         font_color: fontColor,
@@ -1068,13 +1456,37 @@ export default function UnifiedRewardsScreen() {
   };
 
   const handleSavePointsRate = async () => {
-    const parsed = parseFloat(spendPerPoint);
-    if (isNaN(parsed) || parsed <= 0) {
+    const parsedSpend = parseFloat(spendPerPoint);
+    const parsedRedeem = parseInt(pointsPerRm, 10);
+    const parsedMinRedeem = parseInt(minRedeemPoints, 10) || 0;
+    const parsedMaxPercent = parseInt(maxRedeemPercent, 10) || 0;
+
+    if (isNaN(parsedSpend) || parsedSpend <= 0) {
       Alert.alert(
         locale === 'en' ? 'Invalid Input' : 'Input Tidak Sah',
         locale === 'en'
           ? 'Please enter a valid spend amount greater than 0.'
           : 'Sila masukkan jumlah perbelanjaan yang sah lebih daripada 0.'
+      );
+      return;
+    }
+
+    if (isNaN(parsedRedeem) || parsedRedeem <= 0) {
+      Alert.alert(
+        locale === 'en' ? 'Invalid Input' : 'Input Tidak Sah',
+        locale === 'en'
+          ? 'Please enter valid points per RM greater than 0.'
+          : 'Sila masukkan bilangan mata per RM yang sah lebih daripada 0.'
+      );
+      return;
+    }
+
+    if (parsedMaxPercent < 0 || parsedMaxPercent > 100) {
+      Alert.alert(
+        locale === 'en' ? 'Invalid Input' : 'Input Tidak Sah',
+        locale === 'en'
+          ? 'Max discount percentage must be between 0% and 100%.'
+          : 'Peratusan diskaun maksima mestilah antara 0% dan 100%.'
       );
       return;
     }
@@ -1085,13 +1497,19 @@ export default function UnifiedRewardsScreen() {
       setSavingPointsRate(true);
       if (programId) {
         await pb.collection('loyalty_programs').update(programId, {
-          spend_per_point: parsed,
+          spend_per_point: parsedSpend,
+          points_per_rm: parsedRedeem,
+          min_redeem_points: parsedMinRedeem,
+          max_redeem_percent: parsedMaxPercent,
         });
       } else {
         const newProg = await pb.collection('loyalty_programs').create({
           merchant: user.merchant_id,
           name: `${merchant?.name || 'Store'} Loyalty Program`,
-          spend_per_point: parsed,
+          spend_per_point: parsedSpend,
+          points_per_rm: parsedRedeem,
+          min_redeem_points: parsedMinRedeem,
+          max_redeem_percent: parsedMaxPercent,
           enable_stamps: enableStamps,
           enable_points: enablePoints,
           is_active: true,
@@ -1099,10 +1517,10 @@ export default function UnifiedRewardsScreen() {
         setProgramId(newProg.id);
       }
       Alert.alert(
-        locale === 'en' ? 'Points Rule Saved' : 'Peraturan Mata Disimpan',
+        locale === 'en' ? 'Points Rules Saved' : 'Peraturan Mata Disimpan',
         locale === 'en'
-          ? `Points earning rule updated: RM ${parsed} spent = 1 Point.`
-          : `Peraturan pendapatan mata dikemas kini: RM ${parsed} dibelanjakan = 1 Mata.`
+          ? `Points rules updated:\n• Earn: RM ${parsedSpend} = 1 Pt\n• Redeem: ${parsedRedeem} Pts = RM 1.00 Discount\n• Min Points: ${parsedMinRedeem > 0 ? parsedMinRedeem + ' Pts' : 'None'}`
+          : `Peraturan mata berjaya disimpan:\n• Dapat: RM ${parsedSpend} = 1 Mata\n• Tebus: ${parsedRedeem} Mata = RM 1.00 Diskaun\n• Minima Tebus: ${parsedMinRedeem > 0 ? parsedMinRedeem + ' Mata' : 'Tiada'}`
       );
     } catch (err: any) {
       console.warn("Failed to save points rate:", err);
@@ -1116,19 +1534,79 @@ export default function UnifiedRewardsScreen() {
     const slots: React.ReactNode[] = [];
     for (let i = 1; i <= requiredStamps; i++) {
       const isEarned = i <= 3;
+      const subRewardForSlot = subRewards.find(sr => sr.at_stamp === i);
+      const isFinalGoal = i === requiredStamps;
+
       const slotStyle = isEarned
-        ? [styles.prevLargeStampEarned, { backgroundColor: stampColor || 'rgba(255,255,255,0.95)' }]
-        : [styles.prevLargeStampEmpty, { borderColor: fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)' }];
+        ? [styles.prevLargeStampEarned, { backgroundColor: stampColor || 'rgba(255,255,255,0.95)', position: 'relative' as const }]
+        : [styles.prevLargeStampEmpty, { 
+            borderColor: subRewardForSlot ? '#FFCC00' : (fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)'),
+            backgroundColor: subRewardForSlot ? 'rgba(255, 204, 0, 0.12)' : 'transparent',
+            position: 'relative' as const,
+          }];
+
       slots.push(
         <View key={i} style={slotStyle}>
-          {activeIconObj.family === 'Ionicons' && (
-            <Ionicons name={activeIconObj.name} size={14} color={isEarned ? iconColor : (fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)')} />
-          )}
-          {activeIconObj.family === 'FontAwesome' && (
-            <FontAwesome name={activeIconObj.name} size={14} color={isEarned ? iconColor : (fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)')} />
-          )}
-          {activeIconObj.family === 'MaterialIcons' && (
-            <MaterialIcons name={activeIconObj.name} size={14} color={isEarned ? iconColor : (fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)')} />
+          {isEarned ? (
+            <>
+              {activeIconObj.family === 'Ionicons' && (
+                <Ionicons name={activeIconObj.name} size={14} color={iconColor} />
+              )}
+              {activeIconObj.family === 'FontAwesome' && (
+                <FontAwesome name={activeIconObj.name} size={14} color={iconColor} />
+              )}
+              {activeIconObj.family === 'MaterialIcons' && (
+                <MaterialIcons name={activeIconObj.name} size={14} color={iconColor} />
+              )}
+              {subRewardForSlot && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  backgroundColor: '#FFCC00',
+                  borderRadius: 6,
+                  paddingHorizontal: 2,
+                  paddingVertical: 1,
+                  borderWidth: 1,
+                  borderColor: '#000000',
+                }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>🎁</Text>
+                </View>
+              )}
+            </>
+          ) : subRewardForSlot ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 13 }}>🎁</Text>
+              <View style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                backgroundColor: '#FFCC00',
+                borderRadius: 6,
+                paddingHorizontal: 3,
+                paddingVertical: 0.5,
+                borderWidth: 1,
+                borderColor: '#000000',
+              }}>
+                <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{i}</Text>
+              </View>
+            </View>
+          ) : isFinalGoal ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="ribbon" size={15} color={fontColor || '#FFFFFF'} />
+            </View>
+          ) : (
+            <>
+              {activeIconObj.family === 'Ionicons' && (
+                <Ionicons name={activeIconObj.name} size={14} color={fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)'} />
+              )}
+              {activeIconObj.family === 'FontAwesome' && (
+                <FontAwesome name={activeIconObj.name} size={14} color={fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)'} />
+              )}
+              {activeIconObj.family === 'MaterialIcons' && (
+                <MaterialIcons name={activeIconObj.name} size={14} color={fontColor ? `${fontColor}40` : 'rgba(255, 255, 255, 0.3)'} />
+              )}
+            </>
           )}
         </View>
       );
@@ -1214,184 +1692,258 @@ export default function UnifiedRewardsScreen() {
         contentContainerStyle={[styles.scrollContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark Background */}
-        <View style={{ position: 'absolute', top: -30, left: -20, right: -20, height: 210, backgroundColor: '#050505', zIndex: 0 }} />
-
-        {/* Header Row */}
+        {/* Daylight Studio Header Row */}
         <View style={[styles.headerRow, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={20} color="#050505" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{t('loyalty_settings')}</Text>
           </View>
           <Image 
             source={require('../../assets/risev logo.png')}
-            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#050505' }}
           />
         </View>
 
-
-        {/* Loyalty Program Modules Toggle Card */}
-        <View style={styles.modulesConfigCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="options-outline" size={18} color="#050505" />
-              <Text style={styles.modulesCardTitle}>
-                {locale === 'en' ? 'Loyalty Program Modules' : 'Modul Program Kesetiaan'}
-              </Text>
-            </View>
+        {/* Compact Loyalty Modules Status Capsule */}
+        <View style={[styles.programModuleCapsule, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+          <View style={styles.moduleCapsuleHeader}>
+            <Text style={styles.moduleCapsuleLabel}>
+              {locale === 'en' ? 'LOYALTY ENGINES' : 'ENJIN KESETIAAN'}
+            </Text>
             {savingLoyaltyModules && (
-              <ActivityIndicator size="small" color="#050505" />
+              <ActivityIndicator size="small" color="#0F172A" />
             )}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {/* Toggle 1: Stamp Cards */}
-            <View style={{ flex: 1, backgroundColor: enableStamps ? '#FFFFFF' : 'rgba(5, 5, 5, 0.05)', borderWidth: 1, borderColor: enableStamps ? '#FFFFFF' : 'transparent', borderRadius: 16, padding: 14 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: enableStamps ? 'rgba(16, 185, 129, 0.15)' : 'rgba(5, 5, 5, 0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={enableStamps ? "card" : "card-outline"} size={18} color={enableStamps ? '#10B981' : 'rgba(5, 5, 5, 0.6)'} />
-                </View>
-                <Switch
-                  value={enableStamps}
-                  onValueChange={async (val) => {
-                    if (!val && !enablePoints) {
-                      Alert.alert(
-                        locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
-                        locale === 'en' 
-                          ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
-                          : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
-                      );
-                      return;
-                    }
-                    setEnableStamps(val);
-                    if (!val && activeTab === 'card_design') {
-                      setActiveTab(enablePoints ? 'catalogue' : 'birthday');
-                    }
-                    if (programId) {
-                      try {
-                        setSavingLoyaltyModules(true);
-                        await pb.collection('loyalty_programs').update(programId, { enable_stamps: val });
-                      } catch (err) {
-                        console.warn("Failed to toggle stamps:", err);
-                      } finally {
-                        setSavingLoyaltyModules(false);
-                      }
-                    }
-                  }}
-                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#10B981' }}
-                  thumbColor="#FFFFFF"
-                  style={{ transform: [{ scale: 0.8 }] }}
-                />
+          <View style={styles.moduleTogglesRow}>
+            {/* Stamp Engine Capsule */}
+            <View style={[styles.moduleToggleCard, enableStamps && styles.moduleToggleCardActive]}>
+              <View style={[styles.moduleIconWrap, { backgroundColor: enableStamps ? '#ECFDF5' : '#F1F5F9' }]}>
+                <Ionicons name="card" size={16} color={enableStamps ? '#10B981' : '#94A3B8'} />
               </View>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                {locale === 'en' ? 'Stamp Cards' : 'Kad Setem'}
-              </Text>
+              <View style={{ flex: 1, marginRight: 4 }}>
+                <Text style={styles.moduleToggleTitle} numberOfLines={1}>
+                  {locale === 'en' ? 'Stamps' : 'Kad Setem'}
+                </Text>
+                <Text style={[styles.moduleToggleStatus, { color: enableStamps ? '#10B981' : '#94A3B8' }]}>
+                  {enableStamps ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Off' : 'Tutup')}
+                </Text>
+              </View>
+              <Switch
+                value={enableStamps}
+                onValueChange={async (val) => {
+                  if (!val && !enablePoints) {
+                    Alert.alert(
+                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                      locale === 'en' 
+                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                    );
+                    return;
+                  }
+                  setEnableStamps(val);
+                  if (!val && (activeTab as string) === 'stamp_rules') {
+                    setActiveTab('catalogue');
+                  }
+                  if (programId) {
+                    try {
+                      setSavingLoyaltyModules(true);
+                      await pb.collection('loyalty_programs').update(programId, { enable_stamps: val });
+                    } catch (err) {
+                      console.warn("Failed to toggle stamps:", err);
+                    } finally {
+                      setSavingLoyaltyModules(false);
+                    }
+                  }
+                }}
+                trackColor={{ false: '#E2E8F0', true: '#10B981' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scale: 0.75 }] }}
+              />
             </View>
 
-            {/* Toggle 2: Points & Tiers */}
-            <View style={{ flex: 1, backgroundColor: enablePoints ? '#FFFFFF' : 'rgba(5, 5, 5, 0.05)', borderWidth: 1, borderColor: enablePoints ? '#FFFFFF' : 'transparent', borderRadius: 16, padding: 14 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: enablePoints ? 'rgba(217, 119, 6, 0.15)' : 'rgba(5, 5, 5, 0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={enablePoints ? "star" : "star-outline"} size={18} color={enablePoints ? '#D97706' : 'rgba(5, 5, 5, 0.6)'} />
-                </View>
-                <Switch
-                  value={enablePoints}
-                  onValueChange={async (val) => {
-                    if (!val && !enableStamps) {
-                      Alert.alert(
-                        locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
-                        locale === 'en' 
-                          ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
-                          : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
-                      );
-                      return;
-                    }
-                    setEnablePoints(val);
-                    if (!val && (activeTab === 'catalogue' || activeTab === 'points_tiers')) {
-                      setActiveTab(enableStamps ? 'card_design' : 'birthday');
-                    }
-                    if (programId) {
-                      try {
-                        setSavingLoyaltyModules(true);
-                        await pb.collection('loyalty_programs').update(programId, { enable_points: val });
-                      } catch (err) {
-                        console.warn("Failed to toggle points:", err);
-                      } finally {
-                        setSavingLoyaltyModules(false);
-                      }
-                    }
-                  }}
-                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#D97706' }}
-                  thumbColor="#FFFFFF"
-                  style={{ transform: [{ scale: 0.8 }] }}
-                />
+            <View style={styles.moduleDivider} />
+
+            {/* Points Engine Capsule */}
+            <View style={[styles.moduleToggleCard, enablePoints && styles.moduleToggleCardActive]}>
+              <View style={[styles.moduleIconWrap, { backgroundColor: enablePoints ? '#FFFBEB' : '#F1F5F9' }]}>
+                <Ionicons name="star" size={16} color={enablePoints ? '#D97706' : '#94A3B8'} />
               </View>
-              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                {locale === 'en' ? 'Points & Tiers' : 'Mata & Tahap'}
-              </Text>
+              <View style={{ flex: 1, marginRight: 4 }}>
+                <Text style={styles.moduleToggleTitle} numberOfLines={1}>
+                  {locale === 'en' ? 'Points' : 'Mata & Tahap'}
+                </Text>
+                <Text style={[styles.moduleToggleStatus, { color: enablePoints ? '#D97706' : '#94A3B8' }]}>
+                  {enablePoints ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Off' : 'Tutup')}
+                </Text>
+              </View>
+              <Switch
+                value={enablePoints}
+                onValueChange={async (val) => {
+                  if (!val && !enableStamps) {
+                    Alert.alert(
+                      locale === 'en' ? 'Cannot Disable' : 'Tidak Boleh Dinyahdayakan',
+                      locale === 'en' 
+                        ? 'At least one loyalty module (Stamp Cards or Points & Tiers) must remain active.' 
+                        : 'Sekurang-kurangnya satu modul kesetiaan mesti kekal aktif.'
+                    );
+                    return;
+                  }
+                  setEnablePoints(val);
+                  if (!val && activeTab === 'points_tiers') {
+                    setActiveTab('catalogue');
+                  }
+                  if (programId) {
+                    try {
+                      setSavingLoyaltyModules(true);
+                      await pb.collection('loyalty_programs').update(programId, { enable_points: val });
+                    } catch (err) {
+                      console.warn("Failed to toggle points:", err);
+                    } finally {
+                      setSavingLoyaltyModules(false);
+                    }
+                  }
+                }}
+                trackColor={{ false: '#E2E8F0', true: '#D97706' }}
+                thumbColor="#FFFFFF"
+                style={{ transform: [{ scale: 0.75 }] }}
+              />
             </View>
           </View>
         </View>
 
-        {/* Tab Selection Bar */}
-        <View style={styles.tabContainer}>
-          {enablePoints && (
-            <TouchableOpacity 
-              style={[styles.tabBtn, activeTab === 'catalogue' && styles.tabBtnActive]}
-              onPress={() => setActiveTab('catalogue')}
-              activeOpacity={0.85}
+        {/* Apple 2-Row Compact Segmented Tab Bar (Full Width, Zero Scroll) */}
+        <View style={[styles.compactTabBarContainer, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}>
+          {/* Reward Catalog Tab - Permanent Reward Catalog, Never Hidden On Toggle */}
+          <TouchableOpacity 
+            style={[styles.compactTabBtn, activeTab === 'catalogue' && styles.compactTabBtnActive]}
+            onPress={() => setActiveTab('catalogue')}
+            activeOpacity={0.85}
+          >
+            <Ionicons 
+              name={activeTab === 'catalogue' ? "gift" : "gift-outline"} 
+              size={16} 
+              color={activeTab === 'catalogue' ? "#0F172A" : "#64748B"} 
+            />
+            <Text 
+              style={[styles.compactTabBtnText, activeTab === 'catalogue' && styles.compactTabBtnTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'catalogue' && styles.tabBtnTextActive]}>
-                {t('catalogue_tab')}
-              </Text>
-            </TouchableOpacity>
-          )}
+              {locale === 'en' ? 'Reward' : 'Ganjaran'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Card Design Tab - Permanent Brand Card, Never Hidden On Toggle */}
+          <TouchableOpacity 
+            style={[styles.compactTabBtn, activeTab === 'card_design' && styles.compactTabBtnActive]}
+            onPress={() => setActiveTab('card_design')}
+            activeOpacity={0.85}
+          >
+            <Ionicons 
+              name={activeTab === 'card_design' ? "card" : "card-outline"} 
+              size={16} 
+              color={activeTab === 'card_design' ? "#0F172A" : "#64748B"} 
+            />
+            <Text 
+              style={[styles.compactTabBtnText, activeTab === 'card_design' && styles.compactTabBtnTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {locale === 'en' ? 'Card Design' : 'Reka Kad'}
+            </Text>
+          </TouchableOpacity>
 
           {enableStamps && (
             <TouchableOpacity 
-              style={[styles.tabBtn, activeTab === 'card_design' && styles.tabBtnActive]}
-              onPress={() => setActiveTab('card_design')}
+              style={[styles.compactTabBtn, (activeTab as string) === 'stamp_rules' && styles.compactTabBtnActive]}
+              onPress={() => setActiveTab('stamp_rules')}
               activeOpacity={0.85}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'card_design' && styles.tabBtnTextActive]}>
-                {t('card_design_tab')}
+              <Ionicons 
+                name={(activeTab as string) === 'stamp_rules' ? "checkbox" : "checkbox-outline"} 
+                size={16} 
+                color={(activeTab as string) === 'stamp_rules' ? "#0F172A" : "#64748B"} 
+              />
+              <Text 
+                style={[styles.compactTabBtnText, (activeTab as string) === 'stamp_rules' && styles.compactTabBtnTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
+                {locale === 'en' ? 'Stamp Rule' : 'Aturan Cop'}
               </Text>
             </TouchableOpacity>
           )}
 
           {enablePoints && (
             <TouchableOpacity 
-              style={[styles.tabBtn, activeTab === 'points_tiers' && styles.tabBtnActive]}
+              style={[styles.compactTabBtn, activeTab === 'points_tiers' && styles.compactTabBtnActive]}
               onPress={() => setActiveTab('points_tiers')}
               activeOpacity={0.85}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'points_tiers' && styles.tabBtnTextActive]}>
-                {t('points_tiers_tab')}
+              <Ionicons 
+                name={activeTab === 'points_tiers' ? "star" : "star-outline"} 
+                size={16} 
+                color={activeTab === 'points_tiers' ? "#0F172A" : "#64748B"} 
+              />
+              <Text 
+                style={[styles.compactTabBtnText, activeTab === 'points_tiers' && styles.compactTabBtnTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
+                {locale === 'en' ? 'Point Rule' : 'Aturan Mata'}
               </Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity 
-            style={[styles.tabBtn, activeTab === 'birthday' && styles.tabBtnActive]}
+            style={[styles.compactTabBtn, activeTab === 'birthday' && styles.compactTabBtnActive]}
             onPress={() => setActiveTab('birthday')}
             activeOpacity={0.85}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'birthday' && styles.tabBtnTextActive]}>
-              Birthday
+            <Ionicons 
+              name={activeTab === 'birthday' ? "balloon" : "balloon-outline"} 
+              size={16} 
+              color={activeTab === 'birthday' ? "#0F172A" : "#64748B"} 
+            />
+            <Text 
+              style={[styles.compactTabBtnText, activeTab === 'birthday' && styles.compactTabBtnTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {locale === 'en' ? 'Birthday' : 'Hari Lahir'}
             </Text>
           </TouchableOpacity>
         </View>
 
+
         {/* TAB 1: Rewards Catalogue */}
         {activeTab === 'catalogue' && (() => {
-          const activeCount = rewards.filter((r) => r.is_active).length;
-          const draftCount = rewards.filter((r) => !r.is_active).length;
+          const hasBirthday = !!birthdayReward;
+          const bdayActive = hasBirthday && (birthdayReward.is_active ?? true);
+          const bdayCount = hasBirthday ? 1 : 0;
+          const activeCount = rewards.filter((r) => r.is_active).length + (bdayActive ? 1 : 0);
+          const draftCount = rewards.filter((r) => !r.is_active).length + (hasBirthday && !bdayActive ? 1 : 0);
           const discountCount = rewards.filter((r) => r.type === 'discount').length;
           const freeItemCount = rewards.filter((r) => r.type === 'free_item').length;
+          const totalCount = rewards.length + bdayCount;
+
+          const showBirthdayCard = hasBirthday && (
+            catalogueFilter === 'all' ||
+            catalogueFilter === 'birthday' ||
+            (catalogueFilter === 'active' && bdayActive) ||
+            (catalogueFilter === 'draft' && !bdayActive)
+          );
 
           const filteredRewards = rewards.filter((r) => {
+            if (catalogueFilter === 'birthday') return false;
             if (catalogueFilter === 'active') return r.is_active;
             if (catalogueFilter === 'draft') return !r.is_active;
             if (catalogueFilter === 'discount') return r.type === 'discount';
@@ -1453,12 +2005,13 @@ export default function UnifiedRewardsScreen() {
               </View>
 
               {/* Filter Pills Bar */}
-              {rewards.length > 0 && (
+              {totalCount > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsContainer} style={{ marginBottom: 16 }}>
                   {[
-                    { id: 'all', label: locale === 'en' ? 'All' : 'Semua', count: rewards.length },
+                    { id: 'all', label: locale === 'en' ? 'All' : 'Semua', count: totalCount },
                     { id: 'active', label: locale === 'en' ? 'Active' : 'Aktif', count: activeCount },
                     { id: 'draft', label: locale === 'en' ? 'Draft' : 'Deraf', count: draftCount },
+                    { id: 'birthday', label: locale === 'en' ? 'Birthday' : 'Hari Jadi', count: bdayCount },
                     { id: 'discount', label: locale === 'en' ? 'Discounts' : 'Diskaun', count: discountCount },
                     { id: 'free_item', label: locale === 'en' ? 'Free Items' : 'Item Percuma', count: freeItemCount },
                   ].map((pill) => {
@@ -1486,7 +2039,7 @@ export default function UnifiedRewardsScreen() {
 
               {loadingRewards ? (
                 <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
-              ) : rewards.length === 0 ? (
+              ) : totalCount === 0 ? (
                 <View style={styles.emptyContainer}>
                   <View style={styles.emptyIconBg}>
                     <Ionicons name="gift-outline" size={48} color="#94A3B8" />
@@ -1499,7 +2052,31 @@ export default function UnifiedRewardsScreen() {
                     <Text style={styles.createFirstText}>{t('add_first_reward')}</Text>
                   </TouchableOpacity>
                 </View>
-              ) : filteredRewards.length === 0 ? (
+              ) : catalogueFilter === 'birthday' && !hasBirthday ? (
+                <View style={[styles.emptyContainer, { paddingVertical: 36 }]}>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <Ionicons name="gift" size={28} color="#D97706" />
+                  </View>
+                  <Text style={[styles.emptyTitle, { fontSize: 16 }]}>
+                    {locale === 'en' ? 'No Birthday Voucher Configured' : 'Tiada Baucar Hari Jadi Ditetapkan'}
+                  </Text>
+                  <Text style={[styles.emptySubtitle, { maxWidth: 300, textAlign: 'center' }]}>
+                    {locale === 'en'
+                      ? 'Set up an automated birthday voucher to surprise customers on their special day.'
+                      : 'Tetapkan baucar hari jadi automatik untuk mengejutkan pelanggan pada hari lahir mereka.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.createFirstBtn, { marginTop: 14 }]}
+                    onPress={() => setActiveTab('birthday')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="sparkles" size={15} color="#000000" style={{ marginRight: 6 }} />
+                    <Text style={styles.createFirstText}>
+                      {locale === 'en' ? 'Configure Birthday Voucher' : 'Tetapkan Baucar Hari Jadi'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : filteredRewards.length === 0 && !showBirthdayCard ? (
                 <View style={[styles.emptyContainer, { paddingVertical: 40 }]}>
                   <Ionicons name="filter-outline" size={36} color="#94A3B8" style={{ marginBottom: 8 }} />
                   <Text style={[styles.emptyTitle, { fontSize: 16 }]}>{locale === 'en' ? 'No matching rewards' : 'Tiada ganjaran sepadan'}</Text>
@@ -1507,124 +2084,533 @@ export default function UnifiedRewardsScreen() {
                 </View>
               ) : (
                 <View style={styles.rewardsList}>
-                  {filteredRewards.map((reward) => {
-                    const itemImgUrl = reward.image
-                      ? `${pb.baseUrl}/api/files/rewards/${reward.id}/${reward.image}`
-                      : 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=150';
-
+                  {(() => {
+                    const merchantBrandColor = merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || cardColor || '#050505';
+                    const isLightBrand = (() => {
+                      const hex = (merchantBrandColor || '#050505').replace('#', '');
+                      const r = parseInt(hex.substring(0, 2), 16) || 0;
+                      const g = parseInt(hex.substring(2, 4), 16) || 0;
+                      const b = parseInt(hex.substring(4, 6), 16) || 0;
+                      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                      return yiq >= 160;
+                    })();
+                    const brandTextColor = isLightBrand ? '#0F172A' : '#FFFFFF';
                     return (
-                      <View
-                        key={reward.id}
-                        style={{
-                          flexDirection: 'row',
-                          borderRadius: 16,
-                          height: 142,
-                          backgroundColor: '#0F172A',
-                          overflow: 'hidden',
-                          shadowColor: '#000000',
-                          shadowOffset: { width: 0, height: 6 },
-                          shadowOpacity: 0.18,
-                          shadowRadius: 10,
-                          elevation: 4,
-                          marginBottom: 8,
-                        }}
-                      >
-                        {/* 1. LEFT ZONE: Merchant Identity ONLY */}
-                        <View style={{ width: 105, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' }}>
-                          <View style={{
-                            width: 54,
-                            height: 54,
-                            borderRadius: 27,
+                      <>
+                        {showBirthdayCard && (
+                          <View
+                            key="birthday_reward_catalog_card"
+                            style={{
+                              flexDirection: 'row',
+                              borderRadius: 16,
+                              height: 160,
+                              backgroundColor: '#FFFFFF',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              overflow: 'hidden',
+                              shadowColor: '#000000',
+                              shadowOffset: { width: 0, height: 4 },
+                              shadowOpacity: 0.08,
+                              shadowRadius: 10,
+                              elevation: 4,
+                              marginBottom: 12,
+                            }}
+                          >
+                            {/* 1. LEFT STUB: Voucher Category Color Spine */}
+                            <View style={{
+                              width: 44,
+                              backgroundColor: merchantBrandColor,
+                              alignItems: 'center',
+                              position: 'relative',
+                              borderTopLeftRadius: 16,
+                              borderBottomLeftRadius: 16,
+                              overflow: 'hidden',
+                            }}>
+                              <View style={{
+                                width: 160,
+                                height: 44,
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                marginLeft: -80,
+                                marginTop: -22,
+                                transform: [{ rotate: '-90deg' }],
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}>
+                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
+                                  BIRTHDAY PASS
+                                </Text>
+                                <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_700Bold', color: brandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
+                                  ANNUAL REWARD
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* 2. MIDDLE MAIN BODY (Pure White Card) */}
+                            <View style={{
+                              flex: 1,
+                              backgroundColor: '#FFFFFF',
+                              paddingVertical: 12,
+                              paddingHorizontal: 12,
+                              justifyContent: 'space-between',
+                            }}>
+                              {/* Top Header Row: Ready to Redeem & Type Tag */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
+                                  <Ionicons name="sparkles" size={11} color="#B45309" />
+                                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Birthday Special</Text>
+                                </View>
+
+                                <View style={{
+                                  backgroundColor: birthdayReward.reward_type === 'stamps' ? '#10B981' : '#FFCC00',
+                                  paddingHorizontal: 7,
+                                  paddingVertical: 2.5,
+                                  borderRadius: 6,
+                                }}>
+                                  <Text style={{
+                                    fontSize: 8.5,
+                                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                                    color: birthdayReward.reward_type === 'stamps' ? '#FFFFFF' : '#050505',
+                                    letterSpacing: 0.5,
+                                  }}>
+                                    {birthdayReward.reward_type === 'stamps' ? 'BONUS STAMPS' : 'FREE ITEM'}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Middle Body: YOUR REWARD micro-label + Title + Description */}
+                              <View style={{ marginVertical: 2 }}>
+                                <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' }}>
+                                  YOUR BIRTHDAY OFFER
+                                </Text>
+                                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 19 }} numberOfLines={2}>
+                                  {birthdayReward.title || 'Free Birthday Treat'}
+                                </Text>
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 2, lineHeight: 14 }} numberOfLines={1}>
+                                  {birthdayReward.description || (birthdayReward.reward_type === 'stamps' ? 'Bonus stamps issued on customer birthday' : 'Special treat during birthday celebration')}
+                                </Text>
+                              </View>
+
+                              {/* Bottom Footer Row: Source Badge + Validity (Left) + Apple Squircle Actions (Right) */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
+                                  <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <Ionicons name="gift" size={9} color="#DC2626" />
+                                    <Text style={{ color: '#DC2626', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>BIRTHDAY PASS</Text>
+                                  </View>
+
+                                  <Text style={{ fontSize: 10, color: '#CBD5E1' }}>|</Text>
+
+                                  <Text style={styles.stockText}>
+                                    {locale === 'en' ? 'Validity' : 'Sah'}: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>{birthdayReward.expiry_days || 3} {locale === 'en' ? 'Days' : 'Hari'}</Text>
+                                  </Text>
+
+                                  <Text style={{ fontSize: 10, color: '#CBD5E1' }}>|</Text>
+
+                                  <Text style={styles.stockText}>
+                                    ⏰ {birthdayReward.send_time || '09:00'}
+                                  </Text>
+                                </View>
+
+                                {/* Apple Squircle Action Buttons */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                  <TouchableOpacity
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 8,
+                                      backgroundColor: '#F1F5F9',
+                                      borderWidth: 1,
+                                      borderColor: '#E2E8F0',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                    onPress={() => setActiveTab('birthday')}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Ionicons name="create-outline" size={14} color="#0F172A" />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 8,
+                                      backgroundColor: '#FEF2F2',
+                                      borderWidth: 1,
+                                      borderColor: '#FEE2E2',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                    onPress={handleDeleteBirthday}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* 3. PERFORATION COLUMN (Notches & Dashed Line) */}
+                            <View style={{
+                              width: 18,
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              position: 'relative',
+                              zIndex: 3,
+                            }} pointerEvents="none">
+                              {/* Background fill for right half to connect brand color to dashed line */}
+                              <View style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: 9,
+                                backgroundColor: merchantBrandColor,
+                              }} />
+
+                              {/* Dashed line */}
+                              <View style={{
+                                width: 1,
+                                height: '100%',
+                                borderColor: '#FFFFFF',
+                                borderWidth: 1,
+                                borderStyle: 'dashed',
+                                zIndex: 1,
+                              }} />
+
+                              {/* Top Notch */}
+                              <View style={{
+                                position: 'absolute',
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                top: -9,
+                                backgroundColor: '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                zIndex: 2,
+                              }} />
+
+                              {/* Bottom Notch */}
+                              <View style={{
+                                position: 'absolute',
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                bottom: -9,
+                                backgroundColor: '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                zIndex: 2,
+                              }} />
+                            </View>
+
+                            {/* 4. RIGHT STUB (Brand Color from Image 2) */}
+                            <View style={{
+                              width: 100,
+                              backgroundColor: merchantBrandColor,
+                              borderTopRightRadius: 16,
+                              borderBottomRightRadius: 16,
+                              paddingVertical: 12,
+                              paddingHorizontal: 8,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <View style={{
+                                width: 52,
+                                height: 52,
+                                borderRadius: 26,
+                                backgroundColor: '#FFFFFF',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderWidth: 2,
+                                borderColor: isLightBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                                shadowColor: '#000000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.12,
+                                shadowRadius: 4,
+                                elevation: 3,
+                                marginBottom: 8,
+                              }}>
+                                <Image source={{ uri: merchantLogo }} style={{ width: 46, height: 46, borderRadius: 23, resizeMode: 'cover' }} />
+                              </View>
+                              <Text style={{
+                                fontSize: 11,
+                                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                                color: brandTextColor,
+                                textAlign: 'center',
+                                width: '100%',
+                                letterSpacing: 0.3,
+                              }} numberOfLines={2}>
+                                {(merchant?.name || 'STORE').toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+                        {filteredRewards.map((reward) => {
+                      return (
+                        <View
+                          key={reward.id}
+                          style={{
+                            flexDirection: 'row',
+                            borderRadius: 16,
+                            height: 160,
                             backgroundColor: '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            overflow: 'hidden',
+                            shadowColor: '#000000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.08,
+                            shadowRadius: 10,
+                            elevation: 4,
+                            marginBottom: 12,
+                          }}
+                        >
+                          {/* 1. LEFT STUB: Voucher Category Color Spine (Standardized to Merchant Brand Color) */}
+                          {(() => {
+                            const spineTheme = getVoucherSpineTheme(reward.type, reward.name, merchantBrandColor);
+                            return (
+                              <View style={{
+                                width: 44,
+                                backgroundColor: merchantBrandColor,
+                                alignItems: 'center',
+                                position: 'relative',
+                                borderTopLeftRadius: 16,
+                                borderBottomLeftRadius: 16,
+                                overflow: 'hidden',
+                              }}>
+                                <View style={{
+                                  width: 160,
+                                  height: 44,
+                                  position: 'absolute',
+                                  top: '50%',
+                                  left: '50%',
+                                  marginLeft: -80,
+                                  marginTop: -22,
+                                  transform: [{ rotate: '-90deg' }],
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}>
+                                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
+                                    {spineTheme.spineText}
+                                  </Text>
+                                  <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_700Bold', color: brandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
+                                    {spineTheme.subText}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })()}
+
+                          {/* 2. MIDDLE MAIN BODY (Pure White Card) */}
+                          <View style={{
+                            flex: 1,
+                            backgroundColor: '#FFFFFF',
+                            paddingVertical: 12,
+                            paddingHorizontal: 12,
+                            justifyContent: 'space-between',
+                          }}>
+                            {/* Top Header Row: Ready to Redeem & Type Tag */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
+                                <Ionicons name="gift" size={11} color="#B45309" />
+                                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                              </View>
+
+                              <View style={{
+                                backgroundColor: reward.type === 'discount' ? '#0F172A' : '#FFCC00',
+                                paddingHorizontal: 7,
+                                paddingVertical: 2.5,
+                                borderRadius: 6,
+                              }}>
+                                <Text style={{
+                                  fontSize: 8.5,
+                                  fontFamily: 'PlusJakartaSans_800ExtraBold',
+                                  color: reward.type === 'discount' ? '#FFFFFF' : '#050505',
+                                  letterSpacing: 0.5,
+                                }}>
+                                  {reward.type === 'discount' ? 'DISCOUNT' : 'FREE ITEM'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Middle Body: YOUR REWARD micro-label + Title + Description */}
+                            <View style={{ marginVertical: 2 }}>
+                              <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' }}>
+                                YOUR REWARD
+                              </Text>
+                              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 19 }} numberOfLines={2}>
+                                {reward.name}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 2, lineHeight: 14 }} numberOfLines={1}>
+                                {reward.description || (reward.type === 'discount' ? 'Discount reward offer' : 'Reward for completing store card')}
+                              </Text>
+                            </View>
+
+                            {/* Bottom Footer Row: Source Badge + Stock Info (Left) + Apple Squircle Actions (Right) */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
+                                {reward.id === linkedRewardId ? (
+                                  <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <Ionicons name="card" size={9} color="#059669" />
+                                    <Text style={{ color: '#059669', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                                  </View>
+                                ) : (
+                                  <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <Ionicons name="gift" size={9} color="#2563EB" />
+                                    <Text style={{ color: '#2563EB', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>POINTS ({reward.points_cost} Pts)</Text>
+                                  </View>
+                                )}
+
+                                <Text style={{ fontSize: 10, color: '#CBD5E1' }}>|</Text>
+
+                                {/* Stock Label */}
+                                <View style={{ opacity: 0.95 }}>
+                                  {renderStockLabel(reward.stock)}
+                                </View>
+                              </View>
+
+                              {/* Apple Squircle Action Buttons */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <TouchableOpacity
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 8,
+                                    backgroundColor: '#F1F5F9',
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  onPress={() => handleOpenEdit(reward)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="create-outline" size={14} color="#0F172A" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 8,
+                                    backgroundColor: '#FEF2F2',
+                                    borderWidth: 1,
+                                    borderColor: '#FEE2E2',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  onPress={() => handleOpenDelete(reward)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* 3. PERFORATION COLUMN (Notches & Dashed Line) */}
+                          <View style={{
+                            width: 18,
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            position: 'relative',
+                            zIndex: 3,
+                          }} pointerEvents="none">
+                            {/* Background fill for right half to connect brand color to dashed line */}
+                            <View style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: 9,
+                              backgroundColor: merchantBrandColor,
+                            }} />
+
+                            {/* Dashed line */}
+                            <View style={{
+                              width: 1,
+                              height: '100%',
+                              borderColor: '#FFFFFF',
+                              borderWidth: 1,
+                              borderStyle: 'dashed',
+                              zIndex: 1,
+                            }} />
+
+                            {/* Top Notch */}
+                            <View style={{
+                              position: 'absolute',
+                              width: 18,
+                              height: 18,
+                              borderRadius: 9,
+                              top: -9,
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              zIndex: 2,
+                            }} />
+
+                            {/* Bottom Notch */}
+                            <View style={{
+                              position: 'absolute',
+                              width: 18,
+                              height: 18,
+                              borderRadius: 9,
+                              bottom: -9,
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              zIndex: 2,
+                            }} />
+                          </View>
+
+                          {/* 4. RIGHT STUB (Brand Color from Image 2) */}
+                          <View style={{
+                            width: 100,
+                            backgroundColor: merchantBrandColor,
+                            borderTopRightRadius: 16,
+                            borderBottomRightRadius: 16,
+                            paddingVertical: 12,
+                            paddingHorizontal: 8,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.15,
-                            shadowRadius: 4,
-                            elevation: 3,
-                            marginBottom: 6,
                           }}>
-                            <Image source={{ uri: merchantLogo }} style={{ width: 48, height: 48, borderRadius: 24, resizeMode: 'cover' }} />
-                          </View>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center', width: '100%' }} numberOfLines={1}>
-                            {merchant?.name || 'Your Store'}
-                          </Text>
-                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', width: '100%', marginTop: 1 }} numberOfLines={1}>
-                            {merchant?.category || 'food'}
-                          </Text>
-                        </View>
-
-                        {/* CENTER DIVIDER: Ticket Cutout Notches & Perforated Line */}
-                        <View style={{ width: 16, alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                          <View style={{ width: 16, height: 8, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#F8FAFC', position: 'absolute', top: 0, zIndex: 5 }} />
-                          <View style={{ width: 1, height: '100%', borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderStyle: 'dashed' }} />
-                          <View style={{ width: 16, height: 8, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: '#F8FAFC', position: 'absolute', bottom: 0, zIndex: 5 }} />
-                        </View>
-
-                        {/* 2. CENTER ZONE: Reward Info */}
-                        <View style={{ flex: 1, paddingVertical: 12, paddingHorizontal: 12, justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                          {/* Top Header Row: Ready to Redeem Badge */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-                            <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="gift" size={11} color="#000000" />
-                              <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Ready to redeem</Text>
+                            <View style={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 26,
+                              backgroundColor: '#FFFFFF',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderWidth: 2,
+                              borderColor: isLightBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                              shadowColor: '#000000',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.12,
+                              shadowRadius: 4,
+                              elevation: 3,
+                              marginBottom: 8,
+                            }}>
+                              <Image source={{ uri: merchantLogo }} style={{ width: 46, height: 46, borderRadius: 23, resizeMode: 'cover' }} />
                             </View>
-                          </View>
-
-                          {/* Middle Body: Title & Description */}
-                          <View style={{ marginVertical: 3, zIndex: 2 }}>
-                            <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: -0.3, lineHeight: 19 }} numberOfLines={2}>
-                              {reward.name}
-                            </Text>
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2, lineHeight: 15 }} numberOfLines={1}>
-                              {reward.description || (reward.type === 'discount' ? 'Discount reward offer' : 'Reward for completing store card')}
+                            <Text style={{
+                              fontSize: 11,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: brandTextColor,
+                              textAlign: 'center',
+                              width: '100%',
+                              letterSpacing: 0.3,
+                            }} numberOfLines={2}>
+                              {(merchant?.name || 'STORE').toUpperCase()}
                             </Text>
                           </View>
-
-                          {/* Bottom Footer Row: Source Badge + Stock Info */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 2 }}>
-                            {reward.id === linkedRewardId ? (
-                              <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name="card" size={10} color="#FFFFFF" />
-                                <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.5 }}>STAMP CARD REWARD</Text>
-                              </View>
-                            ) : (
-                              <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name="gift" size={10} color="#FFFFFF" />
-                                <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.5 }}>POINTS REWARD ({reward.points_cost} Pts)</Text>
-                              </View>
-                            )}
-
-                            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>|</Text>
-
-                            {/* Stock Label */}
-                            <View style={{ opacity: 0.9 }}>
-                              {renderStockLabel(reward.stock)}
-                            </View>
-                          </View>
                         </View>
-
-                        {/* 3. RIGHT SAFE ZONE: Tag & Edit Actions */}
-                        <View style={{ width: 115, paddingVertical: 12, paddingHorizontal: 12, justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', zIndex: 2 }}>
-                          {/* Top Right Tag */}
-                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5, zIndex: 3 }}>
-                            {reward.type === 'discount' ? 'DISCOUNT' : 'FREE ITEM'}
-                          </Text>
-
-                          {/* Action buttons on bottom right */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 3 }}>
-                            <TouchableOpacity style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }} onPress={() => handleOpenEdit(reward)}>
-                              <Ionicons name="create-outline" size={14} color="#FFFFFF" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={() => handleOpenDelete(reward)}>
-                              <Ionicons name="trash-outline" size={14} color="#FCA5A5" />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
+                      );
+                    })}
+                      </>
                     );
-                  })}
+                  })()}
                 </View>
               )}
             </View>
@@ -1766,753 +2752,3111 @@ export default function UnifiedRewardsScreen() {
               );})()}
             </TouchableOpacity>
 
-            <View style={{ marginBottom: 24 }} />
+            {/* UNIFIED CARD DESIGN VIEW (Refined & Beautified - Image 2 Standard) */}
+            <View style={{ gap: 14, marginTop: 18 }}>
+              {/* CARD 1: Colors & Icons (Unified Settings Card) */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 24,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                paddingHorizontal: 16,
+                paddingVertical: 2,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.03,
+                shadowRadius: 10,
+                elevation: 2,
+              }}>
+                {/* 1. Background Row */}
+                <TouchableOpacity
+                  onPress={() => setActiveColorPickerModal('background')}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F8FAFC',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="color-palette-outline" size={19} color="#0F172A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Background' : 'Background'}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                        {locale === 'en' ? 'Card background color' : 'Warna latar kad'}
+                      </Text>
+                    </View>
+                  </View>
 
-            {/* Card Settings & Rules Combined Card */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('card_settings')}</Text>
+                  {/* Selected Color Only + Chevron */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: cardColor || '#FFCC00',
+                      borderWidth: 2,
+                      borderColor: (cardColor === '#FFFFFF' || cardColor?.toLowerCase() === '#ffffff') ? '#CBD5E1' : '#0F172A',
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    }} />
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
 
-              {/* Total Stamps */}
-              <View style={{ marginTop: 8 }}>
-                <Text style={styles.settingsLabel}>{t('total_stamps_required')}</Text>
-                <View style={[styles.segmentRow, { marginTop: 8 }]}>
-                  {[5, 10, 15].map((num) => (
+                {/* 2. Stamp Slots Row */}
+                <TouchableOpacity
+                  onPress={() => setActiveColorPickerModal('slots')}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F8FAFC',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="grid-outline" size={17} color="#0F172A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Stamp Slots' : 'Stamp Slots'}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                        {locale === 'en' ? 'Color for stamp slots' : 'Warna slot cop setem'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Selected Color Only + Chevron */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: stampColor || '#3B82F6',
+                      borderWidth: 2,
+                      borderColor: (stampColor === '#FFFFFF' || stampColor?.toLowerCase() === '#ffffff') ? '#CBD5E1' : '#0F172A',
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    }} />
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* 3. Text Color Row */}
+                <TouchableOpacity
+                  onPress={() => setActiveColorPickerModal('text')}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F8FAFC',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Aa</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Text Color' : 'Text Color'}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                        {locale === 'en' ? 'Name, balance and labels' : 'Nama kedai & baki setem'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Selected Color Only + Chevron */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: fontColor || '#050505',
+                      borderWidth: 2,
+                      borderColor: (fontColor === '#FFFFFF' || fontColor?.toLowerCase() === '#ffffff') ? '#CBD5E1' : '#0F172A',
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    }} />
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* 4. Stamp Check Icon Row */}
+                <TouchableOpacity
+                  onPress={() => setActiveColorPickerModal('icons')}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 14,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="checkmark-circle-outline" size={19} color="#0F172A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Stamp Check Icon' : 'Stamp Check Icon'}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                        {locale === 'en' ? 'Icon for collected stamps' : 'Ikon visual bila cop ditebus'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Selected Icon Only + Chevron */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {(() => {
+                      const curIconObj = stampIcons.find(i => i.id === selectedIcon) || { id: 'checkmark', name: 'checkmark', family: 'Ionicons' };
+                      return (
+                        <View style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 13,
+                          backgroundColor: '#0F172A',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#000000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 2,
+                          elevation: 1,
+                        }}>
+                          {curIconObj.family === 'Ionicons' && (
+                            <Ionicons name={curIconObj.name as any} size={13} color="#FFFFFF" />
+                          )}
+                          {curIconObj.family === 'FontAwesome' && (
+                            <FontAwesome name={curIconObj.name as any} size={11} color="#FFFFFF" />
+                          )}
+                          {curIconObj.family === 'MaterialIcons' && (
+                            <MaterialIcons name={curIconObj.name as any} size={13} color="#FFFFFF" />
+                          )}
+                        </View>
+                      );
+                    })()}
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* CARD 2: Artwork (Accordion Card) */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 24,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                padding: 18,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.03,
+                shadowRadius: 10,
+                elevation: 2,
+              }}>
+                {/* Accordion Header */}
+                <TouchableOpacity
+                  onPress={() => setIsArtworkExpanded(!isArtworkExpanded)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <View style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="image-outline" size={18} color="#0F172A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Artwork' : 'Artwork'}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                        {locale === 'en' ? 'Custom designs for front and back of your card.' : 'Reka bentuk kustom untuk depan dan belakang kad.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name={isArtworkExpanded ? "chevron-up" : "chevron-down"} size={18} color="#0F172A" />
+                </TouchableOpacity>
+
+                {/* Accordion Body */}
+                {isArtworkExpanded && (
+                  <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F8FAFC', gap: 14 }}>
+                    {/* Front Design Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        {/* Thumbnail */}
+                        <View style={{
+                          width: 66,
+                          height: 40,
+                          borderRadius: 8,
+                          backgroundColor: cardColor || '#FFCC00',
+                          overflow: 'hidden',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          {bgImage ? (
+                            <Image source={{ uri: bgImage }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                          ) : (
+                            <Ionicons name="card-outline" size={18} color="#FFFFFF" />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {locale === 'en' ? 'Front Design' : 'Front Design'}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                            {bgImage ? (locale === 'en' ? 'Custom artwork uploaded' : 'Imej kustom dimuat naik') : (locale === 'en' ? 'No artwork uploaded' : 'Tiada imej dimuat naik')}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={handlePickCardBg}
+                          style={{
+                            backgroundColor: '#F1F5F9',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 10,
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {bgImage ? (locale === 'en' ? 'Replace' : 'Tukar') : (locale === 'en' ? 'Upload' : 'Muat Naik')}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {bgImage ? (
+                          <TouchableOpacity
+                            onPress={() => { setBgImage(''); setBgFile(null); setRemoveBgImage(true); }}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 8,
+                              backgroundColor: '#EF4444',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
+                          </TouchableOpacity>
+                        ) : null}
+
+                        <TouchableOpacity onPress={handlePickCardBg} style={{ paddingLeft: 2 }} activeOpacity={0.7}>
+                          <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={{ height: 1, backgroundColor: '#F8FAFC' }} />
+
+                    {/* Back Design Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        {/* Thumbnail */}
+                        <View style={{
+                          width: 66,
+                          height: 40,
+                          borderRadius: 8,
+                          backgroundColor: cardColor || '#FFCC00',
+                          overflow: 'hidden',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          {bgImageBack ? (
+                            <Image source={{ uri: bgImageBack }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                          ) : (
+                            <Ionicons name="card-outline" size={18} color="#FFFFFF" />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {locale === 'en' ? 'Back Design' : 'Back Design'}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                            {bgImageBack ? (locale === 'en' ? 'Custom artwork uploaded' : 'Imej kustom dimuat naik') : (locale === 'en' ? 'No artwork uploaded' : 'Tiada imej dimuat naik')}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={handlePickCardBgBack}
+                          style={{
+                            backgroundColor: '#F1F5F9',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 10,
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {bgImageBack ? (locale === 'en' ? 'Replace' : 'Tukar') : (locale === 'en' ? 'Upload' : 'Muat Naik')}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {bgImageBack ? (
+                          <TouchableOpacity
+                            onPress={() => { setBgImageBack(''); setBgFileBack(null); setRemoveBgImageBack(true); }}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 8,
+                              backgroundColor: '#EF4444',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
+                          </TouchableOpacity>
+                        ) : null}
+
+                        <TouchableOpacity onPress={handlePickCardBgBack} style={{ paddingLeft: 2 }} activeOpacity={0.7}>
+                          <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* STICKY BOTTOM ACTION: Save Changes (Solid High-Contrast Black Button) */}
+              <TouchableOpacity 
+                style={{
+                  backgroundColor: '#050505',
+                  borderRadius: 16,
+                  height: 52,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.18,
+                  shadowRadius: 10,
+                  elevation: 4,
+                  marginTop: 6,
+                  marginBottom: 20,
+                }} 
+                onPress={handleSaveCardConfig} 
+                disabled={isSavingCard}
+                activeOpacity={0.88}
+              >
+                {isSavingCard ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    {locale === 'en' ? 'Save Changes' : 'Save Changes'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* COLOR & ICON FULL PICKER MODAL SHEET */}
+            <Modal
+              visible={activeColorPickerModal !== null}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setActiveColorPickerModal(null)}
+            >
+              <View style={{
+                flex: 1,
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                justifyContent: 'flex-end',
+              }}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={1}
+                  onPress={() => setActiveColorPickerModal(null)}
+                />
+
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  paddingHorizontal: 20,
+                  paddingTop: 12,
+                  paddingBottom: 36,
+                  maxHeight: '80%',
+                }}>
+                  {/* Handle */}
+                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+
+                  {/* Header */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {activeColorPickerModal === 'background'
+                        ? (locale === 'en' ? 'Card Background Color' : 'Warna Latar Kad')
+                        : activeColorPickerModal === 'slots'
+                          ? (locale === 'en' ? 'Stamp Slots Color' : 'Warna Slot Cop')
+                          : activeColorPickerModal === 'text'
+                            ? (locale === 'en' ? 'Text Color' : 'Warna Teks')
+                            : (locale === 'en' ? 'Choose Stamp Check Icon' : 'Pilih Ikon Cop Setem')}
+                    </Text>
                     <TouchableOpacity
-                      key={num}
-                      style={[
-                        styles.segmentBtn,
-                        requiredStamps === num && styles.segmentBtnActive,
-                      ]}
-                      onPress={() => setRequiredStamps(num as any)}
+                      onPress={() => setActiveColorPickerModal(null)}
+                      style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Ionicons name="close" size={17} color="#0F172A" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Body Content */}
+                  {activeColorPickerModal === 'icons' ? (
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 14 }}>
+                        {locale === 'en' ? 'Select the symbol displayed inside earned stamp slots:' : 'Pilih simbol yang dipaparkan dalam petak cop:'}
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                        {stampIcons.map((icon) => {
+                          const isSel = selectedIcon === icon.id;
+                          return (
+                            <TouchableOpacity
+                              key={icon.id}
+                              style={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: 14,
+                                backgroundColor: isSel ? '#0F172A' : '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: isSel ? '#0F172A' : '#E2E8F0',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              onPress={() => {
+                                setSelectedIcon(icon.id);
+                                setActiveColorPickerModal(null);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              {icon.family === 'Ionicons' && (
+                                <Ionicons name={icon.name as any} size={20} color={isSel ? '#FFFFFF' : '#475569'} />
+                              )}
+                              {icon.family === 'FontAwesome' && (
+                                <FontAwesome name={icon.name as any} size={18} color={isSel ? '#FFFFFF' : '#475569'} />
+                              )}
+                              {icon.family === 'MaterialIcons' && (
+                                <MaterialIcons name={icon.name as any} size={20} color={isSel ? '#FFFFFF' : '#475569'} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
+                  ) : (
+                    <View style={{ gap: 18 }}>
+                      {/* Presets Grid */}
+                      <View>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 10 }}>
+                          {locale === 'en' ? 'Preset Palette' : 'Palet Pilihan'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                          {(activeColorPickerModal === 'background'
+                            ? colorOptions
+                            : activeColorPickerModal === 'slots'
+                              ? stampColorOptions
+                              : fontColorOptions
+                          ).map((opt) => {
+                            const curVal = activeColorPickerModal === 'background' ? cardColor : activeColorPickerModal === 'slots' ? stampColor : fontColor;
+                            const isSel = curVal.toLowerCase() === opt.value.toLowerCase();
+                            return (
+                              <TouchableOpacity
+                                key={opt.value}
+                                onPress={() => {
+                                  if (activeColorPickerModal === 'background') { setCardColor(opt.value); setCustomHexInput(opt.value); }
+                                  else if (activeColorPickerModal === 'slots') { setStampColor(opt.value); setCustomStampHexInput(opt.value); }
+                                  else { setFontColor(opt.value); setCustomFontHexInput(opt.value); }
+                                }}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  backgroundColor: isSel ? '#F1F5F9' : '#FFFFFF',
+                                  borderWidth: 1,
+                                  borderColor: isSel ? '#0F172A' : '#E2E8F0',
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 7,
+                                  borderRadius: 20,
+                                }}
+                              >
+                                <View style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 8,
+                                  backgroundColor: opt.value,
+                                  borderWidth: opt.value === '#FFFFFF' ? 1 : 0,
+                                  borderColor: '#CBD5E1',
+                                }} />
+                                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                                  {opt.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+
+                      {/* Custom Hex Code */}
+                      <View>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 8 }}>
+                          {locale === 'en' ? 'Custom Hex Code' : 'Kod Warna Hex'}
+                        </Text>
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          gap: 8,
+                        }}>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8' }}>#</Text>
+                          <TextInput
+                            style={{ flex: 1, fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}
+                            value={(activeColorPickerModal === 'background'
+                              ? customHexInput
+                              : activeColorPickerModal === 'slots'
+                                ? customStampHexInput
+                                : customFontHexInput
+                            ).replace('#', '')}
+                            onChangeText={(val) => {
+                              const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                              if (activeColorPickerModal === 'background') {
+                                setCustomHexInput('#' + cleaned);
+                                if (cleaned.length === 6) setCardColor('#' + cleaned.toUpperCase());
+                              } else if (activeColorPickerModal === 'slots') {
+                                setCustomStampHexInput('#' + cleaned);
+                                if (cleaned.length === 6) setStampColor('#' + cleaned.toUpperCase());
+                              } else {
+                                setCustomFontHexInput('#' + cleaned);
+                                if (cleaned.length === 6) setFontColor('#' + cleaned.toUpperCase());
+                              }
+                            }}
+                            placeholder="000000"
+                            placeholderTextColor="#94A3B8"
+                            maxLength={6}
+                            {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                          />
+                          <View style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 6,
+                            backgroundColor: activeColorPickerModal === 'background' ? cardColor : activeColorPickerModal === 'slots' ? stampColor : fontColor,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                          }} />
+                        </View>
+                      </View>
+
+                      {/* Close Done Button */}
+                      <TouchableOpacity
+                        onPress={() => setActiveColorPickerModal(null)}
+                        style={{
+                          backgroundColor: '#0F172A',
+                          borderRadius: 12,
+                          paddingVertical: 12,
+                          alignItems: 'center',
+                          marginTop: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </Modal>
+          </View>
+        )}
+
+        {/* TAB: Stamp Rules (Stamp Loyalty V3 - Fresha x Apple iOS x Risev Signature) */}
+        {activeTab === 'stamp_rules' && (() => {
+          const selectedRw = rewards.find(r => r.id === linkedRewardId);
+          const finalRewardName = rewardDesc.trim() || selectedRw?.name || (locale === 'en' ? 'Free Reward' : 'Ganjaran Percuma');
+
+          // Helper Open Handlers
+          const openGoalScreen = () => {
+            setTempGoal(requiredStamps);
+            setIsCustomGoalMode(![5, 10, 15].includes(requiredStamps));
+            setCustomGoalInput(![5, 10, 15].includes(requiredStamps) ? String(requiredStamps) : '');
+            setStampSubScreen('goal');
+          };
+
+          const openRewardScreen = () => {
+            setTempLinkedRewardId(linkedRewardId);
+            setTempRewardDesc(rewardDesc);
+            setRewardSearchQuery('');
+            setRewardCategoryFilter('all');
+            setStampSubScreen('reward');
+          };
+
+          const openExpiryScreen = () => {
+            setTempExpiryDays(expiryDays || '90');
+            setStampSubScreen('expiry');
+          };
+
+          const openMinSpendScreen = () => {
+            setTempEnableMinSpend(enableMinSpend);
+            setTempMinSpendAmount(minSpendAmount || '0');
+            const val = parseFloat(minSpendAmount) || 0;
+            if (!enableMinSpend || val === 0) setMinSpendPreset('none');
+            else if (val === 10) setMinSpendPreset('10');
+            else if (val === 20) setMinSpendPreset('20');
+            else setMinSpendPreset('custom');
+            setStampSubScreen('min_spend');
+          };
+
+          const openMilestonesScreen = () => {
+            setStampSubScreen('milestones');
+          };
+
+          const openSimulatorScreen = () => {
+            setStampSubScreen('simulator');
+          };
+
+          // Simulator Math
+          const spendPerStamp = enableMinSpend ? (parseFloat(minSpendAmount) || 15) : 15;
+          const totalCycleSpend = spendPerStamp * requiredStamps;
+          const subRewardsTotalVal = subRewards.reduce((acc, curr) => acc + (parseFloat(curr.reward_value) || 0), 0);
+          const fullRewardEstVal = 10;
+          const totalRewardsGiven = fullRewardEstVal + subRewardsTotalVal;
+          const effectiveRate = totalCycleSpend > 0 ? ((totalRewardsGiven / totalCycleSpend) * 100).toFixed(1) : '0';
+
+          // -------------------------------------------------------------
+          // 3/4 BOTTOM SHEET SUB-SCREENS CONTENT RENDERER
+          // -------------------------------------------------------------
+          const renderSubScreenContent = () => {
+            // SCREEN A: SET STAMP GOAL
+            if (stampSubScreen === 'goal') {
+              const currentGoalNum = isCustomGoalMode ? (parseInt(customGoalInput, 10) || 10) : tempGoal;
+              return (
+              <View style={{ gap: 18, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Set Stamp Goal
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      How many stamps should customers collect to complete their card?
+                    </Text>
+                  </View>
+                </View>
+
+                {/* 2x2 Grid of Stamp Goals */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                  {[
+                    { stamps: 5, label: '5', sub: 'Fast Goal' },
+                    { stamps: 10, label: '10', sub: 'Recommended' },
+                    { stamps: 15, label: '15', sub: 'High Value' },
+                  ].map((opt) => {
+                    const isSelected = !isCustomGoalMode && tempGoal === opt.stamps;
+                    return (
+                      <TouchableOpacity
+                        key={opt.stamps}
+                        style={{
+                          width: '48%',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 18,
+                          paddingVertical: 18,
+                          paddingHorizontal: 16,
+                          borderWidth: isSelected ? 2 : 1,
+                          borderColor: isSelected ? '#FFCC00' : '#E2E8F0',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                        }}
+                        onPress={() => {
+                          setIsCustomGoalMode(false);
+                          setTempGoal(opt.stamps);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        {isSelected && (
+                          <View style={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: '#FFCC00',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Ionicons name="checkmark" size={13} color="#000000" />
+                          </View>
+                        )}
+                        <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                          {opt.label}
+                        </Text>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 2 }}>
+                          stamps
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 3 }}>
+                          {opt.sub}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Custom Option */}
+                  <TouchableOpacity
+                    style={{
+                      width: '48%',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 18,
+                      paddingVertical: 18,
+                      paddingHorizontal: 16,
+                      borderWidth: isCustomGoalMode ? 2 : 1,
+                      borderColor: isCustomGoalMode ? '#FFCC00' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                    }}
+                    onPress={() => {
+                      setIsCustomGoalMode(true);
+                      if (!customGoalInput) setCustomGoalInput(String(tempGoal || 10));
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    {isCustomGoalMode && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: '#FFCC00',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Ionicons name="checkmark" size={13} color="#000000" />
+                      </View>
+                    )}
+                    <Ionicons name="calendar-outline" size={26} color="#000000" />
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 4 }}>
+                      Custom
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Set your own
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Custom Goal Input Row */}
+                {isCustomGoalMode && (
+                  <View style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 16,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                      Enter Custom Stamps:
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <TextInput
+                        style={{
+                          width: 60,
+                          height: 40,
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          textAlign: 'center',
+                          fontSize: 16,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#000000',
+                        }}
+                        keyboardType="number-pad"
+                        value={customGoalInput}
+                        onChangeText={setCustomGoalInput}
+                        placeholder="8"
+                        placeholderTextColor="#94A3B8"
+                      />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                        stamps
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Helper Card */}
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}>
+                  <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569', lineHeight: 18 }}>
+                    Customers need <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{currentGoalNum} stamps</Text> to complete their card and redeem the reward.
+                  </Text>
+                </View>
+
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => {
+                    const finalG = isCustomGoalMode ? (parseInt(customGoalInput, 10) || 10) : tempGoal;
+                    const clampedG = Math.max(2, Math.min(30, finalG));
+                    handleSelectStampGoal(clampedG);
+                    setStampSubScreen(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // -------------------------------------------------------------
+          // SCREEN B: SELECT COMPLETION REWARD
+          // -------------------------------------------------------------
+          if (stampSubScreen === 'reward') {
+            const filteredRewards = rewards.filter((r) => {
+              if (rewardCategoryFilter === 'free_item' && r.type !== 'free_item') return false;
+              if (rewardCategoryFilter === 'discount' && r.type !== 'discount') return false;
+              if (rewardSearchQuery.trim()) {
+                const q = rewardSearchQuery.toLowerCase();
+                return r.name.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q);
+              }
+              return true;
+            });
+
+            return (
+              <View style={{ gap: 16, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Select Completion Reward
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Choose the reward customers will receive when they complete all stamps.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Filter Tabs */}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[
+                    { key: 'all', label: 'All Items' },
+                    { key: 'free_item', label: 'Free Item' },
+                    { key: 'discount', label: 'Discount' },
+                    { key: 'custom', label: 'Custom' },
+                  ].map((tab) => {
+                    const isSel = rewardCategoryFilter === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          backgroundColor: isSel ? '#000000' : '#F1F5F9',
+                        }}
+                        onPress={() => setRewardCategoryFilter(tab.key as any)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{
+                          fontSize: 12,
+                          fontFamily: 'PlusJakartaSans_700Bold',
+                          color: isSel ? '#FFFFFF' : '#64748B',
+                        }}>
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Search Bar */}
+                {rewardCategoryFilter !== 'custom' && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    paddingHorizontal: 12,
+                    height: 44,
+                  }}>
+                    <Ionicons name="search-outline" size={17} color="#94A3B8" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontFamily: 'PlusJakartaSans_600SemiBold',
+                        color: '#000000',
+                      }}
+                      placeholder="Search menu items..."
+                      placeholderTextColor="#94A3B8"
+                      value={rewardSearchQuery}
+                      onChangeText={setRewardSearchQuery}
+                    />
+                    {rewardSearchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setRewardSearchQuery('')}>
+                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Rewards List */}
+                {rewardCategoryFilter !== 'custom' && (
+                  <View style={{ gap: 8 }}>
+                    {filteredRewards.length === 0 ? (
+                      <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                        <Ionicons name="gift-outline" size={32} color="#94A3B8" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 8 }}>
+                          No matching rewards found
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredRewards.map((rw) => {
+                        const isSelected = tempLinkedRewardId === rw.id;
+                        const rwImgUrl = rw.image ? `${pb.baseUrl}/api/files/rewards/${rw.id}/${rw.image}` : null;
+                        return (
+                          <TouchableOpacity
+                            key={rw.id}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: 16,
+                              padding: 12,
+                              borderWidth: isSelected ? 1.5 : 1,
+                              borderColor: isSelected ? '#000000' : '#E2E8F0',
+                            }}
+                            onPress={() => {
+                              setTempLinkedRewardId(rw.id);
+                              setTempRewardDesc(rw.name);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                              {rwImgUrl ? (
+                                <Image source={{ uri: rwImgUrl }} style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9' }} />
+                              ) : (
+                                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Ionicons name={rw.type === 'discount' ? 'pricetag' : 'gift'} size={20} color="#FFCC00" />
+                                </View>
+                              )}
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }} numberOfLines={1}>
+                                  {rw.name}
+                                </Text>
+                                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                                  {rw.type === 'discount' ? 'Discount Voucher' : 'Free Item'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Fresha x iOS Signature Radio Indicator */}
+                            <View style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 11,
+                              borderWidth: isSelected ? 2 : 1.5,
+                              borderColor: isSelected ? '#000000' : '#CBD5E1',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              {isSelected && (
+                                <View style={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: '#FFCC00',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}>
+                                  <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#000000' }} />
+                                </View>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {/* Custom Reward Mode */}
+                {rewardCategoryFilter === 'custom' && (
+                  <View style={{ gap: 12 }}>
+                    <View style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      padding: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      gap: 8,
+                    }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                        Custom Reward Name
+                      </Text>
+                      <TextInput
+                        style={{
+                          height: 44,
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          paddingHorizontal: 12,
+                          fontSize: 14,
+                          fontFamily: 'PlusJakartaSans_600SemiBold',
+                          color: '#000000',
+                        }}
+                        placeholder="e.g. Free Hot Latte / RM10 Off"
+                        placeholderTextColor="#94A3B8"
+                        value={tempRewardDesc}
+                        onChangeText={(val) => {
+                          setTempRewardDesc(val);
+                          setTempLinkedRewardId(null);
+                        }}
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 14,
+                        borderWidth: 1.5,
+                        borderColor: '#000000',
+                        paddingVertical: 13,
+                      }}
+                      onPress={() => setShowInlineCreateModal(true)}
                       activeOpacity={0.8}
                     >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          requiredStamps === num && styles.segmentTextActive,
-                        ]}
-                      >
-                        {num}
+                      <Ionicons name="add" size={18} color="#000000" />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                        Create New in Catalog
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+                  </View>
+                )}
 
-              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
-
-              {/* Expiry */}
-              <Text style={styles.settingsLabel}>{t('card_expiration_days')}</Text>
-              <View style={[styles.inputWrapper, expiryFocused && styles.inputWrapperFocused, { marginTop: 8 }]}>
-                <TextInput
-                  style={styles.nestedTextInput}
-                  value={expiryDays}
-                  onChangeText={setExpiryDays}
-                  keyboardType="number-pad"
-                  placeholder={locale === 'en' ? "e.g. 30" : "cth. 30"}
-                  placeholderTextColor="#94A3B8"
-                  onFocus={() => setExpiryFocused(true)}
-                  onBlur={() => setExpiryFocused(false)}
-                />
-                <Text style={styles.inputSuffix}>{t('days')}</Text>
-              </View>
-
-              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
-
-              {/* Minimum Spend Requirement */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.settingsLabel}>
-                    {locale === 'en' ? 'Minimum Spend per Stamp' : 'Syarat Belanja Minimum'}
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => {
+                    setLinkedRewardId(tempLinkedRewardId);
+                    setRewardDesc(tempRewardDesc);
+                    setStampSubScreen(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
                   </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                    {locale === 'en'
-                      ? 'Require customers to reach a minimum bill amount to earn a stamp.'
-                      : 'Syaratkan jumlah bil minimum untuk pelanggan menerima 1 cop.'}
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // -------------------------------------------------------------
+          // SCREEN C: SET CARD EXPIRATION
+          // -------------------------------------------------------------
+          if (stampSubScreen === 'expiry') {
+            const expOptions = [
+              { val: '30', label: '30 days' },
+              { val: '60', label: '60 days' },
+              { val: '90', label: '90 days' },
+              { val: '180', label: '180 days' },
+              { val: '0', label: 'No expiry' },
+            ];
+
+            const expiryDaysNum = parseInt(tempExpiryDays, 10) || 0;
+
+            return (
+              <View style={{ gap: 16, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Set Card Expiration
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Number of days before a stamp card expires from the customer's first visit.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Expiry Options List */}
+                <View style={{ gap: 10 }}>
+                  {expOptions.map((opt) => {
+                    const isSelected = (opt.val === '0' && (!tempExpiryDays || tempExpiryDays === '0')) || tempExpiryDays === opt.val;
+                    return (
+                      <TouchableOpacity
+                        key={opt.val}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          padding: 16,
+                          borderWidth: isSelected ? 1.5 : 1,
+                          borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          gap: 12,
+                        }}
+                        onPress={() => setTempExpiryDays(opt.val)}
+                        activeOpacity={0.8}
+                      >
+                        {/* Radio */}
+                        <View style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          borderWidth: isSelected ? 2 : 1.5,
+                          borderColor: isSelected ? '#000000' : '#CBD5E1',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          {isSelected && (
+                            <View style={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: 6,
+                              backgroundColor: '#FFCC00',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#000000' }} />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Helper Card */}
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}>
+                  <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569', lineHeight: 18 }}>
+                    {expiryDaysNum > 0 
+                      ? `The stamp card will expire ${expiryDaysNum} days after the customer's first visit.`
+                      : 'The stamp card will never expire.'}
                   </Text>
                 </View>
-                <Switch
-                  value={enableMinSpend}
-                  onValueChange={setEnableMinSpend}
-                  trackColor={{ false: 'rgba(5, 5, 5, 0.15)', true: '#10B981' }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
 
-              {enableMinSpend && (
-                <View style={[styles.inputWrapper, minSpendFocused && styles.inputWrapperFocused, { marginTop: 12 }]}>
-                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginRight: 6 }}>RM</Text>
-                  <TextInput
-                    style={styles.nestedTextInput}
-                    value={minSpendAmount}
-                    onChangeText={setMinSpendAmount}
-                    keyboardType="numeric"
-                    placeholder="15.00"
-                    placeholderTextColor="#94A3B8"
-                    onFocus={() => setMinSpendFocused(true)}
-                    onBlur={() => setMinSpendFocused(false)}
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => {
+                    setExpiryDays(tempExpiryDays);
+                    setStampSubScreen(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // -------------------------------------------------------------
+          // SCREEN D: MINIMUM SPEND PER STAMP
+          // -------------------------------------------------------------
+          if (stampSubScreen === 'min_spend') {
+            const minSpendChoices = [
+              { key: 'none', label: 'No minimum spend' },
+              { key: '10', label: 'RM 10 per stamp' },
+              { key: '20', label: 'RM 20 per stamp' },
+              { key: 'custom', label: 'Custom amount' },
+            ];
+
+            return (
+              <View style={{ gap: 16, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Minimum Spend per Stamp
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Set a minimum bill amount for each stamp to be earned.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Options List */}
+                <View style={{ gap: 10 }}>
+                  {minSpendChoices.map((opt) => {
+                    const isSelected = minSpendPreset === opt.key;
+                    return (
+                      <View key={opt.key} style={{ gap: 8 }}>
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            padding: 16,
+                            borderWidth: isSelected ? 1.5 : 1,
+                            borderColor: isSelected ? '#000000' : '#E2E8F0',
+                            gap: 12,
+                          }}
+                          onPress={() => setMinSpendPreset(opt.key as any)}
+                          activeOpacity={0.8}
+                        >
+                          {/* Radio */}
+                          <View style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 11,
+                            borderWidth: isSelected ? 2 : 1.5,
+                            borderColor: isSelected ? '#000000' : '#CBD5E1',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            {isSelected && (
+                              <View style={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: 6,
+                                backgroundColor: '#FFCC00',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}>
+                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#000000' }} />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Custom Input */}
+                        {opt.key === 'custom' && isSelected && (
+                          <View style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 14,
+                            paddingHorizontal: 14,
+                            height: 48,
+                            borderWidth: 1,
+                            borderColor: '#CBD5E1',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginLeft: 34,
+                          }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginRight: 6 }}>
+                              RM
+                            </Text>
+                            <TextInput
+                              style={{
+                                flex: 1,
+                                fontSize: 14,
+                                fontFamily: 'PlusJakartaSans_700Bold',
+                                color: '#000000',
+                              }}
+                              keyboardType="numeric"
+                              placeholder="15.00"
+                              placeholderTextColor="#94A3B8"
+                              value={tempMinSpendAmount}
+                              onChangeText={setTempMinSpendAmount}
+                            />
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                              per stamp
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Helper Card */}
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}>
+                  <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569', lineHeight: 18 }}>
+                    {minSpendPreset === 'none' 
+                      ? 'Customers can earn a stamp from any eligible purchase amount.'
+                      : minSpendPreset === '10'
+                      ? 'Customers must spend at least RM10.00 to receive each stamp.'
+                      : minSpendPreset === '20'
+                      ? 'Customers must spend at least RM20.00 to receive each stamp.'
+                      : `Customers must spend at least RM${parseFloat(tempMinSpendAmount || '0').toFixed(2)} to receive each stamp.`}
+                  </Text>
+                </View>
+
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => {
+                    if (minSpendPreset === 'none') {
+                      setEnableMinSpend(false);
+                      setMinSpendAmount('0');
+                    } else if (minSpendPreset === '10') {
+                      setEnableMinSpend(true);
+                      setMinSpendAmount('10');
+                    } else if (minSpendPreset === '20') {
+                      setEnableMinSpend(true);
+                      setMinSpendAmount('20');
+                    } else {
+                      setEnableMinSpend(true);
+                      setMinSpendAmount(tempMinSpendAmount || '15');
+                    }
+                    setStampSubScreen(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // -------------------------------------------------------------
+          // SCREEN E: MILESTONE REWARDS
+          // -------------------------------------------------------------
+          if (stampSubScreen === 'milestones') {
+            return (
+              <View style={{ gap: 16, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Milestone Rewards
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Offer extra rewards at specific stamp milestones.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Enable Switch Card */}
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="gift-outline" size={18} color="#000000" />
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                      Enable milestone rewards
+                    </Text>
+                  </View>
+                  <Switch
+                    value={enableMilestones}
+                    onValueChange={setEnableMilestones}
+                    trackColor={{ false: '#E2E8F0', true: '#000000' }}
+                    thumbColor={enableMilestones ? '#FFCC00' : '#FFFFFF'}
                   />
-                  <Text style={styles.inputSuffix}>{locale === 'en' ? 'min. bill' : 'bil minimum'}</Text>
                 </View>
-              )}
 
-              <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 }} />
+                {/* Milestones List */}
+                {enableMilestones && (
+                  <View style={{ gap: 10 }}>
+                    {subRewards.length === 0 ? (
+                      <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                        <Ionicons name="gift-outline" size={32} color="#94A3B8" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 8 }}>
+                          No milestone rewards configured
+                        </Text>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 3, textAlign: 'center' }}>
+                          Add extra gifts at intermediate stamps to boost customer motivation before reaching {requiredStamps} stamps.
+                        </Text>
+                      </View>
+                    ) : (
+                      subRewards.map((sr) => (
+                        <TouchableOpacity
+                          key={sr.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            padding: 14,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            justifyContent: 'space-between',
+                          }}
+                          onPress={() => {
+                            setEditingMilestoneId(sr.id);
+                            setMilestoneFormStamp(sr.at_stamp);
+                            setMilestoneFormTitle(sr.reward_title);
+                            setMilestoneFormType(sr.reward_type as any);
+                            setMilestoneFormValue(sr.reward_value);
+                            setShowMilestoneEditorModal(true);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                            <Ionicons name="reorder-two-outline" size={20} color="#94A3B8" />
+                            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 16 }}>🎁</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                                {sr.at_stamp} stamps
+                              </Text>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                                {sr.reward_title}
+                              </Text>
+                            </View>
+                          </View>
+                          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                        </TouchableOpacity>
+                      ))
+                    )}
 
-              {/* Completion Reward Selector */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={styles.settingsLabel}>{t('stamp_completion_desc') || 'Completion Reward'}</Text>
+                    {/* Add Milestone Reward Button */}
+                    {subRewards.length < (requiredStamps - 1) && (
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 14,
+                          paddingVertical: 14,
+                          borderWidth: 1.5,
+                          borderColor: '#000000',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          marginTop: 4,
+                        }}
+                        onPress={handleAddSubReward}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="add" size={18} color="#000000" />
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                          Add Milestone Reward
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Milestone Edit Modal */}
+                <Modal visible={showMilestoneEditorModal} transparent animationType="slide">
+                  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                          Edit Milestone Reward
+                        </Text>
+                        <TouchableOpacity onPress={() => setShowMilestoneEditorModal(false)}>
+                          <Ionicons name="close" size={22} color="#000000" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Stamp Pill Selector */}
+                      <View>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6 }}>
+                          On Stamp:
+                        </Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                          {Array.from({ length: requiredStamps - 1 }).map((_, i) => {
+                            const sNum = i + 1;
+                            const isCurr = milestoneFormStamp === sNum;
+                            return (
+                              <TouchableOpacity
+                                key={sNum}
+                                style={{
+                                  width: 44,
+                                  height: 38,
+                                  borderRadius: 10,
+                                  backgroundColor: isCurr ? '#000000' : '#F1F5F9',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                onPress={() => setMilestoneFormStamp(sNum)}
+                              >
+                                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isCurr ? '#FFCC00' : '#000000' }}>
+                                  #{sNum}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+
+                      {/* Title Input */}
+                      <View>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6 }}>
+                          Reward Title:
+                        </Text>
+                        <TextInput
+                          style={{
+                            height: 44,
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#CBD5E1',
+                            paddingHorizontal: 12,
+                            fontSize: 14,
+                            fontFamily: 'PlusJakartaSans_600SemiBold',
+                            color: '#000000',
+                          }}
+                          value={milestoneFormTitle}
+                          onChangeText={setMilestoneFormTitle}
+                          placeholder="e.g. Free AISKRM Cup"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+
+                      {/* Estimated Value */}
+                      <View>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6 }}>
+                          Estimated Value (RM):
+                        </Text>
+                        <TextInput
+                          style={{
+                            height: 44,
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#CBD5E1',
+                            paddingHorizontal: 12,
+                            fontSize: 14,
+                            fontFamily: 'PlusJakartaSans_800ExtraBold',
+                            color: '#000000',
+                          }}
+                          keyboardType="numeric"
+                          value={milestoneFormValue}
+                          onChangeText={setMilestoneFormValue}
+                          placeholder="5.00"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+
+                      {/* Actions */}
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#FEE2E2',
+                            borderRadius: 14,
+                            paddingVertical: 14,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => {
+                            if (editingMilestoneId) {
+                              handleRemoveSubReward(editingMilestoneId);
+                            }
+                            setShowMilestoneEditorModal(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{
+                            flex: 2,
+                            backgroundColor: '#000000',
+                            borderRadius: 14,
+                            paddingVertical: 14,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => {
+                            if (editingMilestoneId) {
+                              handleUpdateSubReward(editingMilestoneId, {
+                                at_stamp: milestoneFormStamp,
+                                reward_title: milestoneFormTitle,
+                                reward_value: milestoneFormValue,
+                                reward_type: milestoneFormType,
+                              });
+                            }
+                            setShowMilestoneEditorModal(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                            Save Milestone
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                </Modal>
+
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => setStampSubScreen(null)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+          // -------------------------------------------------------------
+          // SCREEN F: REWARD COST PREVIEW
+          // -------------------------------------------------------------
+          if (stampSubScreen === 'simulator') {
+            return (
+              <View style={{ gap: 18, paddingBottom: 24 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity 
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                    onPress={() => setStampSubScreen(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#000000" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                      Reward Cost Preview
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      Estimate the cost and impact of your loyalty rewards.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* 3-Column Stats Box */}
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 18,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  flexDirection: 'row',
+                  gap: 8,
+                }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      Total Spend
+                    </Text>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 4 }}>
+                      RM {totalCycleSpend.toFixed(2)}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
+                      ({requiredStamps} × RM{spendPerStamp.toFixed(0)})
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 1, backgroundColor: '#E2E8F0' }} />
+
+                  <View style={{ flex: 1, paddingLeft: 6 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      Total Rewards
+                    </Text>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 4 }}>
+                      RM {totalRewardsGiven.toFixed(2)}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
+                      (1 redemption)
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 1, backgroundColor: '#E2E8F0' }} />
+
+                  <View style={{ flex: 1, paddingLeft: 6 }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      Effective Rate
+                    </Text>
+                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981', marginTop: 4 }}>
+                      {effectiveRate}%
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
+                      of turnover
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Bulb Advice Box */}
+                <View style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  flexDirection: 'row',
+                  gap: 12,
+                }}>
+                  <Ionicons name="bulb-outline" size={24} color="#FFCC00" style={{ marginTop: 2 }} />
+                  <Text style={{ flex: 1, fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569', lineHeight: 18 }}>
+                    Customers spend RM{totalCycleSpend.toFixed(2)} across {requiredStamps} visits to earn RM{totalRewardsGiven.toFixed(2)} in rewards ({effectiveRate}% effective rate). This estimate helps you plan your margin while maximizing visit frequency.
+                  </Text>
+                </View>
+
+                {/* Sticky Save CTA */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => setStampSubScreen(null)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
+            return null;
+          };
+
+          // -------------------------------------------------------------
+          // SCREEN 1: MAIN STAMP LOYALTY OVERVIEW (Fresha x Apple iOS x Risev)
+          // -------------------------------------------------------------
+          return (
+            <View style={{ gap: 20, paddingBottom: 24 }}>
+              {/* Stamp Rule Section Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <View>
+                  <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                    {locale === 'en' ? 'Stamp Loyalty' : 'Aturan Kad Setem'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {locale === 'en' ? 'Manage your stamp rules & milestones' : 'Urus aturan cop & ganjaran kemajuan'}
+                  </Text>
+                </View>
+
+                {/* Status Pill */}
                 <TouchableOpacity
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 4,
-                    backgroundColor: '#EFF6FF',
-                    borderColor: '#93C5FD',
+                    gap: 5,
+                    backgroundColor: isActive ? '#F0FDF4' : '#F8FAFC',
                     borderWidth: 1,
+                    borderColor: isActive ? '#BBF7D0' : '#E2E8F0',
                     paddingHorizontal: 10,
                     paddingVertical: 5,
-                    borderRadius: 12,
+                    borderRadius: 20,
                   }}
-                  onPress={() => setShowInlineCreateModal(true)}
+                  onPress={() => setIsActive(!isActive)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="add-circle" size={15} color="#2563EB" />
-                  <Text style={{ color: '#2563EB', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>
-                    {locale === 'en' ? '+ Create New Reward' : '+ Cipta Ganjaran Baru'}
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isActive ? '#16A34A' : '#94A3B8' }} />
+                  <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: isActive ? '#16A34A' : '#64748B' }}>
+                    {isActive ? 'Active' : 'Inactive'}
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Reward Selector List / Cards */}
-              {rewards && rewards.length > 0 ? (
-                <View style={{ marginTop: 10, gap: 8 }}>
-                  {rewards.map((rw) => {
-                    const isSelected = linkedRewardId === rw.id;
-                    return (
-                      <TouchableOpacity
-                        key={rw.id}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: 12,
-                          borderRadius: 16,
-                          backgroundColor: isSelected ? '#F0F9FF' : '#F8FAFC',
-                          borderColor: isSelected ? '#0284C7' : '#E2E8F0',
-                          borderWidth: isSelected ? 2 : 1,
-                        }}
-                        onPress={() => {
-                          setLinkedRewardId(rw.id);
-                          setRewardDesc(rw.name);
-                          setShowValidationWarning(false);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                          <View style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 12,
-                            backgroundColor: isSelected ? '#0284C7' : '#E2E8F0',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Ionicons name={rw.type === 'discount' ? 'pricetag' : 'gift'} size={18} color={isSelected ? '#FFFFFF' : '#64748B'} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>
-                              {rw.name}
-                            </Text>
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }} numberOfLines={1}>
-                              {rw.type === 'discount' ? (locale === 'en' ? 'Discount Voucher' : 'Baucar Diskaun') : (locale === 'en' ? 'Free Item Reward' : 'Ganjaran Item Percuma')} • Stock: {rw.stock || 'Unlimited'}
-                            </Text>
-                          </View>
-                        </View>
-                        {isSelected && (
-                          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#0284C7', alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={{ marginTop: 10, padding: 16, borderRadius: 14, backgroundColor: '#FFFBEB', borderColor: '#FDE68A', borderWidth: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, color: '#92400E', textAlign: 'center', marginBottom: 10, fontFamily: 'PlusJakartaSans_600SemiBold' }}>
-                    {locale === 'en' ? 'No rewards found in catalog. Create your first reward for this stamp card.' : 'Tiada ganjaran dijumpai dalam katalog. Cipta ganjaran pertama anda untuk kad setem ini.'}
-                  </Text>
+              {/* YOUR LOYALTY CARD Section */}
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+                  YOUR LOYALTY CARD
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.04,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}
+                  onPress={openRewardScreen}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, paddingRight: 8 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="gift" size={24} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.3 }} numberOfLines={1}>
+                        Collect {requiredStamps} stamps
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 3 }} numberOfLines={1}>
+                        Get {finalRewardName}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Loyalty Rules Section */}
+              <View>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginBottom: 12 }}>
+                  Loyalty Rules
+                </Text>
+
+                <View style={{ gap: 10 }}>
+                  {/* Row 1: Stamps Required */}
                   <TouchableOpacity
-                    style={{ backgroundColor: '#D97706', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-                    onPress={() => setShowInlineCreateModal(true)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openGoalScreen}
+                    activeOpacity={0.8}
                   >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>+ Create First Reward</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="bag-handle-outline" size={18} color="#000000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Stamps Required
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                          {requiredStamps} stamps
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 2: Completion Reward */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openRewardScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="gift-outline" size={18} color="#000000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Completion Reward
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                          {finalRewardName}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 3: Card Expiration */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openExpiryScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="calendar-outline" size={18} color="#000000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Card Expiration
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                          {parseInt(expiryDays, 10) > 0 ? `${expiryDays} days` : 'No expiry'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 4: Minimum Spend per Stamp */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openMinSpendScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="receipt-outline" size={18} color="#000000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Minimum Spend per Stamp
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                          {enableMinSpend && parseFloat(minSpendAmount) > 0 ? `RM ${parseFloat(minSpendAmount).toFixed(0)} per stamp` : 'No minimum spend'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                   </TouchableOpacity>
                 </View>
-              )}
-
-              {showValidationWarning && (
-                <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 6, marginLeft: 4 }}>
-                  {locale === 'en' ? 'Please select or create a completion reward' : 'Sila pilih atau cipta ganjaran kelayakan'}
-                </Text>
-              )}
-            </View>
-
-            {/* Custom Background Image Uploader */}
-            <View style={styles.configCard}>
-              <Text style={styles.cardSectionTitle}>{t('custom_bg_image')}</Text>
-              <Text style={styles.cardSectionDesc}>
-                Upload custom designs for the front and back of your card.
-              </Text>
-              <View style={[styles.bgUploadRow, { gap: 16 }]}>
-                {/* Front Image */}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Front Design</Text>
-                  {bgImage ? (
-                    <View style={styles.bgPreviewContainer}>
-                      <Image source={{ uri: bgImage }} style={styles.bgPreviewThumb} />
-                      <TouchableOpacity 
-                        style={styles.bgRemoveBtn}
-                        onPress={() => {
-                          setBgImage('');
-                          setBgFile(null);
-                          setRemoveBgImage(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.bgUploadBtn}
-                      onPress={handlePickCardBg}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                      <Text style={styles.bgUploadBtnText}>{t('upload_card_image')}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Back Image */}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#475569', marginBottom: 8 }}>Back Design</Text>
-                  {bgImageBack ? (
-                    <View style={styles.bgPreviewContainer}>
-                      <Image source={{ uri: bgImageBack }} style={styles.bgPreviewThumb} />
-                      <TouchableOpacity 
-                        style={styles.bgRemoveBtn}
-                        onPress={() => {
-                          setBgImageBack('');
-                          setBgFileBack(null);
-                          setRemoveBgImageBack(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.bgUploadBtn}
-                      onPress={handlePickCardBgBack}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={24} color="#64748B" />
-                      <Text style={styles.bgUploadBtnText}>Upload Back</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* 3-in-1 Card Color Theme */}
-            <View style={styles.configCard}>
-              {/* Card Background Color Selector */}
-              <View style={{ borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 16, marginBottom: 16 }}>
-                <Text style={styles.cardSectionTitle}>{t('Background')}</Text>
-                <View style={styles.colorRow}>
-                {colorOptions.map((opt) => {
-                  const isSelected = cardColor === opt.value;
-                  return (
-                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
-                      <TouchableOpacity
-                        style={[styles.colorCircle, { backgroundColor: opt.value }]}
-                        onPress={() => { setCardColor(opt.value); setCustomHexInput(opt.value); }}
-                        activeOpacity={0.8}
-                      >
-                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-                {Platform.OS === 'web' && (
-                  <View style={!colorOptions.some(o => o.value === cardColor) ? styles.colorCircleSelectedRing : undefined}>
-                    <TouchableOpacity
-                      style={[styles.colorCircle, styles.colorWheelCircle]}
-                      onPress={() => cardColorInputRef.current?.click()}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="color-filter-outline" size={14} color="#050505" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                  <View style={styles.inlineHexWrapper}>
-                    <Text style={styles.inlineHexHash}>#</Text>
-                    <TextInput
-                      style={styles.inlineHexInput}
-                      value={customHexInput.replace('#', '')}
-                      onChangeText={(val) => {
-                        const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
-                        setCustomHexInput('#' + cleaned);
-                        if (cleaned.length === 6) { setCardColor('#' + cleaned.toUpperCase()); }
-                      }}
-                      placeholder="000000"
-                      placeholderTextColor="#BEC6E0"
-                      maxLength={6}
-                      {...Platform.select({ web: { outlineStyle: 'none' } as any })}
-                    />
-                  </View>
-                </View>
               </View>
 
-            {/* Collected Stamp Slots Color Selector */}
-            <View style={{ borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 16, marginBottom: 16 }}>
-              <Text style={styles.cardSectionTitle}>{t('Stamp Slots')}</Text>
-              <View style={styles.colorRow}>
-                {stampColorOptions.map((opt) => {
-                  const isSelected = stampColor === opt.value;
-                  return (
-                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
-                      <TouchableOpacity
-                        style={[styles.colorCircle, { backgroundColor: opt.value }]}
-                        onPress={() => { setStampColor(opt.value); setCustomStampHexInput(opt.value); }}
-                        activeOpacity={0.8}
-                      >
-                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-                {Platform.OS === 'web' && (
-                  <View style={!stampColorOptions.some(o => o.value === stampColor) ? styles.colorCircleSelectedRing : undefined}>
-                    <TouchableOpacity
-                      style={[styles.colorCircle, styles.colorWheelCircle]}
-                      onPress={() => stampColorInputRef.current?.click()}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="color-filter-outline" size={14} color="#050505" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                <View style={styles.inlineHexWrapper}>
-                  <Text style={styles.inlineHexHash}>#</Text>
-                  <TextInput
-                    style={styles.inlineHexInput}
-                    value={customStampHexInput.replace('#', '')}
-                    onChangeText={(val) => {
-                      const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
-                      setCustomStampHexInput('#' + cleaned);
-                      if (cleaned.length === 6) { setStampColor('#' + cleaned.toUpperCase()); }
-                    }}
-                    placeholder="3B82F6"
-                    placeholderTextColor="#BEC6E0"
-                    maxLength={6}
-                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Stamp Card Font Color Selector */}
-            <View>
-              <Text style={styles.cardSectionTitle}>{t('Text')}</Text>
-              <View style={styles.colorRow}>
-                {fontColorOptions.map((opt) => {
-                  const isSelected = fontColor === opt.value;
-                  const checkColor = opt.value === '#FFFFFF' ? '#050505' : '#FFFFFF';
-                  return (
-                    <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
-                      <TouchableOpacity
-                        style={[styles.colorCircle, { backgroundColor: opt.value, borderWidth: 1, borderColor: '#E2E8F0' }]}
-                        onPress={() => { setFontColor(opt.value); setCustomFontHexInput(opt.value); }}
-                        activeOpacity={0.8}
-                      >
-                        {isSelected && <Ionicons name="checkmark" size={14} color={checkColor} />}
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-                {Platform.OS === 'web' && (
-                  <View style={!fontColorOptions.some(o => o.value === fontColor) ? styles.colorCircleSelectedRing : undefined}>
-                    <TouchableOpacity
-                      style={[styles.colorCircle, styles.colorWheelCircle]}
-                      onPress={() => fontColorInputRef.current?.click()}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="color-filter-outline" size={14} color="#050505" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                <View style={styles.inlineHexWrapper}>
-                  <Text style={styles.inlineHexHash}>#</Text>
-                  <TextInput
-                    style={styles.inlineHexInput}
-                    value={customFontHexInput.replace('#', '')}
-                    onChangeText={(val) => {
-                      const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
-                      setCustomFontHexInput('#' + cleaned);
-                      if (cleaned.length === 6) { setFontColor('#' + cleaned.toUpperCase()); }
-                    }}
-                    placeholder="FFFFFF"
-                    placeholderTextColor="#BEC6E0"
-                    maxLength={6}
-                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Custom Stamp Icons Picker */}
-            <View style={styles.configCard}>
-              <View style={{ borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 16, marginBottom: 16 }}>
-                <Text style={styles.cardSectionTitle}>{t('stamp_check_icon')}</Text>
-                <Text style={styles.cardSectionDesc}>
-                  {t('stamp_check_desc')}
-                </Text>
-                <View style={styles.iconsGrid}>
-                  {stampIcons.map((icon) => (
-                    <TouchableOpacity
-                      key={icon.id}
-                      style={[
-                        styles.iconOption,
-                        selectedIcon === icon.id && styles.iconOptionActive,
-                      ]}
-                      onPress={() => setSelectedIcon(icon.id)}
-                      activeOpacity={0.8}
-                    >
-                      {icon.family === 'Ionicons' && (
-                        <Ionicons name={icon.name} size={18} color={selectedIcon === icon.id ? '#FFFFFF' : '#64748B'} />
-                      )}
-                      {icon.family === 'FontAwesome' && (
-                        <FontAwesome name={icon.name} size={18} color={selectedIcon === icon.id ? '#FFFFFF' : '#64748B'} />
-                      )}
-                      {icon.family === 'MaterialIcons' && (
-                        <MaterialIcons name={icon.name} size={18} color={selectedIcon === icon.id ? '#FFFFFF' : '#64748B'} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
+              {/* More Options Section */}
               <View>
-                <Text style={styles.cardSectionTitle}>{t('Icon Color')}</Text>
-                <View style={styles.colorRow}>
-                  {fontColorOptions.map((opt) => {
-                    const isSelected = iconColor === opt.value;
-                    const checkColor = opt.value === '#FFFFFF' ? '#050505' : '#FFFFFF';
-                    return (
-                      <View key={opt.value} style={isSelected ? styles.colorCircleSelectedRing : undefined}>
-                        <TouchableOpacity
-                          style={[styles.colorCircle, { backgroundColor: opt.value, borderWidth: 1, borderColor: '#E2E8F0' }]}
-                          onPress={() => { setIconColor(opt.value); setCustomIconHexInput(opt.value); }}
-                          activeOpacity={0.8}
-                        >
-                          {isSelected && <Ionicons name="checkmark" size={14} color={checkColor} />}
-                        </TouchableOpacity>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginBottom: 12 }}>
+                  More Options
+                </Text>
+
+                <View style={{ gap: 10 }}>
+                  {/* Row 1: Milestone Rewards */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openMilestonesScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="stats-chart-outline" size={18} color="#000000" />
                       </View>
-                    );
-                  })}
-                  {Platform.OS === 'web' && (
-                    <View style={!fontColorOptions.some(o => o.value === iconColor) ? styles.colorCircleSelectedRing : undefined}>
-                      <TouchableOpacity
-                        style={[styles.colorCircle, styles.colorWheelCircle]}
-                        onPress={() => iconColorInputRef.current?.click()}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="color-filter-outline" size={14} color="#050505" />
-                      </TouchableOpacity>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Milestone Rewards
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                          {subRewards.length > 0 ? `${subRewards.length} configured` : 'Not set up • Optional'}
+                        </Text>
+                      </View>
                     </View>
-                  )}
-                  <View style={styles.inlineHexWrapper}>
-                    <Text style={styles.inlineHexHash}>#</Text>
-                    <TextInput
-                      style={styles.inlineHexInput}
-                      value={customIconHexInput.replace('#', '')}
-                      onChangeText={(val) => {
-                        const cleaned = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
-                        setCustomIconHexInput('#' + cleaned);
-                        if (cleaned.length === 6) { setIconColor('#' + cleaned.toUpperCase()); }
-                      }}
-                      placeholder="FFFFFF"
-                      placeholderTextColor="#BEC6E0"
-                      maxLength={6}
-                      {...Platform.select({ web: { outlineStyle: 'none' } as any })}
-                    />
-                  </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 2: Reward Cost Preview */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openSimulatorScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="calculator-outline" size={18} color="#000000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Reward Cost Preview
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 2 }}>
+                          Estimate your reward expenses
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Sticky Save Changes CTA */}
+              <View style={{ marginTop: 10, marginBottom: 20 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    borderRadius: 14,
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }}
+                  onPress={handleSaveCardConfig}
+                  disabled={isSavingCard}
+                  activeOpacity={0.85}
+                >
+                  {isSavingCard ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Save Changes
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* 3/4 Height Bottom Sheet Modal for Sub-Screens (Slide from down to 3/4 of the page) */}
+              <Modal
+                visible={stampSubScreen !== null}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setStampSubScreen(null)}
+              >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', justifyContent: 'flex-end' }}>
+                  {/* Backdrop touch to dismiss */}
+                  <TouchableOpacity 
+                    style={{ flex: 1 }} 
+                    activeOpacity={1} 
+                    onPress={() => setStampSubScreen(null)} 
+                  />
+
+                  {/* Bottom Sheet Container (3/4 of page) */}
+                  <View style={{
+                    height: Math.round(screenHeight * 0.75),
+                    maxHeight: Math.round(screenHeight * 0.75),
+                    backgroundColor: '#FFFFFF',
+                    borderTopLeftRadius: 28,
+                    borderTopRightRadius: 28,
+                    paddingHorizontal: 20,
+                    paddingTop: 10,
+                    paddingBottom: 24,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: -6 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 16,
+                    elevation: 20,
+                    maxWidth: isDesktop ? 600 : '100%',
+                    width: '100%',
+                    alignSelf: 'center',
+                  }}>
+                    {/* Top Drag Handle Indicator Bar */}
+                    <View style={{
+                      width: 40,
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: '#CBD5E1',
+                      alignSelf: 'center',
+                      marginBottom: 14,
+                    }} />
+
+                    <ScrollView
+                      style={{ flex: 1 }}
+                      contentContainerStyle={{ paddingBottom: 20 }}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {renderSubScreenContent()}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
             </View>
+          );
+        })()}
 
-            {/* Action Save Button */}
-            <TouchableOpacity 
-              style={styles.saveSubmitBtn} 
-              onPress={handleSaveCardConfig} 
-              disabled={isSavingCard}
-              activeOpacity={0.9}
-            >
-              {isSavingCard ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveSubmitBtnText}>{t('save_card_config')}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* TAB 3: Points Rules Dashboard */}
+        {/* TAB 3: Points Loyalty Dashboard (IMAGE 1 EXACT DESIGN) */}
         {activeTab === 'points_tiers' && (() => {
           const parsedSpend = parseFloat(spendPerPoint) || 1;
+          const parsedRedeem = parseInt(pointsPerRm, 10) || 100;
+          const parsedMin = parseInt(minRedeemPoints, 10) || 0;
+          const parsedMax = parseInt(maxRedeemPercent, 10) || 0;
+
+          // Live Calculator Math
+          const testSpendNum = parseFloat(testSpend) || 100;
+          const calculatedPoints = Math.floor(testSpendNum / parsedSpend);
+          const calculatedDiscount = (calculatedPoints / parsedRedeem).toFixed(2);
+          const rewardRatePercent = testSpendNum > 0
+            ? ((parseFloat(calculatedDiscount) / testSpendNum) * 100).toFixed(1).replace(/\.0$/, '')
+            : '0';
+
           return (
-            <View style={{ marginTop: 12, gap: 16 }}>
-              {/* Hero Banner for Points Rule */}
-              <View style={[styles.configCard, { backgroundColor: '#1A1400', paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <Ionicons name="star" size={28} color="#FFC700" />
-                  <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                    RM {parsedSpend} = 1 Point
+            <View style={{ marginTop: 12, gap: 14 }}>
+              {/* Header: Points Loyalty Title + Live Active Status Toggle */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 4,
+                marginBottom: 2,
+              }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.3 }}>
+                    {locale === 'en' ? 'Points Loyalty' : 'Mata Ganjaran'}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {locale === 'en' ? 'Reward customers for every purchase.' : 'Ganjarkan pelanggan bagi setiap pembelian.'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
-                  Example: RM 50.00 spent = {Math.floor(50 / parsedSpend)} points automatically
-                </Text>
+
+                {/* Status Badge with Toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: enablePoints ? '#ECFDF5' : '#F1F5F9',
+                    paddingHorizontal: 9,
+                    paddingVertical: 3.5,
+                    borderRadius: 9999,
+                    borderWidth: 1,
+                    borderColor: enablePoints ? '#A7F3D0' : '#E2E8F0',
+                  }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: enablePoints ? '#10B981' : '#94A3B8' }} />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: enablePoints ? '#059669' : '#64748B' }}>
+                      {enablePoints ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Paused' : 'Dijeda')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={enablePoints}
+                    onValueChange={(val) => {
+                      if (!val && !enableStamps) {
+                        Alert.alert('Action Restricted', locale === 'en' ? 'At least one loyalty module (Stamps or Points) must remain active.' : 'Sekurang-kurangnya satu modul mesti aktif.');
+                        return;
+                      }
+                      setEnablePoints(val);
+                    }}
+                    trackColor={{ false: '#E2E8F0', true: '#000000' }}
+                    thumbColor="#FFFFFF"
+                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                  />
+                </View>
               </View>
 
-              {/* Points Conversion Rate Card */}
-              <View style={styles.configCard}>
-                <View style={styles.cardSectionHeader}>
-                  <Ionicons name="calculator-outline" size={22} color="#0F172A" />
-                  <Text style={styles.cardSectionTitle}>Points Earning Rate</Text>
-                </View>
-                <Text style={styles.cardSectionDesc}>
-                  Set how many Malaysian Ringgit (RM) a customer must spend to earn 1 loyalty point at checkout.
-                </Text>
+              {/* CARD 1: EARN POINTS (IMAGE 1 EXACT) */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                padding: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
+              }}>
+                {/* Header Row */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}
+                  onPress={() => setShowEarnRateModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                    <View style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: '#FEF08A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="cash-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Earn Points' : 'Dapatkan Mata'}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {locale === 'en' ? 'Set how much customers need to spend to earn 1 point.' : 'Tetapkan jumlah belanja untuk dapatkan 1 mata.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
 
-                {/* Quick Presets */}
-                <View style={{ marginTop: 16 }}>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 8, letterSpacing: 0.5 }}>
-                    QUICK PRESETS
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {[
-                      { label: 'RM 1 = 1 Pt', val: '1' },
-                      { label: 'RM 2 = 1 Pt', val: '2' },
-                      { label: 'RM 5 = 1 Pt', val: '5' },
-                      { label: 'RM 10 = 1 Pt', val: '10' },
-                    ].map((preset) => {
-                      const isSel = spendPerPoint === preset.val;
-                      return (
-                        <TouchableOpacity
-                          key={preset.val}
-                          style={{
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            borderRadius: 12,
-                            backgroundColor: isSel ? '#1A1400' : '#F1F5F9',
-                            borderWidth: 1,
-                            borderColor: isSel ? '#FFC700' : '#E2E8F0',
-                          }}
-                          onPress={() => setSpendPerPoint(preset.val)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={{
-                            fontSize: 13,
-                            fontFamily: 'PlusJakartaSans_700Bold',
-                            color: isSel ? '#FFC700' : '#475569',
-                          }}>
-                            {preset.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                {/* Quick Presets Pills */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  {['1', '2', '5', '10'].map((amt) => {
+                    const isSelected = spendPerPoint === amt;
+                    return (
+                      <TouchableOpacity
+                        key={amt}
+                        onPress={() => setSpendPerPoint(amt)}
+                        style={{
+                          flex: 1,
+                          height: 38,
+                          borderRadius: 10,
+                          backgroundColor: isSelected ? '#000000' : '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={{
+                          fontSize: 12.5,
+                          fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold',
+                          color: isSelected ? '#FFCC00' : '#0F172A',
+                        }}>
+                          RM {amt}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Split Dual-Metric Display */}
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  flexDirection: 'row',
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                }}>
+                  {/* Left: Spend */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Spend' : 'Belanja'}
+                    </Text>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      RM {spendPerPoint || '1'}
+                    </Text>
+                  </View>
+
+                  {/* Vertical Hairline Divider */}
+                  <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
+
+                  {/* Right: Earn */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Earn' : 'Dapat'}
+                    </Text>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      1 Point
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* CARD 2: REDEEM VALUE (IMAGE 1 EXACT) */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                padding: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
+              }}>
+                {/* Header Row */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}
+                  onPress={() => setShowRedeemRateModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                    <View style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: '#FEF08A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="gift-outline" size={22} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Redeem Value' : 'Nilai Tebus'}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {locale === 'en' ? 'Set how many points can be redeemed for a discount.' : 'Tetapkan berapa mata untuk ditebus sebagai diskaun.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {/* Split Dual-Metric Display */}
+                <TouchableOpacity
+                  onPress={() => setShowRedeemRateModal(true)}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  {/* Left: Points */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Points' : 'Mata'}
+                    </Text>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {pointsPerRm || '100'} Pts
+                    </Text>
+                  </View>
+
+                  {/* Vertical Hairline Divider */}
+                  <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
+
+                  {/* Right: Discount Value */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Discount Value' : 'Nilai Diskaun'}
+                    </Text>
+                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      RM 1.00
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* CARD 3: PREVIEW EXAMPLE (LIVE CALCULATOR - IMAGE 1 EXACT) */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                padding: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
+              }}>
+                {/* Header Row with Inline Test Spend Input */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 10 }}>
+                    <View style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="calculator-outline" size={22} color="#0F172A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Preview Example' : 'Contoh Pratonton'}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {locale === 'en' ? 'See how it works at checkout.' : 'Lihat kiraan semasa pembayaran.'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Interactive Spending Input Box */}
+                  <View style={{
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 10,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    minWidth: 110,
+                    alignItems: 'flex-end',
+                  }}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 1 }}>
+                      {locale === 'en' ? 'Customer spending (RM)' : 'Belanja Pelanggan (RM)'}
+                    </Text>
+                    <TextInput
+                      value={testSpend}
+                      onChangeText={setTestSpend}
+                      keyboardType="numeric"
+                      style={{
+                        fontSize: 16,
+                        fontFamily: 'PlusJakartaSans_800ExtraBold',
+                        color: '#0F172A',
+                        textAlign: 'right',
+                        padding: 0,
+                        minWidth: 50,
+                      }}
+                      placeholder="100"
+                      placeholderTextColor="#94A3B8"
+                    />
                   </View>
                 </View>
 
-                {/* Custom Spend Input */}
-                <View style={{ marginTop: 20 }}>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 8, letterSpacing: 0.5 }}>
-                    SPEND REQUIRED PER 1 POINT (RM)
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', height: 52, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1' }}>
-                    <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginLeft: 16, marginRight: 8 }}>
-                      RM
+                {/* Calculation Summary Strip (Creamy Gold) */}
+                <View style={{
+                  backgroundColor: '#FEFCE8',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#FEF08A',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                }}>
+                  {/* Points Earned */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Points earned' : 'Mata diperoleh'}
                     </Text>
-                    <TextInput
-                      style={[{ flex: 1, fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', paddingVertical: 12 }, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                      placeholder="e.g. 2"
-                      placeholderTextColor="#94A3B8"
-                      value={spendPerPoint}
-                      onChangeText={(text) => {
-                        const cleaned = text.replace(/[^0-9.]/g, '');
-                        setSpendPerPoint(cleaned);
-                      }}
-                      keyboardType="decimal-pad"
-                    />
-                    <View style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginRight: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
-                        = 1 Point
+                    <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {calculatedPoints} Pts
+                    </Text>
+                  </View>
+
+                  {/* Hairline Divider */}
+                  <View style={{ width: 1, backgroundColor: '#FDE047', marginHorizontal: 8, opacity: 0.6 }} />
+
+                  {/* Discount Value */}
+                  <View style={{ flex: 1.1 }}>
+                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Discount value' : 'Nilai diskaun'}
+                    </Text>
+                    <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      RM {calculatedDiscount}
+                    </Text>
+                  </View>
+
+                  {/* Hairline Divider */}
+                  <View style={{ width: 1, backgroundColor: '#FDE047', marginHorizontal: 8, opacity: 0.6 }} />
+
+                  {/* Reward Rate */}
+                  <View style={{ flex: 1.1 }}>
+                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
+                      {locale === 'en' ? 'Reward rate' : 'Kadar ganjaran'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+                      <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {rewardRatePercent}%
+                      </Text>
+                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12' }}>
+                        {locale === 'en' ? 'of spend' : 'belanja'}
                       </Text>
                     </View>
                   </View>
                 </View>
+              </View>
 
-                {/* Live Simulation Preview */}
-                <View style={{ marginTop: 20, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="sparkles" size={16} color="#D97706" />
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
-                      Live Checkout Simulation
-                    </Text>
+              {/* CARD 4: RULES & LIMITS (IMAGE 1 EXACT) */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+                onPress={() => setShowPointsRulesModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                  <View style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    backgroundColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="shield-checkmark-outline" size={22} color="#0F172A" />
                   </View>
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 20.00</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      +{Math.floor(20 / parsedSpend)} Points
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {locale === 'en' ? 'Rules & Limits' : 'Peraturan & Had'}
                     </Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 50.00</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      +{Math.floor(50 / parsedSpend)} Points
-                    </Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Spend RM 100.00</Text>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      +{Math.floor(100 / parsedSpend)} Points
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                      {locale === 'en'
+                        ? 'Set redemption rules, limits and fraud protection.'
+                        : 'Tetapkan syarat penebusan, had minima dan keselamatan.'}
                     </Text>
                   </View>
                 </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
 
-                {/* Save Points Rule Action Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.saveSubmitBtn,
-                    { marginTop: 24, backgroundColor: '#050505', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-                    savingPointsRate && { opacity: 0.6 },
-                  ]}
-                  onPress={handleSavePointsRate}
-                  disabled={savingPointsRate}
-                  activeOpacity={0.85}
-                >
-                  {savingPointsRate ? (
-                    <ActivityIndicator color="#FFC700" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
-                      <Text style={styles.saveSubmitBtnText}>Save Points Earning Rule</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Informative Tip Card */}
-              <View style={styles.tipCard}>
-                <View style={styles.tipCardHeader}>
-                  <Ionicons name="bulb-outline" size={20} color="#D97706" />
-                  <Text style={styles.tipCardTitle}>Points Rate Strategy</Text>
-                </View>
-                <Text style={styles.tipCardText}>
-                  A lower spend requirement (like RM 1 = 1 Point) creates higher customer engagement and excitement, while higher amounts (like RM 5 = 1 Point) work great for higher ticket merchants. You can adjust this anytime without affecting past customer balances.
-                </Text>
-              </View>
+              {/* Primary Save Action Button (IMAGE 1 EXACT CAPSULE) */}
+              <TouchableOpacity
+                style={[{
+                  backgroundColor: '#000000',
+                  height: 52,
+                  borderRadius: 9999,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 6,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                  elevation: 4,
+                }, savingPointsRate && { opacity: 0.6 }]}
+                onPress={handleSavePointsRate}
+                disabled={savingPointsRate}
+                activeOpacity={0.8}
+              >
+                {savingPointsRate ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    {locale === 'en' ? 'Save Changes' : 'Simpan Perubahan'}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
           );
         })()}
 
         {/* TAB 4: Birthday Rewards */}
-        {activeTab === 'birthday' && (
-            <View style={{ marginTop: 12, gap: 16 }}>
-              <View style={styles.configCard}>
-                <View style={styles.cardSectionHeader}>
-                  <Ionicons name="gift-outline" size={22} color="#0F172A" />
-                  <Text style={styles.cardSectionTitle}>Birthday Rewards</Text>
-                </View>
-                <Text style={styles.cardSectionDesc}>
-                  {isMalay
-                    ? 'Ganjaran hari lahir diberikan secara automatik kepada pelanggan pada hari lahir mereka.'
-                    : 'Automatically reward customers on their birthday with digital vouchers or bonus stamps.'}
-                </Text>
+        {activeTab === 'birthday' && (() => {
+          const birthdayBrandColor = merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || cardColor || '#050505';
+          const isLightBrand = (() => {
+            const hex = (birthdayBrandColor || '#050505').replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16) || 0;
+            const g = parseInt(hex.substring(2, 4), 16) || 0;
+            const b = parseInt(hex.substring(4, 6), 16) || 0;
+            const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+            return yiq >= 160;
+          })();
+          const brandTextColor = isLightBrand ? '#0F172A' : '#FFFFFF';
 
+          return (
+            <View style={{ marginTop: 12, gap: 16 }}>
+              {/* 1. TOP AUTOMATION STATUS BANNER */}
+              <View style={[styles.configCard, { padding: 18, marginBottom: 0 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    AUTOMATED BIRTHDAY ENGINE
+                  </Text>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: birthdayForm.is_active ? '#ECFDF5' : '#F1F5F9',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: birthdayForm.is_active ? '#A7F3D0' : '#E2E8F0',
+                  }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: birthdayForm.is_active ? '#10B981' : '#94A3B8' }} />
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: birthdayForm.is_active ? '#065F46' : '#64748B', letterSpacing: 0.4 }}>
+                      {birthdayForm.is_active ? (locale === 'en' ? 'ALWAYS ACTIVE' : 'SENTIASA AKTIF') : (locale === 'en' ? 'PAUSED' : 'DIJEDA')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.3 }}>
+                    {locale === 'en' ? 'Turn Birthdays Into Guaranteed Visits' : 'Tukar Hari Lahir Kepada Pelanggan Setia'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setHelpModalInfo({
+                      title: locale === 'en' ? 'Automated Birthday Engine' : 'Enjin Hari Lahir Automatik',
+                      desc: locale === 'en'
+                        ? 'Every customer with a birthday on file automatically receives a branded digital pass in their wallet on their birthday morning to celebrate and redeem at your store.'
+                        : 'Setiap pelanggan yang berdaftar akan menerima baucar khas ini secara automatik pada pagi hari lahir mereka untuk ditebus di kedai.',
+                    })}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 2. LIVE CUSTOMER BOARDING PASS PREVIEW */}
+              <View style={[styles.configCard, { padding: 16, marginBottom: 0 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    {locale === 'en' ? 'LIVE CUSTOMER VOUCHER PREVIEW' : 'PRATONTON BAUCAR PELANGGAN'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F1F5F9', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 }}>
+                    <Ionicons name="eye-outline" size={10.5} color="#64748B" />
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                      {locale === 'en' ? 'Customer View' : 'Pandangan Pelanggan'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* THE REFINED AIRLINE BOARDING PASS TICKET CARD */}
+                <View style={{
+                  height: 142,
+                  borderRadius: 16,
+                  backgroundColor: '#FFFFFF',
+                  flexDirection: 'row',
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 3,
+                  position: 'relative',
+                }}>
+                  {/* LEFT ACCENT STRIP: Brand Color Accent Bar */}
+                  <View style={{
+                    width: 7,
+                    backgroundColor: birthdayBrandColor,
+                    borderTopLeftRadius: 16,
+                    borderBottomLeftRadius: 16,
+                  }} />
+
+                  {/* CENTER ZONE: Reward Info with ample breathing room */}
+                  <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'space-between' }}>
+                    {/* Top Row: Clean Single Badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{
+                        backgroundColor: '#FFFBEB',
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 6,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}>
+                        <Ionicons name={birthdayForm.reward_type === 'stamps' ? "star" : "gift"} size={11} color="#B45309" />
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309', letterSpacing: 0.2 }}>
+                          {birthdayForm.reward_type === 'stamps'
+                            ? (locale === 'en' ? 'BIRTHDAY STAMPS' : 'COP HARI LAHIR')
+                            : (locale === 'en' ? 'BIRTHDAY SPECIAL' : 'KHAS HARI LAHIR')}
+                        </Text>
+                      </View>
+
+                      <View style={{
+                        backgroundColor: '#F1F5F9',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}>
+                        <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#475569', letterSpacing: 0.4 }}>
+                          {birthdayForm.reward_type === 'stamps' ? 'AUTO-CREDIT' : 'IN-STORE PASS'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Middle: Title & Subtitle */}
+                    <View style={{ marginVertical: 2 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.2, lineHeight: 19 }} numberOfLines={1}>
+                        {birthdayForm.title || (locale === 'en' ? 'Free Birthday Treat' : 'Hadiah Hari Lahir')}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                        {birthdayForm.reward_type === 'stamps'
+                          ? (locale === 'en' ? `${birthdayForm.reward_value || '2'} bonus stamps added to card` : `${birthdayForm.reward_value || '2'} cop bonus ditambah ke kad`)
+                          : (birthdayForm.reward_value || (locale === 'en' ? 'Valid during birthday celebration' : 'Sah semasa sambutan hari lahir'))}
+                      </Text>
+                    </View>
+
+                    {/* Bottom Metadata & Action CTA */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="time-outline" size={12} color="#059669" />
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>
+                          {locale === 'en' ? 'Valid: 3 Days' : 'Sah: 3 Hari'}
+                        </Text>
+                      </View>
+
+                      <View style={{
+                        height: 25,
+                        borderRadius: 12.5,
+                        backgroundColor: '#0F172A',
+                        paddingHorizontal: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>
+                          {locale === 'en' ? 'Use Pass ➔' : 'Tebus Baucar ➔'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* PERFORATION NOTCHES & DASHED LINE */}
+                  <View style={{ width: 14, alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 3 }} pointerEvents="none">
+                    <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 7, backgroundColor: birthdayBrandColor }} />
+                    <View style={{ width: 1, height: '100%', borderColor: '#FFFFFF', borderWidth: 1, borderStyle: 'dashed', zIndex: 1 }} />
+                    <View style={{ position: 'absolute', width: 14, height: 14, borderRadius: 7, top: -7, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', zIndex: 2 }} />
+                    <View style={{ position: 'absolute', width: 14, height: 14, borderRadius: 7, bottom: -7, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', zIndex: 2 }} />
+                  </View>
+
+                  {/* RIGHT STUB: Logo & Merchant Name */}
+                  <View style={{
+                    width: 86,
+                    backgroundColor: birthdayBrandColor,
+                    borderTopRightRadius: 16,
+                    borderBottomRightRadius: 16,
+                    paddingVertical: 10,
+                    paddingHorizontal: 6,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <View style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1.5,
+                      borderColor: isLightBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                      marginBottom: 6,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3,
+                      elevation: 2,
+                    }}>
+                      <Image source={{ uri: merchantLogo }} style={{ width: 38, height: 38, borderRadius: 19, resizeMode: 'cover' }} />
+                    </View>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, textAlign: 'center', width: '100%', letterSpacing: 0.3 }} numberOfLines={2}>
+                      {(merchant?.name || 'STORE').toUpperCase()}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2.5, marginTop: 4, opacity: 0.85 }}>
+                      <Ionicons name="barcode-outline" size={10} color={brandTextColor} />
+                      <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.6 }}>
+                        PASS
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* 3. APPLE GROUPED LIST CONFIGURATION (IMAGE 1 EXACT DESIGN) */}
+              <View style={[styles.configCard, { padding: 16, backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0, elevation: 0, paddingHorizontal: 0, marginTop: 4 }]}>
                 {loadingBirthday ? (
                   <ActivityIndicator size="small" color="#050505" style={{ marginVertical: 20 }} />
                 ) : (
                   <>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>{isMalay ? 'Jenis Ganjaran' : 'Reward Type'}</Text>
-                      <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {/* Header with Title and Automation Toggle */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingHorizontal: 4 }}>
+                      <View>
+                        <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.2 }}>
+                          {locale === 'en' ? 'Birthday Pass Automation' : 'Automasi Baucar Hari Lahir'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          {locale === 'en' ? 'Automated in-wallet delivery on customer birthdays' : 'Dihantar automatik pada pagi hari lahir'}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: birthdayForm.is_active ? '#059669' : '#64748B' }}>
+                          {birthdayForm.is_active ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Paused' : 'Dijeda')}
+                        </Text>
+                        <Switch
+                          value={birthdayForm.is_active}
+                          onValueChange={(val) => setBirthdayForm((f) => ({ ...f, is_active: val }))}
+                          trackColor={{ false: '#E2E8F0', true: '#000000' }}
+                          thumbColor="#FFFFFF"
+                          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                      </View>
+                    </View>
+
+                    {/* SECTION 1: REWARD TYPE ROW (IMAGE 1 EXACT) */}
+                    <View style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 14,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.04,
+                      shadowRadius: 3,
+                      elevation: 1,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {locale === 'en' ? 'Reward Type' : 'Jenis Ganjaran'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setHelpModalInfo({
+                            title: locale === 'en' ? 'Reward Type' : 'Jenis Ganjaran',
+                            desc: locale === 'en'
+                              ? 'Choose between issuing a digital Voucher Pass for checkout redemption or crediting bonus loyalty stamps directly to the customer card.'
+                              : 'Pilih antara memberi Baucar Hadiah digital untuk ditebus di kaunter, atau cop bonus dimasukkan terus ke kad pelanggan.',
+                          })}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{
+                        flexDirection: 'row',
+                        backgroundColor: '#F1F5F9',
+                        borderRadius: 9999,
+                        padding: 3,
+                        gap: 3,
+                      }}>
                         {[
-                          {
-                            id: 'voucher_code',
-                            icon: 'gift-outline',
-                            label: isMalay ? 'Baucar / Hadiah' : 'Voucher / Gift',
-                            desc: isMalay ? 'Jana kod baucar digital' : 'Redeemable voucher code',
-                            color: '#10B981',
-                          },
-                          {
-                            id: 'stamps',
-                            icon: 'star-outline',
-                            label: isMalay ? 'Cop Bonus' : 'Bonus Stamps',
-                            desc: isMalay ? 'Kredit terus ke kad' : 'Direct to stamp card',
-                            color: '#EAB308',
-                          },
-                        ].map((type) => {
-                          const isActive = birthdayForm.reward_type === type.id;
+                          { id: 'voucher_code', icon: 'gift-outline', label: locale === 'en' ? 'Voucher' : 'Baucar' },
+                          { id: 'stamps', icon: 'star-outline', label: locale === 'en' ? 'Stamps' : 'Cop' },
+                        ].map((t) => {
+                          const isSelected = birthdayForm.reward_type === t.id;
                           return (
                             <TouchableOpacity
-                              key={type.id}
-                              style={{
-                                flex: 1,
-                                backgroundColor: isActive ? '#FFFBEB' : '#F8FAFC',
-                                borderColor: isActive ? '#FFC700' : '#E2E8F0',
-                                borderWidth: 1.5,
-                                borderRadius: 16,
-                                padding: 14,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                              }}
+                              key={t.id}
                               onPress={() => {
-                                const newType = type.id as any;
-                                setBirthdayForm((f) => {
-                                  const isStamps = newType === 'stamps';
-                                  const defaultTpl = isStamps
-                                    ? 'Happy Birthday {{name}}! {{merchant}} has gifted you {{title}} directly to your stamp card! Check your card anytime at {{login_link}}.'
-                                    : 'Happy Birthday {{name}}! {{merchant}} has a special treat for you: {{title}}. Show this code at the counter: {{code}}. Valid until {{expiry}}.';
-                                  return {
-                                    ...f,
-                                    reward_type: newType,
-                                    reward_value: '',
-                                    title: '',
-                                    message_template: defaultTpl,
-                                  };
-                                });
+                                const newType = t.id as any;
+                                setBirthdayForm((f) => ({
+                                  ...f,
+                                  reward_type: newType,
+                                  title: newType === 'stamps' ? '2 Bonus Stamps' : (f.title || 'Free Birthday Treat'),
+                                  reward_value: newType === 'stamps' ? '2' : (f.reward_value || 'Free Birthday Item'),
+                                }));
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                paddingVertical: 6,
+                                paddingHorizontal: 12,
+                                borderRadius: 9999,
+                                backgroundColor: isSelected ? '#000000' : 'transparent',
                               }}
                               activeOpacity={0.7}
                             >
-                              <View style={{ backgroundColor: isActive ? '#FFC700' : '#FFFFFF', width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', shadowColor: isActive ? '#FFC700' : '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isActive ? 0.2 : 0.05, shadowRadius: 4, elevation: 2 }}>
-                                <Ionicons name={type.icon as any} size={22} color={isActive ? '#1A1400' : type.color} />
-                              </View>
-                              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isActive ? '#1A1400' : '#0F172A', textAlign: 'center' }}>
-                                {type.label}
-                              </Text>
-                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
-                                {type.desc}
+                              <Ionicons name={t.icon as any} size={13} color={isSelected ? '#FFFFFF' : '#64748B'} />
+                              <Text style={{
+                                fontSize: 11.5,
+                                fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                                color: isSelected ? '#FFFFFF' : '#64748B',
+                              }}>
+                                {t.label}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -2520,99 +5864,283 @@ export default function UnifiedRewardsScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>
-                        {birthdayForm.reward_type === 'stamps'
-                          ? (isMalay ? 'Berapa banyak cop bonus?' : 'How many bonus stamps?')
-                          : (isMalay ? 'Apakah tawaran / hadiah percuma?' : "What's the offer / gift?")}
-                      </Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={birthdayForm.reward_value}
-                        onChangeText={(text) => {
+                    {/* SECTION 2: GIFT OFFER ROW (IMAGE 1 EXACT) */}
+                    <View style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {birthdayForm.reward_type === 'stamps'
+                            ? (locale === 'en' ? 'Bonus Stamps' : 'Cop Bonus')
+                            : (locale === 'en' ? 'Gift Offer' : 'Tawaran Hadiah')}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setHelpModalInfo({
+                            title: birthdayForm.reward_type === 'stamps'
+                              ? (locale === 'en' ? 'Bonus Stamps Quantity' : 'Bilangan Cop')
+                              : (locale === 'en' ? 'Gift Offer' : 'Tawaran Hadiah'),
+                            desc: birthdayForm.reward_type === 'stamps'
+                              ? (locale === 'en' ? 'Number of stamps added directly to customer card on their birthday.' : 'Bilangan cop bonus dimasukkan ke kad pelanggan.')
+                              : (locale === 'en' ? 'Select a product or service from your menu to offer as a birthday gift.' : 'Pilih produk atau servis dari menu anda untuk dihadiahkan.'),
+                          })}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                        }}
+                        onPress={() => {
                           if (birthdayForm.reward_type === 'stamps') {
-                            const cleaned = text.replace(/[^0-9]/g, '');
-                            setBirthdayForm((f) => ({
-                              ...f,
-                              reward_value: cleaned,
-                              title: cleaned ? `${cleaned} Free Stamp${Number(cleaned) > 1 ? 's' : ''}` : '',
-                              description: cleaned ? `Birthday Reward: ${cleaned} free stamp${Number(cleaned) > 1 ? 's' : ''}` : '',
-                            }));
+                            setShowStampsPicker(true);
                           } else {
-                            setBirthdayForm((f) => ({
-                              ...f,
-                              reward_value: text,
-                              title: text,
-                              description: `Birthday special: ${text}`,
-                            }));
+                            setManualGiftInput(selectedBirthdayItem?.name || birthdayForm.title || '');
+                            setManualGiftDescInput(selectedBirthdayItem?.description || birthdayForm.description || '');
+                            setBirthdayGiftMode(selectedBirthdayItem && isPro ? 'catalog' : 'manual');
+                            setShowBirthdayItemPicker(true);
                           }
                         }}
-                        placeholder={birthdayForm.reward_type === 'stamps' ? 'e.g. 2' : 'e.g. Free Coffee / 15% Off'}
-                        placeholderTextColor="#94A3B8"
-                        keyboardType={birthdayForm.reward_type === 'stamps' ? 'number-pad' : 'default'}
-                      />
-                      <Text style={styles.helpText}>
-                        {birthdayForm.reward_type === 'stamps'
-                          ? (isMalay
-                              ? 'Cop akan dikreditkan secara automatik ke kad cop digital pelanggan pada hari lahir mereka.'
-                              : "Stamps will be credited directly to the customer's digital card on their birthday.")
-                          : (isMalay
-                              ? 'Pelanggan akan menerima kod baucar unik (cth: BDAY-XXXX) untuk ditebus di kedai.'
-                              : 'Customer receives a unique voucher code (e.g. BDAY-XXXX) to show in-store.')}
-                      </Text>
-                    </View>
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                          {birthdayForm.reward_type === 'stamps' ? (
+                            <View style={{ width: 52, height: 44, borderRadius: 10, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="star" size={22} color="#D97706" />
+                            </View>
+                          ) : selectedBirthdayItem ? (
+                            <View style={{ width: 52, height: 44, borderRadius: 10, backgroundColor: '#F1F5F9', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                              <Image
+                                source={{
+                                  uri: (selectedBirthdayItem?.image ? pb.files.getUrl(selectedBirthdayItem, selectedBirthdayItem.image) : (selectedBirthdayItem?.photo ? pb.files.getUrl(selectedBirthdayItem, selectedBirthdayItem.photo) : null)) ||
+                                    'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&q=80&w=240'
+                                }}
+                                style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                              />
+                            </View>
+                          ) : (
+                            <View style={{ width: 52, height: 44, borderRadius: 10, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="gift" size={22} color="#D97706" />
+                            </View>
+                          )}
 
-                    <View style={styles.twoColumnInputs}>
-                      <View style={[styles.inputContainer, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>Expiry (days)</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16 }}>
-                          <Ionicons name="time-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
-                          <TextInput
-                            style={{ flex: 1, height: 48, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}
-                            value={birthdayForm.expiry_days}
-                            onChangeText={(text) => setBirthdayForm((f) => ({ ...f, expiry_days: text.replace(/[^0-9]/g, '') }))}
-                            placeholder="7"
-                            placeholderTextColor="#94A3B8"
-                            keyboardType="number-pad"
-                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>
+                              {selectedBirthdayItem?.name || birthdayForm.title || (birthdayForm.reward_type === 'stamps' ? '2 Bonus Stamps' : (locale === 'en' ? 'Select or Type a Gift' : 'Pilih atau Taip Hadiah'))}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                              {birthdayForm.reward_type === 'stamps'
+                                ? (locale === 'en' ? `${birthdayForm.reward_value || '2'} stamps auto-credited` : `${birthdayForm.reward_value || '2'} cop dikreditkan`)
+                                : (selectedBirthdayItem
+                                    ? `Linked menu item · RM${Number(selectedBirthdayItem.price || 0).toFixed(0)}`
+                                    : (birthdayForm.description || (locale === 'en' ? 'Custom gift voucher' : 'Baucar hadiah tersuai')))}
+                            </Text>
+                          </View>
                         </View>
+
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* SECTION 3: VALIDITY WINDOW ROW (IMAGE 1 EXACT) */}
+                    <View style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {locale === 'en' ? 'Validity Window' : 'Tempoh Sah'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setHelpModalInfo({
+                            title: locale === 'en' ? 'Validity Window' : 'Tempoh Sah',
+                            desc: locale === 'en'
+                              ? 'Determines how many days the customer has to claim their birthday treat.'
+                              : 'Berapa hari pelanggan boleh menggunakan baucar hari lahir mereka.',
+                          })}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
                       </View>
-                      <View style={[styles.inputContainer, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>Send Time</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16 }}>
-                          <Ionicons name="paper-plane-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
-                          <TextInput
-                            style={{ flex: 1, height: 48, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}
-                            value={birthdayForm.send_time}
-                            onChangeText={(text) => {
-                              let cleaned = text.replace(/[^0-9:]/g, '');
-                              if (cleaned.length >= 3 && !cleaned.includes(':')) {
-                                cleaned = cleaned.slice(0, 2) + ':' + cleaned.slice(2, 4);
-                              }
-                              setBirthdayForm((f) => ({ ...f, send_time: cleaned.slice(0, 5) }));
-                            }}
-                            placeholder="09:00"
-                            placeholderTextColor="#94A3B8"
-                            maxLength={5}
-                          />
+
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                        }}
+                        onPress={() => setShowValidityPicker(true)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="calendar-outline" size={24} color="#0F172A" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {birthdayForm.expiry_days === '7'
+                                ? (locale === 'en' ? '7 Days' : '7 Hari')
+                                : (birthdayForm.expiry_days === '30'
+                                    ? (locale === 'en' ? '30 Days' : '30 Hari')
+                                    : (locale === 'en' ? '3 Days' : '3 Hari'))}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {birthdayForm.expiry_days === '7'
+                                ? (locale === 'en' ? '3 days before · Birthday · 3 days after' : '3 hari sebelum · Hari lahir · 3 hari selepas')
+                                : (birthdayForm.expiry_days === '30'
+                                    ? (locale === 'en' ? 'Entire customer birthday month' : 'Sepanjang bulan hari lahir')
+                                    : (locale === 'en' ? 'Day before · Birthday · Day after' : 'Hari sebelum · Hari lahir · Hari selepas'))}
+                            </Text>
+                          </View>
                         </View>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* SECTION 4: SEND SCHEDULE ROW (IMAGE 1 EXACT) */}
+                    <View style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {locale === 'en' ? 'Send Schedule' : 'Waktu Hantar'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setHelpModalInfo({
+                            title: locale === 'en' ? 'Send Schedule' : 'Waktu Hantar',
+                            desc: locale === 'en'
+                              ? 'Automated delivery time when the birthday notification is delivered to the customer wallet.'
+                              : 'Waktu automatik bila notifikasi dihantar ke pelanggan.',
+                          })}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
                       </View>
+
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                        }}
+                        onPress={() => setShowSchedulePicker(true)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="time-outline" size={24} color="#0F172A" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {birthdayForm.send_time ? `${birthdayForm.send_time} ${Number(birthdayForm.send_time.split(':')[0]) >= 12 ? 'PM' : 'AM'}` : '09:00 AM'}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {locale === 'en' ? "Send on customer's birthday · Store local time" : "Dihantar pada hari lahir · Waktu tempatan"}
+                            </Text>
+                          </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                      </TouchableOpacity>
                     </View>
 
+                    {/* SECTION 5: REDEMPTION RULES ROW (IMAGE 1 EXACT) */}
+                    <View style={{ marginBottom: 20 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {locale === 'en' ? 'Redemption Rules' : 'Syarat Penebusan'}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setHelpModalInfo({
+                            title: locale === 'en' ? 'Redemption Rules' : 'Syarat Penebusan',
+                            desc: locale === 'en'
+                              ? 'Security and anti-fraud rules applied to birthday passes.'
+                              : 'Syarat keselamatan dan pencegahan penipuan baucar.',
+                          })}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="help-circle-outline" size={15} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
 
-
-                    <View style={styles.switchRow}>
-                      <Text style={styles.switchLabel}>Active</Text>
-                      <Switch
-                        value={birthdayForm.is_active}
-                        onValueChange={(value) => setBirthdayForm((f) => ({ ...f, is_active: value }))}
-                        trackColor={{ false: '#E2E8F0', true: '#050505' }}
-                        thumbColor="#FFFFFF"
-                      />
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                        }}
+                        onPress={() => setShowRulesModal(true)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="document-text-outline" size={24} color="#0F172A" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {locale === 'en' ? 'Standard rules' : 'Syarat standard'}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {locale === 'en' ? 'Once per customer, per birthday year' : 'Sekali bagi setiap pelanggan, setiap tahun'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                      </TouchableOpacity>
                     </View>
 
+                    {/* Primary Save Action Button (IMAGE 1 EXACT CAPSULE) */}
                     <TouchableOpacity
-                      style={[styles.saveSubmitBtn, savingBirthday && { opacity: 0.6 }]}
+                      style={[{
+                        backgroundColor: '#000000',
+                        height: 50,
+                        borderRadius: 9999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 6,
+                        elevation: 3,
+                      }, savingBirthday && { opacity: 0.6 }]}
                       onPress={handleSaveBirthday}
                       disabled={savingBirthday}
                       activeOpacity={0.8}
@@ -2620,162 +6148,303 @@ export default function UnifiedRewardsScreen() {
                       {savingBirthday ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.saveSubmitBtnText}>{birthdayReward ? 'Update Birthday Reward' : 'Create Birthday Reward'}</Text>
+                        <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                          {locale === 'en' ? 'Save Changes' : 'Simpan Perubahan'}
+                        </Text>
                       )}
                     </TouchableOpacity>
                   </>
                 )}
               </View>
             </View>
-          )}
+          );
+        })()}
         </ScrollView>
 
 
 
-      {/* Save Reward Modal (Refined Reference Layout) */}
+      {/* Save Reward Full Page Modal */}
       <Modal
         visible={modalVisible}
-        transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 16,
-        }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom', 'left', 'right']}>
+          {/* Top Full-Page Header */}
           <View style={{
-            width: '100%',
-            maxWidth: 520,
-            maxHeight: '90%',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(0, 0, 0, 0.06)',
             backgroundColor: '#FFFFFF',
-            borderRadius: 28,
-            padding: 24,
-            shadowColor: '#000000',
-            shadowOffset: { width: 0, height: 16 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
-            elevation: 10,
           }}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, paddingRight: 10 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="gift" size={24} color="#D97706" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                    {editingReward ? (locale === 'en' ? 'Edit Reward' : 'Sunting Ganjaran') : (locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran')}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2, lineHeight: 16 }}>
-                    {locale === 'en' ? 'Add a reward to your catalog and link it to your loyalty programs.' : 'Tambah ganjaran ke katalog dan hubungkan ke program kesetiaan anda.'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="close" size={18} color="#64748B" />
-              </TouchableOpacity>
+            {/* Left Balance Spacer */}
+            <View style={{ width: 40 }} />
+
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                {editingReward ? (locale === 'en' ? 'Edit Reward' : 'Sunting Ganjaran') : (locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran')}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                {locale === 'en' ? 'Catalog Voucher Setup' : 'Tetapan Baucar Katalog'}
+              </Text>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color="#000000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 130 }}
+            keyboardShouldPersistTaps="handled"
+          >
 
               {/* 🎫 Live Customer Ticket Voucher Preview */}
               <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
-                  🎫 Live Customer Voucher Preview
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+                  Live Customer Voucher Preview
                 </Text>
-                <View style={{
-                  height: 140,
-                  borderRadius: 18,
-                  backgroundColor: '#0B0F17',
-                  flexDirection: 'row',
-                  overflow: 'hidden',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4,
-                  position: 'relative',
-                }}>
-                  {/* 1. LEFT ZONE: Merchant Identity ONLY */}
-                  <View style={{ width: 95, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>
+                {(() => {
+                  const modalBrandColor = merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || cardColor || '#050505';
+                  const isLightModalBrand = (() => {
+                    const hex = (modalBrandColor || '#050505').replace('#', '');
+                    const r = parseInt(hex.substring(0, 2), 16) || 0;
+                    const g = parseInt(hex.substring(2, 4), 16) || 0;
+                    const b = parseInt(hex.substring(4, 6), 16) || 0;
+                    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                    return yiq >= 160;
+                  })();
+                  const modalBrandTextColor = isLightModalBrand ? '#0F172A' : '#FFFFFF';
+
+                  return (
                     <View style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 24,
+                      height: 155,
+                      borderRadius: 16,
                       backgroundColor: '#FFFFFF',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
                       shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 3,
-                      elevation: 2,
-                      marginBottom: 4,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 8,
+                      elevation: 4,
+                      position: 'relative',
                     }}>
-                      <Image source={{ uri: merchantLogo }} style={{ width: 42, height: 42, borderRadius: 21, resizeMode: 'cover' }} />
-                    </View>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center', width: '100%' }} numberOfLines={1}>
-                      {merchant?.name || 'Your Store'}
-                    </Text>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', width: '100%', marginTop: 1 }} numberOfLines={1}>
-                      {merchant?.category || 'food'}
-                    </Text>
-                  </View>
+                      {/* 1. LEFT STUB: Voucher Category Color Spine (Standardized to Merchant Brand Color) */}
+                      {(() => {
+                        const spineTheme = getVoucherSpineTheme(formCampaignType || formType, formTitle, modalBrandColor);
+                        return (
+                          <View style={{
+                            width: 42,
+                            backgroundColor: modalBrandColor,
+                            alignItems: 'center',
+                            position: 'relative',
+                            borderTopLeftRadius: 16,
+                            borderBottomLeftRadius: 16,
+                            overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              width: 155,
+                              height: 42,
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              marginLeft: -77.5,
+                              marginTop: -21,
+                              transform: [{ rotate: '-90deg' }],
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: modalBrandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
+                                {spineTheme.spineText}
+                              </Text>
+                              <Text style={{ fontSize: 6.5, fontFamily: 'PlusJakartaSans_700Bold', color: modalBrandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
+                                {spineTheme.subText}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })()}
 
-                  {/* CENTER DIVIDER: Ticket Notches & Dotted Line */}
-                  <View style={{ width: 14, alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                    <View style={{ width: 14, height: 7, borderBottomLeftRadius: 7, borderBottomRightRadius: 7, backgroundColor: '#FFFFFF', position: 'absolute', top: 0, zIndex: 5 }} />
-                    <View style={{ width: 1, height: '100%', borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderStyle: 'dashed' }} />
-                    <View style={{ width: 14, height: 7, borderTopLeftRadius: 7, borderTopRightRadius: 7, backgroundColor: '#FFFFFF', position: 'absolute', bottom: 0, zIndex: 5 }} />
-                  </View>
+                      {/* 2. CENTER ZONE: Reward Information on Pure White */}
+                      <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'space-between' }}>
+                        {/* Top Row: Ready to redeem pill + Discount tag */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
+                            <Ionicons name="gift" size={10} color="#B45309" />
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                          </View>
 
-                  {/* 2. CENTER ZONE: Reward Information */}
-                  <View style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 10, justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                    <View style={{ zIndex: 2 }}>
-                      <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 100, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 }}>
-                        <Ionicons name="gift" size={10} color="#000000" />
-                        <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Ready to redeem</Text>
+                          <View style={{
+                            backgroundColor: formType === 'discount' ? '#0F172A' : '#FFCC00',
+                            paddingHorizontal: 7,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                          }}>
+                            <Text style={{
+                              fontSize: 8,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: formType === 'discount' ? '#FFFFFF' : '#050505',
+                              letterSpacing: 0.5,
+                            }}>
+                              {formType === 'discount' ? (formDiscountValue ? (formDiscountType === 'percentage' ? `${formDiscountValue}% OFF` : `RM ${formDiscountValue} OFF`) : 'DISCOUNT') : 'FREE ITEM'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Middle: YOUR REWARD + Title + Description */}
+                        <View style={{ marginVertical: 1 }}>
+                          <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 1, textTransform: 'uppercase' }}>
+                            YOUR REWARD
+                          </Text>
+                          <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 18 }} numberOfLines={2}>
+                            {formTitle || 'FREE AISKRIM Premium 3 scoop'}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1, lineHeight: 14 }} numberOfLines={1}>
+                            {formDesc || (
+                              formType === 'discount'
+                                ? (formDiscountType === 'percentage'
+                                    ? `${formDiscountValue || 'XX'}% OFF${formDiscountScope === 'specific' && formApplicableItemsText ? ` (${formApplicableItemsText})` : ' offer'}`
+                                    : `RM ${formDiscountValue || 'XX'} OFF${formDiscountScope === 'specific' && formApplicableItemsText ? ` (${formApplicableItemsText})` : ' offer'}`)
+                                : (formApplicableItemsText
+                                    ? `${formFreeQty && Number(formFreeQty) > 1 ? `${formFreeQty}x ` : ''}${formApplicableItemsText}`
+                                    : 'Reward for completing store card')
+                            )}
+                          </Text>
+                        </View>
+
+                        {/* Bottom Row: Source Pill & Stock + Use Voucher Button */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <Ionicons name="card" size={8.5} color="#059669" />
+                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                            </View>
+                            <Text style={{ fontSize: 9, color: '#CBD5E1' }}>|</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                              Stock: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>{formStock || 'Unlimited'}</Text>
+                            </Text>
+                          </View>
+
+                          {/* Customer CTA Button */}
+                          <View style={{ height: 24, borderRadius: 12, backgroundColor: '#0F172A', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>Use Voucher ➔</Text>
+                          </View>
+                        </View>
                       </View>
 
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: -0.3, lineHeight: 18 }} numberOfLines={2}>
-                        {formTitle || 'FREE AISKRIM Premium 3 scoop'}
-                      </Text>
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2, lineHeight: 14 }} numberOfLines={1}>
-                        {formType === 'discount' ? (formDiscountType === 'percentage' ? `${formDiscountValue || 'XX'}% OFF offer` : `RM ${formDiscountValue || 'XX'} OFF offer`) : 'Reward for completing store card'}
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, zIndex: 2 }}>
-                      <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="card" size={9} color="#FFFFFF" />
-                        <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>STAMP CARD REWARD</Text>
+                      {/* 3. PERFORATION COLUMN */}
+                      <View style={{
+                        width: 16,
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        position: 'relative',
+                        zIndex: 3,
+                      }} pointerEvents="none">
+                        <View style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 8,
+                          backgroundColor: modalBrandColor,
+                        }} />
+                        <View style={{
+                          width: 1,
+                          height: '100%',
+                          borderColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          zIndex: 1,
+                        }} />
+                        <View style={{
+                          position: 'absolute',
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          top: -8,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          zIndex: 2,
+                        }} />
+                        <View style={{
+                          position: 'absolute',
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          bottom: -8,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          zIndex: 2,
+                        }} />
                       </View>
-                      <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>|</Text>
-                      <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                        Stock: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Unlimited</Text>
-                      </Text>
-                    </View>
-                  </View>
 
-                  {/* 3. RIGHT SAFE ZONE: Tag & Use Voucher CTA */}
-                  <View style={{ width: 115, paddingVertical: 10, paddingHorizontal: 10, justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', zIndex: 2 }}>
-                    {/* Top Right Tag */}
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5, zIndex: 3 }}>
-                      {formType === 'discount' ? `${formDiscountValue || '20'}% OFF` : 'FREE ITEM'}
-                    </Text>
-
-                    {/* Bottom Right CTA Button */}
-                    <View style={{ height: 26, borderRadius: 13, backgroundColor: '#FFFFFF', paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }} numberOfLines={1}>Use Voucher ➔</Text>
+                      {/* 4. RIGHT STUB */}
+                      <View style={{
+                        width: 95,
+                        backgroundColor: modalBrandColor,
+                        borderTopRightRadius: 16,
+                        borderBottomRightRadius: 16,
+                        paddingVertical: 10,
+                        paddingHorizontal: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <View style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                          backgroundColor: '#FFFFFF',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 2,
+                          borderColor: isLightModalBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.12,
+                          shadowRadius: 3,
+                          elevation: 2,
+                          marginBottom: 6,
+                        }}>
+                          <Image source={{ uri: merchantLogo }} style={{ width: 42, height: 42, borderRadius: 21, resizeMode: 'cover' }} />
+                        </View>
+                        <Text style={{
+                          fontSize: 10,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: modalBrandTextColor,
+                          textAlign: 'center',
+                          width: '100%',
+                          letterSpacing: 0.3,
+                        }} numberOfLines={2}>
+                          {(merchant?.name || 'STORE').toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </View>
+                  );
+                })()}
               </View>
 
               {/* Title Input */}
@@ -2844,14 +6513,341 @@ export default function UnifiedRewardsScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* PRO Campaign Recipes (8 Formula Pintar) */}
+              <View style={{
+                borderRadius: 18,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                padding: 14,
+                marginBottom: 20,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="diamond" size={16} color="#B45309" />
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
+                      {locale === 'en' ? 'PRO Campaign Recipes' : 'Formula Kempen Pintar PRO'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!isPro) setShowUpgradeModal(true);
+                    }}
+                    activeOpacity={0.8}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 2.5,
+                      borderRadius: 999,
+                      backgroundColor: isPro ? '#000000' : '#FEF3C7',
+                      borderWidth: 1,
+                      borderColor: isPro ? '#000000' : '#F59E0B',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 9.5,
+                      fontFamily: 'PlusJakartaSans_800ExtraBold',
+                      color: isPro ? '#FFCC00' : '#B45309',
+                      letterSpacing: 0.5,
+                    }}>
+                      {isPro ? 'PRO UNLOCKED' : '🔒 PRO ONLY'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16, marginBottom: 12 }}>
+                  {locale === 'en'
+                    ? 'Pre-built promotion formulas to boost footfall, fill off-peak hours, or bring back quiet customers.'
+                    : 'Formula promosi siap-pakai untuk lonjakkan jualan, penuhkan waktu lengang, atau panggil pelanggan sepi.'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {PRO_CAMPAIGN_RECIPES.map((recipe) => {
+                    const isSelected = formCampaignType === recipe.id;
+                    return (
+                      <TouchableOpacity
+                        key={recipe.id}
+                        style={{
+                          width: '48%',
+                          flexGrow: 1,
+                          padding: 10,
+                          borderRadius: 14,
+                          backgroundColor: isSelected ? '#000000' : '#FFFFFF',
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                          justifyContent: 'space-between',
+                          minHeight: 82,
+                        }}
+                        onPress={() => handleSelectRecipe(recipe)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : `${recipe.color}15`,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Ionicons name={recipe.icon as any} size={15} color={isSelected ? '#FFCC00' : recipe.color} />
+                          </View>
+                          <View style={{
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${recipe.color}15`,
+                          }}>
+                            <Text style={{
+                              fontSize: 8,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: isSelected ? '#FFCC00' : recipe.color,
+                              letterSpacing: 0.3,
+                            }}>
+                              {!isPro ? '🔒 PRO' : recipe.tag}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={{
+                          fontSize: 11.5,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: isSelected ? '#FFFFFF' : '#1E293B',
+                          marginBottom: 2,
+                        }} numberOfLines={1}>
+                          {recipe.name}
+                        </Text>
+                        <Text style={{
+                          fontSize: 9.5,
+                          fontFamily: 'PlusJakartaSans_500Medium',
+                          color: isSelected ? '#94A3B8' : '#64748B',
+                          lineHeight: 13,
+                        }} numberOfLines={2}>
+                          {recipe.desc}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Dynamic PRO Campaign Smart Controls (if active) */}
+              {formCampaignType && (() => {
+                const activeRecipe = PRO_CAMPAIGN_RECIPES.find(r => r.id === formCampaignType);
+                if (!activeRecipe) return null;
+
+                return (
+                  <View style={{
+                    borderRadius: 18,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: '#000000',
+                    padding: 14,
+                    marginBottom: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}>
+                    {/* Header: Recipe badge + Clear button */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          backgroundColor: activeRecipe.color,
+                        }}>
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                            {activeRecipe.tag}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
+                          {activeRecipe.name}
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => setFormCampaignType(null)}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: '#F1F5F9' }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                          {locale === 'en' ? '✕ Reset Formula' : '✕ Batal Formula'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Controls based on specific recipe */}
+                    {formCampaignType === 'happy_hour' && (
+                      <View>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Quick Time Presets:' : 'Pilihan Waktu Lengang Pantas:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {[
+                            { label: '2:00 PM – 5:00 PM', timeStr: 'Sah 2:00 PM – 5:00 PM' },
+                            { label: '3:00 PM – 6:00 PM', timeStr: 'Sah 3:00 PM – 6:00 PM' },
+                            { label: '11:00 AM – 2:00 PM', timeStr: 'Sah 11:00 AM – 2:00 PM' },
+                          ].map((preset) => {
+                            const isSlotActive = formApplicableItemsText.includes(preset.label);
+                            return (
+                              <TouchableOpacity
+                                key={preset.label}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: isSlotActive ? '#7C3AED' : '#F1F5F9',
+                                  borderWidth: 1,
+                                  borderColor: isSlotActive ? '#7C3AED' : '#E2E8F0',
+                                }}
+                                onPress={() => {
+                                  const dayPart = formApplicableItemsText.includes('Isnin') ? ' (Isnin–Khamis)' : (formApplicableItemsText.includes('Mon') ? ' (Mon-Thu)' : '');
+                                  setFormApplicableItemsText(`${preset.timeStr}${dayPart}`);
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isSlotActive ? '#FFFFFF' : '#475569' }}>
+                                  {preset.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Valid Days:' : 'Hari Sah Digunakan:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {[
+                            { label: 'Isnin – Khamis', enLabel: 'Mon – Thu', suffix: ' (Isnin–Khamis)' },
+                            { label: 'Isnin – Jumaat', enLabel: 'Mon – Fri', suffix: ' (Isnin–Jumaat)' },
+                            { label: 'Setiap Hari', enLabel: 'Daily', suffix: ' (Setiap Hari)' },
+                          ].map((dayPreset) => {
+                            const label = locale === 'en' ? dayPreset.enLabel : dayPreset.label;
+                            const isDayActive = formApplicableItemsText.includes(dayPreset.label) || formApplicableItemsText.includes(dayPreset.enLabel);
+                            return (
+                              <TouchableOpacity
+                                key={dayPreset.label}
+                                style={{
+                                  flex: 1,
+                                  alignItems: 'center',
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: isDayActive ? '#000000' : '#F1F5F9',
+                                  borderWidth: 1,
+                                  borderColor: isDayActive ? '#000000' : '#E2E8F0',
+                                }}
+                                onPress={() => {
+                                  const baseTime = formApplicableItemsText.split('(')[0].trim() || 'Sah 2:00 PM – 5:00 PM';
+                                  setFormApplicableItemsText(`${baseTime}${dayPreset.suffix}`);
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: isDayActive ? '#FFCC00' : '#475569' }}>
+                                  {label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {formCampaignType === 'flash_sale' && (
+                      <View>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Limited-time deal duration:' : 'Tempoh tawaran kilat:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                          {[
+                            { label: '⚡ 24 Jam', val: '24' },
+                            { label: '⚡ 48 Jam', val: '48' },
+                            { label: '⚡ 3 Hari', val: '72' },
+                          ].map((d) => (
+                            <TouchableOpacity
+                              key={d.val}
+                              style={{
+                                flex: 1,
+                                alignItems: 'center',
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: '#000000',
+                              }}
+                              onPress={() => {
+                                if (!formDesc) setFormDesc(`Tamat dalam tempoh ${d.label}. Terhad selagi stok masih ada!`);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFCC00' }}>
+                                {d.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                          {locale === 'en' ? 'Live countdown timer will be displayed prominently on customer vouchers.' : 'Jam undur langsung akan dipaparkan dengan jelas pada baucar pelanggan.'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {formCampaignType === 'spend_save' && (
+                      <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#166534', marginBottom: 2 }}>
+                          {locale === 'en' ? 'Spend & Save Summary' : 'Rumusan Belanja & Jimat'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#15803D' }}>
+                          {locale === 'en'
+                            ? `Spend min RM ${formMinSpend || '50'} ➔ Save RM ${formDiscountValue || '10'} immediately.`
+                            : `Belanja minima RM ${formMinSpend || '50'} ➔ Jimat RM ${formDiscountValue || '10'} serta-merta.`}
+                        </Text>
+                      </View>
+                    )}
+
+                    {['bogo', 'welcome_gift', 'bring_friend', 'win_back', 'festive'].includes(formCampaignType) && (
+                      <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155' }}>
+                          {activeRecipe.desc}. {locale === 'en' ? 'Parameters are auto-configured below.' : 'Parameter di bawah telah dilaraskan secara pintar.'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
               {/* Dynamic Inputs based on Reward Type */}
               {formType === 'free_item' ? (
                 <View style={{ marginBottom: 16 }}>
+                  {/* Free Item Name / Specific Details */}
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                    {locale === 'en' ? 'Free item details (optional)' : 'Nama item percuma / perincian (pilihan)'}
+                  </Text>
+                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 4, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                    <Ionicons name="gift-outline" size={18} color="#D97706" style={{ marginRight: 10 }} />
+                    <TextInput
+                      style={styles.nestedTextInput}
+                      value={formApplicableItemsText}
+                      onChangeText={setFormApplicableItemsText}
+                      placeholder={locale === 'en' ? "e.g. 1x Iced Latte / 3x Curry Puffs" : "Contoh: 1x Kopi O Ais / Karipap 3 Ketul / Servis Cuci Luar"}
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 14, marginLeft: 2 }}>
+                    {locale === 'en' ? 'What the customer physically receives when claiming at the counter.' : 'Nama item fizikal atau servis yang akan diterima pelanggan apabila menuntut di kaunter.'}
+                  </Text>
+
+                  {/* Quantity */}
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {locale === 'en' ? 'Quantity' : 'Kuantiti'}
                   </Text>
                   <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-                    <Ionicons name="cube" size={18} color="#64748B" style={{ marginRight: 10 }} />
+                    <Ionicons name="cube-outline" size={18} color="#64748B" style={{ marginRight: 10 }} />
                     <TextInput
                       style={styles.nestedTextInput}
                       value={formFreeQty}
@@ -2864,6 +6860,7 @@ export default function UnifiedRewardsScreen() {
                 </View>
               ) : (
                 <View style={{ marginBottom: 16 }}>
+                  {/* Discount Type */}
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {locale === 'en' ? 'Discount type' : 'Jenis diskaun'}
                   </Text>
@@ -2908,7 +6905,7 @@ export default function UnifiedRewardsScreen() {
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {formDiscountType === 'percentage' ? 'Discount percentage (%) *' : 'Discount amount (RM) *'}
                   </Text>
-                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 12, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
                     <Ionicons name={formDiscountType === 'percentage' ? 'pricetag-outline' : 'cash-outline'} size={18} color="#64748B" style={{ marginRight: 10 }} />
                     <TextInput
                       style={styles.nestedTextInput}
@@ -2920,6 +6917,86 @@ export default function UnifiedRewardsScreen() {
                     />
                   </View>
 
+                  {/* Discount Scope (Semua Pesanan vs Item Khusus) */}
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                    {locale === 'en' ? 'Discount applies to' : 'Skop diskaun (Sah untuk)'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        backgroundColor: formDiscountScope === 'all' ? '#000000' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: formDiscountScope === 'all' ? '#000000' : '#E2E8F0',
+                      }}
+                      onPress={() => setFormDiscountScope('all')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cart" size={14} color={formDiscountScope === 'all' ? '#FFCC00' : '#64748B'} />
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: formDiscountScope === 'all' ? '#FFCC00' : '#475569' }}>
+                        {locale === 'en' ? 'All Items (Whole Bill)' : 'Semua Pesanan (Seluruh Bil)'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        backgroundColor: formDiscountScope === 'specific' ? '#000000' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: formDiscountScope === 'specific' ? '#000000' : '#E2E8F0',
+                      }}
+                      onPress={() => setFormDiscountScope('specific')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="pricetags" size={14} color={formDiscountScope === 'specific' ? '#FFCC00' : '#64748B'} />
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: formDiscountScope === 'specific' ? '#FFCC00' : '#475569' }}>
+                        {locale === 'en' ? 'Specific Items Only' : 'Item / Menu Khusus'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {formDiscountScope === 'specific' ? (
+                    <View style={{ marginBottom: 14 }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6 }}>
+                        {locale === 'en' ? 'Applicable items / terms *' : 'Nama produk / terma item khusus *'}
+                      </Text>
+                      <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                        <Ionicons name="pricetag" size={16} color="#D97706" style={{ marginRight: 10 }} />
+                        <TextInput
+                          style={styles.nestedTextInput}
+                          value={formApplicableItemsText}
+                          onChangeText={setFormApplicableItemsText}
+                          placeholder={locale === 'en' ? "e.g. Valid for beverages only" : "Contoh: Sah untuk minuman sahaja / Menu sarapan"}
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, marginLeft: 2 }}>
+                        {locale === 'en' ? 'This term will be displayed on customer vouchers & staff counter screen.' : 'Terma ini akan dipaparkan dengan jelas pada baucar pelanggan & skrin kaunter staf.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
+                        💡 {locale === 'en' ? 'Discount will apply to the customer’s total checkout bill at the counter.' : 'Diskaun akan dipotong terus daripada jumlah keseluruhan bil semasa bayaran di kaunter.'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Minimum spend (optional) */}
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {locale === 'en' ? 'Minimum spend (RM) (optional)' : 'Belanja minimum (RM) (pilihan)'}
                   </Text>
@@ -2935,6 +7012,7 @@ export default function UnifiedRewardsScreen() {
                     />
                   </View>
 
+                  {/* Maximum discount cap (optional) */}
                   {formDiscountType === 'percentage' && (
                     <>
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
@@ -2991,88 +7069,6 @@ export default function UnifiedRewardsScreen() {
                 {locale === 'en' ? 'Leave blank for unlimited.' : 'Biarkan kosong untuk tanpa had.'}
               </Text>
 
-              {/* PRO Link Product / Service Section */}
-              <View style={{
-                borderRadius: 18,
-                backgroundColor: isPro ? '#F8FAFC' : '#FAF5FF',
-                borderColor: isPro ? '#E2E8F0' : '#E9D5FF',
-                borderWidth: 1,
-                padding: 14,
-                marginBottom: 20,
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name={isPro ? "link" : "lock-closed"} size={16} color={isPro ? "#3B82F6" : "#8B5CF6"} />
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
-                      Link Product or Service {!isPro && '— PRO'}
-                    </Text>
-                  </View>
-                  {!isPro && (
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        backgroundColor: '#8B5CF6',
-                      }}
-                      onPress={() => setShowUpgradeModal(true)}
-                    >
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Upgrade</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16, marginBottom: 10 }}>
-                  {isPro
-                    ? 'Select specific services or products that this reward applies to during counter checkout.'
-                    : 'Automatically apply rewards and calculate discounts during counter checkout.'}
-                </Text>
-
-                {isPro ? (
-                  merchantServicesList.length === 0 ? (
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', fontStyle: 'italic' }}>
-                      No active products or services found in your catalog.
-                    </Text>
-                  ) : (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                      {merchantServicesList.map((item) => {
-                        const isSelected = formSelectedLinkedItemIds.includes(item.id);
-                        return (
-                          <TouchableOpacity
-                            key={item.id}
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 6,
-                              borderRadius: 10,
-                              backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
-                              borderColor: isSelected ? '#3B82F6' : '#CBD5E1',
-                              borderWidth: 1,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 6,
-                            }}
-                            onPress={() => {
-                              setFormSelectedLinkedItemIds(prev =>
-                                isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
-                              );
-                            }}
-                          >
-                            <Ionicons
-                              name={isSelected ? "checkbox" : "square-outline"}
-                              size={14}
-                              color={isSelected ? "#3B82F6" : "#64748B"}
-                            />
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: isSelected ? '#1E40AF' : '#334155' }}>
-                              {item.name} (RM {parseFloat(item.price || 0).toFixed(2)})
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )
-                ) : null}
-              </View>
-
               {/* Publish Switch */}
               <View style={{
                 flexDirection: 'row',
@@ -3101,57 +7097,80 @@ export default function UnifiedRewardsScreen() {
                 />
               </View>
 
-              {/* Action Buttons Row */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    borderRadius: 16,
-                    backgroundColor: '#F8FAFC',
-                    borderColor: '#E2E8F0',
-                    borderWidth: 1.5,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onPress={() => setModalVisible(false)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
-                    {locale === 'en' ? 'Cancel' : 'Batal'}
-                  </Text>
-                </TouchableOpacity>
+          </ScrollView>
 
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    borderRadius: 16,
-                    backgroundColor: '#F59E0B',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#F59E0B',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 10,
-                    elevation: 3,
-                  }}
-                  onPress={handleSaveReward}
-                  disabled={isSavingReward}
-                  activeOpacity={0.85}
-                >
-                  {isSavingReward ? (
-                    <ActivityIndicator color="#000000" size="small" />
-                  ) : (
-                    <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 14 }}>
-                      {editingReward ? (locale === 'en' ? 'Save changes' : 'Simpan perubah') : (locale === 'en' ? 'Create reward' : 'Cipta ganjaran')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+          {/* Sticky Bottom Action Bar */}
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(0, 0, 0, 0.08)',
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 8,
+            flexDirection: 'row',
+            gap: 12,
+          }}>
+            <TouchableOpacity
+              style={{
+                width: 90,
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
+                {locale === 'en' ? 'Cancel' : 'Batal'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#000000',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 8,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              onPress={handleSaveReward}
+              disabled={isSavingReward}
+              activeOpacity={0.85}
+            >
+              {isSavingReward ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={18} color="#FFCC00" />
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15 }}>
+                    {editingReward ? (locale === 'en' ? 'Save Changes' : 'Simpan Perubahan') : (locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran')}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -3462,132 +7481,287 @@ export default function UnifiedRewardsScreen() {
         </View>
       </Modal>
 
-      {/* Refined Create Reward Modal (Exact Match to Reference Design) */}
+      {/* Refined Create Reward Full Page Modal */}
       <Modal
         visible={showInlineCreateModal}
-        transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => setShowInlineCreateModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 440, width: '92%', padding: 24, borderRadius: 28, backgroundColor: '#FFFFFF' }]}>
-            {/* Header Row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, paddingRight: 8 }}>
-                <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="gift-outline" size={24} color="#D97706" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                    {locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran'}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2, lineHeight: 16 }}>
-                    {locale === 'en' ? 'Add a reward to your catalog and link it to your loyalty programs.' : 'Tambah ganjaran ke katalog dan hubungkan ke program kesetiaan anda.'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowInlineCreateModal(false)}
-                style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="close" size={18} color="#64748B" />
-              </TouchableOpacity>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom', 'left', 'right']}>
+          {/* Top Full-Page Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+            backgroundColor: '#FFFFFF',
+          }}>
+            {/* Left Balance Spacer */}
+            <View style={{ width: 40 }} />
+
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                {locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran'}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                {locale === 'en' ? 'Stamp Reward Setup' : 'Tetapan Ganjaran Cop'}
+              </Text>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+            <TouchableOpacity
+              onPress={() => setShowInlineCreateModal(false)}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color="#000000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 130 }}
+            keyboardShouldPersistTaps="handled"
+          >
               {/* 🎫 Live Customer Ticket Voucher Preview */}
               <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
-                  🎫 Live Customer Voucher Preview
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+                  Live Customer Voucher Preview
                 </Text>
-                <View style={{
-                  height: 140,
-                  borderRadius: 18,
-                  backgroundColor: '#0B0F17',
-                  flexDirection: 'row',
-                  overflow: 'hidden',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4,
-                  position: 'relative',
-                }}>
-                  {/* 1. LEFT ZONE: Merchant Identity ONLY */}
-                  <View style={{ width: 95, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>
+                {(() => {
+                  const modalBrandColor = merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || cardColor || '#050505';
+                  const isLightModalBrand = (() => {
+                    const hex = (modalBrandColor || '#050505').replace('#', '');
+                    const r = parseInt(hex.substring(0, 2), 16) || 0;
+                    const g = parseInt(hex.substring(2, 4), 16) || 0;
+                    const b = parseInt(hex.substring(4, 6), 16) || 0;
+                    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                    return yiq >= 160;
+                  })();
+                  const modalBrandTextColor = isLightModalBrand ? '#0F172A' : '#FFFFFF';
+
+                  return (
                     <View style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 24,
+                      height: 155,
+                      borderRadius: 16,
                       backgroundColor: '#FFFFFF',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
                       shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 3,
-                      elevation: 2,
-                      marginBottom: 4,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 8,
+                      elevation: 4,
+                      position: 'relative',
                     }}>
-                      <Image source={{ uri: merchantLogo }} style={{ width: 42, height: 42, borderRadius: 21, resizeMode: 'cover' }} />
-                    </View>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', textAlign: 'center', width: '100%' }} numberOfLines={1}>
-                      {merchant?.name || 'Your Store'}
-                    </Text>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center', width: '100%', marginTop: 1 }} numberOfLines={1}>
-                      {merchant?.category || 'food'}
-                    </Text>
-                  </View>
+                      {/* 1. LEFT STUB: Voucher Category Color Spine (Standardized to Merchant Brand Color) */}
+                      {(() => {
+                        const spineTheme = getVoucherSpineTheme(inlineCampaignType || inlineType, inlineTitle, modalBrandColor);
+                        return (
+                          <View style={{
+                            width: 42,
+                            backgroundColor: modalBrandColor,
+                            alignItems: 'center',
+                            position: 'relative',
+                            borderTopLeftRadius: 16,
+                            borderBottomLeftRadius: 16,
+                            overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              width: 155,
+                              height: 42,
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              marginLeft: -77.5,
+                              marginTop: -21,
+                              transform: [{ rotate: '-90deg' }],
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: modalBrandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
+                                {spineTheme.spineText}
+                              </Text>
+                              <Text style={{ fontSize: 6.5, fontFamily: 'PlusJakartaSans_700Bold', color: modalBrandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
+                                {spineTheme.subText}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })()}
 
-                  {/* CENTER DIVIDER: Ticket Notches & Dotted Line */}
-                  <View style={{ width: 14, alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                    <View style={{ width: 14, height: 7, borderBottomLeftRadius: 7, borderBottomRightRadius: 7, backgroundColor: '#FFFFFF', position: 'absolute', top: 0, zIndex: 5 }} />
-                    <View style={{ width: 1, height: '100%', borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderStyle: 'dashed' }} />
-                    <View style={{ width: 14, height: 7, borderTopLeftRadius: 7, borderTopRightRadius: 7, backgroundColor: '#FFFFFF', position: 'absolute', bottom: 0, zIndex: 5 }} />
-                  </View>
+                      {/* 2. CENTER ZONE: Reward Information on Pure White */}
+                      <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'space-between' }}>
+                        {/* Top Row: Ready to redeem pill + Discount tag */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
+                            <Ionicons name="gift" size={10} color="#B45309" />
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                          </View>
 
-                  {/* 2. CENTER ZONE: Reward Information */}
-                  <View style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 10, justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
-                    <View style={{ zIndex: 2 }}>
-                      <View style={{ backgroundColor: '#FFC700', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 100, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 }}>
-                        <Ionicons name="gift" size={10} color="#000000" />
-                        <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Ready to redeem</Text>
+                          <View style={{
+                            backgroundColor: inlineType === 'discount' ? '#0F172A' : '#FFCC00',
+                            paddingHorizontal: 7,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                          }}>
+                            <Text style={{
+                              fontSize: 8,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: inlineType === 'discount' ? '#FFFFFF' : '#050505',
+                              letterSpacing: 0.5,
+                            }}>
+                              {inlineType === 'discount' ? (inlineDiscountValue ? (inlineDiscountType === 'percentage' ? `${inlineDiscountValue}% OFF` : `RM ${inlineDiscountValue} OFF`) : 'DISCOUNT') : 'FREE ITEM'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Middle: YOUR REWARD + Title + Description */}
+                        <View style={{ marginVertical: 1 }}>
+                          <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 1, textTransform: 'uppercase' }}>
+                            YOUR REWARD
+                          </Text>
+                          <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 18 }} numberOfLines={2}>
+                            {inlineTitle || 'FREE AISKRIM Premium 3 scoop'}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1, lineHeight: 14 }} numberOfLines={1}>
+                            {inlineDesc || (
+                              inlineType === 'discount'
+                                ? (inlineDiscountType === 'percentage'
+                                    ? `${inlineDiscountValue || 'XX'}% OFF${inlineDiscountScope === 'specific' && inlineApplicableItemsText ? ` (${inlineApplicableItemsText})` : ' offer'}`
+                                    : `RM ${inlineDiscountValue || 'XX'} OFF${inlineDiscountScope === 'specific' && inlineApplicableItemsText ? ` (${inlineApplicableItemsText})` : ' offer'}`)
+                                : (inlineApplicableItemsText
+                                    ? `${inlineFreeQty && Number(inlineFreeQty) > 1 ? `${inlineFreeQty}x ` : ''}${inlineApplicableItemsText}`
+                                    : 'Reward for completing store card')
+                            )}
+                          </Text>
+                        </View>
+
+                        {/* Bottom Row: Source Pill & Stock + Use Voucher Button */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <Ionicons name="card" size={8.5} color="#059669" />
+                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                            </View>
+                            <Text style={{ fontSize: 9, color: '#CBD5E1' }}>|</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                              Stock: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>{inlineStock || 'Unlimited'}</Text>
+                            </Text>
+                          </View>
+
+                          {/* Customer CTA Button */}
+                          <View style={{ height: 24, borderRadius: 12, backgroundColor: '#0F172A', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>Use Voucher ➔</Text>
+                          </View>
+                        </View>
                       </View>
 
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: -0.3, lineHeight: 18 }} numberOfLines={2}>
-                        {inlineTitle || 'FREE AISKRIM Premium 3 scoop'}
-                      </Text>
-                      <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2, lineHeight: 14 }} numberOfLines={1}>
-                        {inlineType === 'discount' ? (inlineDiscountType === 'percentage' ? `${inlineDiscountValue || 'XX'}% OFF offer` : `RM ${inlineDiscountValue || 'XX'} OFF offer`) : 'Reward for completing store card'}
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, zIndex: 2 }}>
-                      <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="card" size={9} color="#FFFFFF" />
-                        <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>STAMP CARD REWARD</Text>
+                      {/* 3. PERFORATION COLUMN */}
+                      <View style={{
+                        width: 16,
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        position: 'relative',
+                        zIndex: 3,
+                      }} pointerEvents="none">
+                        <View style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 8,
+                          backgroundColor: modalBrandColor,
+                        }} />
+                        <View style={{
+                          width: 1,
+                          height: '100%',
+                          borderColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          zIndex: 1,
+                        }} />
+                        <View style={{
+                          position: 'absolute',
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          top: -8,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          zIndex: 2,
+                        }} />
+                        <View style={{
+                          position: 'absolute',
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          bottom: -8,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          zIndex: 2,
+                        }} />
                       </View>
-                      <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>|</Text>
-                      <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                        Stock: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Unlimited</Text>
-                      </Text>
-                    </View>
-                  </View>
 
-                  {/* 3. RIGHT SAFE ZONE: Tag, Image Overlay & Use Voucher CTA */}
-                  {/* 3. RIGHT SAFE ZONE: Tag & Use Voucher CTA */}
-                  <View style={{ width: 115, paddingVertical: 10, paddingHorizontal: 10, justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', zIndex: 2 }}>
-                    {/* Top Right Tag */}
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5, zIndex: 3 }}>
-                      {inlineType === 'discount' ? `${inlineDiscountValue || '20'}% OFF` : 'FREE ITEM'}
-                    </Text>
-
-                    {/* Bottom Right CTA Button */}
-                    <View style={{ height: 26, borderRadius: 13, backgroundColor: '#FFFFFF', paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }} numberOfLines={1}>Use Voucher ➔</Text>
+                      {/* 4. RIGHT STUB */}
+                      <View style={{
+                        width: 95,
+                        backgroundColor: modalBrandColor,
+                        borderTopRightRadius: 16,
+                        borderBottomRightRadius: 16,
+                        paddingVertical: 10,
+                        paddingHorizontal: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <View style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                          backgroundColor: '#FFFFFF',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 2,
+                          borderColor: isLightModalBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.12,
+                          shadowRadius: 3,
+                          elevation: 2,
+                          marginBottom: 6,
+                        }}>
+                          <Image source={{ uri: merchantLogo }} style={{ width: 42, height: 42, borderRadius: 21, resizeMode: 'cover' }} />
+                        </View>
+                        <Text style={{
+                          fontSize: 10,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: modalBrandTextColor,
+                          textAlign: 'center',
+                          width: '100%',
+                          letterSpacing: 0.3,
+                        }} numberOfLines={2}>
+                          {(merchant?.name || 'STORE').toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </View>
+                  );
+                })()}
               </View>
 
               {/* Title Input */}
@@ -3655,14 +7829,341 @@ export default function UnifiedRewardsScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* PRO Campaign Recipes (8 Formula Pintar) */}
+              <View style={{
+                borderRadius: 18,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                padding: 14,
+                marginBottom: 20,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="diamond" size={16} color="#B45309" />
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
+                      {locale === 'en' ? 'PRO Campaign Recipes' : 'Formula Kempen Pintar PRO'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!isPro) setShowUpgradeModal(true);
+                    }}
+                    activeOpacity={0.8}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 2.5,
+                      borderRadius: 999,
+                      backgroundColor: isPro ? '#000000' : '#FEF3C7',
+                      borderWidth: 1,
+                      borderColor: isPro ? '#000000' : '#F59E0B',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 9.5,
+                      fontFamily: 'PlusJakartaSans_800ExtraBold',
+                      color: isPro ? '#FFCC00' : '#B45309',
+                      letterSpacing: 0.5,
+                    }}>
+                      {isPro ? 'PRO UNLOCKED' : '🔒 PRO ONLY'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16, marginBottom: 12 }}>
+                  {locale === 'en'
+                    ? 'Pre-built promotion formulas to boost footfall, fill off-peak hours, or bring back quiet customers.'
+                    : 'Formula promosi siap-pakai untuk lonjakkan jualan, penuhkan waktu lengang, atau panggil pelanggan sepi.'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {PRO_CAMPAIGN_RECIPES.map((recipe) => {
+                    const isSelected = inlineCampaignType === recipe.id;
+                    return (
+                      <TouchableOpacity
+                        key={recipe.id}
+                        style={{
+                          width: '48%',
+                          flexGrow: 1,
+                          padding: 10,
+                          borderRadius: 14,
+                          backgroundColor: isSelected ? '#000000' : '#FFFFFF',
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 3,
+                          elevation: 1,
+                          justifyContent: 'space-between',
+                          minHeight: 82,
+                        }}
+                        onPress={() => handleSelectInlineRecipe(recipe)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : `${recipe.color}15`,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Ionicons name={recipe.icon as any} size={15} color={isSelected ? '#FFCC00' : recipe.color} />
+                          </View>
+                          <View style={{
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${recipe.color}15`,
+                          }}>
+                            <Text style={{
+                              fontSize: 8,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: isSelected ? '#FFCC00' : recipe.color,
+                              letterSpacing: 0.3,
+                            }}>
+                              {!isPro ? '🔒 PRO' : recipe.tag}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={{
+                          fontSize: 11.5,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: isSelected ? '#FFFFFF' : '#1E293B',
+                          marginBottom: 2,
+                        }} numberOfLines={1}>
+                          {recipe.name}
+                        </Text>
+                        <Text style={{
+                          fontSize: 9.5,
+                          fontFamily: 'PlusJakartaSans_500Medium',
+                          color: isSelected ? '#94A3B8' : '#64748B',
+                          lineHeight: 13,
+                        }} numberOfLines={2}>
+                          {recipe.desc}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Dynamic PRO Campaign Smart Controls (if active) */}
+              {inlineCampaignType && (() => {
+                const activeRecipe = PRO_CAMPAIGN_RECIPES.find(r => r.id === inlineCampaignType);
+                if (!activeRecipe) return null;
+
+                return (
+                  <View style={{
+                    borderRadius: 18,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: '#000000',
+                    padding: 14,
+                    marginBottom: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}>
+                    {/* Header: Recipe badge + Clear button */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          backgroundColor: activeRecipe.color,
+                        }}>
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                            {activeRecipe.tag}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
+                          {activeRecipe.name}
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => setInlineCampaignType(null)}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: '#F1F5F9' }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                          {locale === 'en' ? '✕ Reset Formula' : '✕ Batal Formula'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Controls based on specific recipe */}
+                    {inlineCampaignType === 'happy_hour' && (
+                      <View>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Quick Time Presets:' : 'Pilihan Waktu Lengang Pantas:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {[
+                            { label: '2:00 PM – 5:00 PM', timeStr: 'Sah 2:00 PM – 5:00 PM' },
+                            { label: '3:00 PM – 6:00 PM', timeStr: 'Sah 3:00 PM – 6:00 PM' },
+                            { label: '11:00 AM – 2:00 PM', timeStr: 'Sah 11:00 AM – 2:00 PM' },
+                          ].map((preset) => {
+                            const isSlotActive = inlineApplicableItemsText.includes(preset.label);
+                            return (
+                              <TouchableOpacity
+                                key={preset.label}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: isSlotActive ? '#7C3AED' : '#F1F5F9',
+                                  borderWidth: 1,
+                                  borderColor: isSlotActive ? '#7C3AED' : '#E2E8F0',
+                                }}
+                                onPress={() => {
+                                  const dayPart = inlineApplicableItemsText.includes('Isnin') ? ' (Isnin–Khamis)' : (inlineApplicableItemsText.includes('Mon') ? ' (Mon-Thu)' : '');
+                                  setInlineApplicableItemsText(`${preset.timeStr}${dayPart}`);
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: isSlotActive ? '#FFFFFF' : '#475569' }}>
+                                  {preset.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Valid Days:' : 'Hari Sah Digunakan:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {[
+                            { label: 'Isnin – Khamis', enLabel: 'Mon – Thu', suffix: ' (Isnin–Khamis)' },
+                            { label: 'Isnin – Jumaat', enLabel: 'Mon – Fri', suffix: ' (Isnin–Jumaat)' },
+                            { label: 'Setiap Hari', enLabel: 'Daily', suffix: ' (Setiap Hari)' },
+                          ].map((dayPreset) => {
+                            const label = locale === 'en' ? dayPreset.enLabel : dayPreset.label;
+                            const isDayActive = inlineApplicableItemsText.includes(dayPreset.label) || inlineApplicableItemsText.includes(dayPreset.enLabel);
+                            return (
+                              <TouchableOpacity
+                                key={dayPreset.label}
+                                style={{
+                                  flex: 1,
+                                  alignItems: 'center',
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: isDayActive ? '#000000' : '#F1F5F9',
+                                  borderWidth: 1,
+                                  borderColor: isDayActive ? '#000000' : '#E2E8F0',
+                                }}
+                                onPress={() => {
+                                  const baseTime = inlineApplicableItemsText.split('(')[0].trim() || 'Sah 2:00 PM – 5:00 PM';
+                                  setInlineApplicableItemsText(`${baseTime}${dayPreset.suffix}`);
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: isDayActive ? '#FFCC00' : '#475569' }}>
+                                  {label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {inlineCampaignType === 'flash_sale' && (
+                      <View>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', marginBottom: 6 }}>
+                          {locale === 'en' ? 'Limited-time deal duration:' : 'Tempoh tawaran kilat:'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                          {[
+                            { label: '⚡ 24 Jam', val: '24' },
+                            { label: '⚡ 48 Jam', val: '48' },
+                            { label: '⚡ 3 Hari', val: '72' },
+                          ].map((d) => (
+                            <TouchableOpacity
+                              key={d.val}
+                              style={{
+                                flex: 1,
+                                alignItems: 'center',
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: '#000000',
+                              }}
+                              onPress={() => {
+                                if (!inlineDesc) setInlineDesc(`Tamat dalam tempoh ${d.label}. Terhad selagi stok masih ada!`);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFCC00' }}>
+                                {d.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                          {locale === 'en' ? 'Live countdown timer will be displayed prominently on customer vouchers.' : 'Jam undur langsung akan dipaparkan dengan jelas pada baucar pelanggan.'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {inlineCampaignType === 'spend_save' && (
+                      <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                        <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#166534', marginBottom: 2 }}>
+                          {locale === 'en' ? 'Spend & Save Summary' : 'Rumusan Belanja & Jimat'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#15803D' }}>
+                          {locale === 'en'
+                            ? `Spend min RM ${inlineMinSpend || '50'} ➔ Save RM ${inlineDiscountValue || '10'} immediately.`
+                            : `Belanja minima RM ${inlineMinSpend || '50'} ➔ Jimat RM ${inlineDiscountValue || '10'} serta-merta.`}
+                        </Text>
+                      </View>
+                    )}
+
+                    {['bogo', 'welcome_gift', 'bring_friend', 'win_back', 'festive'].includes(inlineCampaignType) && (
+                      <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#334155' }}>
+                          {activeRecipe.desc}. {locale === 'en' ? 'Parameters are auto-configured below.' : 'Parameter di bawah telah dilaraskan secara pintar.'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
               {/* Dynamic Inputs based on Reward Type */}
               {inlineType === 'free_item' ? (
                 <View style={{ marginBottom: 16 }}>
+                  {/* Free Item Name / Specific Details */}
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                    {locale === 'en' ? 'Free item details (optional)' : 'Nama item percuma / perincian (pilihan)'}
+                  </Text>
+                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 4, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                    <Ionicons name="gift-outline" size={18} color="#D97706" style={{ marginRight: 10 }} />
+                    <TextInput
+                      style={styles.nestedTextInput}
+                      value={inlineApplicableItemsText}
+                      onChangeText={setInlineApplicableItemsText}
+                      placeholder={locale === 'en' ? "e.g. 1x Iced Latte / 3x Curry Puffs" : "Contoh: 1x Kopi O Ais / Karipap 3 Ketul / Servis Cuci Luar"}
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 14, marginLeft: 2 }}>
+                    {locale === 'en' ? 'What the customer physically receives when claiming at the counter.' : 'Nama item fizikal atau servis yang akan diterima pelanggan apabila menuntut di kaunter.'}
+                  </Text>
+
+                  {/* Quantity */}
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {locale === 'en' ? 'Quantity' : 'Kuantiti'}
                   </Text>
                   <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-                    <Ionicons name="cube" size={18} color="#64748B" style={{ marginRight: 10 }} />
+                    <Ionicons name="cube-outline" size={18} color="#64748B" style={{ marginRight: 10 }} />
                     <TextInput
                       style={styles.nestedTextInput}
                       value={inlineFreeQty}
@@ -3721,7 +8222,7 @@ export default function UnifiedRewardsScreen() {
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
                     {inlineDiscountType === 'percentage' ? 'Discount percentage (%) *' : 'Discount amount (RM) *'}
                   </Text>
-                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 12, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                  <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
                     <Ionicons name={inlineDiscountType === 'percentage' ? 'pricetag-outline' : 'cash-outline'} size={18} color="#64748B" style={{ marginRight: 10 }} />
                     <TextInput
                       style={styles.nestedTextInput}
@@ -3732,6 +8233,85 @@ export default function UnifiedRewardsScreen() {
                       placeholderTextColor="#94A3B8"
                     />
                   </View>
+
+                  {/* Discount Scope (Semua Pesanan vs Item Khusus) */}
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                    {locale === 'en' ? 'Discount applies to' : 'Skop diskaun (Sah untuk)'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        backgroundColor: inlineDiscountScope === 'all' ? '#000000' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: inlineDiscountScope === 'all' ? '#000000' : '#E2E8F0',
+                      }}
+                      onPress={() => setInlineDiscountScope('all')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cart" size={14} color={inlineDiscountScope === 'all' ? '#FFCC00' : '#64748B'} />
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: inlineDiscountScope === 'all' ? '#FFCC00' : '#475569' }}>
+                        {locale === 'en' ? 'All Items (Whole Bill)' : 'Semua Pesanan (Seluruh Bil)'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        backgroundColor: inlineDiscountScope === 'specific' ? '#000000' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: inlineDiscountScope === 'specific' ? '#000000' : '#E2E8F0',
+                      }}
+                      onPress={() => setInlineDiscountScope('specific')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="pricetags" size={14} color={inlineDiscountScope === 'specific' ? '#FFCC00' : '#64748B'} />
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: inlineDiscountScope === 'specific' ? '#FFCC00' : '#475569' }}>
+                        {locale === 'en' ? 'Specific Items Only' : 'Item / Menu Khusus'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {inlineDiscountScope === 'specific' ? (
+                    <View style={{ marginBottom: 14 }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6 }}>
+                        {locale === 'en' ? 'Applicable items / terms *' : 'Nama produk / terma item khusus *'}
+                      </Text>
+                      <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                        <Ionicons name="pricetag" size={16} color="#D97706" style={{ marginRight: 10 }} />
+                        <TextInput
+                          style={styles.nestedTextInput}
+                          value={inlineApplicableItemsText}
+                          onChangeText={setInlineApplicableItemsText}
+                          placeholder={locale === 'en' ? "e.g. Valid for beverages only" : "Contoh: Sah untuk minuman sahaja / Menu sarapan"}
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, marginLeft: 2 }}>
+                        {locale === 'en' ? 'This term will be displayed on customer vouchers & staff counter screen.' : 'Terma ini akan dipaparkan dengan jelas pada baucar pelanggan & skrin kaunter staf.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
+                        💡 {locale === 'en' ? 'Discount will apply to the customer’s total checkout bill at the counter.' : 'Diskaun akan dipotong terus daripada jumlah keseluruhan bil semasa bayaran di kaunter.'}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Minimum Spend */}
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
@@ -3806,88 +8386,6 @@ export default function UnifiedRewardsScreen() {
                 {locale === 'en' ? 'Leave blank for unlimited.' : 'Biarkan kosong untuk tanpa had.'}
               </Text>
 
-              {/* PRO Link Product / Service Section */}
-              <View style={{
-                borderRadius: 18,
-                backgroundColor: isPro ? '#F8FAFC' : '#FAF5FF',
-                borderColor: isPro ? '#E2E8F0' : '#E9D5FF',
-                borderWidth: 1,
-                padding: 14,
-                marginBottom: 20,
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name={isPro ? "link" : "lock-closed"} size={16} color={isPro ? "#3B82F6" : "#8B5CF6"} />
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1E293B' }}>
-                      Link Product or Service {!isPro && '— PRO'}
-                    </Text>
-                  </View>
-                  {!isPro && (
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        backgroundColor: '#8B5CF6',
-                      }}
-                      onPress={() => setShowUpgradeModal(true)}
-                    >
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Upgrade</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', lineHeight: 16, marginBottom: 10 }}>
-                  {isPro
-                    ? 'Select specific services or products that this reward applies to during counter checkout.'
-                    : 'Automatically apply rewards and calculate discounts during counter checkout.'}
-                </Text>
-
-                {isPro ? (
-                  merchantServicesList.length === 0 ? (
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', fontStyle: 'italic' }}>
-                      No active products or services found in your catalog.
-                    </Text>
-                  ) : (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                      {merchantServicesList.map((item) => {
-                        const isSelected = selectedLinkedItemIds.includes(item.id);
-                        return (
-                          <TouchableOpacity
-                            key={item.id}
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 6,
-                              borderRadius: 10,
-                              backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
-                              borderColor: isSelected ? '#3B82F6' : '#CBD5E1',
-                              borderWidth: 1,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 6,
-                            }}
-                            onPress={() => {
-                              setSelectedLinkedItemIds(prev =>
-                                isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
-                              );
-                            }}
-                          >
-                            <Ionicons
-                              name={isSelected ? "checkbox" : "square-outline"}
-                              size={14}
-                              color={isSelected ? "#3B82F6" : "#64748B"}
-                            />
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: isSelected ? '#1E40AF' : '#334155' }}>
-                              {item.name} (RM {parseFloat(item.price || 0).toFixed(2)})
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )
-                ) : null}
-              </View>
-
               {/* Link to Stamp Card Banner */}
               <View style={{
                 flexDirection: 'row',
@@ -3921,57 +8419,80 @@ export default function UnifiedRewardsScreen() {
                 />
               </View>
 
-              {/* Action Buttons Row */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    borderRadius: 16,
-                    backgroundColor: '#F8FAFC',
-                    borderColor: '#E2E8F0',
-                    borderWidth: 1.5,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onPress={() => setShowInlineCreateModal(false)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: '#1E293B', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
-                    {locale === 'en' ? 'Cancel' : 'Batal'}
-                  </Text>
-                </TouchableOpacity>
+          </ScrollView>
 
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    borderRadius: 16,
-                    backgroundColor: '#F59E0B',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#F59E0B',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 10,
-                    elevation: 3,
-                  }}
-                  onPress={handleCreateInlineReward}
-                  disabled={isSavingInlineReward}
-                  activeOpacity={0.85}
-                >
-                  {isSavingInlineReward ? (
-                    <ActivityIndicator color="#000000" size="small" />
-                  ) : (
-                    <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 14 }}>
-                      {locale === 'en' ? 'Create reward' : 'Cipta ganjaran'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+          {/* Sticky Bottom Action Bar */}
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(0, 0, 0, 0.08)',
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 8,
+            flexDirection: 'row',
+            gap: 12,
+          }}>
+            <TouchableOpacity
+              style={{
+                width: 90,
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.08)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={() => setShowInlineCreateModal(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
+                {locale === 'en' ? 'Cancel' : 'Batal'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: '#000000',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 8,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              onPress={handleCreateInlineReward}
+              disabled={isSavingInlineReward}
+              activeOpacity={0.85}
+            >
+              {isSavingInlineReward ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={18} color="#FFCC00" />
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15 }}>
+                    {locale === 'en' ? 'Create Reward' : 'Cipta Ganjaran'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Risev Curated Reward Visual Picker Modal */}
@@ -3993,6 +8514,976 @@ export default function UnifiedRewardsScreen() {
         discountValue={visualPickerTarget === 'main' ? formDiscountValue : inlineDiscountValue}
       />
 
+      {/* PRO: Birthday Product & Service Picker Modal */}
+      <Modal
+        visible={showBirthdayItemPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBirthdayItemPicker(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowBirthdayItemPicker(false)}
+          />
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            maxHeight: '80%',
+            paddingTop: 12,
+            paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+            paddingHorizontal: 20,
+          }}>
+            {/* Sheet Handle */}
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 14 }} />
+
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                  {locale === 'en' ? 'Gift Offer' : 'Tawaran Hadiah'}
+                </Text>
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                  {locale === 'en' ? 'Type a custom gift (Free) or link catalog item (PRO)' : 'Taip hadiah manual (Percuma) atau paut katalog (PRO)'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowBirthdayItemPicker(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Mode Switcher Tabs */}
+            <View style={{
+              flexDirection: 'row',
+              backgroundColor: '#F1F5F9',
+              borderRadius: 12,
+              padding: 3,
+              marginBottom: 14,
+            }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  backgroundColor: birthdayGiftMode === 'manual' ? '#FFFFFF' : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: birthdayGiftMode === 'manual' ? 0.08 : 0,
+                  shadowRadius: 2,
+                  elevation: birthdayGiftMode === 'manual' ? 1 : 0,
+                }}
+                onPress={() => setBirthdayGiftMode('manual')}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: birthdayGiftMode === 'manual' ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold',
+                  color: birthdayGiftMode === 'manual' ? '#0F172A' : '#64748B',
+                }}>
+                  ✏️ {locale === 'en' ? 'Custom Gift' : 'Taip Manual'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  backgroundColor: birthdayGiftMode === 'catalog' ? '#000000' : 'transparent',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 5,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: birthdayGiftMode === 'catalog' ? 0.08 : 0,
+                  shadowRadius: 2,
+                  elevation: birthdayGiftMode === 'catalog' ? 1 : 0,
+                }}
+                onPress={() => setBirthdayGiftMode('catalog')}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontFamily: birthdayGiftMode === 'catalog' ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold',
+                  color: birthdayGiftMode === 'catalog' ? '#FFFFFF' : '#64748B',
+                }}>
+                  🛍️ {locale === 'en' ? 'Link Catalog' : 'Paut Item'}
+                </Text>
+                <View style={{ backgroundColor: '#FFCC00', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>PRO</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {birthdayGiftMode === 'manual' ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+                {/* Manual Gift Input */}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>
+                  {locale === 'en' ? 'Gift Title / Item Name' : 'Nama Hadiah / Item'}
+                </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  paddingHorizontal: 12,
+                  height: 46,
+                  marginBottom: 12,
+                }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}
+                    placeholder={locale === 'en' ? 'e.g. Free 1 Scoop Ais Krim, 10% Off...' : 'cth: Percuma 1 Skop Ais Krim, Baucar RM10...'}
+                    placeholderTextColor="#94A3B8"
+                    value={manualGiftInput}
+                    onChangeText={setManualGiftInput}
+                  />
+                  {manualGiftInput.length > 0 && (
+                    <TouchableOpacity onPress={() => setManualGiftInput('')}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Manual Description Input */}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>
+                  {locale === 'en' ? 'Description (Optional)' : 'Keterangan (Pilihan)'}
+                </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: '#E2E8F0',
+                  paddingHorizontal: 12,
+                  height: 46,
+                  marginBottom: 14,
+                }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}
+                    placeholder={locale === 'en' ? 'e.g. Valid with any dine-in order' : 'cth: Sah untuk sebarang pesanan'}
+                    placeholderTextColor="#94A3B8"
+                    value={manualGiftDescInput}
+                    onChangeText={setManualGiftDescInput}
+                  />
+                </View>
+
+                {/* Preset Suggestions */}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                  {locale === 'en' ? 'Quick Suggestions' : 'Cadangan Pantas'}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
+                  {[
+                    { title: locale === 'en' ? 'Free 1 Scoop Ice Cream' : 'Percuma 1 Skop Ais Krim', desc: locale === 'en' ? 'Complimentary ice cream treat' : 'Hadiah ais krim percuma' },
+                    { title: locale === 'en' ? 'Free Drink / Coffee' : 'Minuman Percuma', desc: locale === 'en' ? 'Any beverage of customer choice' : 'Sebarang minuman pilihan pelanggan' },
+                    { title: locale === 'en' ? 'Free Birthday Dessert' : 'Pencuci Mulut Percuma', desc: locale === 'en' ? 'Complimentary slice of cake' : 'Sepotong kek percuma' },
+                    { title: locale === 'en' ? '10% Off Total Bill' : 'Diskaun 10% Jumlah Bil', desc: locale === 'en' ? 'Birthday celebration discount' : 'Ganjaran diskaun hari lahir' },
+                    { title: locale === 'en' ? 'RM10 Birthday Voucher' : 'Baucar RM10 Hari Jadi', desc: locale === 'en' ? 'Deducted at cashier counter' : 'Ditolak di kaunter bayaran' },
+                    { title: locale === 'en' ? 'Special Birthday Treat' : 'Hadiah Istimewa Hari Jadi', desc: locale === 'en' ? 'Exclusive gift treat' : 'Pek hadiah istimewa' },
+                  ].map((preset, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        paddingVertical: 7,
+                        paddingHorizontal: 12,
+                        borderRadius: 9999,
+                      }}
+                      onPress={() => {
+                        setManualGiftInput(preset.title);
+                        setManualGiftDescInput(preset.desc);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}>
+                        {preset.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Confirm Button */}
+                <TouchableOpacity
+                  style={{
+                    height: 48,
+                    backgroundColor: '#000000',
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 4,
+                  }}
+                  onPress={handleConfirmManualGift}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    {locale === 'en' ? 'Confirm Gift Offer' : 'Sahkan Tawaran Hadiah'}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : !isPro ? (
+              <View style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: 16,
+                borderWidth: 1.5,
+                borderColor: '#E2E8F0',
+                padding: 18,
+                alignItems: 'center',
+                marginVertical: 8,
+              }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                  <Ionicons name="sparkles" size={24} color="#D97706" />
+                </View>
+                <View style={{ backgroundColor: '#000000', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 6, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFCC00', letterSpacing: 0.5 }}>
+                    PRO FEATURE
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', textAlign: 'center', marginBottom: 6 }}>
+                  {locale === 'en' ? 'Link Real Products & Services' : 'Paut Produk & Servis Sebenar'}
+                </Text>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', lineHeight: 18, marginBottom: 16, paddingHorizontal: 12 }}>
+                  {locale === 'en'
+                    ? 'Upgrade to Risev PRO to link items directly from your menu with high-res photos, real prices, and automatic inventory sync.'
+                    : 'Naik taraf ke Risev PRO untuk memautkan item terus dari menu anda dengan foto resolusi tinggi, harga sebenar, dan penyegerakan inventori automatik.'}
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#000000',
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderRadius: 9999,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: '100%',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => {
+                    setShowBirthdayItemPicker(false);
+                    setShowUpgradeModal(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="lock-open" size={14} color="#FFCC00" />
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                    {locale === 'en' ? 'Unlock with Risev PRO' : 'Buka Kunci dengan Risev PRO'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ marginTop: 12, paddingVertical: 4 }}
+                  onPress={() => setBirthdayGiftMode('manual')}
+                >
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', textDecorationLine: 'underline' }}>
+                    {locale === 'en' ? '← Continue with free custom gift' : '← Teruskan dengan taip manual percuma'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {/* Search Input */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  paddingHorizontal: 12,
+                  height: 42,
+                  marginBottom: 10,
+                  gap: 8,
+                }}>
+                  <Ionicons name="search-outline" size={16} color="#94A3B8" />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}
+                    placeholder={locale === 'en' ? 'Search products or services...' : 'Cari produk atau servis...'}
+                    placeholderTextColor="#94A3B8"
+                    value={birthdayItemSearch}
+                    onChangeText={setBirthdayItemSearch}
+                  />
+                  {birthdayItemSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => setBirthdayItemSearch('')}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Filter Tabs: All, Services, Products */}
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                  {[
+                    { id: 'all', label: locale === 'en' ? 'All Items' : 'Semua' },
+                    { id: 'service', label: locale === 'en' ? 'Services' : 'Servis' },
+                    { id: 'product', label: locale === 'en' ? 'Products' : 'Produk' },
+                  ].map((tab) => {
+                    const isActive = birthdayItemFilter === tab.id;
+                    return (
+                      <TouchableOpacity
+                        key={tab.id}
+                        onPress={() => setBirthdayItemFilter(tab.id as any)}
+                        style={{
+                          paddingVertical: 5,
+                          paddingHorizontal: 12,
+                          borderRadius: 9999,
+                          backgroundColor: isActive ? '#000000' : '#F1F5F9',
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 11,
+                          fontFamily: isActive ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold',
+                          color: isActive ? '#FFFFFF' : '#64748B',
+                        }}>
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Items List */}
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>
+                  {(() => {
+                    const itemsToFilter = merchantServicesList.length > 0 ? merchantServicesList : [
+                      { id: 'srv_1', name: 'Signature Haircut', item_type: 'service', price: 35, category: 'Hair', duration_minutes: 45 },
+                      { id: 'srv_2', name: 'Iced Latte / Coffee', item_type: 'product', price: 12, category: 'Beverage' },
+                      { id: 'srv_3', name: 'Express Manicure', item_type: 'service', price: 45, category: 'Nails', duration_minutes: 30 },
+                      { id: 'srv_4', name: 'Deluxe Car Wash', item_type: 'service', price: 25, category: 'Auto', duration_minutes: 30 },
+                      { id: 'srv_5', name: 'Artisan Slice Cake', item_type: 'product', price: 16, category: 'Dessert' },
+                    ];
+
+                    const filtered = itemsToFilter.filter((item) => {
+                      const matchesSearch = item.name.toLowerCase().includes(birthdayItemSearch.toLowerCase()) ||
+                        (item.category && item.category.toLowerCase().includes(birthdayItemSearch.toLowerCase()));
+                      const matchesType = birthdayItemFilter === 'all' || item.item_type === birthdayItemFilter;
+                      return matchesSearch && matchesType;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <View style={{ paddingVertical: 28, alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="search" size={28} color="#CBD5E1" style={{ marginBottom: 6 }} />
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                            {locale === 'en' ? 'No matching items found' : 'Tiada item ditemui'}
+                          </Text>
+                        </View>
+                      );
+                    }
+
+                    return filtered.map((item) => {
+                      const isSelected = selectedBirthdayItem?.id === item.id;
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 12,
+                            borderRadius: 14,
+                            backgroundColor: isSelected ? '#000000' : '#F8FAFC',
+                            borderWidth: 1.5,
+                            borderColor: isSelected ? '#000000' : '#E2E8F0',
+                          }}
+                          onPress={() => handleSelectBirthdayItem(item)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                            <View style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 10,
+                              backgroundColor: isSelected ? '#FFFFFF' : '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Ionicons
+                                name={item.item_type === 'product' ? 'cube-outline' : 'sparkles-outline'}
+                                size={18}
+                                color={isSelected ? '#000000' : '#0F172A'}
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{
+                                  fontSize: 13.5,
+                                  fontFamily: 'PlusJakartaSans_700Bold',
+                                  color: isSelected ? '#FFFFFF' : '#0F172A',
+                                }} numberOfLines={1}>
+                                  {item.name}
+                                </Text>
+                                <View style={{
+                                  backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
+                                  paddingHorizontal: 5,
+                                  paddingVertical: 1,
+                                  borderRadius: 4,
+                                }}>
+                                  <Text style={{
+                                    fontSize: 8.5,
+                                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                                    color: isSelected ? '#FFCC00' : '#475569',
+                                    textTransform: 'uppercase',
+                                  }}>
+                                    {item.item_type || 'service'}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={{
+                                fontSize: 11,
+                                fontFamily: 'PlusJakartaSans_500Medium',
+                                color: isSelected ? '#94A3B8' : '#64748B',
+                                marginTop: 1,
+                              }}>
+                                {item.category ? `${item.category} · ` : ''}{item.duration_minutes ? `${item.duration_minutes} mins` : ''}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {item.price ? (
+                            <Text style={{
+                              fontSize: 13,
+                              fontFamily: 'PlusJakartaSans_800ExtraBold',
+                              color: isSelected ? '#FFCC00' : '#0F172A',
+                              marginLeft: 8,
+                            }}>
+                              RM{Number(item.price).toFixed(0)}
+                            </Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* On-Demand Contextual Info Tooltip Modal */}
+      <Modal
+        visible={!!helpModalInfo}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setHelpModalInfo(null)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setHelpModalInfo(null)}
+        >
+          <View style={{
+            width: '100%',
+            maxWidth: 380,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 20,
+            padding: 22,
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.15,
+            shadowRadius: 16,
+            elevation: 8,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#0F172A',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="help" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', flex: 1 }}>
+                {helpModalInfo?.title}
+              </Text>
+            </View>
+
+            <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#475569', lineHeight: 20, marginBottom: 18 }}>
+              {helpModalInfo?.desc}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setHelpModalInfo(null)}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                backgroundColor: '#0F172A',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                {locale === 'en' ? 'Got It' : 'Faham'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Validity Window Picker Modal */}
+      <Modal
+        visible={showValidityPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowValidityPicker(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowValidityPicker(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Validity Window' : 'Tempoh Sah'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'Choose how long the customer has to claim their birthday treat.' : 'Pilih tempoh masa untuk pelanggan menebus baucar.'}
+            </Text>
+            <View style={{ gap: 10 }}>
+              {[
+                { id: '3', title: locale === 'en' ? '3 Days (Recommended)' : '3 Hari (Disyorkan)', desc: locale === 'en' ? 'Day before · Birthday · Day after' : 'Hari sebelum · Hari lahir · Hari selepas' },
+                { id: '7', title: locale === 'en' ? '7 Days (1 Week)' : '7 Hari (1 Minggu)', desc: locale === 'en' ? '3 days before · Birthday · 3 days after' : '3 hari sebelum · Hari lahir · Hari selepas' },
+                { id: '30', title: locale === 'en' ? '30 Days (Full Month)' : '30 Hari (1 Bulan)', desc: locale === 'en' ? 'Entire customer birthday month' : 'Sepanjang bulan hari lahir' },
+              ].map((opt) => {
+                const isSelected = birthdayForm.expiry_days === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    onPress={() => {
+                      setBirthdayForm((f) => ({ ...f, expiry_days: opt.id }));
+                      setShowValidityPicker(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 14,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#000000' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {opt.title}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Send Schedule Picker Modal */}
+      <Modal
+        visible={showSchedulePicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSchedulePicker(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSchedulePicker(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Send Schedule' : 'Waktu Hantar'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? "Select the dispatch time for automated in-wallet delivery." : "Pilih masa hantaran automatik ke telefon pelanggan."}
+            </Text>
+            <View style={{ gap: 10 }}>
+              {[
+                { time: '09:00', label: '09:00 AM (Recommended)', desc: locale === 'en' ? "Send on customer's birthday · Store local time" : "Dihantar pada pagi hari lahir" },
+                { time: '10:00', label: '10:00 AM', desc: locale === 'en' ? "Mid-morning dispatch before lunchtime visits" : "Hantaran pertengahan pagi" },
+                { time: '12:00', label: '12:00 PM', desc: locale === 'en' ? "Lunchtime celebration surprise" : "Hantaran waktu makan tengah hari" },
+              ].map((opt) => {
+                const isSelected = birthdayForm.send_time === opt.time;
+                return (
+                  <TouchableOpacity
+                    key={opt.time}
+                    onPress={() => {
+                      setBirthdayForm((f) => ({ ...f, send_time: opt.time }));
+                      setShowSchedulePicker(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 14,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#000000' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {opt.label}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Redemption Rules Modal */}
+      <Modal
+        visible={showRulesModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRulesModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowRulesModal(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Redemption Rules' : 'Syarat Penebusan'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'Standard safeguard policies applied to this birthday pass.' : 'Syarat keselamatan baucar hari lahir.'}
+            </Text>
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              {[
+                { icon: 'shield-checkmark-outline', title: locale === 'en' ? 'Once per Birthday Year' : 'Sekali Setiap Tahun Lahir', desc: locale === 'en' ? 'Each customer can only claim this offer once per calendar birthday year.' : 'Setiap pelanggan hanya boleh menebus sekali dalam setahun.' },
+                { icon: 'qr-code-outline', title: locale === 'en' ? 'In-Store Verification' : 'Pengesahan Kaunter', desc: locale === 'en' ? 'Customer must present their digital pass or code for staff verification at checkout.' : 'Pelanggan perlu menunjukkan kod atau imbasan QR semasa pembayaran.' },
+                { icon: 'timer-outline', title: locale === 'en' ? 'Auto-Expiring Pass' : 'Tamat Tempoh Automatik', desc: locale === 'en' ? 'The pass automatically expires at 11:59 PM on the final day of the validity window.' : 'Baucar lupus secara automatik pada hari terakhir tempoh sah.' },
+              ].map((rule, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                  <Ionicons name={rule.icon as any} size={20} color="#0F172A" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{rule.title}</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>{rule.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowRulesModal(false)}
+              style={{ backgroundColor: '#000000', height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{locale === 'en' ? 'Done' : 'Selesai'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Stamps Count Picker Modal */}
+      <Modal
+        visible={showStampsPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStampsPicker(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowStampsPicker(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Bonus Stamps' : 'Cop Bonus'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'How many bonus stamps to credit directly on their birthday.' : 'Bilangan cop bonus untuk dikreditkan secara automatik.'}
+            </Text>
+            <View style={{ gap: 10 }}>
+              {['1', '2', '3', '5'].map((count) => {
+                const isSelected = birthdayForm.reward_value === count;
+                return (
+                  <TouchableOpacity
+                    key={count}
+                    onPress={() => {
+                      setBirthdayForm((f) => ({
+                        ...f,
+                        reward_value: count,
+                        title: `${count} Bonus Stamps`,
+                        description: `Birthday celebration: ${count} bonus stamps credited to your card.`,
+                      }));
+                      setShowStampsPicker(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 14,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#000000' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons name="star" size={18} color="#D97706" />
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {count} {locale === 'en' ? (count === '1' ? 'Bonus Stamp' : 'Bonus Stamps') : 'Cop Bonus'} {count === '2' ? `(${locale === 'en' ? 'Recommended' : 'Disyorkan'})` : ''}
+                      </Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Earn Points Custom Rate Modal */}
+      <Modal
+        visible={showEarnRateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEarnRateModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowEarnRateModal(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Earn Points Rate' : 'Kadar Perolehan Mata'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'How much customer spends to earn 1 loyalty point.' : 'Jumlah belanja pelanggan untuk dapatkan 1 mata.'}
+            </Text>
+
+            {/* Quick Presets */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              {['1', '2', '5', '10'].map((amt) => {
+                const isSelected = spendPerPoint === amt;
+                return (
+                  <TouchableOpacity
+                    key={amt}
+                    onPress={() => setSpendPerPoint(amt)}
+                    style={{
+                      flex: 1,
+                      height: 40,
+                      borderRadius: 10,
+                      backgroundColor: isSelected ? '#000000' : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: isSelected ? '#000000' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold',
+                      color: isSelected ? '#FFCC00' : '#0F172A',
+                    }}>
+                      RM {amt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Custom Spend Input */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#F8FAFC',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              paddingHorizontal: 14,
+              height: 48,
+              marginBottom: 20,
+            }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginRight: 8 }}>RM</Text>
+              <TextInput
+                value={spendPerPoint}
+                onChangeText={setSpendPerPoint}
+                keyboardType="decimal-pad"
+                style={{ flex: 1, fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}
+                placeholder="1"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>= 1 Point</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowEarnRateModal(false)}
+              style={{ backgroundColor: '#000000', height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                {locale === 'en' ? 'Done' : 'Selesai'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Redeem Value Selection Modal */}
+      <Modal
+        visible={showRedeemRateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRedeemRateModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowRedeemRateModal(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Redeem Value' : 'Nilai Penebusan'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'Choose how many points convert to RM 1.00 discount.' : 'Pilih berapa mata untuk ditukar kepada RM 1.00 diskaun.'}
+            </Text>
+
+            <View style={{ gap: 10, marginBottom: 20 }}>
+              {[
+                { pts: '100', title: '100 Pts = RM 1.00', desc: locale === 'en' ? '1% reward rate (Industry Standard)' : 'Kadar ganjaran 1% (Standard Industri)' },
+                { pts: '50', title: '50 Pts = RM 1.00', desc: locale === 'en' ? '2% reward rate (High Generosity)' : 'Kadar ganjaran 2% (Lebih Lumayan)' },
+                { pts: '200', title: '200 Pts = RM 1.00', desc: locale === 'en' ? '0.5% reward rate (Conservative Margin)' : 'Kadar ganjaran 0.5% (Margin Selamat)' },
+              ].map((opt) => {
+                const isSelected = pointsPerRm === opt.pts;
+                return (
+                  <TouchableOpacity
+                    key={opt.pts}
+                    onPress={() => {
+                      setPointsPerRm(opt.pts);
+                      setShowRedeemRateModal(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 14,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? '#F8FAFC' : '#FFFFFF',
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#000000' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {opt.title}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#000000" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Points Rules & Limits Modal */}
+      <Modal
+        visible={showPointsRulesModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPointsRulesModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowPointsRulesModal(false)} />
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 24 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginBottom: 4 }}>
+              {locale === 'en' ? 'Rules & Limits' : 'Syarat & Had Penebusan'}
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16 }}>
+              {locale === 'en' ? 'Protect your business margins with redemption thresholds.' : 'Lindungi margin perniagaan dengan had penebusan.'}
+            </Text>
+
+            {/* Min Redeem Threshold */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginBottom: 6 }}>
+                {locale === 'en' ? 'Minimum Points to Redeem (0 = No Min)' : 'Minima Mata untuk Tebus (0 = Tiada)'}
+              </Text>
+              <TextInput
+                value={minRedeemPoints}
+                onChangeText={setMinRedeemPoints}
+                keyboardType="number-pad"
+                style={{
+                  height: 44,
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  paddingHorizontal: 12,
+                  fontSize: 14,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#0F172A',
+                }}
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Max Discount % Cap */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', marginBottom: 6 }}>
+                {locale === 'en' ? 'Max Bill Discount Cap (%) (0 = No Cap)' : 'Had Maksima Diskaun Bil (%) (0 = Tiada Had)'}
+              </Text>
+              <TextInput
+                value={maxRedeemPercent}
+                onChangeText={setMaxRedeemPercent}
+                keyboardType="number-pad"
+                style={{
+                  height: 44,
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  paddingHorizontal: 12,
+                  fontSize: 14,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  color: '#0F172A',
+                }}
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowPointsRulesModal(false)}
+              style={{ backgroundColor: '#000000', height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                {locale === 'en' ? 'Save & Close' : 'Simpan & Tutup'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Risev Pro Upgrade Modal */}
       <UpgradeModal
         visible={showUpgradeModal}
@@ -4008,25 +9499,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   headerRow: {
-    height: 60,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
+    marginBottom: 16,
     zIndex: 1,
   },
   backBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#0F172A',
     letterSpacing: -0.4,
   },
   catalogueActionBar: {
@@ -4093,41 +9592,80 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 140,
   },
-  modulesConfigCard: {
-    backgroundColor: '#FFC700',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 6,
+  // Compact Loyalty Modules Capsule
+  programModuleCapsule: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  modulesCardTitle: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    letterSpacing: 0.3,
-  },
-  moduleRow: {
+  moduleCapsuleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 12,
+    marginBottom: 8,
+    paddingHorizontal: 2,
   },
-  moduleName: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
-  },
-  moduleDesc: {
+  moduleCapsuleLabel: {
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.8,
+  },
+  moduleTogglesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  moduleToggleCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  moduleToggleCardActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  moduleIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  moduleToggleTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  moduleToggleStatus: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginTop: 1,
+  },
+  moduleDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: '#E2E8F0',
   },
   introSection: {
     marginBottom: 20,
@@ -4144,43 +9682,214 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
-  // Sub-tabs styling
-  tabContainer: {
+  // Apple 2-Row Compact Segmented Tab Bar (Full Width, Zero Scroll)
+  compactTabBarContainer: {
     flexDirection: 'row',
-    backgroundColor: '#171717',
-    borderRadius: 100,
-    padding: 6,
-    marginBottom: 24,
-    zIndex: 2,
-    marginTop: 0,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 100,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    padding: 3,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 3,
   },
-  tabBtnActive: {
-    backgroundColor: '#FFC700',
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+  compactTabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
   },
-  tabBtnText: {
-    fontSize: 13,
+  compactTabBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  compactTabBtnText: {
+    fontSize: 10,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#F8FAFC',
+    color: '#64748B',
+    marginTop: 3,
+    textAlign: 'center',
   },
-  tabBtnTextActive: {
+  compactTabBtnTextActive: {
+    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  // Apple Segmented Tab Bar
+  segmentedTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 20,
+  },
+  segmentedTabBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  segmentedTabBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentedTabBtnText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  segmentedTabBtnTextActive: {
+    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  // Apple Pass Digital Voucher Card
+  appleRewardPassCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  rewardPassThumbWrap: {
+    position: 'relative',
+    width: 60,
+    height: 60,
+    marginRight: 12,
+  },
+  rewardPassThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    resizeMode: 'cover',
+  },
+  rewardTypeBadge: {
+    position: 'absolute',
+    bottom: -4,
+    left: 2,
+    right: 2,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewardTypeBadgeFree: {
+    backgroundColor: '#FFCC00',
+  },
+  rewardTypeBadgeDiscount: {
+    backgroundColor: '#0F172A',
+  },
+  rewardTypeBadgeText: {
+    fontSize: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#050505',
+    letterSpacing: 0.5,
+  },
+  rewardPassContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  rewardPassTitle: {
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  rewardPassDesc: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    lineHeight: 15,
+    marginBottom: 6,
+  },
+  rewardPassMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  stampRewardPill: {
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stampRewardPillText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#050505',
+    letterSpacing: 0.4,
+  },
+  pointsRewardPill: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pointsRewardPillText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#2563EB',
+    letterSpacing: 0.4,
+  },
+  stockStatusBadge: {
+    justifyContent: 'center',
+  },
+  rewardPassActions: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 64,
+    paddingLeft: 2,
+  },
+  rewardActionBtnsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rewardActionEditBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewardActionDeleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Catalogue Styles
   loadingContainer: {

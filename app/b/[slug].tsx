@@ -3708,7 +3708,7 @@ export default function CustomerBookingPwaScreen() {
                     merchantName: merchant?.store_name || 'Risev Official Merchant',
                     logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=150',
                     title: 'Free reward upon completing loyalty card',
-                    subtitle: 'Reward for completing Standard Loyalty Card',
+                    subtitle: 'Stamp Card Reward',
                     expiry: 'Valid until 01/11/2026',
                     status: 'active',
                     serialNo: 'NO. 81389',

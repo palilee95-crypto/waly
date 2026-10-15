@@ -54,6 +54,12 @@ export default function SubscriptionScreen() {
   const [codeError, setCodeError] = useState('');
   const [codeSuccess, setCodeSuccess] = useState('');
   const [showCodeBox, setShowCodeBox] = useState(false);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const [monthlyBookingCount, setMonthlyBookingCount] = useState(0);
+  const [branchCount, setBranchCount] = useState(1);
+  const [staffCount, setStaffCount] = useState(1);
+  const [activeVoucherCount, setActiveVoucherCount] = useState(0);
+  const [showUsageModal, setShowUsageModal] = useState(false);
 
   // Auto-open checkout modal if requested via route params
   useEffect(() => {
@@ -120,6 +126,48 @@ export default function SubscriptionScreen() {
           filter: `merchant = "${user.merchant_id}" && created >= "${startOfMonth}"`,
         });
         setMonthlyCustomerCount(monthlyCards.totalItems);
+
+        // Monthly bookings count
+        try {
+          const monthlyBookings = await pb.collection('bookings').getList(1, 1, {
+            filter: `merchant = "${user.merchant_id}" && created >= "${startOfMonth}"`,
+            requestKey: null,
+          });
+          setMonthlyBookingCount(monthlyBookings.totalItems);
+        } catch {}
+
+        // Outlets count
+        try {
+          const bList = await pb.collection('merchant_branches').getFullList({
+            filter: `merchant = "${user.merchant_id}"`,
+            requestKey: null,
+          });
+          setBranchCount(bList.length + 1);
+        } catch {
+          setBranchCount(1);
+        }
+
+        // Staff count
+        try {
+          const sList = await pb.collection('staff_accounts').getFullList({
+            filter: `merchant = "${user.merchant_id}"`,
+            requestKey: null,
+          });
+          setStaffCount(sList.length);
+        } catch {
+          setStaffCount(1);
+        }
+
+        // Active vouchers / rewards count
+        try {
+          const vList = await pb.collection('rewards').getFullList({
+            filter: `merchant = "${user.merchant_id}" && is_active = true`,
+            requestKey: null,
+          });
+          setActiveVoucherCount(vList.length);
+        } catch {
+          setActiveVoucherCount(0);
+        }
       } catch (e) {}
     };
     fetchSubData();
@@ -202,12 +250,12 @@ export default function SubscriptionScreen() {
         periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual)' : '12 Bulan (Tahunan)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
         highlights: locale === 'en' ? [
           '300 customer quota per renewal',
-          'Basic analytics dashboard',
-          'Up to 5 staff accounts'
+          'Basic booking engine (30 bookings / mo)',
+          'Single Store Outlet (HQ) & up to 5 staff'
         ] : [
           'Kuota 300 pelanggan setiap pembaharuan',
-          'Papan pemuka analitik asas',
-          'Hingga 5 akaun staf'
+          'Sistem tempahan asas (30 tempahan / bln)',
+          '1 Outlet (HQ) & hingga 5 akaun staf'
         ]
       };
     } else {
@@ -229,13 +277,15 @@ export default function SubscriptionScreen() {
         periodLabel: isAnnual ? (locale === 'en' ? '12 Months (Annual - Save 20%)' : '12 Bulan (Tahunan - Jimat 20%)') : (locale === 'en' ? '1 Month (Monthly)' : '1 Bulan (Bulanan)'),
         highlights: locale === 'en' ? [
           'Unlimited customer database ♾️',
+          'Unlimited bookings & staff commission',
           'Up to 5 store outlets (1 HQ + 4 Branches)',
-          'Pro Sales & Opportunity Analytics',
+          'Milestone rewards & birthday automation',
           'Up to 10 staff accounts'
         ] : [
           'Database pelanggan tanpa had ♾️',
+          'Tempahan tanpa had & komisen staf',
           'Hingga 5 outlet (1 HQ + 4 Cawangan)',
-          'Analitik Jualan & Peluang Pro',
+          'Ganjaran kemajuan & automasi hari lahir',
           'Hingga 10 akaun staf'
         ]
       };
@@ -335,7 +385,7 @@ export default function SubscriptionScreen() {
           {/* Sticky Header with Logo & Tagline */}
           <View style={styles.header}>
             <View style={[styles.headerTop, { justifyContent: 'space-between' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <TouchableOpacity 
                   style={styles.closeBtn} 
                   onPress={async () => {
@@ -348,38 +398,53 @@ export default function SubscriptionScreen() {
                   }} 
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                  <Ionicons name="close" size={20} color="#000000" />
                 </TouchableOpacity>
-                <Text style={styles.headerUpsellTitle}>Subscription Plan</Text>
+                <View>
+                  <Text style={styles.headerUpsellTitle}>Subscription Plan</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                    {locale === 'en' ? 'Manage store tier & quota' : 'Urus taraf kedai & kuota'}
+                  </Text>
+                </View>
               </View>
               <Image 
                 source={require('../../assets/risev logo.png')}
-                style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
+                style={{ width: 85, height: 26, resizeMode: 'contain' }}
               />
             </View>
           </View>
 
           <View style={styles.scrollContent}>
 
-          {/* 1. Current Active Plan & Quota Status Card */}
+          {/* 1. Current Active Plan & Quota Status Card (Clear White Compact Style) */}
           {user?.merchant_status === 'active' ? (
             <View style={{
-              backgroundColor: '#050505',
-              borderRadius: 20,
-              padding: 16,
-              marginBottom: 16,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              padding: 13,
+              marginBottom: 12,
               borderWidth: 1,
-              borderColor: 'rgba(255, 199, 0, 0.3)',
-              shadowColor: '#050505',
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.08,
-              shadowRadius: 12,
-              elevation: 3,
+              borderColor: '#E2E8F0',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 2,
             }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: '#FFCC00',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Ionicons name="sparkles" size={16} color="#050505" />
+                  </View>
                   <View>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.3 }}>
                       {activeSub?.plan === 'stand_bundle'
                         ? 'Stand Starter Bundle'
                         : activeSub?.plan === 'starter'
@@ -388,222 +453,476 @@ export default function SubscriptionScreen() {
                             ? 'Business Plan'
                             : 'PRO Plan'}
                     </Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                      {activeSub?.plan === 'stand_bundle' ? 'Included with NFC Plate' : 'Active Subscription'}
+                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                      {activeSub?.plan === 'stand_bundle' ? 'Included with NFC Plate' : 'Executive VIP Membership'}
                     </Text>
                   </View>
                 </View>
 
-                <View style={{ backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>ACTIVE</Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: '#DCFCE7',
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 20,
+                }}>
+                  <View style={{ width: 5.5, height: 5.5, borderRadius: 3, backgroundColor: '#16A34A' }} />
+                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#15803D', letterSpacing: 0.4 }}>ACTIVE VIP</Text>
                 </View>
               </View>
 
-              {/* Quota Progress */}
-              <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
-                    Customer Database Quota
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
-                    {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
-                      ? `${customerCount.toLocaleString()} (Unlimited ♾️)`
-                      : `${customerCount.toLocaleString()} / ${(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300).toLocaleString()}`}
-                  </Text>
+              {/* Dual Quota Milestones */}
+              <View style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginTop: 10,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                gap: 9,
+              }}>
+                {/* 1. Customer Database Quota */}
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Ionicons name="people-outline" size={13} color="#64748B" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Customer Database' : 'Pangkalan Pelanggan'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {customerCount.toLocaleString()}
+                      </Text>
+                      {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? (
+                        <View style={{ backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE047', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5 }}>
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Unlimited ♾️</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                          / {(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300).toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={{ height: 4.5, backgroundColor: '#E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
+                    <View style={{ 
+                      height: '100%', 
+                      width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                        ? '100%'
+                        : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300)) * 100))}%`, 
+                      backgroundColor: '#FFCC00', 
+                      borderRadius: 2.5 
+                    }} />
+                  </View>
                 </View>
-                <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                  <View style={{ 
-                    height: '100%', 
-                    width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
-                      ? '100%'
-                      : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300)) * 100))}%`, 
-                    backgroundColor: '#FFC700', 
-                    borderRadius: 3 
-                  }} />
+
+                {/* 2. Monthly Bookings Quota */}
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Monthly Bookings' : 'Tempahan (Bulan Ini)'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {monthlyBookingCount.toLocaleString()}
+                      </Text>
+                      {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? (
+                        <View style={{ backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE047', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5 }}>
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Unlimited ♾️</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                          / 30
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={{ height: 4.5, backgroundColor: '#E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
+                    <View style={{ 
+                      height: '100%', 
+                      width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                        ? '100%'
+                        : `${Math.min(100, Math.round((monthlyBookingCount / 30) * 100))}%`, 
+                      backgroundColor: '#10B981', 
+                      borderRadius: 2.5 
+                    }} />
+                  </View>
                 </View>
               </View>
 
-              {/* Expiry Details */}
+              {/* Expiry Details & Usage Milestones Action */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <Ionicons 
                     name={activeSub?.plan === 'stand_bundle' ? "infinite" : "calendar-outline"} 
-                    size={14} 
-                    color="#10B981" 
+                    size={13} 
+                    color="#64748B" 
                   />
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#10B981' }}>
+                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
                     {activeSub?.plan === 'stand_bundle'
-                      ? 'No Expiry Date (500 capacity)'
+                      ? 'Lifetime Hardware License'
                       : activeSub?.current_period_end 
                         ? `Renews on ${new Date(activeSub.current_period_end.replace(' ', 'T')).toLocaleDateString()}` 
                         : 'Active Subscription'}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => router.replace('/(merchant)')}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>
-                    Dashboard →
+                <TouchableOpacity 
+                  onPress={() => setShowUsageModal(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {locale === 'en' ? 'Usage Details' : 'Milestone Kuota'}
                   </Text>
+                  <Ionicons name="chevron-forward" size={12} color="#0F172A" />
                 </TouchableOpacity>
               </View>
             </View>
           ) : null}
 
-          {/* Option B: Buy NFC Stand in-app */}
+          {/* Option B: Buy NFC Stand in-app (Daylight White Squircle with Gold Accent) */}
           <TouchableOpacity
             style={{
-              backgroundColor: '#050505',
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 24,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              padding: 14,
+              marginBottom: 20,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              shadowColor: '#FFC700',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
               shadowRadius: 8,
-              elevation: 4,
+              elevation: 2,
             }}
             activeOpacity={0.8}
             onPress={() => router.push('/(merchant)/nfc-marketplace')}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="cart" size={18} color="#FFC700" />
+              <View style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: '#FFCC00',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="cart" size={19} color="#050505" />
               </View>
               <View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
                   {locale === 'en' ? "Don't have a Stand?" : "Belum ada NFC Stand?"}
                 </Text>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
-                  {locale === 'en' ? "Get RiseV NFC Bundle" : "Dapatkan Bundle NFC RiseV"}
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                  {locale === 'en' ? "Get RiseV NFC Bundle · Lifetime Quota" : "Dapatkan Bundle NFC RiseV · Kuota Seumur Hidup"}
                 </Text>
               </View>
             </View>
-            <Ionicons name="arrow-forward" size={20} color="#FFC700" />
+            <View style={{
+              backgroundColor: '#050505',
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                Order
+              </Text>
+              <Ionicons name="arrow-forward" size={12} color="#FFCC00" />
+            </View>
           </TouchableOpacity>
 
-          {/* 2. Billing Toggle (Monthly / Annual) */}
-          <View style={styles.billingToggleWrapper}>
+          {/* 2. Explore Plans Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 4 }}>
+            <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.3 }}>
+              Explore Plans
+            </Text>
+            <TouchableOpacity onPress={() => setShowUsageModal(true)} activeOpacity={0.7}>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                {locale === 'en' ? 'Compare benefits' : 'Bandingkan ciri'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 3. Segmented Cadence Toggle (Monthly / Annually) */}
+          <View style={{
+            flexDirection: 'row',
+            backgroundColor: '#F1F5F9',
+            borderRadius: 14,
+            padding: 4,
+            marginBottom: 14,
+          }}>
             <TouchableOpacity 
-              style={[styles.billingToggleBtn, billingCycle === 'monthly' && styles.billingToggleBtnActive]}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 11,
+                backgroundColor: billingCycle === 'monthly' ? '#000000' : 'transparent',
+              }}
               onPress={() => setBillingCycle('monthly')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.billingToggleText, billingCycle === 'monthly' && styles.billingToggleTextActive]}>
+              <Text style={{
+                fontSize: 12.5,
+                fontFamily: billingCycle === 'monthly' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                color: billingCycle === 'monthly' ? '#FFFFFF' : '#475569',
+              }}>
                 Monthly
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.billingToggleBtn, billingCycle === 'annually' && styles.billingToggleBtnActive]}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 11,
+                backgroundColor: billingCycle === 'annually' ? '#000000' : 'transparent',
+              }}
               onPress={() => setBillingCycle('annually')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.billingToggleText, billingCycle === 'annually' && styles.billingToggleTextActive]}>
+              <Text style={{
+                fontSize: 12.5,
+                fontFamily: billingCycle === 'annually' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_600SemiBold',
+                color: billingCycle === 'annually' ? '#FFFFFF' : '#475569',
+              }}>
                 Annually (Save 20%)
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* 3. Compact Plan Selector (2 Columns Grid) */}
-          <Text style={styles.sectionLabel}>Select your plan:</Text>
-          <View style={styles.planSelectorRow}>
-            {/* Starter Plan */}
-            <TouchableOpacity
-              style={[
-                styles.planCard,
-                selectedPlan === 'starter' && styles.planCardActive
-              ]}
-              onPress={() => setSelectedPlan('starter')}
-              activeOpacity={0.9}
-            >
-              {activeSub?.status === 'active' && activeSub?.plan === 'starter' ? (
-                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
-                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
-                </View>
-              ) : null}
-              <Text style={styles.planCardTitle}>Starter</Text>
-              <Text style={styles.planCardPrice}>
-                {billingCycle === 'monthly' ? 'RM 47' : 'RM 38'}
-              </Text>
-              <Text style={styles.planCardPeriod}>/mo</Text>
-            </TouchableOpacity>
-
-            {/* Pro Plan (Best Seller) */}
-            <TouchableOpacity
-              style={[
-                styles.planCard,
-                selectedPlan === 'pro' && styles.planCardActive,
-                styles.proPlanCardHighlight
-              ]}
-              onPress={() => setSelectedPlan('pro')}
-              activeOpacity={0.9}
-            >
-              {activeSub?.status === 'active' && activeSub?.plan === 'pro' ? (
-                <View style={[styles.bestSellerTag, { backgroundColor: '#10B981' }]}>
-                  <Text style={styles.bestSellerTagText}>CURRENT</Text>
+          {/* 4. Plan Selector: Stacked Radio Cards */}
+          {/* Starter Plan */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              padding: 14,
+              marginBottom: 10,
+              borderWidth: selectedPlan === 'starter' ? 2 : 1,
+              borderColor: selectedPlan === 'starter' ? '#FFCC00' : '#E2E8F0',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: selectedPlan === 'starter' ? 0.05 : 0.02,
+              shadowRadius: 6,
+              elevation: selectedPlan === 'starter' ? 2 : 1,
+            }}
+            onPress={() => setSelectedPlan('starter')}
+            activeOpacity={0.85}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {selectedPlan === 'starter' ? (
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#FEF08A',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#000000' }} />
                 </View>
               ) : (
-                <View style={styles.bestSellerTag}>
-                  <Text style={styles.bestSellerTagText}>POPULAR</Text>
-                </View>
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  borderWidth: 2,
+                  borderColor: '#CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                }} />
               )}
-              <Text style={styles.planCardTitle}>PRO</Text>
-              <Text style={[styles.planCardPrice, { color: '#050505' }]}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    Starter
+                  </Text>
+                  {activeSub?.status === 'active' && activeSub?.plan === 'starter' ? (
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>Current</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                  Essential loyalty & 30 bookings/mo
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                {billingCycle === 'monthly' ? 'RM 47' : 'RM 38'}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                / month
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* PRO Plan */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              padding: 14,
+              marginBottom: 18,
+              borderWidth: selectedPlan === 'pro' ? 2 : 1,
+              borderColor: selectedPlan === 'pro' ? '#FFCC00' : '#E2E8F0',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              shadowColor: selectedPlan === 'pro' ? '#FFCC00' : '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: selectedPlan === 'pro' ? 0.12 : 0.02,
+              shadowRadius: 8,
+              elevation: selectedPlan === 'pro' ? 3 : 1,
+            }}
+            onPress={() => setSelectedPlan('pro')}
+            activeOpacity={0.85}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {selectedPlan === 'pro' ? (
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#FEF08A',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#000000' }} />
+                </View>
+              ) : (
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  borderWidth: 2,
+                  borderColor: '#CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                }} />
+              )}
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    PRO
+                  </Text>
+                  {activeSub?.status === 'active' && (activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise') ? (
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>Current</Text>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>Popular</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                  Unlimited loyalty, bookings & team
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
                 {billingCycle === 'monthly' ? 'RM 97' : 'RM 78'}
               </Text>
-              <Text style={styles.planCardPeriod}>/mo</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 4. Live Pricing & Urgency block */}
-          <View style={styles.priceHighlightCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View>
-                <Text style={styles.highlightPlanName}>{currentPrice.label}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                  <Text style={styles.highlightActivePrice}>{currentPrice.price}</Text>
-                  <Text style={styles.highlightOriginalPrice}>{currentPrice.originalPrice}</Text>
-                  <Text style={styles.highlightPeriod}>/ month</Text>
-                </View>
-              </View>
-              <View style={styles.highlightBadge}>
-                <Text style={styles.highlightBadgeText}>BEST VALUE</Text>
-              </View>
-            </View>
-
-            {/* Info note */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-              <Ionicons name="information-circle-outline" size={14} color="#64748B" />
               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                System subscription only. NFC VIP stands sold separately.
+                / month
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          {/* 5. Features List Box */}
-          <Text style={styles.sectionLabel}>Features included:</Text>
-          <View style={styles.featuresBox}>
-            {getFeaturesList().map((feat, idx) => {
-              const isLocked = feat.startsWith('[LOCK]');
-              const cleanFeat = feat.replace('[LOCK] ', '');
-              return (
-                <View key={idx} style={styles.featureRow}>
-                  <View style={[styles.checkBadge, { backgroundColor: isLocked ? '#F1F5F9' : '#FEF3C7' }]}>
-                    <Ionicons 
-                      name={isLocked ? "lock-closed" : "checkmark"} 
-                      size={8} 
-                      color={isLocked ? "#94A3B8" : "#B45309"} 
-                    />
-                  </View>
-                  <Text style={[styles.featureText, isLocked && { color: '#94A3B8', textDecorationLine: 'line-through' }]}>
-                    {cleanFeat}
-                    {cleanFeat.includes('WhatsApp Automation') && <Text style={styles.inlineBadge}>  META API </Text>}
+          {/* 5. Key Differences Table */}
+          <View style={{ marginBottom: 14 }}>
+            {/* Table Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, paddingHorizontal: 4 }}>
+              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                Key Differences
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ width: 85, textAlign: 'center', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>
+                  Starter
+                </Text>
+                <View style={{ width: 85, alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 8, paddingVertical: 3 }}>
+                  <Text style={{ textAlign: 'center', fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    PRO
                   </Text>
                 </View>
-              );
-            })}
-           </View>
+              </View>
+            </View>
+
+            {/* Table Content Container */}
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              overflow: 'hidden',
+            }}>
+              {[
+                { icon: 'people-outline' as const, label: 'Customer capacity', starter: '300', pro: 'Unlimited ♾️' },
+                { icon: 'calendar-outline' as const, label: 'Booking engine', starter: '30 / month', pro: 'Unlimited' },
+                { icon: 'storefront-outline' as const, label: 'Business outlets', starter: '1 (HQ)', pro: '5 Outlets' },
+                { icon: 'person-add-outline' as const, label: 'Staff accounts', starter: 'Up to 5', pro: '10 + Comm' },
+                { icon: 'gift-outline' as const, label: 'Milestone loyalty', starter: 'Standard', pro: 'All Engines 🎁' },
+                { icon: 'ticket-outline' as const, label: 'Active vouchers', starter: '5 Max', pro: 'Unlimited' },
+              ].map((item, index, arr) => (
+                <View
+                  key={index}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                    borderBottomWidth: index === arr.length - 1 ? 0 : 1,
+                    borderBottomColor: '#F1F5F9',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <Ionicons name={item.icon} size={16} color="#64748B" />
+                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }}>
+                      {item.label}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ width: 85, textAlign: 'center', fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                      {item.starter}
+                    </Text>
+                    <View style={{ width: 85, alignItems: 'center', backgroundColor: '#F8FAFC', paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ textAlign: 'center', fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        {item.pro}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -651,6 +970,254 @@ export default function SubscriptionScreen() {
           <TouchableOpacity onPress={() => Alert.alert('Privacy Policy', 'Privacy policy details...')}><Text style={styles.legalLink}>Privacy</Text></TouchableOpacity>
         </View>
       </View>
+
+      {/* Usage Milestones & Feature Breakdown Modal */}
+      <Modal
+        visible={showUsageModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowUsageModal(false)}
+      >
+        <View style={styles.checkoutOverlay}>
+          <TouchableOpacity 
+            style={styles.checkoutOverlayBg} 
+            activeOpacity={1} 
+            onPress={() => setShowUsageModal(false)} 
+          />
+
+          <View style={[styles.checkoutSheet, { maxHeight: '85%' }]}>
+            {/* Sheet Handle */}
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 }} />
+
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                  {locale === 'en' ? 'Feature Usage & Milestones' : 'Milestone Penggunaan Ciri'}
+                </Text>
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                  {locale === 'en' ? 'Live status of your monthly plan entitlements' : 'Status langsung kuota pelan bulanan anda'}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowUsageModal(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="close" size={18} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
+              {/* Active Tier Pill */}
+              <View style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: 14,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="shield-checkmark" size={16} color="#000000" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                      {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? 'PRO Plan (VIP Member)' : 'Starter Plan'}
+                    </Text>
+                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      {activeSub?.current_period_end ? `Renews: ${new Date(activeSub.current_period_end.replace(' ', 'T')).toLocaleDateString()}` : 'Active Lifetime License'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#15803D' }}>ACTIVE</Text>
+                </View>
+              </View>
+
+              {/* Metric 1: Customer Database */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="people" size={15} color="#B45309" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Customer Database' : 'Pangkalan Pelanggan'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                          ? 'Unlimited customer registration'
+                          : `${Math.max(0, 300 - customerCount)} quota balance remaining`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {customerCount} {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '♾️' : '/ 300'}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: '100%',
+                    width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                      ? '100%'
+                      : `${Math.min(100, Math.round((customerCount / 300) * 100))}%`,
+                    backgroundColor: '#FFCC00',
+                  }} />
+                </View>
+              </View>
+
+              {/* Metric 2: Monthly Bookings */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="calendar" size={15} color="#15803D" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Bookings (This Month)' : 'Tempahan (Bulan Ini)'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                          ? 'Unlimited storefront bookings'
+                          : `${Math.max(0, 30 - monthlyBookingCount)} bookings balance remaining`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {monthlyBookingCount} {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '♾️' : '/ 30'}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: '100%',
+                    width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                      ? '100%'
+                      : `${Math.min(100, Math.round((monthlyBookingCount / 30) * 100))}%`,
+                    backgroundColor: '#10B981',
+                  }} />
+                </View>
+              </View>
+
+              {/* Metric 3: Outlets & Branches */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="storefront" size={15} color="#6D28D9" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Business Outlets' : 'Cawangan Kedai'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                          ? 'Up to 5 outlets included (1 HQ + 4 Branches)'
+                          : '1 Single HQ outlet'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {branchCount} / {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '5' : '1'}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: '100%',
+                    width: `${Math.min(100, Math.round((branchCount / (activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? 5 : 1)) * 100))}%`,
+                    backgroundColor: '#8B5CF6',
+                  }} />
+                </View>
+              </View>
+
+              {/* Metric 4: Staff Accounts */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="person-add" size={15} color="#0369A1" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Staff Accounts' : 'Akaun Staf'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                          ? 'Up to 10 staff with commission engine'
+                          : 'Up to 5 cashier accounts'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {staffCount} / {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '10' : '5'}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: '100%',
+                    width: `${Math.min(100, Math.round((staffCount / (activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? 10 : 5)) * 100))}%`,
+                    backgroundColor: '#0284C7',
+                  }} />
+                </View>
+              </View>
+
+              {/* Metric 5: Active Vouchers */}
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="ticket" size={15} color="#DC2626" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                        {locale === 'en' ? 'Active Vouchers' : 'Baucar Aktif'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                        {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                          ? 'Unlimited active vouchers & discount campaigns'
+                          : `${Math.max(0, 5 - activeVoucherCount)} active vouchers remaining`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {activeVoucherCount} {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '♾️' : '/ 5'}
+                  </Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{
+                    height: '100%',
+                    width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
+                      ? '100%'
+                      : `${Math.min(100, Math.round((activeVoucherCount / 5) * 100))}%`,
+                    backgroundColor: '#EF4444',
+                  }} />
+                </View>
+              </View>
+
+              {/* Bottom Action */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#050505',
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  marginTop: 6,
+                }}
+                onPress={() => setShowUsageModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                  {locale === 'en' ? 'Close Breakdown' : 'Tutup Status Kuota'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Checkout Order Summary Modal */}
       <Modal
@@ -1164,8 +1731,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 160,
-    backgroundColor: '#050505',
+    height: 120,
+    backgroundColor: '#FFFFFF',
     zIndex: 0,
   },
   safeArea: {
@@ -1173,10 +1740,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-    backgroundColor: '#050505',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   headerTop: {
     flexDirection: 'row',
@@ -1187,10 +1756,12 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   headerUpsell: {
     marginTop: 24,
@@ -1199,24 +1770,21 @@ const styles = StyleSheet.create({
   headerUpsellTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#0F172A',
     letterSpacing: -0.4,
   },
   headerUpsellDesc: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#CBD5E1',
+    color: '#64748B',
     marginTop: 8,
     lineHeight: 18,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+    paddingHorizontal: 20,
+    paddingBottom: 130,
     backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 28,
-    marginTop: -24,
+    paddingTop: 18,
     flex: 1,
   },
   upsellSparkle: {

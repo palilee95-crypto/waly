@@ -45,7 +45,7 @@ onRecordCreate((e) => {
     const reward = new Record(rewardsCol);
     reward.set('merchant', merchantId);
     reward.set('name', rewardDesc);
-    reward.set('description', `Reward for completing ${e.record.get('name') || 'Stamp Card'}`);
+    reward.set('description', 'Stamp Card Reward');
     reward.set('points_cost', 0);
     reward.set('stock', 1000000); // effectively unlimited
     reward.set('is_active', true);
@@ -97,7 +97,7 @@ onRecordUpdate((e) => {
       const reward = new Record(rewardsCol);
       reward.set('merchant', e.record.get('merchant'));
       reward.set('name', newDesc);
-      reward.set('description', `Reward for completing ${e.record.get('name') || 'Stamp Card'}`);
+      reward.set('description', 'Stamp Card Reward');
       reward.set('points_cost', 0);
       reward.set('stock', 1000000);
       reward.set('is_active', true);

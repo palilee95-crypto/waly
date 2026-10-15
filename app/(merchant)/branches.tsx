@@ -40,6 +40,14 @@ interface Branch {
   assigned_stands?: string[];
 }
 
+export interface StaffOption {
+  id: string;
+  name: string;
+  phone?: string;
+  role_title?: string;
+  is_owner?: boolean;
+}
+
 export default function BranchesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -83,6 +91,11 @@ export default function BranchesScreen() {
   const [isHq, setIsHq] = useState(false);
   const [googleReviewUrl, setGoogleReviewUrl] = useState('');
   const [resolvingGoogleUrl, setResolvingGoogleUrl] = useState(false);
+  const [merchantName, setMerchantName] = useState('');
+  const [availableStaff, setAvailableStaff] = useState<StaffOption[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [isCustomManager, setIsCustomManager] = useState<boolean>(false);
+  const [showStaffPickerModal, setShowStaffPickerModal] = useState<boolean>(false);
 
   useEffect(() => {
     fetchBranches();
@@ -96,8 +109,8 @@ export default function BranchesScreen() {
 
     setLoading(true);
     try {
-      // Fetch branches, subscription, transactions, staff, and stand codes concurrently
-      const [records, subRec, txRecords, staffRecords, codeRecords] = await Promise.all([
+      // Fetch branches, subscription, transactions, staff, stand codes, and merchant concurrently
+      const [records, subRec, txRecords, staffRecords, codeRecords, merchRec, msRecords] = await Promise.all([
         pb.collection('branches').getFullList<Branch>({
           filter: `merchant = "${user.merchant_id}"`,
           sort: '-is_hq,-created',
@@ -110,16 +123,91 @@ export default function BranchesScreen() {
           requestKey: null
         }).catch(() => []),
         pb.collection('users').getFullList({
-          filter: `merchant_id = "${user.merchant_id}" && (role = "merchant" || role = "both")`,
+          filter: `merchant_id = "${user.merchant_id}" && (role = "merchant" || role = "both" || role = "staff")`,
           requestKey: null
         }).catch(() => []),
         pb.collection('activation_codes').getFullList({
           filter: `redeemed_by = "${user.merchant_id}"`,
           requestKey: null
+        }).catch(() => []),
+        pb.collection('merchants').getOne(user.merchant_id).catch(() => null),
+        pb.collection('merchant_staff').getFullList({
+          filter: `merchant = "${user.merchant_id}" && is_active = true`,
+          requestKey: null
         }).catch(() => [])
       ]);
 
       setSubscription(subRec);
+      if (merchRec?.name) {
+        setMerchantName(merchRec.name);
+      }
+
+      // Build unified staff list from Staff Management
+      const staffList: StaffOption[] = [];
+      const ownerName = user?.name || merchRec?.name || (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai');
+      staffList.push({
+        id: user?.id || 'owner_id',
+        name: ownerName,
+        phone: user?.phone || merchRec?.phone || '',
+        role_title: locale === 'en' ? 'Store Owner' : 'Pemilik Kedai',
+        is_owner: true
+      });
+
+      // 1. Try fetching from /api/risev/merchant/staff
+      try {
+        const sRes = await pb.send<any>('/api/risev/merchant/staff?timeframe=all&sort_by=stamps', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + pb.authStore.token }
+        });
+        if (sRes && Array.isArray(sRes.staff)) {
+          sRes.staff.forEach((s: any) => {
+            const cleanName = (s.name || '').trim();
+            if (!cleanName || cleanName.toLowerCase() === ownerName.toLowerCase()) return;
+            if (!staffList.some(item => item.id === s.id || item.name.toLowerCase() === cleanName.toLowerCase())) {
+              staffList.push({
+                id: s.id,
+                name: cleanName,
+                phone: s.phone || '',
+                role_title: s.role_title || (locale === 'en' ? 'Staff' : 'Staf')
+              });
+            }
+          });
+        }
+      } catch (stErr) {}
+
+      // 2. Add from merchant_staff
+      if (Array.isArray(msRecords)) {
+        msRecords.forEach((ms: any) => {
+          const cleanName = (ms.name || '').trim();
+          if (!cleanName || cleanName.toLowerCase() === ownerName.toLowerCase()) return;
+          if (!staffList.some(item => item.name.toLowerCase() === cleanName.toLowerCase())) {
+            staffList.push({
+              id: ms.id,
+              name: cleanName,
+              phone: ms.phone || '',
+              role_title: ms.role_title || (locale === 'en' ? 'Staff' : 'Staf')
+            });
+          }
+        });
+      }
+
+      // 3. Add from users
+      if (Array.isArray(staffRecords)) {
+        staffRecords.forEach((u: any) => {
+          const cleanName = (u.name || '').trim();
+          if (!cleanName || cleanName.toLowerCase() === ownerName.toLowerCase()) return;
+          if (!staffList.some(item => item.id === u.id || item.name.toLowerCase() === cleanName.toLowerCase())) {
+            staffList.push({
+              id: u.id,
+              name: cleanName,
+              phone: u.phone || '',
+              role_title: u.role_title || (locale === 'en' ? 'Staff' : 'Staf')
+            });
+          }
+        });
+      }
+
+      setAvailableStaff(staffList);
 
       let branchList = records || [];
 
@@ -216,10 +304,22 @@ export default function BranchesScreen() {
     setName('');
     setAddress('');
     setCity('');
-    setPhone('');
-    setManagerName('');
     setGoogleReviewUrl('');
     setIsHq(branches.length === 0);
+
+    const defaultStaff = availableStaff.find(s => s.is_owner) || availableStaff[0];
+    if (defaultStaff) {
+      setManagerName(defaultStaff.name);
+      setPhone(defaultStaff.phone || '');
+      setSelectedStaffId(defaultStaff.id);
+      setIsCustomManager(false);
+    } else {
+      setManagerName(user?.name || '');
+      setPhone(user?.phone || '');
+      setSelectedStaffId(user?.id || '');
+      setIsCustomManager(false);
+    }
+
     setModalVisible(true);
   };
 
@@ -232,6 +332,18 @@ export default function BranchesScreen() {
     setManagerName(branch.manager_name);
     setGoogleReviewUrl(branch.google_review_url || '');
     setIsHq(Boolean(branch.is_hq));
+
+    const matched = availableStaff.find(s => 
+      s.name.trim().toLowerCase() === (branch.manager_name || '').trim().toLowerCase()
+    );
+    if (matched) {
+      setSelectedStaffId(matched.id);
+      setIsCustomManager(false);
+    } else {
+      setSelectedStaffId('');
+      setIsCustomManager(Boolean(branch.manager_name));
+    }
+
     setModalVisible(true);
   };
 
@@ -401,29 +513,38 @@ export default function BranchesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Absolute Full Bleed Header Background */}
-      <View style={[styles.headerBleedBg, { height: 140 + insets.top }]} />
+      {/* ── Sticky Pure White Header ── */}
+      <View style={[styles.stickyHeader, { paddingTop: insets.top + 6 }]}>
+        <View style={styles.headerInnerRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => handleSmartBack(router, '/(merchant)/profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={20} color="#000000" />
+            <Text style={styles.backButtonText}>
+              {locale === 'en' ? 'Profile' : 'Profil'}
+            </Text>
+          </TouchableOpacity>
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Top Header Navigation */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => handleSmartBack(router, '/(merchant)/profile')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>{locale === 'en' ? 'Branch Management' : 'Pengurusan Cawangan'}</Text>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {locale === 'en' ? 'Branch Management' : 'Pengurusan Cawangan'}
+          </Text>
 
-          <Image 
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 85, height: 26, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
+          <TouchableOpacity
+            style={styles.headerAddPill}
+            onPress={handleOpenAddModal}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={16} color="#FFCC00" />
+            <Text style={styles.headerAddPillText}>
+              {locale === 'en' ? 'Add' : 'Tambah'}
+            </Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
+      <SafeAreaView style={styles.safeArea} edges={[]}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
@@ -431,178 +552,122 @@ export default function BranchesScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Business Tier Unlock Banner */}
-          <View style={styles.tierBanner}>
-            <View style={styles.tierBannerLeft}>
-              <View style={styles.tierIconBadge}>
-                <Ionicons name="business" size={18} color="#FFC700" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.tierBannerTitle}>{locale === 'en' ? 'Multi-Branch Engine' : 'Sistem Pelbagai Cawangan'}</Text>
-                  <View style={styles.businessPill}>
-                    <Text style={styles.businessPillText}>BUSINESS</Text>
-                  </View>
+          {/* Executive Brand KPI Summary Card (Concept A) */}
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.kpiIconBox}>
+                  <Ionicons name="business" size={18} color="#FFCC00" />
                 </View>
-                <Text style={styles.tierBannerDesc}>
-                  {locale === 'en'
-                    ? 'Manage staff assignments, compare sales performance, and track stamp distribution per location.'
-                    : 'Urus agihan staff, bandingkan hasil jualan, dan pantau rekod stamp mengikut cawangan.'}
+                <View>
+                  <Text style={styles.kpiBrandTitle}>
+                    {merchantName || (branches.find(b => b.is_hq)?.name.replace(/\s*\(HQ\)$/i, '')) || (locale === 'en' ? 'Brand-Wide Outlets' : 'Seluruh Cawangan Jenama')}
+                  </Text>
+                  <Text style={styles.kpiSubText}>
+                    {branches.length} {locale === 'en' ? 'active locations registered' : 'cawangan aktif berdaftar'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.quotaPill}>
+                <Text style={styles.quotaPillText}>
+                  {branches.length}/{maxAllowedBranches === 999 ? '∞' : maxAllowedBranches} {locale === 'en' ? 'Outlets' : 'Cawangan'}
                 </Text>
               </View>
             </View>
-          </View>
 
-          {/* Multi-Branch Performance Spotlight / Comparison */}
-          {branches.length > 0 && (
-            <View style={{
-              backgroundColor: '#050505',
-              borderRadius: 22,
-              padding: 18,
-              marginBottom: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.15,
-              shadowRadius: 12,
-              elevation: 4
-            }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="bar-chart" size={16} color="#FFC700" />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                      {locale === 'en' ? 'Brand-Wide Outlets Summary' : 'Ringkasan Seluruh Cawangan'}
-                    </Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8' }}>
-                      {branches.length} {locale === 'en' ? 'active outlets registered' : 'cawangan aktif'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={{ backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#38BDF8' }}>
-                    LIVE DATA
-                  </Text>
-                </View>
+            {/* 3-Column Metrics Grid */}
+            <View style={styles.kpiMetricsRow}>
+              <View style={styles.kpiMetricCol}>
+                <Text style={styles.kpiMetricLabel}>{locale === 'en' ? 'TOTAL SALES' : 'JUMLAH JUALAN'}</Text>
+                <Text style={styles.kpiMetricValue}>
+                  RM {branches.reduce((sum, b) => sum + (b.total_sales || 0), 0).toLocaleString()}
+                </Text>
               </View>
-
-              {/* Total Brand Stats Row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', borderRadius: 14, padding: 12, marginBottom: 14 }}>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL SALES</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
-                    RM {branches.reduce((sum, b) => sum + (b.total_sales || 0), 0).toLocaleString()}
-                  </Text>
-                </View>
-                <View style={{ width: 1, height: 26, backgroundColor: '#262626' }} />
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL STAMPS</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', marginTop: 2 }}>
-                    {branches.reduce((sum, b) => sum + (b.total_stamps || 0), 0).toLocaleString()}
-                  </Text>
-                </View>
-                <View style={{ width: 1, height: 26, backgroundColor: '#262626' }} />
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', letterSpacing: 0.5 }}>TOTAL STAFF</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
-                    {branches.reduce((sum, b) => sum + (b.staff_count || 1), 0)}
-                  </Text>
-                </View>
+              <View style={styles.kpiMetricDivider} />
+              <View style={styles.kpiMetricCol}>
+                <Text style={styles.kpiMetricLabel}>{locale === 'en' ? 'TOTAL STAMPS' : 'JUMLAH STAMP'}</Text>
+                <Text style={styles.kpiMetricValue}>
+                  {branches.reduce((sum, b) => sum + (b.total_stamps || 0), 0).toLocaleString()}
+                </Text>
               </View>
-
-              {/* Multi-Branch Revenue Distribution Bar */}
-              {(() => {
-                const totalRev = branches.reduce((sum, b) => sum + (b.total_sales || 0), 0);
-                const colors = ['#FFC700', '#38BDF8', '#10B981', '#F43F5E', '#A855F7'];
-                return (
-                  <View>
-                    <View style={{ height: 6, borderRadius: 3, backgroundColor: '#262626', flexDirection: 'row', overflow: 'hidden', marginBottom: 8 }}>
-                      {branches.map((b, idx) => {
-                        const pct = totalRev > 0 ? ((b.total_sales || 0) / totalRev) * 100 : (100 / branches.length);
-                        return (
-                          <View
-                            key={b.id}
-                            style={{
-                              flex: pct,
-                              backgroundColor: colors[idx % colors.length]
-                            }}
-                          />
-                        );
-                      })}
-                    </View>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                      {branches.map((b, idx) => {
-                        const pct = totalRev > 0 ? Math.round(((b.total_sales || 0) / totalRev) * 100) : Math.round(100 / branches.length);
-                        return (
-                          <View key={b.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors[idx % colors.length] }} />
-                            <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#CBD5E1' }}>
-                              {b.name.replace(' (HQ)', '')}: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{pct}%</Text>
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                );
-              })()}
+              <View style={styles.kpiMetricDivider} />
+              <View style={styles.kpiMetricCol}>
+                <Text style={styles.kpiMetricLabel}>{locale === 'en' ? 'TOTAL STAFF' : 'STAF BERTUGAS'}</Text>
+                <Text style={styles.kpiMetricValue}>
+                  {branches.reduce((sum, b) => sum + (b.staff_count || 1), 0)}
+                </Text>
+              </View>
             </View>
-          )}
+
+            {/* Multi-Branch Revenue Distribution Bar */}
+            {(() => {
+              const totalRev = branches.reduce((sum, b) => sum + (b.total_sales || 0), 0);
+              const palette = ['#000000', '#FFCC00', '#475569', '#94A3B8', '#CBD5E1'];
+              return (
+                <View style={{ marginTop: 14 }}>
+                  <View style={styles.distributionTrack}>
+                    {branches.map((b, idx) => {
+                      const pct = totalRev > 0 ? ((b.total_sales || 0) / totalRev) * 100 : (100 / branches.length);
+                      return (
+                        <View
+                          key={b.id}
+                          style={{
+                            flex: pct,
+                            backgroundColor: palette[idx % palette.length],
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
+                  <View style={styles.distributionLegend}>
+                    {branches.map((b, idx) => {
+                      const pct = totalRev > 0 ? Math.round(((b.total_sales || 0) / totalRev) * 100) : Math.round(100 / branches.length);
+                      return (
+                        <View key={b.id} style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: palette[idx % palette.length] }]} />
+                          <Text style={styles.legendText}>
+                            {b.name.replace(' (HQ)', '')}: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{pct}%</Text>
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })()}
+          </View>
 
           {/* Section Header */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeaderTitle}>{locale === 'en' ? 'Registered Outlets' : 'Senarai Cawangan'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity onPress={fetchBranches} activeOpacity={0.7} style={{ padding: 4 }}>
-                <Ionicons name="refresh-outline" size={18} color="#64748B" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#FFC700',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-                onPress={handleOpenAddModal}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={16} color="#050505" />
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                  {locale === 'en' ? 'Add' : 'Tambah'}
-                </Text>
-              </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionHeaderLabel}>
+                {locale === 'en' ? 'REGISTERED OUTLETS' : 'SENARAI CAWANGAN'}
+              </Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{branches.length}</Text>
+              </View>
             </View>
+
+            <TouchableOpacity onPress={fetchBranches} activeOpacity={0.7} style={styles.refreshBtn}>
+              <Ionicons name="refresh-outline" size={17} color="#64748B" />
+            </TouchableOpacity>
           </View>
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FFC700" />
+              <ActivityIndicator size="small" color="#FFCC00" />
               <Text style={styles.loadingText}>{locale === 'en' ? 'Loading branches...' : 'Memuatkan cawangan...'}</Text>
             </View>
           ) : branches.length === 0 ? (
-            <View style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 20,
-              padding: 28,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1.5,
-              borderColor: '#E2E8F0',
-              borderStyle: 'dashed',
-              gap: 8,
-            }}>
-              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                <Ionicons name="business-outline" size={26} color="#B45309" />
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="business-outline" size={26} color="#000000" />
               </View>
-              <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+              <Text style={styles.emptyTitle}>
                 {locale === 'en' ? 'No Branches Added Yet' : 'Tiada Cawangan Didaftarkan'}
               </Text>
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', maxWidth: 280, lineHeight: 18 }}>
+              <Text style={styles.emptyDesc}>
                 {locale === 'en' 
                   ? 'Add your main store outlet and any branches to manage staff and track performance.' 
                   : 'Daftar cawangan utama dan cawangan lain untuk urus staf dan pantau prestasi.'}
@@ -614,12 +679,12 @@ export default function BranchesScreen() {
                 <View key={branch.id} style={styles.branchCard}>
                   {/* Card Header */}
                   <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                       <View style={[styles.branchIconWrap, branch.is_hq && styles.hqIconWrap]}>
                         <Ionicons 
                           name={branch.is_hq ? "business" : "storefront-outline"} 
                           size={20} 
-                          color={branch.is_hq ? "#FFC700" : "#050505"} 
+                          color={branch.is_hq ? "#FFCC00" : "#0F172A"} 
                         />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -627,7 +692,7 @@ export default function BranchesScreen() {
                           <Text style={styles.branchName}>{branch.name}</Text>
                           {branch.is_hq && (
                             <View style={styles.hqBadge}>
-                              <Text style={styles.hqBadgeText}>HQ / MAIN</Text>
+                              <Text style={styles.hqBadgeText}>HQ / UTAMA</Text>
                             </View>
                           )}
                         </View>
@@ -635,176 +700,176 @@ export default function BranchesScreen() {
                       </View>
                     </View>
 
-                    {/* Actions */}
+                    {/* Header Action Buttons */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <TouchableOpacity 
                         style={styles.actionIconBtn} 
                         onPress={() => handleOpenEditModal(branch)}
                         activeOpacity={0.7}
                       >
-                        <Feather name="edit-2" size={14} color="#050505" />
+                        <Feather name="edit-2" size={13} color="#0F172A" />
                       </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionIconBtn, { backgroundColor: '#FEE2E2' }]} 
-                        onPress={() => handleDeleteBranch(branch)}
-                        activeOpacity={0.7}
-                      >
-                        <Feather name="trash-2" size={14} color="#EF4444" />
-                      </TouchableOpacity>
+                      {(!branch.is_hq || branches.length > 1) && (
+                        <TouchableOpacity 
+                          style={[styles.actionIconBtn, { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' }]} 
+                          onPress={() => handleDeleteBranch(branch)}
+                          activeOpacity={0.7}
+                        >
+                          <Feather name="trash-2" size={13} color="#EF4444" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
 
-                  {/* Branch Details Box */}
-                  <View style={styles.branchDetailsBox}>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="location-outline" size={14} color="#64748B" />
-                      <Text style={styles.detailText} numberOfLines={1}>{branch.address || 'Address not set'}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="person-outline" size={14} color="#64748B" />
-                      <Text style={styles.detailText}>
-                        {locale === 'en' ? 'Manager:' : 'Pengurus:'} <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{branch.manager_name || 'Store Owner'}</Text>
-                      </Text>
-                    </View>
-                    {branch.phone ? (
-                      <View style={styles.detailRow}>
-                        <Ionicons name="call-outline" size={14} color="#64748B" />
-                        <Text style={styles.detailText}>{branch.phone}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {/* Google Review & Hardware Badges Row */}
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                    {branch.google_review_url ? (
+                  {/* Apple Unified Grouped Inset Box (Pilihan 1) */}
+                  <View style={styles.unifiedInsetGroup}>
+                    {/* Row 1: Location & Contact */}
+                    <View style={styles.insetSection}>
                       <TouchableOpacity
-                        onPress={() => {
-                          if (branch.google_review_url) {
-                            Linking.openURL(branch.google_review_url).catch(() => {});
-                          }
-                        }}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 5,
-                          backgroundColor: '#FEF3C7',
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: '#FDE68A'
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="star" size={12} color="#D97706" />
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                          Google Review Active
-                        </Text>
-                        <Ionicons name="open-outline" size={10} color="#B45309" />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
+                        style={styles.insetAddressRow}
                         onPress={() => handleOpenEditModal(branch)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          backgroundColor: '#F1F5F9',
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0'
-                        }}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="add-circle-outline" size={12} color="#64748B" />
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                          {locale === 'en' ? '+ Add Google Review URL' : '+ Tambah URL Review'}
-                        </Text>
+                        <Ionicons name="location-outline" size={15} color="#64748B" style={{ marginTop: 1 }} />
+                        <View style={{ flex: 1 }}>
+                          {branch.address ? (
+                            <Text style={styles.insetTextPrimary} numberOfLines={2}>
+                              {branch.address}
+                            </Text>
+                          ) : (
+                            <Text style={styles.insetTextPlaceholder}>
+                              {locale === 'en' ? '+ Set outlet address' : '+ Tetapkan alamat cawangan'}
+                            </Text>
+                          )}
+                        </View>
+                        <Ionicons name="chevron-forward" size={13} color="#94A3B8" />
                       </TouchableOpacity>
-                    )}
 
-                    {branch.assigned_stands && branch.assigned_stands.length > 0 && (
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        backgroundColor: '#EFF6FF',
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#DBEAFE'
-                      }}>
-                        <Ionicons name="hardware-chip-outline" size={12} color="#2563EB" />
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#1D4ED8' }}>
-                          {branch.assigned_stands.join(', ')}
+                      <View style={styles.insetMetaRow}>
+                        <View style={styles.insetMetaItem}>
+                          <Ionicons name="person-outline" size={12} color="#64748B" />
+                          <Text style={styles.insetTextSecondary}>
+                            {locale === 'en' ? 'Manager: ' : 'Pengurus: '}
+                            <Text style={styles.insetTextBold}>
+                              {branch.manager_name || (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai')}
+                            </Text>
+                          </Text>
+                        </View>
+                        {branch.phone ? (
+                          <>
+                            <View style={styles.metaDot} />
+                            <View style={styles.insetMetaItem}>
+                              <Ionicons name="call-outline" size={12} color="#64748B" />
+                              <Text style={styles.insetTextSecondary}>{branch.phone}</Text>
+                            </View>
+                          </>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <View style={styles.insetDivider} />
+
+                    {/* Row 2: Hardware & Integrations (Smart Stands & Google Review) */}
+                    <View style={[styles.insetSection, styles.insetSectionRow]}>
+                      {branch.assigned_stands && branch.assigned_stands.length > 0 ? (
+                        <TouchableOpacity
+                          style={styles.standPill}
+                          onPress={() => {
+                            Alert.alert(
+                              locale === 'en' ? 'Assigned Smart Stands' : 'Smart Stand Berdaftar',
+                              (branch.assigned_stands || []).join('\n')
+                            );
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="hardware-chip-outline" size={13} color="#000000" />
+                          <Text style={styles.standPillText}>
+                            {branch.assigned_stands.length} {locale === 'en' ? (branch.assigned_stands.length === 1 ? 'Stand Active' : 'Stands Active') : 'Stand Aktif'}
+                          </Text>
+                          <Ionicons name="information-circle-outline" size={12} color="#64748B" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.standPill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
+                          <Ionicons name="hardware-chip-outline" size={13} color="#94A3B8" />
+                          <Text style={[styles.standPillText, { color: '#94A3B8' }]}>
+                            {locale === 'en' ? '0 Stands' : '0 Stand'}
+                          </Text>
+                        </View>
+                      )}
+
+                      {branch.google_review_url ? (
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (branch.google_review_url) {
+                              Linking.openURL(branch.google_review_url).catch(() => {});
+                            }
+                          }}
+                          style={styles.googleReviewActivePillUnified}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="star" size={12} color="#D97706" />
+                          <Text style={styles.googleReviewActiveTextUnified}>Google Review</Text>
+                          <Ionicons name="open-outline" size={11} color="#B45309" />
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleOpenEditModal(branch)}
+                          style={styles.googleReviewAddPillUnified}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="add" size={12} color="#64748B" />
+                          <Text style={styles.googleReviewAddTextUnified}>
+                            {locale === 'en' ? '+ Google Review' : '+ Google Review'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={styles.insetDivider} />
+
+                    {/* Row 3: Customer Onboarding Link (NFC / QR) */}
+                    <View style={[styles.insetSection, styles.insetSectionRow]}>
+                      <View style={styles.onboardingRowLeft}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Ionicons name="link-outline" size={14} color="#000000" />
+                          <Text style={styles.onboardingRowTitle}>
+                            {locale === 'en' ? 'Customer Onboarding' : 'Pautan Onboarding'}
+                          </Text>
+                        </View>
+                        <Text style={styles.onboardingRowSubtitle}>
+                          {locale === 'en' ? 'NFC Stand & QR Join Link' : 'Pendaftaran NFC & Kod QR'}
                         </Text>
                       </View>
-                    )}
-                  </View>
 
-                  {/* Onboarding NFC Link */}
-                  <View style={{
-                    marginTop: 10,
-                    marginBottom: 14,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.5 }}>
-                        NFC / QR ONBOARDING LINK
-                      </Text>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' }} numberOfLines={1}>
-                        {`https://risev.app/join?m=${user?.merchant_id}&b=${branch.id}`}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-                      <TouchableOpacity
-                        onPress={async () => {
-                          await Clipboard.setStringAsync(`https://risev.app/join?m=${user?.merchant_id}&b=${branch.id}`);
-                          Alert.alert(
-                            locale === 'en' ? 'Link Copied' : 'Pautan Disalin',
-                            locale === 'en' ? 'Onboarding link copied to clipboard!' : 'Pautan pendaftaran disalin ke papan klip!'
-                          );
-                        }}
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          backgroundColor: '#FFC700',
-                          borderRadius: 8,
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                          {locale === 'en' ? 'COPY' : 'SALIN'}
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(`https://risev.app/join?m=${user?.merchant_id}&b=${branch.id}`);
+                            Alert.alert(
+                              locale === 'en' ? 'Link Copied' : 'Pautan Disalin',
+                              locale === 'en' ? 'Onboarding link copied to clipboard!' : 'Pautan pendaftaran disalin ke papan klip!'
+                            );
+                          }}
+                          style={styles.copyLinkBtnUnified}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="copy-outline" size={12} color="#FFCC00" />
+                          <Text style={styles.copyLinkBtnTextUnified}>
+                            {locale === 'en' ? 'COPY' : 'SALIN'}
+                          </Text>
+                        </TouchableOpacity>
 
-                      <TouchableOpacity
-                        onPress={() => {
-                          setActiveQrUrl(`https://risev.app/join?m=${user?.merchant_id}&b=${branch.id}`);
-                          setActiveQrBranchName(branch.name);
-                        }}
-                        style={{
-                          padding: 6,
-                          backgroundColor: '#F1F5F9',
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="qr-code-outline" size={16} color="#050505" />
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setActiveQrUrl(`https://risev.app/join?m=${user?.merchant_id}&b=${branch.id}`);
+                            setActiveQrBranchName(branch.name);
+                          }}
+                          style={styles.qrIconBtnUnified}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="qr-code-outline" size={15} color="#000000" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
 
@@ -827,7 +892,7 @@ export default function BranchesScreen() {
                     <View style={styles.perfDivider} />
                     <View style={styles.perfItem}>
                       <Text style={styles.perfLabel}>{locale === 'en' ? 'Stamps' : 'Stamp'}</Text>
-                      <Text style={[styles.perfValue, { color: '#FFC700' }]}>{(branch.total_stamps || 0).toLocaleString()}</Text>
+                      <Text style={[styles.perfValue, { color: '#000000' }]}>{(branch.total_stamps || 0).toLocaleString()}</Text>
                     </View>
                   </View>
                 </View>
@@ -835,14 +900,14 @@ export default function BranchesScreen() {
             </View>
           )}
 
-          {/* Quick Add CTA */}
+          {/* Primary Add New Branch Button (Apple Style) */}
           <TouchableOpacity
             style={styles.bigAddBtn}
             onPress={handleOpenAddModal}
             activeOpacity={0.85}
           >
-            <Ionicons name="add-circle" size={20} color="#050505" />
-            <Text style={styles.bigAddBtnText}>{locale === 'en' ? '+ Add New Branch' : '+ Tambah Cawangan Baru'}</Text>
+            <Ionicons name="add" size={18} color="#FFCC00" />
+            <Text style={styles.bigAddBtnText}>{locale === 'en' ? 'Add New Branch' : 'Tambah Cawangan Baru'}</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -933,15 +998,116 @@ export default function BranchesScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Manager Name */}
-                <Text style={styles.inputLabel}>{locale === 'en' ? 'BRANCH MANAGER' : 'NAMA PENGURUS'}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Encik Farhan"
-                  placeholderTextColor="#94A3B8"
-                  value={managerName}
-                  onChangeText={setManagerName}
-                />
+                {/* Branch Manager Selection (From Staff Management) */}
+                <View style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={styles.inputLabel}>
+                      {locale === 'en' ? 'BRANCH MANAGER' : 'PENGURUS CAWANGAN'}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (isCustomManager) {
+                          setIsCustomManager(false);
+                          const def = availableStaff[0];
+                          if (def) {
+                            setManagerName(def.name);
+                            if (def.phone) setPhone(def.phone);
+                            setSelectedStaffId(def.id);
+                          }
+                        } else {
+                          setIsCustomManager(true);
+                          setSelectedStaffId('');
+                        }
+                      }}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.toggleCustomText}>
+                        {isCustomManager 
+                          ? (locale === 'en' ? '← Choose from Staff' : '← Pilih Dari Staf') 
+                          : (locale === 'en' ? '+ Custom Name' : '+ Tulis Nama Manual')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {!isCustomManager && availableStaff.length > 0 ? (
+                    <View>
+                      {/* Selected Staff Card Trigger */}
+                      <TouchableOpacity
+                        style={styles.staffPickerTrigger}
+                        onPress={() => setShowStaffPickerModal(true)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <View style={styles.staffPickerAvatar}>
+                            <Text style={styles.staffPickerAvatarText}>
+                              {(managerName || 'P').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.staffPickerSelectedName} numberOfLines={1}>
+                                {managerName || (locale === 'en' ? 'Select a manager' : 'Pilih pengurus')}
+                              </Text>
+                              {availableStaff.find(s => s.name.trim().toLowerCase() === managerName.trim().toLowerCase())?.is_owner && (
+                                <View style={styles.ownerBadge}>
+                                  <Text style={styles.ownerBadgeText}>OWNER</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.staffPickerRoleText}>
+                              {availableStaff.find(s => s.name.trim().toLowerCase() === managerName.trim().toLowerCase())?.role_title || 
+                               (locale === 'en' ? 'Staff Member' : 'Staf Berdaftar')}
+                              {phone ? ` · ${phone}` : ''}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.staffPickerChevronBox}>
+                          <Ionicons name="swap-vertical" size={15} color="#000000" />
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Quick Select Horizontal Chips */}
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false} 
+                        contentContainerStyle={{ gap: 6, paddingTop: 8, paddingBottom: 2 }}
+                      >
+                        {availableStaff.map((staff) => {
+                          const isSelected = managerName.trim().toLowerCase() === staff.name.trim().toLowerCase();
+                          return (
+                            <TouchableOpacity
+                              key={staff.id}
+                              onPress={() => {
+                                setManagerName(staff.name);
+                                if (staff.phone) {
+                                  setPhone(staff.phone);
+                                }
+                                setSelectedStaffId(staff.id);
+                                setIsCustomManager(false);
+                              }}
+                              style={[styles.staffChip, isSelected && styles.staffChipActive]}
+                              activeOpacity={0.8}
+                            >
+                              <View style={[styles.staffChipDot, isSelected && styles.staffChipDotActive]} />
+                              <Text style={[styles.staffChipText, isSelected && styles.staffChipTextActive]}>
+                                {staff.name} {staff.is_owner ? '👑' : ''}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      placeholder={locale === 'en' ? 'e.g. Encik Farhan' : 'cth: Encik Farhan'}
+                      placeholderTextColor="#94A3B8"
+                      value={managerName}
+                      onChangeText={setManagerName}
+                    />
+                  )}
+                </View>
 
                 {/* Contact Phone */}
                 <Text style={styles.inputLabel}>{locale === 'en' ? 'CONTACT NUMBER' : 'NOMBOR TELEFON'}</Text>
@@ -1010,6 +1176,111 @@ export default function BranchesScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Staff Picker Sheet Modal */}
+        <Modal
+          visible={showStaffPickerModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowStaffPickerModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, isDesktop && { maxWidth: 460 }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {locale === 'en' ? 'Select Branch Manager' : 'Pilih Pengurus Cawangan'}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {locale === 'en' ? 'Registered staff from Staff Management' : 'Staf berdaftar dari Pengurusan Staf'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowStaffPickerModal(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color="#050505" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+                {availableStaff.map((staff) => {
+                  const isSelected = managerName.trim().toLowerCase() === staff.name.trim().toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={staff.id}
+                      style={[styles.staffItemRow, isSelected && styles.staffItemRowActive]}
+                      onPress={() => {
+                        setManagerName(staff.name);
+                        if (staff.phone) {
+                          setPhone(staff.phone);
+                        }
+                        setSelectedStaffId(staff.id);
+                        setIsCustomManager(false);
+                        setShowStaffPickerModal(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        <View style={[styles.staffPickerAvatar, isSelected && { backgroundColor: '#000000' }]}>
+                          <Text style={styles.staffPickerAvatarText}>
+                            {staff.name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={[styles.staffItemName, isSelected && { fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }]}>
+                              {staff.name}
+                            </Text>
+                            {staff.is_owner && (
+                              <View style={styles.ownerBadge}>
+                                <Text style={styles.ownerBadgeText}>OWNER</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.staffItemSubtitle}>
+                            {staff.role_title} {staff.phone ? `· ${staff.phone}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {isSelected ? (
+                        <View style={styles.selectedCheckWrap}>
+                          <Ionicons name="checkmark" size={14} color="#000000" />
+                        </View>
+                      ) : (
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* Option to enter custom name */}
+                <TouchableOpacity
+                  style={[styles.staffItemRow, { borderStyle: 'dashed', backgroundColor: '#FFFFFF', borderColor: '#CBD5E1', marginTop: 4 }]}
+                  onPress={() => {
+                    setIsCustomManager(true);
+                    setSelectedStaffId('');
+                    setShowStaffPickerModal(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <View style={[styles.staffPickerAvatar, { backgroundColor: '#F1F5F9' }]}>
+                      <Ionicons name="create-outline" size={16} color="#475569" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.staffItemName, { color: '#000000' }]}>
+                        {locale === 'en' ? 'Enter Custom Manager Name' : 'Tulis Nama Pengurus Manual'}
+                      </Text>
+                      <Text style={styles.staffItemSubtitle}>
+                        {locale === 'en' ? 'Type a name not in staff list' : 'Taip nama selain daripada senarai staf'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -1308,125 +1579,215 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  headerBleedBg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#050505',
-    zIndex: 0,
-  },
   safeArea: {
     flex: 1,
-    zIndex: 1,
   },
-  header: {
+  // ── Apple Pure White Sticky Header ──
+  stickyHeader: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    zIndex: 30,
+    paddingBottom: 8,
+  },
+  headerInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  backButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 6,
+    paddingRight: 8,
+    minWidth: 70,
+  },
+  backButtonText: {
+    fontSize: 14.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: -0.4,
+    color: '#000000',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    flex: 1,
   },
-  headerSubtitle: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
-  },
-  addHeaderBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#FFC700',
+  headerAddPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+    minWidth: 70,
     justifyContent: 'center',
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+  },
+  headerAddPillText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.2,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 110,
   },
-  tierBanner: {
-    backgroundColor: '#050505',
+  // ── Executive KPI Summary Card (Concept A) ──
+  kpiCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
+    padding: 18,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 199, 0, 0.3)',
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 4,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  tierBannerLeft: {
+  kpiHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  tierIconBadge: {
+  kpiIconBox: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 199, 0, 0.15)',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
-  tierBannerTitle: {
-    fontSize: 14,
+  kpiBrandTitle: {
+    fontSize: 14.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#000000',
+    letterSpacing: -0.2,
   },
-  businessPill: {
-    backgroundColor: '#FFC700',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  businessPillText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    letterSpacing: 0.5,
-  },
-  tierBannerDesc: {
+  kpiSubText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 4,
-    lineHeight: 16,
+    color: '#64748B',
+    marginTop: 1,
   },
+  quotaPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quotaPillText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: 0.2,
+  },
+  kpiMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  kpiMetricCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  kpiMetricLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  kpiMetricValue: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  kpiMetricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#F1F5F9',
+  },
+  distributionTrack: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 99,
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+  },
+  distributionLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  legendText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  // ── Section Header ──
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
     marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  sectionHeaderTitle: {
-    fontSize: 14,
+  sectionHeaderLabel: {
+    fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#64748B',
+    letterSpacing: 0.8,
+  },
+  countBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 6.5,
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+  },
+  refreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -1439,17 +1800,57 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#64748B',
   },
+  // ── Empty State ──
+  emptyContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptyDesc: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  // ── Registered Outlets ──
   branchCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1457,8 +1858,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   branchIconWrap: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
@@ -1467,13 +1868,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   hqIconWrap: {
-    backgroundColor: '#050505',
-    borderColor: '#050505',
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   branchName: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#000000',
   },
   hqBadge: {
     backgroundColor: '#FEF3C7',
@@ -1496,27 +1897,169 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  branchDetailsBox: {
+  // ── Apple Unified Grouped Inset (Pilihan 1) ──
+  unifiedInsetGroup: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-    gap: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 14,
+    overflow: 'hidden',
   },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  insetSection: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     gap: 8,
   },
-  detailText: {
+  insetSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  insetDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 14,
+  },
+  insetAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  insetTextPrimary: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+    lineHeight: 17,
+  },
+  insetTextPlaceholder: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+    fontStyle: 'italic',
+  },
+  insetMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  insetMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  insetTextSecondary: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+  insetTextBold: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#CBD5E1',
+  },
+  // Hardware & Review Pills in Row 2
+  standPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 8,
+  },
+  standPillText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  googleReviewActivePillUnified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 8,
+  },
+  googleReviewActiveTextUnified: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#B45309',
+  },
+  googleReviewAddPillUnified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 8,
+  },
+  googleReviewAddTextUnified: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  // Row 3 Onboarding Link
+  onboardingRowLeft: {
     flex: 1,
+    gap: 2,
+  },
+  onboardingRowTitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  onboardingRowSubtitle: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+  },
+  copyLinkBtnUnified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  copyLinkBtnTextUnified: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.5,
+  },
+  qrIconBtnUnified: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   performanceStrip: {
     flexDirection: 'row',
@@ -1533,40 +2076,41 @@ const styles = StyleSheet.create({
   },
   perfLabel: {
     fontSize: 9,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans_700Bold',
     color: '#94A3B8',
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   perfValue: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#000000',
     marginTop: 2,
   },
   perfDivider: {
     width: 1,
     height: 20,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
   },
   bigAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFC700',
+    backgroundColor: '#000000',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 15,
     marginTop: 16,
-    shadowColor: '#FFC700',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     elevation: 3,
   },
   bigAddBtnText: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#FFCC00',
   },
   modalOverlay: {
     flex: 1,
@@ -1661,14 +2205,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   saveBtn: {
-    backgroundColor: '#FFC700',
+    backgroundColor: '#000000',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FFC700',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 3,
     marginTop: 10,
@@ -1676,6 +2220,138 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: '#FFCC00',
+  },
+  // ── Staff Manager Selector Styles ──
+  toggleCustomText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
+    textDecorationLine: 'underline',
+  },
+  staffPickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  staffPickerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffPickerAvatarText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+  },
+  staffPickerSelectedName: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  staffPickerRoleText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  ownerBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  ownerBadgeText: {
+    fontSize: 8.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
+  staffPickerChevronBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 8,
+  },
+  staffChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  staffChipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#94A3B8',
+  },
+  staffChipDotActive: {
+    backgroundColor: '#FFCC00',
+  },
+  staffChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#475569',
+  },
+  staffChipTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  staffItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  staffItemRowActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#000000',
+    borderWidth: 1.5,
+  },
+  staffItemName: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
+  },
+  staffItemSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  selectedCheckWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

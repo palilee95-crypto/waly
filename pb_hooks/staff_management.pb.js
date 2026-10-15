@@ -1082,6 +1082,199 @@ routerAdd("POST", "/api/risev/merchant/staff/compensation", (e) => {
   });
 }, $apis.requireAuth("users"));
 
+// Staff Role & Compensation Tiers Management
+routerAdd("GET", "/api/risev/merchant/staff/roles", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized. Please log in first." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  let merchant;
+  try {
+    merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
+  } catch (err) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+
+  let merchantMeta = {};
+  try {
+    const rawM = merchant.get("metadata");
+    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+  } catch (mErr) {
+    merchantMeta = {};
+  }
+
+  let configuredRoles = Array.isArray(merchantMeta.staff_role_tiers) ? merchantMeta.staff_role_tiers : [];
+
+  // Query real staff members to attach real staff counts and derive roles if none exist
+  let staffMembers = [];
+  try {
+    staffMembers = $app.findRecordsByFilter(
+      "users",
+      `merchant_id = "${merchantId}" && id != "${merchant.getString("owner")}"`,
+      "-created",
+      200,
+      0
+    );
+  } catch (err) {}
+
+  let msList = [];
+  try {
+    msList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}"`, "-created", 200, 0);
+  } catch (err) {}
+
+  const realStaff = [];
+  const seenIds = {};
+
+  staffMembers.forEach(u => {
+    seenIds[u.id] = true;
+    let uMeta = {};
+    try {
+      const raw = u.get("metadata");
+      uMeta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+    } catch (e) {}
+
+    const matchingMs = msList.find(ms => ms.getString("user") === u.id || (ms.getString("phone") && ms.getString("phone") === u.getString("phone")));
+    const roleTitle = (matchingMs && matchingMs.getString("role_title")) || u.getString("role_title") || uMeta.role_title || "Staff";
+    const empType = u.getString("employment_type") || (matchingMs && matchingMs.getString("employment_type")) || uMeta.employment_type || "full_time";
+    const baseSalary = parseFloat(u.get("base_salary")) || (matchingMs ? parseFloat(matchingMs.get("base_salary")) : 0) || parseFloat(uMeta.base_salary) || 0;
+    const hourlyRate = parseFloat(u.get("hourly_rate")) || (matchingMs ? parseFloat(matchingMs.get("hourly_rate")) : 0) || parseFloat(uMeta.hourly_rate) || 0;
+    const commType = u.getString("commission_type") || (matchingMs && matchingMs.getString("commission_type")) || uMeta.commission_type || "none";
+    const commRate = parseFloat(u.get("commission_rate")) || (matchingMs ? parseFloat(matchingMs.get("commission_rate")) : 0) || parseFloat(uMeta.commission_rate) || 0;
+
+    realStaff.push({
+      id: u.id,
+      name: u.getString("name"),
+      avatar: u.getString("avatar"),
+      role_title: roleTitle,
+      employment_type: empType,
+      base_salary: baseSalary,
+      hourly_rate: hourlyRate,
+      commission_type: commType,
+      commission_rate: commRate
+    });
+  });
+
+  msList.forEach(ms => {
+    const linkedUser = ms.getString("user");
+    if (!linkedUser || !seenIds[linkedUser]) {
+      realStaff.push({
+        id: ms.id,
+        name: ms.getString("name"),
+        avatar: ms.getString("avatar"),
+        role_title: ms.getString("role_title") || "Staff",
+        employment_type: ms.getString("employment_type") || "full_time",
+        base_salary: parseFloat(ms.get("base_salary")) || 0,
+        hourly_rate: parseFloat(ms.get("hourly_rate")) || 0,
+        commission_type: ms.getString("commission_type") || "none",
+        commission_rate: parseFloat(ms.get("commission_rate")) || 0
+      });
+    }
+  });
+
+  // If no role tiers are configured yet, derive them from real staff
+  if (configuredRoles.length === 0 && realStaff.length > 0) {
+    const distinctRolesMap = {};
+    realStaff.forEach(s => {
+      const key = (s.role_title || "Staff").trim();
+      if (!distinctRolesMap[key.toLowerCase()]) {
+        distinctRolesMap[key.toLowerCase()] = {
+          id: 'role_' + key.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          title: key,
+          employment_type: s.employment_type || 'full_time',
+          base_salary: s.base_salary || 0,
+          hourly_rate: s.hourly_rate || 0,
+          commission_type: s.commission_type || 'none',
+          commission_rate: s.commission_rate || 0,
+          description: `Active store role (${s.employment_type === 'part_time' ? 'Hourly wage' : 'Monthly salary'})`
+        };
+      }
+    });
+    configuredRoles = Object.values(distinctRolesMap);
+  }
+
+  // Augment each role with real assigned staff count and assigned member details
+  const augmentedRoles = configuredRoles.map(role => {
+    const assigned = realStaff.filter(s => (s.role_title || '').trim().toLowerCase() === role.title.trim().toLowerCase());
+    return Object.assign({}, role, {
+      staff_count: assigned.length,
+      assigned_staff: assigned.map(a => ({
+        id: a.id,
+        name: a.name,
+        avatar: a.avatar
+      }))
+    });
+  });
+
+  return e.json(200, {
+    success: true,
+    roles: augmentedRoles,
+    total_staff_count: realStaff.length
+  });
+}, $apis.requireAuth("users"));
+
+// Save or update staff role tiers
+routerAdd("POST", "/api/risev/merchant/staff/roles", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized. Please log in first." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  let merchant;
+  try {
+    merchant = $app.findFirstRecordByData("merchants", "id", merchantId);
+  } catch (err) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const roleTiers = Array.isArray(body.role_tiers) ? body.role_tiers : [];
+
+  let merchantMeta = {};
+  try {
+    const rawM = merchant.get("metadata");
+    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+  } catch (mErr) {
+    merchantMeta = {};
+  }
+
+  const sanitized = roleTiers.map(r => ({
+    id: String(r.id || 'role_' + Date.now()),
+    title: String(r.title || '').trim(),
+    employment_type: r.employment_type === 'part_time' ? 'part_time' : 'full_time',
+    base_salary: parseFloat(r.base_salary) || 0,
+    hourly_rate: parseFloat(r.hourly_rate) || 0,
+    commission_type: ['percentage', 'fixed_per_job'].indexOf(r.commission_type) !== -1 ? r.commission_type : 'none',
+    commission_rate: parseFloat(r.commission_rate) || 0,
+    description: r.description ? String(r.description).trim() : ''
+  })).filter(r => r.title.length > 0);
+
+  merchantMeta.staff_role_tiers = sanitized;
+  merchant.set("metadata", JSON.stringify(merchantMeta));
+
+  try {
+    $app.save(merchant);
+  } catch (saveErr) {
+    return e.json(500, { message: "Failed to save role tiers: " + (saveErr.message || saveErr) });
+  }
+
+  return e.json(200, {
+    success: true,
+    message: "Staff roles successfully updated.",
+    roles: sanitized
+  });
+}, $apis.requireAuth("users"));
+
 // Monthly Commission Summary & Aggregation
 routerAdd("GET", "/api/risev/merchant/staff/commissions", (e) => {
   const authRecord = e.auth;
@@ -1147,7 +1340,9 @@ routerAdd("GET", "/api/risev/merchant/staff/commissions", (e) => {
       total_sales: 0,
       total_commission: 0,
       paid_commission: 0,
-      unpaid_commission: 0
+      unpaid_commission: 0,
+      bookings: [],
+      payouts: []
     };
   });
 
@@ -1192,7 +1387,9 @@ routerAdd("GET", "/api/risev/merchant/staff/commissions", (e) => {
           total_sales: 0,
           total_commission: 0,
           paid_commission: 0,
-          unpaid_commission: 0
+          unpaid_commission: 0,
+          bookings: [],
+          payouts: []
         };
       }
       const sSum = staffSummaryMap[staffId];
@@ -1203,6 +1400,27 @@ routerAdd("GET", "/api/risev/merchant/staff/commissions", (e) => {
         sSum.paid_commission += comm;
       } else {
         sSum.unpaid_commission += comm;
+      }
+
+      sSum.bookings.push({
+        id: b.id,
+        booking_code: meta.booking_code || ("#SRV-" + b.id.substring(0, 4).toUpperCase()),
+        date: b.getString("booking_date"),
+        time: b.getString("start_time") || "",
+        amount: bill,
+        commission_amount: comm,
+        commission_rate: sSum.commission_rate,
+        status: meta.commission_payout_status || "unpaid",
+        paid_at: meta.commission_paid_at || ""
+      });
+
+      if (isPaid && meta.commission_paid_at) {
+        sSum.payouts.push({
+          id: b.id,
+          booking_code: meta.booking_code || ("#SRV-" + b.id.substring(0, 4).toUpperCase()),
+          amount: comm,
+          paid_at: meta.commission_paid_at
+        });
       }
     }
   });

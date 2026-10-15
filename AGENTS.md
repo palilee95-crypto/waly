@@ -31,8 +31,8 @@ components/               NotificationBanner (animated overlay), NfcClaimModal (
 theme/                    Design tokens (colors, spacing, radii, shadows, layout)
 assets/                   App icons, splash, logo, mascot
 public/                   Web PWA manifest, favicon
-pb_hooks/                 PocketBase JS hooks (35 files — routes, automation, WhatsApp, payments, loyalty, agents, nfc)
-pb_migrations/            PocketBase collection migrations (32 files, chronological)
+pb_hooks/                 PocketBase JS hooks (55 files — routes, automation, WhatsApp, booking, campaigns, hardware/NFC, payments, loyalty, intelligence)
+pb_migrations/            PocketBase collection migrations (80 files, chronological)
 pb_schema.json            Schema snapshot
 docker-compose.yml        Full VPS stack (caddy, pocketbase, evolution-db, evolution-go, redis, litestream, payment-bot, portainer)
 evolution_db_init/        Postgres init.sql (creates evogo_auth + evogo_users)
@@ -155,19 +155,28 @@ If you ever re-add a pooler, do NOT put evolution-go behind it.
 - **Give** (`give.tsx`): QR scanner (expo-camera) + manual phone/voucher code entry, bill amount + stamps input, voucher redemption (WV-/RV- codes), customer lookup, self-issuance prevention
 - **Customers** (`customers.tsx`): Transaction list with search + type filters, customer detail modal (profile, cards, vouchers, visits), CSV export (3 options)
 - **Marketing** (`marketing.tsx`): Loyalty program config (stamp goal, expiry, reward), card design (colors, icons, background image, live preview), points & tiers explanation, broadcast blast (template variables `{{name}}`, `{{stamps}}`), auto follow-up rules, broadcast history, campaign promotions (double points, bonus stamps)
-- **Rewards** (`rewards.tsx`): 3 tabs — Catalogue (CRUD for rewards: free_item/discount/experience/cash_credit), Card Design, Points & Tiers
+- **Rewards** (`rewards.tsx`): 5-Tab Executive Architecture —
+  1. *Catalogue* (CRUD for rewards: free_item, discount, BOGO, happy_hour, etc., with airline Boarding Pass cards and color-coded vertical spines).
+  2. *Card Design* (Live card customizer, stamp colors, background image, font colors, quick inline reward creator).
+  3. *Stamp Rule* (Stamp target goal, expiry duration, bonus stamps).
+  4. *Point Rule / Points Studio* (`points_tiers`: Apple FinTech minimal formula capsule, 1-row segmented quick pills for earn rates and cash redemption rates, minimum redeem points & max cap % per bill).
+  5. *Birthday* (Automated birthday reward campaigns, schedule time, custom birthday message).
+  - **Tab Permanence Architecture**: Toggling off Points hides only `points_tiers`; the `catalogue` (Reward) tab remains permanently active for vouchers.
+  - **Stand Hardware vs. PRO Plan**: Stand NFC merchants (counter tap quota) use decoupled manual item inputs (`applicable_items_text`) for visual/NFC counter claims; PRO Plan unlocks 8 Smart Growth Campaign Recipes (`PRO_CAMPAIGN_RECIPES` — BOGO, Happy Hour, Flash Sale, Welcome Gift, Bring A Friend, We Miss You, Spend & Save, Festive Special) with interactive Paywall modals and dynamic smart controls (time presets, countdown timers, spend tier calculator).
 - **Staff** (`staff.tsx`): Add/remove staff by phone number via `GET/POST/DELETE /api/risev/merchant/staff`
-- **Profile** (`profile.tsx`): WhatsApp connection (QR modal with exponential backoff polling), edit store (logo, banner, name, category, GPS with Leaflet map), operating hours (per-day toggles), change password, language switcher, switch to customer mode
+- **Profile** (`profile.tsx`): WhatsApp connection (QR modal with exponential backoff polling), edit store profile (logo, banner, name, structured address/postcode, category via `AllCategoriesModal`, GPS Leaflet map, monthly sales goal, customer win-back alert), operating hours (per-day toggles), change password, language switcher, switch to customer mode
 
 ### Key Patterns
 - **Dual role system**: Users can be both customer and merchant. `activeRole` determines which UI is shown. Role switching persisted in storage.
-- **Subscription gating**: 7-day free trial (`status: 'pending'`), ChipIn payment webhook activates subscription, `subscription_enforce.pb.js` blocks operations for non-active merchants. Pricing with duration discounts (1/3/6/9/12 months) + promo codes.
+- **UI/UX Design System**: Single Source of Truth documented in `DESIGN_UI_UX_MEMORY.md` (Apple Wallet × Fresha × Risev Signature, Rule of Three: `#FFFFFF`, `#000000`, `#FFCC00`).
+- **Boarding Pass Ticket Metaphor**: Airline boarding pass voucher styling with color-coded vertical spines (`getVoucherSpineTheme`), ticket punch notches, perforated dashed dividers, and live preview synchronization across customer and merchant screens.
+- **Subscription gating**: 7-day free trial (`status: 'pending'`), ChipIn payment webhook activates subscription, `subscription_enforce.pb.js` blocks operations for non-active merchants. PRO tier unlocks 8 Smart Campaign Recipes, booking/service catalog, and automated POS calculation. Pricing with duration discounts (1/3/6/9/12 months) + promo codes.
 - **Realtime**: PocketBase SSE subscriptions for live updates on transactions, loyalty cards, vouchers, and notifications.
 - **Self-healing**: AuthContext auto-creates missing merchant profiles. WhatsApp status endpoint auto-recovers corrupted instances (403 → delete + recreate).
 - **i18n**: Full English + Bahasa Malaysia via LanguageContext (403 translation keys).
 - **Responsive**: Desktop (>768px) shows sidebar navigation; mobile shows bottom tab bars. Content max-widths center on desktop.
 
-## PocketBase Hooks (35 files)
+## PocketBase Hooks (55 files)
 
 Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.js`:
 
@@ -181,14 +190,17 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 - `otp_send.pb.js` — `GET /api/risev/check-phone`, `POST /api/risev/register`, `POST /api/risev/request-otp`
 - `complete_onboarding.pb.js` — `POST /api/risev/onboarding/complete` (updates name/email, verifies user, returns new JWT)
 - `auto_verify_users.pb.js` — Auto-verifies user emails
+- `protect_users.pb.js` — Security hook: protects user records against unauthorized privilege escalation
 
 ### Staff Management
 - `staff_management.pb.js` — `GET/POST/DELETE /api/risev/merchant/staff` (owner-only)
 
 ### Payment & Subscription
 - `chipin_webhook.pb.js` — `POST /api/risev/chipin-webhook` (activates merchant, creates subscription with 30-day period)
+- `subscription_checkout.pb.js` — Route: `POST /api/risev/merchant/subscription/checkout` (creates automated checkout sessions)
 - `subscription_enforce.pb.js` — `onRecordCreate` hook: blocks transactions/programs/rewards for non-active merchants (allows 7-day trial)
 - `sync_merchant_subscription.pb.js` — Syncs merchant status from subscription changes
+- `pricing_admin.pb.js` — Admin API routes: `GET/POST /api/risev/admin/pricing` (dynamic plan pricing & promo configuration)
 
 ### Loyalty, Stamps & Points
 - `stamp_complete.pb.js` — `onRecordUpdate` on loyalty_cards: when stamps reach goal → reset stamps, increment completions, issue voucher (`WV-XXXX-XXXX`)
@@ -198,6 +210,21 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 - `tier_recalculate.pb.js` — Recalculates customer tiers based on spending
 - `velocity_check.pb.js` — Rate limiting for stamp issuance
 - `manual_give.pb.js` — Route: `POST /api/risev/merchant/give-manual` (allows manual stamp/points issuance via customer phone number lookup)
+- `backfill_transactions.pb.js` — Data repair / transaction backfill utility
+
+### Campaign & Voucher Engines
+- `campaign_vouchers.pb.js` — Route: `POST /api/risev/campaigns/claim` (Smart campaign validation, recipe constraints, promo voucher issuance)
+
+### Booking & Salon Services
+- `booking_system.pb.js` — Routes: `GET/POST/PUT/DELETE /api/risev/bookings` (Service catalog, slot availability, staff schedules, customer appointments)
+- `booking_helper.js` — Core booking validation, duration overlaps, conflict resolution
+- `booking_reminders.pb.js` — Automated cron for WhatsApp/push appointment reminders
+- `booking_reminders_logic.js` — Reminder delivery calculation (24h / 2h before appointment)
+
+### Customer Management & Intelligence
+- `customer_management.pb.js` — Routes: `GET/POST /api/risev/merchant/customers` (Advanced customer listing, segmented filtering, manual visit adjustments)
+- `intelligence_api.pb.js` — Route: `GET /api/risev/merchant/intelligence` (Merchant analytics, customer churn alerts, basket size predictions)
+- `resolve_google_review.pb.js` — Route: `GET /api/risev/feedback/route` (Smart review filtering: 4-5 stars → Google Reviews redirect; 1-3 stars → private merchant feedback)
 
 ### Sales Agents & Prospects
 - `agent_click.pb.js` — Route: `GET /api/risev/agent/click` (tracks referral link click count)
@@ -206,17 +233,21 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 - `merchant_referral.pb.js` — Hook: `onRecordCreate` on `merchants` (links new merchant to its referring agent)
 - `sales_agent_signup.pb.js` — Hook: `onRecordCreate` on `sales_agents` (initializes defaults and referral code)
 
-### NFC & QR Scanning
+### Hardware Stand, NFC & J&T Delivery
 - `nfc_request.pb.js` — Route: `POST /api/risev/nfc/request` (submits customer NFC stamp request via web landing page)
 - `nfc_transaction.pb.js` — Route: `POST /api/risev/nfc/complete` (completes an NFC claim with merchant confirmation)
 - `quick_register.pb.js` — Route: `POST /api/risev/qr/quick-register` (frictionless Name + Phone registration for QR scanning)
+- `redeem_stand_code.pb.js` — Route: `POST /api/risev/hardware/redeem-code` (Activation code verification & stand binding)
+- `resolve_stand.pb.js` — Route: `GET /api/risev/stand/:code` (Resolves physical counter stand QR/NFC metadata)
+- `jnt.pb.js` — Route: `POST /api/risev/admin/shipping/jnt` (J&T Express shipping airway bill generation for Stand hardware kits)
 
 ### Birthday Rewards
 - `birthday.pb.js` — Cron Route: `GET /api/risev/cron/birthdays` (runs daily birthday campaigns and auto-issues vouchers)
 
-### Notifications
+### Notifications & Push
 - `notification_helper.js` — Creates notification records in `notifications` collection
 - `push_notify.js` — Sends Expo push notifications via `exp.host/--/api/v2/push/send`, auto-cleans invalid tokens
+- `push_api.pb.js` — Route: `POST /api/risev/notifications/push-test` & WebPush subscriptions management
 - `welcome_notification.pb.js` — Sends welcome notification on user creation
 
 ### Access Control & Validation
@@ -226,7 +257,13 @@ Routes are registered via `routerAdd(method, path, handler)` in `pb_hooks/*.pb.j
 
 ### Engine / Sequence Automation
 - `smart_follow_up.js` — Helper/runner: called by cron (every 5 minutes) to run automated multi-step follow-up message sequences
+- `smart_follow_up_api.pb.js` — Routes: `GET/POST /api/risev/merchant/follow-up` (Sequence builder, condition rules, broadcast history)
+- `smart_follow_up_enroll.pb.js` — Hook: `onRecordCreate` on `transactions` / `customer_events` (auto-enrolls customers into smart sequences)
 - `cascade_delete_user.pb.js` — Hook: `onRecordDelete` on `users` (cleans up all merchant/customer relations to prevent schema violations)
+
+### System Settings & Infra
+- `system_settings.pb.js` — Global configuration cache & feature flags getter
+- `smtp_env.pb.js` — Dynamic SMTP mailer injector from environment variables
 
 Hooks hot-reload when the files change on disk — no PocketBase restart needed. But if you change `docker-compose.yml`, run `docker compose up -d` (add `--force-recreate <service>` to recreate a specific container).
 
@@ -264,14 +301,37 @@ Daily cron (10 AM) in automation_runner.pb.js
 
 ## Theme / Design Tokens
 
-Defined in `theme/index.ts`:
-- **Colors**: Primary (royal purple `#5C3BCC`), Accent (amber gold `#F4A825`), Dark/Light surfaces, Semantic (success/warning/error/info), Text hierarchy, Stamp colors
-- **Spacing**: 0–128 scale
-- **Radii**: none to full (9999)
-- **Shadows**: sm/md/lg/xl presets
-- **Layout**: Screen padding, header/tab bar/button/input heights, stamp card dimensions, avatar sizes
+Single Source of Truth documented in `DESIGN_UI_UX_MEMORY.md` and implemented in `theme/index.ts`:
 
-## pb_migrations (32 files, chronological)
+### The Rule of Three (Brand Color Palette)
+- **Primary / Dominant Surface**: Pure Crisp White (`#FFFFFF`) — Clean, airy, spacious canvas.
+- **Secondary / High-Contrast Structural**: Deep Midnight Black (`#000000`, surface dark `#0A0A0C` to `#16161A`) — Solid typography, high-contrast badges, tactile primary CTA buttons.
+- **Accent / Dynamic Energy**: Electric Amber / Risev Accent (`#FFCC00`, primary purple `#5C3BCC`, warning amber `#F4A825`) — VIP badges, loyalty stamps, conversion triggers.
+
+### Boarding Pass Airline Spine System (`getVoucherSpineTheme`)
+Curated 10-color vertical spine system for voucher cards, auto-adapting border, background, and high-contrast vertical title text:
+1. `purple`: `#5C3BCC` (Default Risev Signature)
+2. `emerald`: `#10B981` (Free Item / Refreshment)
+3. `amber`: `#F59E0B` (Happy Hour / Timed)
+4. `rose`: `#EF4444` (Flash Sale / Urgency)
+5. `pink`: `#EC4899` (Welcome Gift / First-Timer)
+6. `cyan`: `#06B6D4` (Bring A Friend / Social)
+7. `violet`: `#8B5CF6` (VIP / Repeat Customer)
+8. `orange`: `#F97316` (We Miss You / Win-Back)
+9. `teal`: `#14B8A6` (Spend & Save / Basket Booster)
+10. `indigo`: `#6366F1` (Festive Special / Seasonal)
+
+### PRO Campaign Recipes (`PRO_CAMPAIGN_RECIPES`)
+8 growth campaign formulas with preset voucher spines, discounts, and copy formulas:
+- `bogo` (Buy 1 Free 1), `happy_hour` (Time-decay off-peak), `flash_sale` (Short-window rush), `welcome_gift` (First visit friction remover), `bring_a_friend` (Viral referral booster), `we_miss_you` (30-day churn winback), `spend_and_save` (Tiered basket booster), `festive_special` (Holiday/Merdeka flash reward).
+
+### Spacing, Radii, Shadows & Typography
+- **Spacing**: 0–128 geometric scale (`theme.spacing`)
+- **Radii**: Smooth curves from `sm` (6px) to `full` (9999px pill)
+- **Shadows**: Premium multi-layer presets (`theme.shadows.sm`, `md`, `lg`, `xl`)
+- **Typography**: Inter / Outfit / System sans-serif with strict semantic weights (`400`, `600`, `700`, `800`, `900`)
+
+## pb_migrations (80 files, chronological)
 
 1. `1782000000_collections_snapshot.js` — Initial schema snapshot
 2. `1782806195_updated_users.js` — User collection updates
@@ -305,6 +365,54 @@ Defined in `theme/index.ts`:
 30. `1782807027_create_nfc_claims.js` — Created nfc_claims collection
 31. `1782807028_add_merchant_bg_image.js` — Card background image field configuration
 32. `1782807029_add_merchant_bg_image_v2.js` — Refinement of card background image configurations
+33. `1782807030_add_sales_agent_tier_rates.js` — Sales agent commission tier percentage rates
+34. `1782807030_allow_draft_nfc_claims_status.js` — Draft status support on NFC claims
+35. `1782807031_add_sales_agent_tier_thresholds.js` — Tier qualification thresholds for sales agents
+36. `1782807032_create_whatsapp_configurations.js` — Dedicated WhatsApp instance configurations collection
+37. `1782807033_add_card_background_back.js` — Restored loyalty card back background field
+38. `1782807033_create_system_settings.js` — System configuration collection for feature toggles & global limits
+39. `1782807034_create_branches.js` — Multi-branch outlet management collection
+40. `1782807035_add_branch_to_users_and_update_plans.js` — User branch associations and branch plan limit flags
+41. `1782807036_fix_branches_id_autogenerate.js` — Standardized branches collection ID autogeneration pattern
+42. `1782807037_backfill_hq_branches.js` — Backfilled default HQ branch for existing merchants
+43. `1782807038_create_activation_codes.js` — Physical NFC stand activation code collection
+44. `1782807039_create_hardware_orders.js` — Hardware stand purchase orders & tracking collection
+45. `1782807040_seed_pricesettings02.js` — Seeded pricing settings for tiered subscription billing
+46. `1782807041_update_pricing_settings_rules.js` — Security rules for pricing settings administration
+47. `1782807042_create_store_feedbacks_and_google_review.js` — Feedback collection and Google Review funnel config
+48. `1782807043_allow_negative_bill_amount.js` — Allowed negative bill amounts for transaction corrections/refunds
+49. `1782807044_allow_transactions_delete.js` — Merchant owner permissions for transaction deletion
+50. `1782807045_fix_store_feedbacks_id_autogenerate.js` — Feedback collection ID autogeneration fix
+51. `1782807046_add_inactive_threshold_days.js` — Inactivity threshold setting for win-back automations
+52. `1782807047_harden_collection_security_rules.js` — Hardened API access rules across all core collections
+53. `1782807048_add_staff_to_transactions.js` — Recorded staff member ID on transaction records
+54. `1782807049_allow_staff_view_subscriptions.js` — Granted staff read permissions on merchant subscription status
+55. `1782807050_add_remark_to_activation_codes.js` — Admin remark field on hardware activation codes
+56. `1782807050_create_push_subscriptions.js` — WebPush subscription endpoint registry collection
+57. `1782807051_backfill_nfc_transactions.js` — Backfilled transaction records for historical NFC claims
+58. `1782807052_add_loyalty_mode_toggles.js` — Added independent `enable_stamps` and `enable_points` switches
+59. `1782807053_add_spend_per_point.js` — Configurable spend-per-point ratio in loyalty programs
+60. `1782807054_enable_all_existing_loyalty_modes.js` — Enabled dual stamp and points mode on existing loyalty programs
+61. `1782807055_create_booking_system_collections.js` — Created merchant_services, service_bookings, service_staff collections
+62. `1782807056_add_image_to_merchant_services.js` — Service hero image field in merchant services
+63. `1782807057_add_avatar_to_merchant_staff.js` — Staff profile avatar image in booking service staff
+64. `1782807058_allow_customers_view_service_bookings.js` — Customer read rules for their own appointment bookings
+65. `1782807059_add_merchant_booking_vip_opt_in.js` — VIP booking priority and auto-confirmation flags
+66. `1782807060_create_customer_events.js` — Created customer_events audit collection for behavioral triggers
+67. `1782807060_update_merchant_services_booking_models.js` — Added deposit, duration buffers, and booking policies
+68. `1782807061_create_user_recommendation_cache.js` — Machine-learning / AI customer recommendation cache collection
+69. `1782807062_refactor_rewards_and_programs_schema.js` — Refactored rewards schema for standalone catalog items
+70. `1782807063_backfill_program_linked_rewards.js` — Migrated legacy embedded reward configurations to standalone rewards
+71. `1782807064_structured_rewards_and_eligible_items.js` — Structured voucher discount fields, min spend, and item scoping
+72. `1782807070_add_reward_visual_id.js` — Added visual identifiers and icon tokens to rewards
+73. `1782807071_update_email_templates.js` — Refreshed system email templates with branded transactional layouts
+74. `1782807072_add_assigned_staff_to_merchant_services.js` — Multi-staff assignment relation on merchant services
+75. `1782807072_add_push_reminders_support.js` — Push reminder tracking fields on service bookings
+76. `1782807073_add_min_spend_to_loyalty_programs.js` — Added minimum qualifying spend per stamp requirement
+77. `1782807074_add_commission_to_merchant_services.js` — Staff commission percentage field on service catalog
+78. `1782807075_add_merchant_allow_staff_selection.js` — Merchant setting allowing customers to pick preferred staff
+79. `1782807076_add_points_redemption_to_loyalty_programs.js` — Added `points_per_rm`, `min_redeem_points`, `max_redeem_percent`, `enable_points`
+80. `1782807077_add_applicable_items_text_and_scope_to_rewards.js` — Added `applicable_items_text` and `discount_scope` fields for decoupled Stand vs PRO voucher creation
 
 ## VPS Operations Cheat Sheet
 
@@ -357,6 +465,10 @@ docker exec risev-evolution-go env | grep POSTGRES
 
 ## Key Files to Reference
 
+- `UI_UX_AGENTS.md` — Multi-agent UI/UX studio protocol (Orchestra, Copywriter, UI Craft, UX Architect, Technical Impact, Token Sentinel, Motion, Edge Case).
+- `DESIGN_UI_UX_MEMORY.md` — Single Source of Truth for UI/UX, Rule of Three, Boarding Pass voucher system, 5-Tab executive architecture, Stand vs PRO plan decoupling, Paywalls.
+- `theme/index.ts` — Design tokens, color palette, `getVoucherSpineTheme` (10-color vertical spine system), `PRO_CAMPAIGN_RECIPES` (8 growth formulas).
+- `app/(merchant)/rewards.tsx` — 5-Tab Executive Architecture (Catalogue, Card Design, Stamp Rule, Points Studio, Birthday), Smart Campaign dynamic controls, PRO paywall modal.
 - `docker-compose.yml` — the entire VPS stack; DSNs for evolution-go (must stay direct to evolution-db:5432).
 - `pb_hooks/whatsapp_helper.js` — Evolution Go proxy + circuit breakers; `callEvo()`, `getInstanceToken()`, `sendTextMessage()`.
 - `pb_hooks/blast_message.pb.js` — WhatsApp status/QR/disconnect/blast routes + webhook receiver.

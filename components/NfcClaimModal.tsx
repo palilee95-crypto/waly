@@ -1503,6 +1503,8 @@ export default function NfcClaimModal() {
                               ? `RM ${discVal} OFF`
                               : 'FREE ITEM';
 
+                            const applicableText = meta.applicable_items_text || v.expand?.reward?.applicable_items_text;
+
                             return (
                               <View key={v.id} style={[styles.figmaVoucherItemRow, isApplied && styles.figmaVoucherItemApplied]}>
                                 <View style={{ flex: 1, paddingRight: 6 }}>
@@ -1512,6 +1514,11 @@ export default function NfcClaimModal() {
                                       <Text style={styles.figmaTagText}>{badgeText}</Text>
                                     </View>
                                   </View>
+                                  {applicableText ? (
+                                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309', marginTop: 2 }}>
+                                      📌 {discType === 'none' || v.expand?.reward?.type === 'free_item' ? `Item: ${applicableText}` : `Sah: ${applicableText}`}
+                                    </Text>
+                                  ) : null}
                                   <Text style={styles.figmaVoucherCode}>Code: {v.code}</Text>
                                 </View>
 

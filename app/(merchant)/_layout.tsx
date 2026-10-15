@@ -28,8 +28,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   const isDesktop = width >= 768;
 
   const currentRoute = state.routes[state.index]?.name;
-  // Hide tab bar on sub-screens like subscription paywall, nfc-marketplace, or profile onboarding
-  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace' || currentRoute === 'profile-onboarding') {
+  // Hide tab bar on sub-screens like subscription paywall, nfc-marketplace, profile onboarding, edit-profile, branches, staff, or rewards
+  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace' || currentRoute === 'profile-onboarding' || currentRoute === 'edit-profile' || currentRoute === 'branches' || currentRoute === 'staff' || currentRoute === 'rewards') {
     return null;
   }
 
@@ -958,7 +958,7 @@ export default function MerchantLayout() {
     );
   }
 
-  const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding');
+  const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding') || pathname.includes('edit-profile') || pathname.includes('branches') || pathname.includes('staff');
 
   return (
     <View style={styles.container}>
@@ -976,14 +976,14 @@ export default function MerchantLayout() {
         <Tabs.Screen name="marketing" />
         <Tabs.Screen name="profile" />
         <Tabs.Screen name="profile-onboarding" options={{ href: null, tabBarStyle: { display: 'none' } }} />
-        <Tabs.Screen name="staff" options={{ href: null }} />
+        <Tabs.Screen name="staff" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />
         <Tabs.Screen name="subscription" options={{ href: null }} />
         <Tabs.Screen name="nfc-marketplace" options={{ href: null }} />
         <Tabs.Screen name="analytics" options={{ href: null }} />
-        <Tabs.Screen name="branches" options={{ href: null }} />
+        <Tabs.Screen name="branches" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="create-template" options={{ href: null }} />
-        <Tabs.Screen name="edit-profile" options={{ href: null }} />
+        <Tabs.Screen name="edit-profile" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="onboarding-setup" options={{ href: null }} />
         <Tabs.Screen name="whatsapp-integration" options={{ href: null }} />
         <Tabs.Screen name="bookings" options={{ href: null }} />
@@ -991,52 +991,48 @@ export default function MerchantLayout() {
       <NfcClaimModal />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && (
+      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && (
         <TouchableOpacity
-          activeOpacity={0.8}
-        onPress={() => {
-          if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
-          } else {
-            Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.');
-          }
-        }}
-        style={{
-          position: 'absolute',
-          bottom: isDesktop ? 40 : 100,
-          right: 24,
-          shadowColor: '#050505',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
-          elevation: 8,
-          zIndex: 9999,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          borderBottomLeftRadius: 28,
-          borderBottomRightRadius: 8, // Chat bubble tail
-          overflow: 'hidden', // Important for BlurView
-          borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.4)', // Glass edge reflection
-        }}
-      >
-        <BlurView
-          intensity={60}
-          tint="light"
+          activeOpacity={0.85}
+          onPress={() => {
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
+            } else {
+              Linking.openURL('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.');
+            }
+          }}
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            backgroundColor: 'rgba(255, 199, 0, 0.75)', // Risev yellow glass
+            position: 'absolute',
+            bottom: isDesktop ? 36 : 82,
+            right: 16,
+            shadowColor: '#050505',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.18,
+            shadowRadius: 10,
+            elevation: 8,
+            zIndex: 9999,
+            borderRadius: 999,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: '#F2BD00',
+            backgroundColor: '#FFCC00',
           }}
         >
-          <Ionicons name="chatbubble-ellipses" size={20} color="#050505" />
-          <Text style={{ color: '#050505', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, letterSpacing: 0.3, marginLeft: 8 }}>
-            {locale === 'en' ? 'Need Help?' : 'Perlu Bantuan?'}
-          </Text>
-        </BlurView>
-      </TouchableOpacity>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 9,
+              paddingHorizontal: 15,
+              gap: 7,
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses" size={17} color="#000000" />
+            <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, letterSpacing: 0.2 }}>
+              {locale === 'en' ? 'Need Help?' : 'Perlu Bantuan?'}
+            </Text>
+          </View>
+        </TouchableOpacity>
       )}
     </View>
   );

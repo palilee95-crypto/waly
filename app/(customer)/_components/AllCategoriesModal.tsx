@@ -7,9 +7,10 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '@/context/LanguageContext';
 
 export type CategoryItemType = {
   id: string;
@@ -19,59 +20,270 @@ export type CategoryItemType = {
   bg: string;
   color: string;
   merchantCount?: number;
+  descEn?: string;
+  descMs?: string;
 };
 
 export const ALL_CATEGORIES_LIST: CategoryItemType[] = [
   // 💈 Grooming & Beauty
-  { id: 'barber', name: 'Barber', group: 'Grooming & Beauty', icon: 'cut', bg: '#FEF9C3', color: '#0F172A', merchantCount: 14 },
-  { id: 'beauty', name: 'Beauty & Salon', group: 'Grooming & Beauty', icon: 'flower-outline', bg: '#FCE7F3', color: '#DB2777', merchantCount: 18 },
-  { id: 'spa', name: 'Spa & Massage', group: 'Grooming & Beauty', icon: 'sparkles-outline', bg: '#F3E8FF', color: '#7C3AED', merchantCount: 8 },
-  { id: 'muslimah_spa', name: 'Muslimah Spa', group: 'Grooming & Beauty', icon: 'heart-outline', bg: '#FDF2F8', color: '#BE185D', merchantCount: 6 },
+  { 
+    id: 'barber', 
+    name: 'Barber', 
+    group: 'Grooming & Beauty', 
+    icon: 'cut', 
+    bg: '#FEF9C3', 
+    color: '#0F172A', 
+    merchantCount: 14,
+    descEn: "Haircut, beard trim & men's grooming",
+    descMs: "Gunting rambut, janggut & dandanan lelaki",
+  },
+  { 
+    id: 'beauty', 
+    name: 'Beauty & Salon', 
+    group: 'Grooming & Beauty', 
+    icon: 'flower-outline', 
+    bg: '#FCE7F3', 
+    color: '#DB2777', 
+    merchantCount: 18,
+    descEn: "Hair styling, facial & manicure",
+    descMs: "Salun rambut, rawatan muka & kuku",
+  },
+  { 
+    id: 'spa', 
+    name: 'Spa & Massage', 
+    group: 'Grooming & Beauty', 
+    icon: 'sparkles-outline', 
+    bg: '#F3E8FF', 
+    color: '#7C3AED', 
+    merchantCount: 8,
+    descEn: "Body massage & reflexology therapy",
+    descMs: "Urutan badan, refleksologi & terapi",
+  },
+  { 
+    id: 'muslimah_spa', 
+    name: 'Muslimah Spa', 
+    group: 'Grooming & Beauty', 
+    icon: 'heart-outline', 
+    bg: '#FDF2F8', 
+    color: '#BE185D', 
+    merchantCount: 6,
+    descEn: "Women-only spa & private treatments",
+    descMs: "Spa khusus wanita & rawatan privasi",
+  },
 
-  // ☕ Food & Beverages
-  { id: 'cafe', name: 'Cafe & Bakery', group: 'Food & Drinks', icon: 'cafe', bg: '#FFEDD5', color: '#C2410C', merchantCount: 26 },
-  { id: 'restaurant', name: 'Restaurant', group: 'Food & Drinks', icon: 'restaurant', bg: '#FEE2E2', color: '#DC2626', merchantCount: 32 },
-  { id: 'dessert', name: 'Dessert & Ice Cream', group: 'Food & Drinks', icon: 'ice-cream-outline', bg: '#FFF7ED', color: '#EA580C', merchantCount: 12 },
-  { id: 'beverage', name: 'Beverage Bar', group: 'Food & Drinks', icon: 'wine-outline', bg: '#ECFDF5', color: '#059669', merchantCount: 9 },
+  // ☕ Food & Drinks
+  { 
+    id: 'cafe', 
+    name: 'Cafe & Bakery', 
+    group: 'Food & Drinks', 
+    icon: 'cafe', 
+    bg: '#FFEDD5', 
+    color: '#C2410C', 
+    merchantCount: 26,
+    descEn: "Coffee, pastry, cakes & all-day brunch",
+    descMs: "Kopi, pastri, kek & sarapan santai",
+  },
+  { 
+    id: 'restaurant', 
+    name: 'Restaurant', 
+    group: 'Food & Drinks', 
+    icon: 'restaurant', 
+    bg: '#FEE2E2', 
+    color: '#DC2626', 
+    merchantCount: 32,
+    descEn: "Dine-in meals, local & western delights",
+    descMs: "Hidangan santapan, masakan tempatan & barat",
+  },
+  { 
+    id: 'dessert', 
+    name: 'Dessert & Ice Cream', 
+    group: 'Food & Drinks', 
+    icon: 'ice-cream-outline', 
+    bg: '#FFF7ED', 
+    color: '#EA580C', 
+    merchantCount: 12,
+    descEn: "Ice cream, waffles, boba & sweets",
+    descMs: "Aiskrim, wafel, boba & pemanis mulut",
+  },
+  { 
+    id: 'beverage', 
+    name: 'Beverage Bar', 
+    group: 'Food & Drinks', 
+    icon: 'wine-outline', 
+    bg: '#ECFDF5', 
+    color: '#059669', 
+    merchantCount: 9,
+    descEn: "Fresh juices, fruit smoothies & tea",
+    descMs: "Jus segar, smoothie buah & aneka teh",
+  },
 
   // 🚘 Automotive
-  { id: 'carwash', name: 'Car Wash & Detailing', group: 'Automotive', icon: 'car-sport', bg: '#E0F2FE', color: '#0284C7', merchantCount: 15 },
-  { id: 'workshop', name: 'Workshop & Repair', group: 'Automotive', icon: 'build-outline', bg: '#F1F5F9', color: '#334155', merchantCount: 11 },
+  { 
+    id: 'carwash', 
+    name: 'Car Wash & Detailing', 
+    group: 'Automotive', 
+    icon: 'car-sport', 
+    bg: '#E0F2FE', 
+    color: '#0284C7', 
+    merchantCount: 15,
+    descEn: "Car wash, detailing, wax & coating",
+    descMs: "Basuhan kereta, detailing & salutan wax",
+  },
+  { 
+    id: 'workshop', 
+    name: 'Workshop & Repair', 
+    group: 'Automotive', 
+    icon: 'build-outline', 
+    bg: '#F1F5F9', 
+    color: '#334155', 
+    merchantCount: 11,
+    descEn: "Vehicle repair, tyre service & parts",
+    descMs: "Baiki kenderaan, servis tayar & alat ganti",
+  },
 
   // 🏋️ Fitness & Lifestyle
-  { id: 'gym', name: 'Gym & Fitness', group: 'Fitness & Lifestyle', icon: 'barbell-outline', bg: '#E0E7FF', color: '#4338CA', merchantCount: 7 },
-  { id: 'sports', name: 'Sports Venue', group: 'Fitness & Lifestyle', icon: 'trophy-outline', bg: '#FEF3C7', color: '#B45309', merchantCount: 5 },
-  { id: 'optician', name: 'Optical & Eyewear', group: 'Fitness & Lifestyle', icon: 'glasses-outline', bg: '#F0FDFA', color: '#0D9488', merchantCount: 4 },
+  { 
+    id: 'gym', 
+    name: 'Gym & Fitness', 
+    group: 'Fitness & Lifestyle', 
+    icon: 'barbell-outline', 
+    bg: '#E0E7FF', 
+    color: '#4338CA', 
+    merchantCount: 7,
+    descEn: "Gym workout, weights & personal fitness",
+    descMs: "Pusat kecergasan, senaman & latihan peribadi",
+  },
+  { 
+    id: 'sports', 
+    name: 'Sports Venue', 
+    group: 'Fitness & Lifestyle', 
+    icon: 'trophy-outline', 
+    bg: '#FEF3C7', 
+    color: '#B45309', 
+    merchantCount: 5,
+    descEn: "Badminton, futsal & recreational courts",
+    descMs: "Gelanggang badminton, futsal & sukan",
+  },
+  { 
+    id: 'optician', 
+    name: 'Optical & Eyewear', 
+    group: 'Fitness & Lifestyle', 
+    icon: 'glasses-outline', 
+    bg: '#F0FDFA', 
+    color: '#0D9488', 
+    merchantCount: 4,
+    descEn: "Eyeglasses, sunglasses & vision test",
+    descMs: "Cermin mata, cermin gelap & ujian mata",
+  },
 
-  // 🧺 Retail & Laundry
-  { id: 'laundry', name: 'Laundry & Dry Clean', group: 'Retail & Services', icon: 'shirt-outline', bg: '#EFF6FF', color: '#2563EB', merchantCount: 10 },
-  { id: 'boutique', name: 'Boutique & Fashion', group: 'Retail & Services', icon: 'bag-handle-outline', bg: '#FAF5FF', color: '#9333EA', merchantCount: 16 },
-  { id: 'groceries', name: 'Groceries & Mart', group: 'Retail & Services', icon: 'cart-outline', bg: '#FEF2F2', color: '#E11D48', merchantCount: 20 },
-  { id: 'florist', name: 'Florist & Gifts', group: 'Retail & Services', icon: 'rose-outline', bg: '#FFF1F2', color: '#E11D48', merchantCount: 6 },
+  // 🧺 Retail & Services
+  { 
+    id: 'laundry', 
+    name: 'Laundry & Dry Clean', 
+    group: 'Retail & Services', 
+    icon: 'shirt-outline', 
+    bg: '#EFF6FF', 
+    color: '#2563EB', 
+    merchantCount: 10,
+    descEn: "Self-service laundromat & dry cleaning",
+    descMs: "Dobi layan diri, cucian kering & gosok",
+  },
+  { 
+    id: 'boutique', 
+    name: 'Boutique & Fashion', 
+    group: 'Retail & Services', 
+    icon: 'bag-handle-outline', 
+    bg: '#FAF5FF', 
+    color: '#9333EA', 
+    merchantCount: 16,
+    descEn: "Apparel, clothing, shoes & modest wear",
+    descMs: "Pakaian, fesyen, kasut & busana muslimah",
+  },
+  { 
+    id: 'groceries', 
+    name: 'Groceries & Mart', 
+    group: 'Retail & Services', 
+    icon: 'cart-outline', 
+    bg: '#FEF2F2', 
+    color: '#E11D48', 
+    merchantCount: 20,
+    descEn: "Mini market, daily essentials & produce",
+    descMs: "Pasar mini, barangan dapur & keperluan harian",
+  },
+  { 
+    id: 'florist', 
+    name: 'Florist & Gifts', 
+    group: 'Retail & Services', 
+    icon: 'rose-outline', 
+    bg: '#FFF1F2', 
+    color: '#E11D48', 
+    merchantCount: 6,
+    descEn: "Fresh flowers, bouquet gifts & hampers",
+    descMs: "Jambangan bunga, gubahan hadiah & hamper",
+  },
 
   // 🛠️ Specialty Services
-  { id: 'pet', name: 'Pet Care & Vet', group: 'Specialty Services', icon: 'paw-outline', bg: '#FFFBEB', color: '#D97706', merchantCount: 8 },
-  { id: 'repair', name: 'Gadget & Mobile Repair', group: 'Specialty Services', icon: 'hardware-chip-outline', bg: '#F8FAFC', color: '#475569', merchantCount: 13 },
-  { id: 'studio', name: 'Studio & Photography', group: 'Specialty Services', icon: 'camera-outline', bg: '#F5F3FF', color: '#6D28D9', merchantCount: 5 },
+  { 
+    id: 'pet', 
+    name: 'Pet Care & Vet', 
+    group: 'Specialty Services', 
+    icon: 'paw-outline', 
+    bg: '#FFFBEB', 
+    color: '#D97706', 
+    merchantCount: 8,
+    descEn: "Pet grooming, vet care & pet supplies",
+    descMs: "Dandanan haiwan, klinik veterinar & makanan",
+  },
+  { 
+    id: 'repair', 
+    name: 'Gadget & Mobile Repair', 
+    group: 'Specialty Services', 
+    icon: 'hardware-chip-outline', 
+    bg: '#F8FAFC', 
+    color: '#475569', 
+    merchantCount: 13,
+    descEn: "Smartphone, screen & laptop fixing",
+    descMs: "Baiki telefon pintar, skrin & komputer riba",
+  },
+  { 
+    id: 'studio', 
+    name: 'Studio & Photography', 
+    group: 'Specialty Services', 
+    icon: 'camera-outline', 
+    bg: '#F5F3FF', 
+    color: '#6D28D9', 
+    merchantCount: 5,
+    descEn: "Photo studio, creative media & events",
+    descMs: "Studio fotografi, media kreatif & acara",
+  },
 ];
 
 type AllCategoriesModalProps = {
   visible: boolean;
   onClose: () => void;
   onSelectCategory: (categoryId: string) => void;
+  mode?: 'customer' | 'merchant';
+  selectedCategoryId?: string;
 };
 
 export default function AllCategoriesModal({
   visible,
   onClose,
   onSelectCategory,
+  mode = 'customer',
+  selectedCategoryId,
 }: AllCategoriesModalProps) {
+  const { locale } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredCategories = ALL_CATEGORIES_LIST.filter((cat) =>
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    cat.group.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCategories = ALL_CATEGORIES_LIST.filter((cat) => {
+    const query = searchQuery.toLowerCase();
+    const nameMatch = cat.name.toLowerCase().includes(query);
+    const groupMatch = cat.group.toLowerCase().includes(query);
+    const descEnMatch = cat.descEn?.toLowerCase().includes(query) ?? false;
+    const descMsMatch = cat.descMs?.toLowerCase().includes(query) ?? false;
+    return nameMatch || groupMatch || descEnMatch || descMsMatch;
+  });
 
   const groups = Array.from(new Set(filteredCategories.map((c) => c.group)));
 
@@ -91,12 +303,27 @@ export default function AllCategoriesModal({
 
           {/* Header Row */}
           <View style={styles.headerRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="grid-outline" size={22} color="#0F172A" />
-              <Text style={styles.headerTitle}>All Categories</Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.headerIconBox}>
+                  <Ionicons name="grid" size={15} color="#FFCC00" />
+                </View>
+                <Text style={styles.headerTitle}>
+                  {mode === 'merchant'
+                    ? (locale === 'en' ? 'Select Store Category' : 'Pilih Kategori Bisnes')
+                    : (locale === 'en' ? 'All Categories' : 'Semua Kategori')}
+                </Text>
+              </View>
+              {mode === 'merchant' && (
+                <Text style={styles.headerSubtitle}>
+                  {locale === 'en'
+                    ? 'Choose your primary store category for customer discovery & perks.'
+                    : 'Pilih industri utama premis anda untuk penyesuaian profil & carian pelanggan.'}
+                </Text>
+              )}
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <Ionicons name="close" size={22} color="#0F172A" />
+              <Ionicons name="close" size={20} color="#0F172A" />
             </TouchableOpacity>
           </View>
 
@@ -107,8 +334,11 @@ export default function AllCategoriesModal({
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search category (e.g. Barber, Cafe, Spa)..."
+              placeholder={locale === 'en' ? 'Search category (e.g. Barber, Cafe, Spa)...' : 'Cari kategori (cth. Barber, Kafe, Spa)...'}
               placeholderTextColor="#94A3B8"
+              {...Platform.select({
+                web: { outlineStyle: 'none' } as any,
+              })}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -124,33 +354,67 @@ export default function AllCategoriesModal({
               return (
                 <View key={group} style={styles.groupSection}>
                   <Text style={styles.groupTitle}>{group}</Text>
-                  <View style={styles.groupGrid}>
-                    {groupItems.map((cat) => (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={styles.catCard}
-                        onPress={() => {
-                          onSelectCategory(cat.id);
-                          onClose();
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[styles.iconBox, { backgroundColor: cat.bg }]}>
-                          <Ionicons name={cat.icon as any} size={22} color={cat.color} />
-                        </View>
-                        <View style={styles.catMetaCol}>
-                          <Text style={styles.catName} numberOfLines={1}>{cat.name}</Text>
-                          <Text style={styles.catCount}>{cat.merchantCount} merchants</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
-                      </TouchableOpacity>
-                    ))}
+                  <View style={styles.groupListCard}>
+                    {groupItems.map((cat, index) => {
+                      const isSelected = mode === 'merchant' && cat.id === selectedCategoryId;
+                      const isLast = index === groupItems.length - 1;
+                      return (
+                        <React.Fragment key={cat.id}>
+                          <TouchableOpacity
+                            style={[
+                              styles.catCard,
+                              isSelected && styles.catCardSelected,
+                            ]}
+                            onPress={() => {
+                              onSelectCategory(cat.id);
+                              onClose();
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.iconBox, { backgroundColor: cat.bg }]}>
+                              <Ionicons name={cat.icon as any} size={22} color={cat.color} />
+                            </View>
+
+                            <View style={styles.catMetaCol}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[styles.catName, isSelected && styles.catNameSelected]} numberOfLines={1}>
+                                  {cat.name}
+                                </Text>
+                                {isSelected && (
+                                  <View style={styles.selectedPillBadge}>
+                                    <Text style={styles.selectedPillBadgeText}>
+                                      {locale === 'en' ? 'SELECTED' : 'DIPILIH'}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={styles.catDesc} numberOfLines={1}>
+                                {mode === 'merchant'
+                                  ? (locale === 'en' ? cat.descEn : cat.descMs)
+                                  : `${cat.merchantCount} merchants`}
+                              </Text>
+                            </View>
+
+                            {mode === 'merchant' ? (
+                              <View style={[styles.radioCircle, isSelected && styles.radioCircleActive]}>
+                                {isSelected && (
+                                  <Ionicons name="checkmark" size={14} color="#FFCC00" />
+                                )}
+                              </View>
+                            ) : (
+                              <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                            )}
+                          </TouchableOpacity>
+                          {!isLast && <View style={styles.rowDivider} />}
+                        </React.Fragment>
+                      );
+                    })}
                   </View>
                 </View>
               );
             })}
 
-            <View style={{ height: 30 }} />
+            <View style={{ height: 40 }} />
           </ScrollView>
         </View>
       </View>
@@ -161,7 +425,7 @@ export default function AllCategoriesModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'flex-end',
   },
   backdropTouch: {
@@ -192,28 +456,46 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  headerIconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
   },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
   closeBtn: {
-    padding: 4,
+    padding: 6,
     backgroundColor: '#F8FAFC',
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: 10,
   },
   searchBarWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginHorizontal: 20,
@@ -228,44 +510,53 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#0F172A',
+    padding: 0,
   },
   scrollBody: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 8,
   },
   groupSection: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   groupTitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#64748B',
-    letterSpacing: 0.5,
-    marginBottom: 10,
+    letterSpacing: 0.8,
+    marginBottom: 8,
     textTransform: 'uppercase',
   },
-  groupGrid: {
-    gap: 10,
+  groupListCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   catCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     padding: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+  },
+  catCardSelected: {
+    backgroundColor: '#FFFDF5',
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 68,
   },
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -278,9 +569,40 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F172A',
   },
-  catCount: {
+  catNameSelected: {
+    color: '#000000',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  selectedPillBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  selectedPillBadgeText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.4,
+  },
+  catDesc: {
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+    lineHeight: 16,
+  },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
 });

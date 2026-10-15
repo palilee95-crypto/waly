@@ -586,20 +586,6 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top Header Bar with Home / Landing Navigation Button */}
-      <View style={[styles.topHeaderBar, isDesktop && { maxWidth: 440, alignSelf: 'center', width: '100%' }]}>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity
-          style={styles.landingHomeButton}
-          onPress={() => router.push('/landing' as any)}
-          activeOpacity={0.7}
-          accessibilityLabel="Go to Landing Page"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="home-outline" size={22} color="#0F172A" />
-        </TouchableOpacity>
-      </View>
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
