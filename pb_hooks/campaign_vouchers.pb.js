@@ -89,8 +89,30 @@ routerAdd("POST", "/api/risev/merchant/campaigns/auto-drop", (e) => {
       const voucher = new Record(voucherCol);
       voucher.set("id", $security.randomString(15).toLowerCase());
       voucher.set("customer", custId);
-      if (rewardId) {
-        voucher.set("reward", rewardId);
+
+      let effectiveRewardId = rewardId;
+      if (!effectiveRewardId) {
+        try {
+          const existing = $app.findRecordsByFilter("rewards", `merchant = "${merchantId}"`, "-created", 1, 0);
+          if (existing.length > 0) {
+            effectiveRewardId = existing[0].id;
+          } else {
+            const rCol = $app.findCollectionByNameOrId("rewards");
+            const r = new Record(rCol);
+            r.set("merchant", merchantId);
+            r.set("name", "Campaign Reward");
+            r.set("points_cost", 1);
+            r.set("is_active", true);
+            r.set("type", discountType === "percentage" ? "discount" : "free_item");
+            r.set("discount_value", parseFloat(discountValue) || 0);
+            $app.save(r);
+            effectiveRewardId = r.id;
+          }
+        } catch (_) {}
+      }
+
+      if (effectiveRewardId) {
+        voucher.set("reward", effectiveRewardId);
       }
       if (campaignId) {
         voucher.set("campaign", campaignId);
