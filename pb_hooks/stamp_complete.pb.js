@@ -68,11 +68,58 @@ onRecordUpdate((e) => {
     return v;
   };
 
+  // Helper to ensure every milestone voucher links to a valid reward record
+  const getOrCreateSubRewardRecord = (merchantId, title, type, value) => {
+    try {
+      const records = $app.findRecordsByFilter(
+        'rewards',
+        `merchant = "${merchantId}" && name = "${title.replace(/"/g, '\\"')}"`,
+        '-created',
+        1,
+        0
+      );
+      if (records && records.length > 0) {
+        return records[0].id;
+      }
+    } catch (e) {}
+
+    try {
+      const rewardsCol = $app.findCollectionByNameOrId('rewards');
+      const r = new Record(rewardsCol);
+      r.set('merchant', merchantId);
+      r.set('name', title);
+      r.set('description', 'Milestone Reward');
+      r.set('points_cost', 0);
+      r.set('stock', 1000000);
+      r.set('is_active', true);
+      r.set('type', type === 'free_item' ? 'free_item' : 'discount');
+      r.set('discount_value', parseFloat(value) || 0);
+      $app.save(r);
+      return r.id;
+    } catch (err) {
+      console.log('[STAMP COMPLETE] Failed to create shadow reward:', err);
+      return program.get('linked_reward') || '';
+    }
+  };
+
   // Helper function to issue custom sub-reward voucher
   const issueCustomSubVoucher = (customerId, subReward, merchantId, daysValid = 30) => {
     const col = $app.findCollectionByNameOrId('vouchers');
     const v = new Record(col);
     v.set('customer', customerId);
+
+    const rewardId = subReward.linked_reward || getOrCreateSubRewardRecord(
+      merchantId,
+      subReward.reward_title || 'Milestone Reward',
+      subReward.reward_type,
+      subReward.reward_value
+    );
+    if (rewardId) {
+      v.set('reward', rewardId);
+    } else if (program.get('linked_reward')) {
+      v.set('reward', program.get('linked_reward'));
+    }
+
     v.set('code', generateVoucherCode());
     v.set('status', 'active');
     v.set('expires_at', new Date(Date.now() + daysValid * 86400000).toISOString());
