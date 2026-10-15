@@ -138,22 +138,31 @@ export default function SubscriptionScreen() {
 
         // Outlets count
         try {
-          const bList = await pb.collection('merchant_branches').getFullList({
+          const bList = await pb.collection('branches').getFullList({
             filter: `merchant = "${user.merchant_id}"`,
             requestKey: null,
           });
-          setBranchCount(bList.length + 1);
+          setBranchCount(Math.max(1, bList.length));
         } catch {
           setBranchCount(1);
         }
 
         // Staff count
         try {
-          const sList = await pb.collection('staff_accounts').getFullList({
-            filter: `merchant = "${user.merchant_id}"`,
-            requestKey: null,
-          });
-          setStaffCount(sList.length);
+          const [msList, uList] = await Promise.all([
+            pb.collection('merchant_staff').getFullList({
+              filter: `merchant = "${user.merchant_id}" && is_active = true`,
+              requestKey: null,
+            }).catch(() => []),
+            pb.collection('users').getFullList({
+              filter: `merchant_id = "${user.merchant_id}" && (role = "merchant" || role = "both" || role = "staff")`,
+              requestKey: null,
+            }).catch(() => [])
+          ]);
+          const staffIds = new Set<string>();
+          msList.forEach((s: any) => staffIds.add(s.id));
+          uList.forEach((u: any) => staffIds.add(u.id));
+          setStaffCount(Math.max(1, staffIds.size));
         } catch {
           setStaffCount(1);
         }

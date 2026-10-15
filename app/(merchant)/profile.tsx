@@ -853,10 +853,11 @@ export default function ProfileScreen() {
       } catch (e) {}
 
       try {
-        const standsRes = await pb.collection('stands').getList(1, 1, {
-          filter: `merchant = "${user.merchant_id}"`,
+        const standsRes = await pb.collection('activation_codes').getList(1, 1, {
+          filter: `redeemed_by = "${user.merchant_id}"`,
+          requestKey: null,
         });
-        setStandsCount(standsRes.totalItems || 1);
+        setStandsCount(Math.max(1, standsRes.totalItems));
       } catch (e) {
         setStandsCount(1);
       }
