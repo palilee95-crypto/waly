@@ -15,6 +15,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -3447,122 +3448,137 @@ export default function NfcLandingScreen() {
         visible={showRewardModal && !!unlockedReward}
         transparent={true}
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => setShowRewardModal(false)}
       >
         <View style={styles.rewardModalBackdrop}>
-          <BlurView intensity={90} tint="dark" style={[styles.rewardModalCard, isDesktop && { maxWidth: 420 }]}>
+          {/* Backdrop Tap to Dismiss (Click outside card to close) */}
+          <Pressable 
+            style={StyleSheet.absoluteFill} 
+            onPress={() => setShowRewardModal(false)} 
+          />
+
+          <View style={[styles.rewardModalCard, isDesktop && { maxWidth: 420 }]}>
             {/* Top Close Button */}
             <TouchableOpacity
               style={styles.rewardModalCloseBtn}
               onPress={() => setShowRewardModal(false)}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="close" size={18} color="rgba(255, 255, 255, 0.7)" />
+              <Ionicons name="close" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
-            {/* Glowing Hero Icon Badge */}
-            <View style={styles.rewardHeroBadgeWrap}>
-              <View style={[
-                styles.rewardHeroGlow, 
-                { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.3)' : 'rgba(52, 211, 153, 0.3)' }
-              ]} />
-              <View style={[
-                styles.rewardHeroIconBox,
-                { borderColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.5)' : 'rgba(52, 211, 153, 0.5)' }
-              ]}>
-                <Text style={{ fontSize: 40 }}>
-                  {unlockedReward?.isMilestone ? '🎁' : '🏆'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Badge Pill */}
-            <View style={[
-              styles.rewardTypePill,
-              { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.15)' : 'rgba(52, 211, 153, 0.15)' }
-            ]}>
-              <Text style={[
-                styles.rewardTypePillText,
-                { color: unlockedReward?.isMilestone ? '#FFCC00' : '#34D399' }
-              ]}>
-                {unlockedReward?.isMilestone 
-                  ? `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}` 
-                  : 'KAD COP LENGKAP 100%'}
-              </Text>
-            </View>
-
-            {/* Title & Subtitle */}
-            <Text style={styles.rewardModalTitle}>
-              {unlockedReward?.isMilestone ? 'Ganjaran Milestone Dibuka!' : 'Tahniah! Kad Cop Selesai!'}
-            </Text>
-            <Text style={styles.rewardModalSubtitle}>
-              {unlockedReward?.isMilestone
-                ? `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`
-                : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!'}
-            </Text>
-
-            {/* Boarding Pass Style Voucher Ticket */}
-            <View style={styles.rewardTicketContainer}>
-              {/* Left Spine */}
-              <View style={[styles.rewardTicketSpine, { backgroundColor: primaryColor || '#FFCC00' }]}>
-                <Ionicons name="gift" size={20} color={getContrastColor(primaryColor || '#FFCC00')} />
-              </View>
-
-              {/* Main Ticket Info */}
-              <View style={styles.rewardTicketContent}>
-                <View style={styles.rewardTicketHeaderRow}>
-                  <Text style={styles.rewardTicketStoreName} numberOfLines={1}>
-                    {merchantName.toUpperCase()}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', width: '100%', paddingBottom: 4 }}
+              style={{ width: '100%' }}
+              bounces={false}
+            >
+              {/* Glowing Hero Icon Badge */}
+              <View style={styles.rewardHeroBadgeWrap}>
+                <View style={[
+                  styles.rewardHeroGlow, 
+                  { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.35)' : 'rgba(52, 211, 153, 0.35)' }
+                ]} />
+                <View style={[
+                  styles.rewardHeroIconBox,
+                  { borderColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.6)' : 'rgba(52, 211, 153, 0.6)' }
+                ]}>
+                  <Text style={{ fontSize: 42 }}>
+                    {unlockedReward?.isMilestone ? '🎁' : '🏆'}
                   </Text>
-                  <View style={styles.rewardTicketActiveBadge}>
-                    <Text style={styles.rewardTicketActiveBadgeText}>ACTIVE</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.rewardTicketTitle} numberOfLines={2}>
-                  {unlockedReward?.title || 'Exclusive Reward Voucher'}
-                </Text>
-
-                {unlockedReward?.code ? (
-                  <View style={styles.rewardTicketCodeRow}>
-                    <Ionicons name="barcode-outline" size={13} color="#94A3B8" />
-                    <Text style={styles.rewardTicketCodeText}>{unlockedReward.code}</Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.rewardTicketFooterRow}>
-                  <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                  <Text style={styles.rewardTicketExpiryText}>Sah 30 hari • Tebus di kaunter kedai</Text>
                 </View>
               </View>
-            </View>
 
-            {/* Action Buttons */}
-            <TouchableOpacity
-              style={styles.rewardModalPrimaryBtn}
-              onPress={handleClaimVoucherLogin}
-              activeOpacity={0.88}
-            >
-              <Ionicons 
-                name={user ? "wallet" : "log-in-outline"} 
-                size={19} 
-                color="#000000" 
-                style={{ marginRight: 8 }} 
-              />
-              <Text style={styles.rewardModalPrimaryBtnText}>
-                {user ? 'Lihat Dalam Baucar Saya' : 'Log Masuk & Simpan Baucar'}
+              {/* Badge Pill */}
+              <View style={[
+                styles.rewardTypePill,
+                { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.15)' : 'rgba(52, 211, 153, 0.15)' }
+              ]}>
+                <Text style={[
+                  styles.rewardTypePillText,
+                  { color: unlockedReward?.isMilestone ? '#FFCC00' : '#34D399' }
+                ]}>
+                  {unlockedReward?.isMilestone 
+                    ? `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}` 
+                    : 'KAD COP LENGKAP 100%'}
+                </Text>
+              </View>
+
+              {/* Title & Subtitle */}
+              <Text style={styles.rewardModalTitle}>
+                {unlockedReward?.isMilestone ? 'Ganjaran Milestone Dibuka!' : 'Tahniah! Kad Cop Selesai!'}
               </Text>
-              <Ionicons name="arrow-forward" size={18} color="#000000" style={{ marginLeft: 6 }} />
-            </TouchableOpacity>
+              <Text style={styles.rewardModalSubtitle}>
+                {unlockedReward?.isMilestone
+                  ? `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`
+                  : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!'}
+              </Text>
 
-            <TouchableOpacity
-              style={styles.rewardModalDismissBtn}
-              onPress={() => setShowRewardModal(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.rewardModalDismissText}>Kekal Di Sini & Lihat Kad Cop</Text>
-            </TouchableOpacity>
-          </BlurView>
+              {/* Boarding Pass Style Voucher Ticket */}
+              <View style={styles.rewardTicketContainer}>
+                {/* Left Spine */}
+                <View style={[styles.rewardTicketSpine, { backgroundColor: primaryColor || '#FFCC00' }]}>
+                  <Ionicons name="gift" size={20} color={getContrastColor(primaryColor || '#FFCC00')} />
+                </View>
+
+                {/* Main Ticket Info */}
+                <View style={styles.rewardTicketContent}>
+                  <View style={styles.rewardTicketHeaderRow}>
+                    <Text style={styles.rewardTicketStoreName} numberOfLines={1}>
+                      {merchantName.toUpperCase()}
+                    </Text>
+                    <View style={styles.rewardTicketActiveBadge}>
+                      <Text style={styles.rewardTicketActiveBadgeText}>ACTIVE</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.rewardTicketTitle} numberOfLines={2}>
+                    {unlockedReward?.title || 'Exclusive Reward Voucher'}
+                  </Text>
+
+                  {unlockedReward?.code ? (
+                    <View style={styles.rewardTicketCodeRow}>
+                      <Ionicons name="barcode-outline" size={13} color="#94A3B8" />
+                      <Text style={styles.rewardTicketCodeText}>{unlockedReward.code}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.rewardTicketFooterRow}>
+                    <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                    <Text style={styles.rewardTicketExpiryText}>Sah 30 hari • Tebus di kaunter kedai</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <TouchableOpacity
+                style={styles.rewardModalPrimaryBtn}
+                onPress={handleClaimVoucherLogin}
+                activeOpacity={0.88}
+              >
+                <Ionicons 
+                  name={user ? "wallet" : "log-in-outline"} 
+                  size={19} 
+                  color="#000000" 
+                  style={{ marginRight: 8 }} 
+                />
+                <Text style={styles.rewardModalPrimaryBtnText}>
+                  {user ? 'Lihat Dalam Baucar Saya' : 'Log Masuk & Simpan Baucar'}
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color="#000000" style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.rewardModalDismissBtn}
+                onPress={() => setShowRewardModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.rewardModalDismissText}>Kekal Di Sini & Lihat Kad Cop</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -3572,28 +3588,34 @@ export default function NfcLandingScreen() {
 const styles = StyleSheet.create({
   rewardModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
     zIndex: 99999,
+    ...(Platform.OS === 'web' ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 } as any : {}),
   },
   rewardModalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: 'rgba(18, 18, 24, 0.96)',
+    maxHeight: '92%',
+    backgroundColor: '#121217',
     borderRadius: 28,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 204, 0, 0.35)',
-    padding: 24,
+    borderColor: 'rgba(255, 204, 0, 0.45)',
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
     alignItems: 'center',
-    shadowColor: '#FFCC00',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 28,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.6,
+    shadowRadius: 30,
     elevation: 20,
     overflow: 'hidden',
     position: 'relative',
+    zIndex: 100000,
   },
   rewardModalCloseBtn: {
     position: 'absolute',
