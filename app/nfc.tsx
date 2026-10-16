@@ -72,6 +72,9 @@ interface AnimatedStampBubbleProps {
   iconColor: string;        // icon tint
   borderColor: string;
   emptyBgColor: string;
+  isMilestone?: boolean;
+  milestoneNumber?: number;
+  isFinalGoal?: boolean;
 }
 
 const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
@@ -83,6 +86,9 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
   iconColor,
   borderColor,
   emptyBgColor,
+  isMilestone,
+  milestoneNumber,
+  isFinalGoal,
 }) => {
   const scaleAnim = useRef(new Animated.Value(isNew ? 2.5 : 1.0)).current;
   const ringScale = useRef(new Animated.Value(1.0)).current;
@@ -115,6 +121,18 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
     }
   }, [isNew]);
 
+  const activeBorderColor = isEarned
+    ? 'transparent'
+    : isMilestone
+    ? '#FFCC00'
+    : borderColor;
+
+  const activeBgColor = isEarned
+    ? bubbleColor
+    : isMilestone
+    ? 'rgba(255, 204, 0, 0.15)'
+    : emptyBgColor;
+
   return (
     <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
       {/* Ring burst overlay */}
@@ -141,17 +159,66 @@ const AnimatedStampBubble: React.FC<AnimatedStampBubbleProps> = ({
           aspectRatio: 1,
           borderRadius: 99,
           borderWidth: isEarned ? 0 : 1.5,
-          borderColor: isEarned ? 'transparent' : borderColor,
+          borderColor: activeBorderColor,
           borderStyle: isEarned ? 'solid' : 'dashed',
-          backgroundColor: isEarned ? bubbleColor : emptyBgColor,
+          backgroundColor: activeBgColor,
           alignItems: 'center',
           justifyContent: 'center',
           transform: [{ scale: scaleAnim }],
+          position: 'relative',
         }}
       >
-        {isEarned
-          ? renderStampIcon(iconId, 14, iconColor)
-          : renderStampIcon(iconId, 14, borderColor)}
+        {isEarned ? (
+          <>
+            {renderStampIcon(iconId, 14, iconColor)}
+            {isMilestone && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  backgroundColor: '#FFCC00',
+                  borderRadius: 6,
+                  paddingHorizontal: 2.5,
+                  paddingVertical: 1,
+                  borderWidth: 1,
+                  borderColor: '#000000',
+                  zIndex: 10,
+                }}
+              >
+                <Text style={{ fontSize: 7, fontWeight: '900', color: '#000000' }}>🎁</Text>
+              </View>
+            )}
+          </>
+        ) : isMilestone ? (
+          <>
+            <Text style={{ fontSize: 13 }}>🎁</Text>
+            {milestoneNumber !== undefined && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                  backgroundColor: '#FFCC00',
+                  borderRadius: 6,
+                  paddingHorizontal: 3,
+                  paddingVertical: 0.5,
+                  borderWidth: 1,
+                  borderColor: '#000000',
+                  zIndex: 10,
+                }}
+              >
+                <Text style={{ fontSize: 7, fontWeight: '900', color: '#000000' }}>
+                  {milestoneNumber}
+                </Text>
+              </View>
+            )}
+          </>
+        ) : isFinalGoal ? (
+          <Ionicons name="ribbon" size={15} color={borderColor} />
+        ) : (
+          renderStampIcon(iconId, 14, borderColor)
+        )}
       </Animated.View>
     </View>
   );
@@ -1900,12 +1967,31 @@ export default function NfcLandingScreen() {
                 </Text>
               </View>
 
-              {/* Bottom: Stamp Status */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="gift-outline" size={14} color="#6B7280" />
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>
-                  {isComplete ? 'Ready to claim!' : `${currentStamps} out of ${stampGoal} stamps collected`}
-                </Text>
+              {/* Bottom: Stamp Status & Next Milestone */}
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="gift-outline" size={14} color="#6B7280" />
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>
+                    {isComplete ? 'Ready to claim!' : `${currentStamps} out of ${stampGoal} stamps collected`}
+                  </Text>
+                </View>
+                {(() => {
+                  const nextMilestone = subRewardsList
+                    .filter((sr: any) => Number(sr.at_stamp) > currentStamps)
+                    .sort((a: any, b: any) => Number(a.at_stamp) - Number(b.at_stamp))[0];
+                  if (nextMilestone) {
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#FDE68A' }}>
+                          <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}>
+                            🎁 Milestone at {nextMilestone.at_stamp} stamps: {nextMilestone.reward_title}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
               </View>
 
             </View>
@@ -2228,10 +2314,13 @@ export default function NfcLandingScreen() {
                           {/* Row 1 (6 Stamps) */}
                           <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
                             {Array.from({ length: 6 }).map((_, idx) => {
-                              const isEarned = (idx + 1) <= currentStamps;
+                              const slotNum = idx + 1;
+                              const isEarned = slotNum <= currentStamps;
                               const isNew = newlyEarnedIndices.has(idx);
                               const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
                               const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                              const milestone = subRewardsList.find((sr: any) => Number(sr.at_stamp) === slotNum);
+                              const isFinalGoal = slotNum === stampGoal;
                               return (
                                 <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
                                   <AnimatedStampBubble
@@ -2243,6 +2332,9 @@ export default function NfcLandingScreen() {
                                     iconColor={cardBgColor}
                                     borderColor={cardFontColor + '30'}
                                     emptyBgColor={cardFontColor + '08'}
+                                    isMilestone={!!milestone}
+                                    milestoneNumber={slotNum}
+                                    isFinalGoal={isFinalGoal}
                                   />
                                 </View>
                               );
@@ -2253,10 +2345,13 @@ export default function NfcLandingScreen() {
                           <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', width: '100%' }}>
                             {Array.from({ length: 4 }).map((_, idx) => {
                               const globalIdx = idx + 6;
-                              const isEarned = (globalIdx + 1) <= currentStamps;
+                              const slotNum = globalIdx + 1;
+                              const isEarned = slotNum <= currentStamps;
                               const isNew = newlyEarnedIndices.has(globalIdx);
                               const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
                               const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                              const milestone = subRewardsList.find((sr: any) => Number(sr.at_stamp) === slotNum);
+                              const isFinalGoal = slotNum === stampGoal;
                               return (
                                 <View key={idx} style={{ width: '13.5%', aspectRatio: 1 }}>
                                   <AnimatedStampBubble
@@ -2268,6 +2363,9 @@ export default function NfcLandingScreen() {
                                     iconColor={cardBgColor}
                                     borderColor={cardFontColor + '30'}
                                     emptyBgColor={cardFontColor + '08'}
+                                    isMilestone={!!milestone}
+                                    milestoneNumber={slotNum}
+                                    isFinalGoal={isFinalGoal}
                                   />
                                 </View>
                               );
@@ -2277,10 +2375,13 @@ export default function NfcLandingScreen() {
                       ) : (
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6, justifyContent: 'center' }}>
                           {Array.from({ length: stampGoal }).map((_, idx) => {
-                            const isEarned = (idx + 1) <= currentStamps;
+                            const slotNum = idx + 1;
+                            const isEarned = slotNum <= currentStamps;
                             const isNew = newlyEarnedIndices.has(idx);
                             const bubbleColor = cardFontColor === '#FFFFFF' ? '#000000' : cardFontColor;
                             const minIdx = newlyEarnedIndices.size > 0 ? Math.min(...Array.from(newlyEarnedIndices)) : 0;
+                            const milestone = subRewardsList.find((sr: any) => Number(sr.at_stamp) === slotNum);
+                            const isFinalGoal = slotNum === stampGoal;
                             return (
                               <View key={idx} style={{ width: '17%', aspectRatio: 1 }}>
                                 <AnimatedStampBubble
@@ -2292,6 +2393,9 @@ export default function NfcLandingScreen() {
                                   iconColor={cardBgColor}
                                   borderColor={cardFontColor + '30'}
                                   emptyBgColor={cardFontColor + '08'}
+                                  isMilestone={!!milestone}
+                                  milestoneNumber={slotNum}
+                                  isFinalGoal={isFinalGoal}
                                 />
                               </View>
                             );
