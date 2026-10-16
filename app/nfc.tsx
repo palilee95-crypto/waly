@@ -1632,10 +1632,10 @@ export default function NfcLandingScreen() {
     }
 
     // 2. Check Intermediate Milestones
-    if (subRewardsList && subRewardsList.length > 0 && currentStamps > prev) {
+    if (subRewardsList && subRewardsList.length > 0) {
       const crossed = subRewardsList.find((sr: any) => {
         const at = parseInt(sr.at_stamp, 10);
-        return at && prev < at && currentStamps >= at;
+        return at && ((prev < at && currentStamps >= at) || currentStamps === at);
       });
       if (crossed) {
         setUnlockedReward({
