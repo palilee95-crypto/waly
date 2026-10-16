@@ -221,7 +221,7 @@ export default function NfcClaimModal() {
     setNetTotalAmount(net);
 
     setBillAmount(net.toFixed(2));
-    setStampAmount('1');
+    setStampAmount(prev => prev || '1');
   }, [selectedServices, appliedVoucher, customBillInput]);
 
   const handleAddItem = (catalogItem: any) => {
@@ -1550,7 +1550,67 @@ export default function NfcClaimModal() {
                       <Ionicons name="chevron-forward" size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
                     </TouchableOpacity>
 
-                    {/* 5. LOYALTY REWARDS PREVIEW CARD */}
+                    {/* 5. STAMPS TO ISSUE / GIVE */}
+                    <View style={styles.stampIssueCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="ribbon-outline" size={15} color="#D97706" />
+                          <Text style={styles.stampIssueLabel}>STAMPS TO GIVE</Text>
+                        </View>
+                        <View style={styles.stampStepperRow}>
+                          <TouchableOpacity
+                            style={styles.stampStepperBtn}
+                            onPress={() => {
+                              const curr = parseInt(stampAmount, 10) || 1;
+                              setStampAmount(String(Math.max(1, curr - 1)));
+                            }}
+                            activeOpacity={0.7}
+                            accessibilityLabel="Decrease stamps"
+                          >
+                            <Ionicons name="remove" size={13} color="#0F172A" />
+                          </TouchableOpacity>
+                          <TextInput
+                            style={[styles.stampStepperInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            value={stampAmount}
+                            onChangeText={(t) => {
+                              const clean = t.replace(/[^0-9]/g, '');
+                              setStampAmount(clean);
+                            }}
+                            keyboardType="number-pad"
+                            maxLength={3}
+                          />
+                          <TouchableOpacity
+                            style={styles.stampStepperBtn}
+                            onPress={() => {
+                              const curr = parseInt(stampAmount, 10) || 1;
+                              setStampAmount(String(Math.min(99, curr + 1)));
+                            }}
+                            activeOpacity={0.7}
+                            accessibilityLabel="Increase stamps"
+                          >
+                            <Ionicons name="add" size={13} color="#0F172A" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Quick preset chips */}
+                      <View style={styles.quickBillChipsRow}>
+                        {['1', '2', '3', '5'].map((amt) => (
+                          <TouchableOpacity
+                            key={amt}
+                            style={[styles.quickBillChip, stampAmount === amt && styles.quickBillChipActive]}
+                            onPress={() => setStampAmount(amt)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.quickBillChipText, stampAmount === amt && styles.quickBillChipTextActive]}>
+                              {amt} {amt === '1' ? 'Stamp' : 'Stamps'}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* 6. LOYALTY REWARDS PREVIEW CARD */}
                     <View style={styles.loyaltyCardApple}>
                       {/* Column 1: Rewards Info */}
                       <View style={styles.loyaltyColMain}>
@@ -1567,8 +1627,10 @@ export default function NfcClaimModal() {
 
                       {/* Column 2: Stamp */}
                       <View style={styles.loyaltyColPill}>
-                        <Ionicons name="person-outline" size={14} color="#D97706" />
-                        <Text style={styles.loyaltyValApple}>+1 Stamp</Text>
+                        <Ionicons name="ribbon-outline" size={14} color="#D97706" />
+                        <Text style={styles.loyaltyValApple}>
+                          +{parseInt(stampAmount, 10) || 1} {(parseInt(stampAmount, 10) || 1) === 1 ? 'Stamp' : 'Stamps'}
+                        </Text>
                       </View>
 
                       <View style={styles.loyaltyDividerLight} />
@@ -1993,6 +2055,47 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#1D1D1F',
+  },
+  stampIssueCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+  },
+  stampIssueLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  stampStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    gap: 4,
+  },
+  stampStepperBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stampStepperInput: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    minWidth: 28,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
   },
   sessionPillBadge: {
     backgroundColor: '#FEF3C7',
