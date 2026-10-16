@@ -25,6 +25,8 @@ export default function ConfirmEmailScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
+  const hasAttemptedRef = React.useRef<string | null>(null);
+
   useEffect(() => {
     if (token === 'preview-success') {
       setStatus('success');
@@ -36,6 +38,11 @@ export default function ConfirmEmailScreen() {
       setErrorMsg('No verification token found in URL.');
       return;
     }
+
+    if (hasAttemptedRef.current === token) {
+      return;
+    }
+    hasAttemptedRef.current = token;
 
     let isMounted = true;
 
@@ -49,7 +56,19 @@ export default function ConfirmEmailScreen() {
         if (isMounted) {
           console.warn('[ConfirmEmail] Verification error:', err?.message || err);
           setStatus('error');
-          setErrorMsg(err?.message || 'Verification token is invalid, expired, or already used.');
+          const raw = String(err?.message || '');
+          if (
+            raw.toLowerCase().includes('validating') ||
+            raw.toLowerCase().includes('invalid') ||
+            raw.toLowerCase().includes('expired') ||
+            raw.toLowerCase().includes('token')
+          ) {
+            setErrorMsg(
+              'This verification link is invalid, expired, or belongs to an earlier registration attempt. If you received multiple emails, please open the latest one.'
+            );
+          } else {
+            setErrorMsg(raw || 'Verification token is invalid, expired, or already used.');
+          }
         }
       }
     };

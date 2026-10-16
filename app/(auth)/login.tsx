@@ -932,6 +932,7 @@ export default function LoginScreen() {
                   <View style={styles.phoneActionSection}>
                     {/* Primary Action Button */}
                     <TouchableOpacity
+                      accessibilityRole="button"
                       style={[styles.primaryBtn, !isValid && styles.primaryBtnDisabled]}
                       onPress={handleGetStarted}
                       disabled={!isValid || isLoading}
@@ -1468,6 +1469,7 @@ export default function LoginScreen() {
 
                     {/* Primary Action Button for Password Login */}
                     <TouchableOpacity
+                      accessibilityRole="button"
                       style={[styles.primaryBtn, (!password || isLoading || (Platform.OS === 'web' && !turnstileToken)) && styles.primaryBtnDisabled]}
                       onPress={handlePasswordLogin}
                       disabled={!password || isLoading || (Platform.OS === 'web' && !turnstileToken)}

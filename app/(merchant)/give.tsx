@@ -411,6 +411,8 @@ export default function GiveStampsScreen() {
         {/* High-Contrast Segment Tabs Embedded */}
         <View style={{ flexDirection: 'row', backgroundColor: '#171717', borderRadius: 100, padding: 6, marginBottom: 24, zIndex: 10 }}>
           <TouchableOpacity
+            accessibilityRole="button"
+            testID="voucher-scan-tab"
             style={[styles.tabBtn, activeTab === 'voucher' && { backgroundColor: '#FFC700' }]}
             onPress={() => {
               setActiveTab('voucher');
@@ -426,6 +428,8 @@ export default function GiveStampsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            accessibilityRole="button"
+            testID="manual-give-tab"
             style={[styles.tabBtn, activeTab === 'manual' && { backgroundColor: '#FFC700' }]}
             onPress={() => {
               setActiveTab('manual');
@@ -789,6 +793,8 @@ export default function GiveStampsScreen() {
 
             {/* Submit Button */}
             <TouchableOpacity
+              accessibilityRole="button"
+              testID="submit-manual-give"
               style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
               onPress={handleManualIssue}
               disabled={isSubmitting}

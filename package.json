@@ -39,6 +39,7 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/react": "~19.2.2",
     "cross-env": "^10.1.0",
     "typescript": "~6.0.3"
@@ -51,7 +52,13 @@
     "admin": "npm run dev --prefix admin-portal",
     "build:web": "npx expo export --platform web --clear",
     "build:staging": "cross-env EXPO_PUBLIC_APP_ENV=staging EXPO_PUBLIC_PB_URL=https://staging-api.risev.app npx expo export --platform web",
-    "build:production": "cross-env EXPO_PUBLIC_APP_ENV=production EXPO_PUBLIC_PB_URL=https://api.risev.app npx expo export --platform web"
+    "build:production": "cross-env EXPO_PUBLIC_APP_ENV=production EXPO_PUBLIC_PB_URL=https://api.risev.app npx expo export --platform web",
+    "test:e2e": "playwright test",
+    "test:e2e:auth": "playwright test tests/e2e/01-auth.spec.ts",
+    "test:e2e:give": "playwright test tests/e2e/02-merchant-give.spec.ts",
+    "test:e2e:rewards": "playwright test tests/e2e/03-merchant-rewards.spec.ts",
+    "test:e2e:staff": "playwright test tests/e2e/04-merchant-staff.spec.ts",
+    "test:e2e:customer": "playwright test tests/e2e/05-customer-flows.spec.ts"
   },
   "private": true
 }

@@ -69,3 +69,9 @@ opencode.jsonc
 
 # Agent Persistent Memory & Daily Journals
 MEMORY/
+
+# Automated QA testing & reports
+tests/
+playwright.config.ts
+playwright-report/
+test-results/
