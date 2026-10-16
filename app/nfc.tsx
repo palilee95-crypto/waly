@@ -784,15 +784,47 @@ export default function NfcLandingScreen() {
   const [reviewFeedback, setReviewFeedback] = useState<string>('');
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
 
+  // 🎁 Unlocked Milestone or Completed Card Reward Voucher Modal
+  const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
+  const [unlockedReward, setUnlockedReward] = useState<{
+    id?: string;
+    code?: string;
+    title: string;
+    description?: string;
+    isMilestone: boolean;
+    atStamp?: number;
+    discountValue?: number;
+    snapshotType?: string;
+  } | null>(null);
+
   // Debug/preview support
   useEffect(() => {
+    const previewReward = (params as any)?.preview_reward;
     if (params.preview_step === 'sent') {
       setStep('sent');
     }
     if (params.preview_approved === 'true' || params.preview_approved === '1') {
       setIsApproved(true);
     }
-  }, [params.preview_step, params.preview_approved]);
+    if (previewReward === 'milestone') {
+      setUnlockedReward({
+        title: 'Free Artisan Coffee',
+        description: 'Milestone Reward for Stamp #5',
+        isMilestone: true,
+        atStamp: 5,
+        code: 'WV-MILE-5555',
+      });
+      setShowRewardModal(true);
+    } else if (previewReward === 'goal') {
+      setUnlockedReward({
+        title: 'Complete Free Meal Voucher',
+        description: 'Full Loyalty Card Completion Reward',
+        isMilestone: false,
+        code: 'WV-GOAL-9999',
+      });
+      setShowRewardModal(true);
+    }
+  }, [params.preview_step, params.preview_approved, (params as any)?.preview_reward]);
   const [reviewSubmitted, setReviewSubmitted] = useState<boolean>(false);
 
   // Tracks which stamp slot indices are "newly earned" this session for animation
@@ -863,10 +895,13 @@ export default function NfcLandingScreen() {
             } catch (e) {}
           }
 
-          // Delay popup ~2.8s to let customer celebrate their stamp and see the voucher progress first
+          // Delay popup ~3.5s to let customer celebrate their stamp and see the voucher progress first
+          // If a reward celebration modal was unlocked, skip review modal to avoid stacking popups
           const timer = setTimeout(() => {
-            setShowReviewModal(true);
-          }, 2800);
+            if (!unlockedReward && !showRewardModal) {
+              setShowReviewModal(true);
+            }
+          }, 3500);
           return () => clearTimeout(timer);
         };
 
@@ -1003,6 +1038,29 @@ export default function NfcLandingScreen() {
       pathname: '/(auth)/login' as any,
       params: { prefill_phone: strippedPhone, prefill_name: prefillName },
     });
+  };
+
+  const handleClaimVoucherLogin = () => {
+    setShowRewardModal(false);
+    const isAuthenticated = !!(user || (pb.authStore.isValid && pb.authStore.record));
+    if (isAuthenticated) {
+      router.push('/(customer)/vouchers' as any);
+    } else {
+      const rawPhone = phoneInput || '';
+      const strippedPhone = rawPhone.startsWith('+60')
+        ? rawPhone.slice(3)
+        : rawPhone.startsWith('60')
+        ? rawPhone.slice(2)
+        : rawPhone;
+      router.push({
+        pathname: '/(auth)/login' as any,
+        params: {
+          prefill_phone: strippedPhone,
+          prefill_name: nameInput.trim() || '',
+          redirect_to: '/(customer)/vouchers',
+        },
+      });
+    }
   };
 
   const handleNavigateToBooking = () => {
@@ -1343,6 +1401,32 @@ export default function NfcLandingScreen() {
           }
           setIsApproved(true);
           setIsWaitingConfirm(false);
+
+          // Fetch claim-status to check if this completion generated a voucher
+          const cid = claimId || record.id;
+          if (cid) {
+            pb.send<any>('/api/risev/nfc/claim-status', {
+              method: 'GET',
+              params: { claim_id: cid },
+              requestKey: null,
+            }).then(res => {
+              if (res?.earned_voucher) {
+                setUnlockedReward({
+                  id: res.earned_voucher.id,
+                  code: res.earned_voucher.code,
+                  title: res.earned_voucher.title,
+                  description: res.earned_voucher.description,
+                  isMilestone: res.earned_voucher.is_sub_reward === true,
+                  atStamp: res.earned_voucher.at_stamp,
+                  discountValue: res.earned_voucher.discount_value,
+                  snapshotType: res.earned_voucher.snapshot_type,
+                });
+                setTimeout(() => {
+                  setShowRewardModal(true);
+                }, 1200);
+              }
+            }).catch(() => {});
+          }
         }
       }
     }, {
@@ -1383,6 +1467,22 @@ export default function NfcLandingScreen() {
               }
               setIsApproved(true);
               setIsWaitingConfirm(false);
+
+              if (res.earned_voucher) {
+                setUnlockedReward({
+                  id: res.earned_voucher.id,
+                  code: res.earned_voucher.code,
+                  title: res.earned_voucher.title,
+                  description: res.earned_voucher.description,
+                  isMilestone: res.earned_voucher.is_sub_reward === true,
+                  atStamp: res.earned_voucher.at_stamp,
+                  discountValue: res.earned_voucher.discount_value,
+                  snapshotType: res.earned_voucher.snapshot_type,
+                });
+                setTimeout(() => {
+                  setShowRewardModal(true);
+                }, 1200);
+              }
               return;
             }
           } catch (cErr) {}
@@ -1507,6 +1607,49 @@ export default function NfcLandingScreen() {
       : `Collect all ${stampGoal} stamps to unlock this voucher and redeem at counter.`;
 
   let rewardImageUrl = getRewardVisualUrl(reward) || getRewardVisualUrl(linkedReward) || merchantLogoUrl || '';
+
+  // Trigger celebration modal if milestone or card goal was reached during approval
+  useEffect(() => {
+    if (!isApproved) return;
+    if (unlockedReward) return; // already populated from server response
+
+    const prev = prevStampsRef.current;
+    if (prev < 0) return;
+
+    // 1. Check Full Card Completion
+    const isCompleted = (currentStamps >= stampGoal && prev < stampGoal) || (currentStamps === 0 && prev > 0);
+    if (isCompleted) {
+      setUnlockedReward({
+        title: rewardTitle || 'Loyalty Reward Voucher',
+        description: rewardSubtitle || 'Card Goal Completed!',
+        isMilestone: false,
+      });
+      const timer = setTimeout(() => {
+        setShowRewardModal(true);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+
+    // 2. Check Intermediate Milestones
+    if (subRewardsList && subRewardsList.length > 0 && currentStamps > prev) {
+      const crossed = subRewardsList.find((sr: any) => {
+        const at = parseInt(sr.at_stamp, 10);
+        return at && prev < at && currentStamps >= at;
+      });
+      if (crossed) {
+        setUnlockedReward({
+          title: crossed.reward_title || 'Milestone Reward',
+          description: `Reward unlocked for collecting ${crossed.at_stamp} stamps`,
+          isMilestone: true,
+          atStamp: parseInt(crossed.at_stamp, 10),
+        });
+        const timer = setTimeout(() => {
+          setShowRewardModal(true);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isApproved, currentStamps, stampGoal, subRewardsList, unlockedReward, rewardTitle, rewardSubtitle]);
 
   // 3. Submit Direct NFC Claim & Setup Optional WhatsApp Redirect
   const handleNfcSubmit = async () => {
@@ -3298,11 +3441,333 @@ export default function NfcLandingScreen() {
           </View>
         </Modal>
       )}
+
+      {/* 🎁 MILESTONE & CARD COMPLETION REWARD CELEBRATION MODAL */}
+      <Modal
+        visible={showRewardModal && !!unlockedReward}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRewardModal(false)}
+      >
+        <View style={styles.rewardModalBackdrop}>
+          <BlurView intensity={90} tint="dark" style={[styles.rewardModalCard, isDesktop && { maxWidth: 420 }]}>
+            {/* Top Close Button */}
+            <TouchableOpacity
+              style={styles.rewardModalCloseBtn}
+              onPress={() => setShowRewardModal(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="rgba(255, 255, 255, 0.7)" />
+            </TouchableOpacity>
+
+            {/* Glowing Hero Icon Badge */}
+            <View style={styles.rewardHeroBadgeWrap}>
+              <View style={[
+                styles.rewardHeroGlow, 
+                { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.3)' : 'rgba(52, 211, 153, 0.3)' }
+              ]} />
+              <View style={[
+                styles.rewardHeroIconBox,
+                { borderColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.5)' : 'rgba(52, 211, 153, 0.5)' }
+              ]}>
+                <Text style={{ fontSize: 40 }}>
+                  {unlockedReward?.isMilestone ? '🎁' : '🏆'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Badge Pill */}
+            <View style={[
+              styles.rewardTypePill,
+              { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.15)' : 'rgba(52, 211, 153, 0.15)' }
+            ]}>
+              <Text style={[
+                styles.rewardTypePillText,
+                { color: unlockedReward?.isMilestone ? '#FFCC00' : '#34D399' }
+              ]}>
+                {unlockedReward?.isMilestone 
+                  ? `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}` 
+                  : 'KAD COP LENGKAP 100%'}
+              </Text>
+            </View>
+
+            {/* Title & Subtitle */}
+            <Text style={styles.rewardModalTitle}>
+              {unlockedReward?.isMilestone ? 'Ganjaran Milestone Dibuka!' : 'Tahniah! Kad Cop Selesai!'}
+            </Text>
+            <Text style={styles.rewardModalSubtitle}>
+              {unlockedReward?.isMilestone
+                ? `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`
+                : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!'}
+            </Text>
+
+            {/* Boarding Pass Style Voucher Ticket */}
+            <View style={styles.rewardTicketContainer}>
+              {/* Left Spine */}
+              <View style={[styles.rewardTicketSpine, { backgroundColor: primaryColor || '#FFCC00' }]}>
+                <Ionicons name="gift" size={20} color={getContrastColor(primaryColor || '#FFCC00')} />
+              </View>
+
+              {/* Main Ticket Info */}
+              <View style={styles.rewardTicketContent}>
+                <View style={styles.rewardTicketHeaderRow}>
+                  <Text style={styles.rewardTicketStoreName} numberOfLines={1}>
+                    {merchantName.toUpperCase()}
+                  </Text>
+                  <View style={styles.rewardTicketActiveBadge}>
+                    <Text style={styles.rewardTicketActiveBadgeText}>ACTIVE</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.rewardTicketTitle} numberOfLines={2}>
+                  {unlockedReward?.title || 'Exclusive Reward Voucher'}
+                </Text>
+
+                {unlockedReward?.code ? (
+                  <View style={styles.rewardTicketCodeRow}>
+                    <Ionicons name="barcode-outline" size={13} color="#94A3B8" />
+                    <Text style={styles.rewardTicketCodeText}>{unlockedReward.code}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.rewardTicketFooterRow}>
+                  <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                  <Text style={styles.rewardTicketExpiryText}>Sah 30 hari • Tebus di kaunter kedai</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <TouchableOpacity
+              style={styles.rewardModalPrimaryBtn}
+              onPress={handleClaimVoucherLogin}
+              activeOpacity={0.88}
+            >
+              <Ionicons 
+                name={user ? "wallet" : "log-in-outline"} 
+                size={19} 
+                color="#000000" 
+                style={{ marginRight: 8 }} 
+              />
+              <Text style={styles.rewardModalPrimaryBtnText}>
+                {user ? 'Lihat Dalam Baucar Saya' : 'Log Masuk & Simpan Baucar'}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#000000" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rewardModalDismissBtn}
+              onPress={() => setShowRewardModal(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.rewardModalDismissText}>Kekal Di Sini & Lihat Kad Cop</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rewardModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 99999,
+  },
+  rewardModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(18, 18, 24, 0.96)',
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 204, 0, 0.35)',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 28,
+    elevation: 20,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  rewardModalCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  rewardHeroBadgeWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  rewardHeroGlow: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    opacity: 0.8,
+  },
+  rewardHeroIconBox: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewardTypePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  rewardTypePillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.8,
+  },
+  rewardModalTitle: {
+    fontSize: 21,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  rewardModalSubtitle: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.75)',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 18,
+    paddingHorizontal: 6,
+  },
+  rewardTicketContainer: {
+    width: '100%',
+    backgroundColor: '#1E1E24',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  rewardTicketSpine: {
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewardTicketContent: {
+    flex: 1,
+    padding: 14,
+  },
+  rewardTicketHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  rewardTicketStoreName: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: 'rgba(255, 255, 255, 0.5)',
+    letterSpacing: 0.5,
+    flex: 1,
+    marginRight: 6,
+  },
+  rewardTicketActiveBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 0.5,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+  },
+  rewardTicketActiveBadgeText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#34D399',
+    letterSpacing: 0.5,
+  },
+  rewardTicketTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    marginBottom: 6,
+  },
+  rewardTicketCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  rewardTicketCodeText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#CBD5E1',
+    letterSpacing: 1,
+  },
+  rewardTicketFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  rewardTicketExpiryText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  rewardModalPrimaryBtn: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#FFCC00',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+    marginBottom: 10,
+  },
+  rewardModalPrimaryBtnText: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.2,
+  },
+  rewardModalDismissBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  rewardModalDismissText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.55)',
+  },
   reviewModalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',

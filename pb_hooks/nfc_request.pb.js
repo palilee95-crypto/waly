@@ -238,6 +238,52 @@ routerAdd("GET", "/api/risev/nfc/claim-status", (e) => {
       }
     } catch (err) {}
 
+    let earnedVoucher = null;
+    const customerId = claim.getString("customer");
+    if (status === "completed" && customerId) {
+      try {
+        const recentVouchers = $app.findRecordsByFilter(
+          "vouchers",
+          `customer = '${customerId}' && status = 'active'`,
+          "-created",
+          1,
+          0
+        );
+        if (recentVouchers.length > 0) {
+          const v = recentVouchers[0];
+          const vCreated = new Date(v.getString("created") || v.get("created")).getTime();
+          const claimCompletedAt = claim.getString("completed_at") ? new Date(claim.getString("completed_at")).getTime() : Date.now();
+          if (Math.abs(Date.now() - vCreated) < 180000 || Math.abs(claimCompletedAt - vCreated) < 180000) {
+            let meta = {};
+            try {
+              const rawMeta = v.getString("metadata") || v.get("metadata");
+              meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+            } catch (mErr) {}
+
+            let rewardTitle = meta.snapshot_title || "";
+            if (!rewardTitle && v.getString("reward")) {
+              try {
+                const rw = $app.findRecordById("rewards", v.getString("reward"));
+                if (rw) rewardTitle = rw.getString("name") || rw.getString("title") || "";
+              } catch (rErr) {}
+            }
+
+            earnedVoucher = {
+              id: v.id,
+              code: v.getString("code"),
+              title: rewardTitle || "Exclusive Reward Voucher",
+              description: meta.snapshot_description || "",
+              is_sub_reward: meta.is_sub_reward === true,
+              at_stamp: meta.at_stamp || null,
+              discount_value: meta.discount_value || 0,
+              snapshot_type: meta.snapshot_type || "free_item",
+              expires_at: v.getString("expires_at") || "",
+            };
+          }
+        }
+      } catch (vErr) {}
+    }
+
     return e.json(200, {
       success: true,
       claim_id: claim.id,
@@ -245,7 +291,8 @@ routerAdd("GET", "/api/risev/nfc/claim-status", (e) => {
       stamp_amount: claim.getInt("stamp_amount") || 0,
       total_stamps: totalStamps,
       stamp_goal: stampGoal,
-      customer_name: claim.getString("customer_name")
+      customer_name: claim.getString("customer_name"),
+      earned_voucher: earnedVoucher
     });
   } catch (err) {
     return e.json(500, { message: err.message || "Failed to get claim status" });
