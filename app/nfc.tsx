@@ -24,6 +24,7 @@ import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 
@@ -669,6 +670,8 @@ export default function NfcLandingScreen() {
     preview_approved?: string;
   }>();
   const { user, logout, refreshSession } = useAuth();
+  const { locale } = useLanguage();
+  const isEn = locale === 'en';
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth > 768;
 
@@ -3401,7 +3404,9 @@ export default function NfcLandingScreen() {
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
             <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '80%' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Resit Digital</Text>
+                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                  {isEn ? 'Digital Receipt' : 'Resit Digital'}
+                </Text>
                 <TouchableOpacity onPress={() => setShowReceiptModal(false)}>
                   <Ionicons name="close-circle" size={28} color="#94A3B8" />
                 </TouchableOpacity>
@@ -3413,8 +3418,12 @@ export default function NfcLandingScreen() {
                     <Ionicons name="storefront" size={32} color="#0F172A" />
                   </View>
                   <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', textAlign: 'center' }}>{merchant?.name}</Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>Resit #: {receiptData.receipt_number || receiptData.id}</Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>{new Date(receiptData.created).toLocaleString('ms-MY')}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
+                    {isEn ? 'Receipt #:' : 'Resit #:'} {receiptData.receipt_number || receiptData.id}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {new Date(receiptData.created).toLocaleString(isEn ? 'en-MY' : 'ms-MY')}
+                  </Text>
                 </View>
 
                 <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, marginBottom: 16 }}>
@@ -3427,14 +3436,18 @@ export default function NfcLandingScreen() {
                     ))
                   ) : (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>Pembayaran Servis</Text>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>
+                        {isEn ? 'Service Payment' : 'Pembayaran Servis'}
+                      </Text>
                       <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
                     </View>
                   )}
                 </View>
 
                 <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Jumlah Total</Text>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                    {isEn ? 'Total Amount' : 'Jumlah Total'}
+                  </Text>
                   <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
                 </View>
               </ScrollView>
@@ -3501,19 +3514,25 @@ export default function NfcLandingScreen() {
                   { color: unlockedReward?.isMilestone ? '#FFCC00' : '#34D399' }
                 ]}>
                   {unlockedReward?.isMilestone 
-                    ? `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}` 
-                    : 'KAD COP LENGKAP 100%'}
+                    ? (isEn ? `MILESTONE STAMP #${unlockedReward.atStamp || 'REWARD'}` : `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}`) 
+                    : (isEn ? 'STAMP CARD 100% COMPLETED' : 'KAD COP LENGKAP 100%')}
                 </Text>
               </View>
 
               {/* Title & Subtitle */}
               <Text style={styles.rewardModalTitle}>
-                {unlockedReward?.isMilestone ? 'Ganjaran Milestone Dibuka!' : 'Tahniah! Kad Cop Selesai!'}
+                {unlockedReward?.isMilestone 
+                  ? (isEn ? 'Milestone Reward Unlocked!' : 'Ganjaran Milestone Dibuka!') 
+                  : (isEn ? 'Congratulations! Card Completed!' : 'Tahniah! Kad Cop Selesai!')}
               </Text>
               <Text style={styles.rewardModalSubtitle}>
                 {unlockedReward?.isMilestone
-                  ? `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`
-                  : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!'}
+                  ? (isEn
+                      ? `Congratulations! You have reached Milestone Stamp #${unlockedReward.atStamp || ''} and unlocked this special voucher!`
+                      : `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`)
+                  : (isEn
+                      ? 'Congratulations! You completed your loyalty card and unlocked the main reward voucher!'
+                      : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!')}
               </Text>
 
               {/* Boarding Pass Style Voucher Ticket */}
@@ -3530,12 +3549,12 @@ export default function NfcLandingScreen() {
                       {merchantName.toUpperCase()}
                     </Text>
                     <View style={styles.rewardTicketActiveBadge}>
-                      <Text style={styles.rewardTicketActiveBadgeText}>ACTIVE</Text>
+                      <Text style={styles.rewardTicketActiveBadgeText}>{isEn ? 'ACTIVE' : 'AKTIF'}</Text>
                     </View>
                   </View>
 
                   <Text style={styles.rewardTicketTitle} numberOfLines={2}>
-                    {unlockedReward?.title || 'Exclusive Reward Voucher'}
+                    {unlockedReward?.title || (isEn ? 'Exclusive Reward Voucher' : 'Baucar Ganjaran Istimewa')}
                   </Text>
 
                   {unlockedReward?.code ? (
@@ -3547,7 +3566,9 @@ export default function NfcLandingScreen() {
 
                   <View style={styles.rewardTicketFooterRow}>
                     <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                    <Text style={styles.rewardTicketExpiryText}>Sah 30 hari • Tebus di kaunter kedai</Text>
+                    <Text style={styles.rewardTicketExpiryText}>
+                      {isEn ? 'Valid 30 days • Redeem at store counter' : 'Sah 30 hari • Tebus di kaunter kedai'}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -3565,7 +3586,9 @@ export default function NfcLandingScreen() {
                   style={{ marginRight: 8 }} 
                 />
                 <Text style={styles.rewardModalPrimaryBtnText}>
-                  {user ? 'Lihat Dalam Baucar Saya' : 'Log Masuk & Simpan Baucar'}
+                  {user 
+                    ? (isEn ? 'View in My Vouchers' : 'Lihat Dalam Baucar Saya') 
+                    : (isEn ? 'Log In & Save Voucher' : 'Log Masuk & Simpan Baucar')}
                 </Text>
                 <Ionicons name="arrow-forward" size={18} color="#000000" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
@@ -3575,7 +3598,9 @@ export default function NfcLandingScreen() {
                 onPress={() => setShowRewardModal(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.rewardModalDismissText}>Kekal Di Sini & Lihat Kad Cop</Text>
+                <Text style={styles.rewardModalDismissText}>
+                  {isEn ? 'Stay Here & View Stamp Card' : 'Kekal Di Sini & Lihat Kad Cop'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
