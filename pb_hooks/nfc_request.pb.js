@@ -71,6 +71,12 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       name = "Customer " + digits.slice(-4);
     }
 
+    const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
+    const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
+    if (reqVoucherId && !name.includes("[VOUCHER:")) {
+      name = `${name} [VOUCHER:${reqVoucherId}#${reqVoucherName}]`;
+    }
+
     // Generate random 6-character uppercase session code
     const sessionCode = $security.randomString(6).toUpperCase();
 
@@ -93,6 +99,14 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         if (branchId) claim.set("branch", branchId);
         if (branchName) claim.set("branch_name", branchName);
         if (customerUser) claim.set("customer", customerUser.id);
+        const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
+        const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
+        if (reqVoucherId) {
+          try { claim.set("voucher", reqVoucherId); } catch (vErr) {}
+        }
+        if (reqVoucherName) {
+          try { claim.set("voucher_title", reqVoucherName); } catch (vErr) {}
+        }
         $app.save(claim);
         console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to pending for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
       }
@@ -110,23 +124,38 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       if (branchId) claim.set("branch", branchId);
       if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
+      const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
+      const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
+      if (reqVoucherId) {
+        try { claim.set("voucher", reqVoucherId); } catch (vErr) {}
+      }
+      if (reqVoucherName) {
+        try { claim.set("voucher_title", reqVoucherName); } catch (vErr) {}
+      }
       $app.save(claim);
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
     }
+
+    const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
+    const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
 
     // Trigger Web Push Notification to Merchant Owner & Branch Staff
     try {
       const pushHelper = require(`${__hooks}/push_notify.js`);
       pushHelper.sendPushToMerchant(merchantId, branchId, {
-        title: "NFC Stamp Claim! 🏷️",
-        body: `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
+        title: reqVoucherName ? "NFC Claim + Baucar! 🏷️🎁" : "NFC Stamp Claim! 🏷️",
+        body: reqVoucherName
+          ? `${name} ingin kumpul cop & tebus: ${reqVoucherName}`
+          : `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
         url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cleanPhone)}`,
         tag: `claim-${claim.id}`,
         data: {
           claim_id: claim.id,
           customer_name: name,
           phone: cleanPhone,
-          session_code: sessionCode
+          session_code: sessionCode,
+          voucher_id: reqVoucherId,
+          voucher_name: reqVoucherName
         }
       });
     } catch (pushErr) {
@@ -152,7 +181,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       status: "pending",
       current_stamps: currentStamps,
       stamp_goal: stampGoal,
-      merchant_name: merchant.getString("name") || "Merchant"
+      merchant_name: merchant.getString("name") || "Merchant",
+      voucher_id: reqVoucherId,
+      voucher_name: reqVoucherName
     });
   } catch (err) {
     console.log("[NFC REQUEST ERROR]", err.message || err);
@@ -298,3 +329,108 @@ routerAdd("GET", "/api/risev/nfc/claim-status", (e) => {
     return e.json(500, { message: err.message || "Failed to get claim status" });
   }
 });
+
+// Endpoint to check customer's active vouchers for this merchant before claiming
+routerAdd("POST", "/api/risev/nfc/customer-vouchers", (e) => {
+  try {
+    const body = e.requestInfo().body || {};
+    const merchantId = (body.merchant_id || body.merchant || "").trim();
+    const rawPhone = (body.phone || body.customer_phone || "").trim();
+
+    if (!merchantId || !rawPhone) {
+      return e.json(200, { success: true, vouchers: [] });
+    }
+
+    let digits = rawPhone.replace(/[^\d]/g, '');
+    if (digits.indexOf("0") === 0) digits = "6" + digits;
+    if (digits.indexOf("60") !== 0 && digits.length >= 9) digits = "60" + digits;
+    const cleanPhone = "+" + digits;
+    const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
+
+    // Find customer by phone
+    let customerId = "";
+    try {
+      const users = $app.findRecordsByFilter(
+        "users",
+        `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`,
+        "-created",
+        1,
+        0
+      );
+      if (users.length > 0) {
+        customerId = users[0].id;
+      }
+    } catch (uErr) {}
+
+    if (!customerId) {
+      return e.json(200, { success: true, vouchers: [] });
+    }
+
+    // Find all active vouchers for this customer
+    const rawVouchers = $app.findRecordsByFilter(
+      "vouchers",
+      `customer = '${customerId}' && status = 'active'`,
+      "-created",
+      20,
+      0
+    );
+
+    const result = [];
+    for (let i = 0; i < rawVouchers.length; i++) {
+      const v = rawVouchers[i];
+      let meta = {};
+      try {
+        const rawMeta = v.getString("metadata") || v.get("metadata");
+        meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+      } catch (mErr) {}
+
+      let rewardId = v.getString("reward");
+      let rewardMerchantId = "";
+      let rewardTitle = meta.snapshot_title || "";
+      let rewardDesc = meta.snapshot_description || "";
+      let rewardType = meta.snapshot_type || "free_item";
+
+      if (rewardId) {
+        try {
+          const rw = $app.findRecordById("rewards", rewardId);
+          if (rw) {
+            rewardMerchantId = rw.getString("merchant");
+            if (!rewardTitle) rewardTitle = rw.getString("name") || rw.getString("title") || "";
+            if (!rewardDesc) rewardDesc = rw.getString("description") || "";
+            if (rw.getString("type")) rewardType = rw.getString("type");
+          }
+        } catch (rErr) {}
+      }
+
+      if (!rewardMerchantId && v.getString("campaign")) {
+        try {
+          const cp = $app.findRecordById("campaigns", v.getString("campaign"));
+          if (cp) {
+            rewardMerchantId = cp.getString("merchant");
+            if (!rewardTitle) rewardTitle = cp.getString("name") || cp.getString("title") || "";
+          }
+        } catch (cErr) {}
+      }
+
+      // Check if voucher belongs to this merchant
+      if (!rewardMerchantId || rewardMerchantId === merchantId) {
+        result.push({
+          id: v.id,
+          code: v.getString("code") || "",
+          title: rewardTitle || "Reward Voucher",
+          description: rewardDesc || "Redeem at counter",
+          type: rewardType,
+          discount_value: meta.discount_value || 0,
+          expires_at: v.getString("expires_at") || v.getString("valid_until") || "",
+          created: v.getString("created")
+        });
+      }
+    }
+
+    return e.json(200, { success: true, vouchers: result });
+  } catch (err) {
+    console.log("[NFC CUSTOMER VOUCHERS ERROR]", err.message || err);
+    return e.json(200, { success: true, vouchers: [] });
+  }
+});
+

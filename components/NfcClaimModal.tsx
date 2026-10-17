@@ -20,13 +20,19 @@ import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
+const getCleanCustomerName = (rawName?: string): string => {
+  if (!rawName) return 'Customer';
+  return rawName.replace(/\s*\[VOUCHER:[^\]]+\]\s*/g, '').trim() || 'Customer';
+};
+
 const getInitials = (name: string) => {
-  if (!name) return '??';
-  const parts = name.split(' ');
+  const clean = getCleanCustomerName(name);
+  if (!clean) return '??';
+  const parts = clean.split(' ');
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
-  return name.substring(0, 2).toUpperCase();
+  return clean.substring(0, 2).toUpperCase();
 };
 
 const formatUpcomingDate = (dateStr?: string): string => {
@@ -397,26 +403,77 @@ export default function NfcClaimModal() {
       // Fetch active customer vouchers
       try {
         let custId = claim.customer;
-        if (!custId && claim.customer_phone) {
-          const uRes = await pb.collection('users').getList(1, 1, {
-            filter: `phone = "${claim.customer_phone}"`,
-          });
-          if (uRes.items.length > 0) custId = uRes.items[0].id;
+        const rawPhone = (claim.customer_phone || '').trim();
+        const digits = rawPhone.replace(/\D/g, '');
+        const withPlus = rawPhone.startsWith('+') ? rawPhone : (digits ? '+' + digits : '');
+
+        if (!custId && rawPhone) {
+          const phoneQueries = [
+            `phone = "${rawPhone}"`,
+            digits ? `phone = "${digits}"` : '',
+            withPlus ? `phone = "${withPlus}"` : '',
+          ].filter(Boolean);
+
+          for (const q of phoneQueries) {
+            try {
+              const uRes = await pb.collection('users').getList(1, 1, { filter: q });
+              if (uRes.items.length > 0) {
+                custId = uRes.items[0].id;
+                break;
+              }
+            } catch (uErr) {}
+          }
         }
+
+        let loadedVouchers: any[] = [];
         if (custId) {
-          const vRes = await pb.collection('vouchers').getList(1, 10, {
+          const vRes = await pb.collection('vouchers').getList(1, 20, {
             filter: `customer = "${custId}" && status = "active"`,
             expand: 'reward',
           });
+          loadedVouchers = vRes.items;
           setCustomerVouchers(vRes.items);
         } else {
           setCustomerVouchers([]);
+        }
+
+        // Auto-select voucher if customer requested one via NFC claim
+        let targetVoucherId = (claim?.voucher || claim?.voucher_id || '').trim();
+        let voucherTitleHint = (claim?.voucher_title || claim?.voucher_name || '').trim();
+        const rawName = claim?.customer_name || '';
+        const vMatch = rawName.match(/\[VOUCHER:([^#\]]+)(?:#([^\]]*))?\]/);
+        if (vMatch) {
+          if (!targetVoucherId) targetVoucherId = vMatch[1].trim();
+          if (!voucherTitleHint && vMatch[2]) voucherTitleHint = vMatch[2].trim();
+        }
+
+        if (targetVoucherId || voucherTitleHint) {
+          let matched = null;
+          if (loadedVouchers.length > 0) {
+            matched = loadedVouchers.find((v: any) =>
+              (targetVoucherId && (v.id === targetVoucherId || v.code === targetVoucherId)) ||
+              (voucherTitleHint && (v.title === voucherTitleHint || v.expand?.reward?.name === voucherTitleHint))
+            );
+          }
+
+          if (matched) {
+            setAppliedVoucher(matched);
+          } else {
+            // Virtual voucher fallback so merchant always sees the customer's selected voucher
+            setAppliedVoucher({
+              id: targetVoucherId || 'v_selected',
+              title: voucherTitleHint || 'Selected Customer Voucher',
+              code: targetVoucherId || '',
+              status: 'active',
+              metadata: { snapshot_title: voucherTitleHint || 'Selected Customer Voucher', discount_type: 'none' },
+            });
+          }
         }
       } catch (e) {
         setCustomerVouchers([]);
       }
     })();
-  }, [claim?.id, claim?.customer_phone, merchantId]);
+  }, [claim?.id, claim?.customer_phone, claim?.customer_name, claim?.voucher, claim?.voucher_id, merchantId]);
 
   const activeClaimRef = React.useRef<any>(null);
   activeClaimRef.current = claim;
@@ -744,7 +801,7 @@ export default function NfcClaimModal() {
             </View>
             <View style={{ flex: 1, paddingRight: 6 }}>
               <Text style={styles.floatingTitle} numberOfLines={1}>
-                Pending Tap: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{claim.customer_name || 'Customer'}</Text>
+                Pending Tap: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{getCleanCustomerName(claim.customer_name)}</Text>
               </Text>
               <Text style={styles.floatingSubtitle}>
                 {claim.customer_phone} · RM {billAmount || '10'} ({stampAmount || '1'} stamp)
@@ -776,13 +833,13 @@ export default function NfcClaimModal() {
               </View>
               <Text style={styles.successTitle}>Stamps Issued Successfully!</Text>
               <Text style={styles.successSubtitle}>
-                {stampAmount} stamp(s) credited to <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{claim.customer_name || 'Customer'}</Text>
+                {stampAmount} stamp(s) credited to <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{getCleanCustomerName(claim.customer_name)}</Text>
               </Text>
 
               <View style={styles.summaryBox}>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Customer</Text>
-                  <Text style={styles.summaryValue}>{claim.customer_name || 'Customer'}</Text>
+                  <Text style={styles.summaryValue}>{getCleanCustomerName(claim.customer_name)}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
@@ -870,7 +927,7 @@ export default function NfcClaimModal() {
                       <View style={{ flex: 1, alignItems: 'center' }}>
                         <Text style={styles.pickerTitle}>Edit Order & Add Items</Text>
                         <Text style={styles.pickerSubTitle} numberOfLines={1}>
-                          {claim.customer_name || 'Customer'} · {claim.customer_phone}
+                          {getCleanCustomerName(claim.customer_name)} · {claim.customer_phone}
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -1078,7 +1135,7 @@ export default function NfcClaimModal() {
                           <Text style={styles.payAvatarText}>{getInitials(claim.customer_name || 'Fazli')}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.payCustomerName}>{claim.customer_name || 'Fazli'}</Text>
+                          <Text style={styles.payCustomerName}>{getCleanCustomerName(claim.customer_name || 'Fazli')}</Text>
                           <Text style={styles.payCustomerSub}>
                             {claim.customer_phone || '+601110209669'} · {claim.session_code || 'ZGKPS6'}
                           </Text>
@@ -1258,13 +1315,19 @@ export default function NfcClaimModal() {
                       </View>
                       
                       <View style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                           <Text style={styles.figmaCustomerName} numberOfLines={1}>
-                            {claim.customer_name || 'Fazli'}
+                            {getCleanCustomerName(claim.customer_name || 'Fazli')}
                           </Text>
                           <View style={styles.sessionPillBadge}>
                             <Text style={styles.sessionPillText}>{claim.session_code || 'ZX2Z8R'}</Text>
                           </View>
+                          {appliedVoucher ? (
+                            <View style={styles.customerVoucherBadge}>
+                              <Ionicons name="gift" size={10} color="#92400E" />
+                              <Text style={styles.customerVoucherBadgeText}>Guna Baucar</Text>
+                            </View>
+                          ) : null}
                         </View>
                         <Text style={styles.figmaCustomerPhone} numberOfLines={1}>
                           {claim.customer_phone || '+601110209669'}
@@ -1460,27 +1523,79 @@ export default function NfcClaimModal() {
                       )}
                     </View>
 
+                    {/* Customer Applied Voucher Highlight Banner */}
+                    {appliedVoucher ? (
+                      <View style={styles.chosenVoucherCard}>
+                        <View style={styles.chosenVoucherHeaderRow}>
+                          <View style={styles.chosenVoucherBadge}>
+                            <Ionicons name="sparkles" size={11} color="#92400E" />
+                            <Text style={styles.chosenVoucherBadgeText}>
+                              PELANGGAN INGIN GUNAKAN BAUCAR INI
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => setAppliedVoucher(null)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={styles.chosenVoucherRemoveBtn}
+                            accessibilityLabel="Batal guna baucar"
+                          >
+                            <Ionicons name="close-circle" size={15} color="#94A3B8" />
+                            <Text style={styles.chosenVoucherRemoveText}>Batal</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.chosenVoucherContentRow}>
+                          <View style={styles.chosenVoucherIconBox}>
+                            <Ionicons name="gift" size={20} color="#D97706" />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.chosenVoucherTitle} numberOfLines={1}>
+                              {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                              {appliedVoucher.code ? (
+                                <View style={styles.chosenVoucherCodeBadge}>
+                                  <Text style={styles.chosenVoucherCodeText}>Kod: {appliedVoucher.code}</Text>
+                                </View>
+                              ) : null}
+                              <View style={styles.chosenVoucherDiscountBadge}>
+                                <Text style={styles.chosenVoucherDiscountText}>
+                                  {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)} OFF` : 'Item Percuma'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={styles.chosenVoucherActivePill}>
+                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                            <Text style={styles.chosenVoucherActiveText}>Dipilih</Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : null}
+
                     {/* 3. AVAILABLE VOUCHERS NAVIGATION ROW */}
                     <TouchableOpacity
-                      style={styles.navRowCard}
+                      style={[styles.navRowCard, appliedVoucher && styles.navRowCardWithVoucher]}
                       onPress={() => setIsVouchersExpanded(!isVouchersExpanded)}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="gift-outline" size={20} color="#1D1D1F" />
-                      <Text style={styles.navRowTitle}>Available vouchers</Text>
+                      <Ionicons name="gift-outline" size={20} color={appliedVoucher ? '#D97706' : '#1D1D1F'} />
+                      <Text style={[styles.navRowTitle, appliedVoucher && { color: '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+                        {appliedVoucher ? 'Baucar Digunakan (1 Dipilih)' : 'Available vouchers'}
+                      </Text>
                       {customerVouchers.length > 0 && (
-                        <View style={styles.figmaCountBadge}>
-                          <Text style={styles.figmaCountText}>{customerVouchers.length}</Text>
+                        <View style={[styles.figmaCountBadge, appliedVoucher && { backgroundColor: '#FEF3C7' }]}>
+                          <Text style={[styles.figmaCountText, appliedVoucher && { color: '#B45309' }]}>{customerVouchers.length}</Text>
                         </View>
                       )}
                       {appliedVoucher ? (
                         <View style={styles.appliedVoucherBadge}>
                           <Text style={styles.appliedVoucherBadgeText} numberOfLines={1}>
-                            ✓ (-RM {discountAmount.toFixed(2)})
+                            ✓ {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : 'Item Percuma'}
                           </Text>
                         </View>
                       ) : null}
-                      <Ionicons name="chevron-forward" size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
+                      <Ionicons name={isVouchersExpanded ? "chevron-up" : "chevron-forward"} size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
                     </TouchableOpacity>
 
                     {/* Collapsible Vouchers Drawer when expanded */}
@@ -1552,8 +1667,8 @@ export default function NfcClaimModal() {
 
                     {/* 5. STAMPS TO ISSUE / GIVE */}
                     <View style={styles.stampIssueCard}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
                           <Ionicons name="ribbon-outline" size={15} color="#D97706" />
                           <Text style={styles.stampIssueLabel}>STAMPS TO GIVE</Text>
                         </View>
@@ -1570,7 +1685,10 @@ export default function NfcClaimModal() {
                             <Ionicons name="remove" size={13} color="#0F172A" />
                           </TouchableOpacity>
                           <TextInput
-                            style={[styles.stampStepperInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                            style={[
+                              styles.stampStepperInput,
+                              Platform.OS === 'web' ? ({ outlineWidth: 0, width: 32, textAlign: 'center' } as any) : null,
+                            ]}
                             value={stampAmount}
                             onChangeText={(t) => {
                               const clean = t.replace(/[^0-9]/g, '');
@@ -1650,7 +1768,14 @@ export default function NfcClaimModal() {
                   <View style={styles.figmaStickyCheckoutFooter}>
                     {/* Total Amount Row */}
                     <View style={styles.figmaTotalRow}>
-                      <Text style={styles.figmaTotalLabel}>Total Amount</Text>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.figmaTotalLabel}>Total Amount</Text>
+                        {appliedVoucher ? (
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669', marginTop: 1 }} numberOfLines={1}>
+                            🏷️ {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code} ({discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : 'Item Percuma'})
+                          </Text>
+                        ) : null}
+                      </View>
                       <Text style={styles.figmaTotalValue}>
                         RM {netTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
@@ -1748,7 +1873,7 @@ export default function NfcClaimModal() {
                         </Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.customerName}>{claim.customer_name || 'Customer'}</Text>
+                        <Text style={styles.customerName}>{getCleanCustomerName(claim.customer_name)}</Text>
                         <Text style={styles.customerPhone}>{claim.customer_phone}</Text>
                       </View>
                       {claim.session_code ? (
@@ -2079,6 +2204,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
     gap: 4,
+    flexShrink: 0,
   },
   stampStepperBtn: {
     width: 26,
@@ -2087,15 +2213,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   stampStepperInput: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#0F172A',
     textAlign: 'center',
-    minWidth: 28,
-    paddingHorizontal: 4,
+    width: 32,
+    maxWidth: 36,
+    height: 26,
+    paddingHorizontal: 0,
     paddingVertical: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
   sessionPillBadge: {
     backgroundColor: '#FEF3C7',
@@ -3777,5 +3908,126 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#64748B',
+  },
+  chosenVoucherCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE047',
+    borderRadius: 16,
+    padding: 12,
+    gap: 8,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  chosenVoucherHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  chosenVoucherBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  chosenVoucherBadgeText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
+    letterSpacing: 0.4,
+  },
+  chosenVoucherRemoveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  chosenVoucherRemoveText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#94A3B8',
+  },
+  chosenVoucherContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  chosenVoucherIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FEF08A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  chosenVoucherTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  chosenVoucherCodeBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  chosenVoucherCodeText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  chosenVoucherDiscountBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  chosenVoucherDiscountText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#15803D',
+  },
+  chosenVoucherActivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  chosenVoucherActiveText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#059669',
+  },
+  navRowCardWithVoucher: {
+    backgroundColor: '#FFFDF5',
+    borderColor: '#FDE68A',
+  },
+  customerVoucherBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  customerVoucherBadgeText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#92400E',
   },
 });

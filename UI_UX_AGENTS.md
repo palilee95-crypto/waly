@@ -899,3 +899,353 @@ The Manage Staff experience (`app/(merchant)/staff.tsx`) follows a strict 3-scre
 - **Refinement**:
   - The redundant segmented pill bar `[ Colors & Icons | Artwork ]` has been completely removed.
   - The screen now flows seamlessly and cleanly from the live interactive card preview directly into **Card 1 (Colors & Icons)** and **Card 2 (Artwork)** without intermediate redundant tabs.
+
+### 54. High-Dopamine Milestone Celebration Modal (Concept A + B)
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Features Implemented**:
+  1. **Hero Celebration**:
+     - Ambient golden halo glow with floating celebration sparkle stars (`✨`, `🌟`).
+     - Dual-ring border with golden accents surrounding the 3D gift/trophy emoji box.
+     - Celebratory pill tag with sparkle icon (`✨ MILESTONE COP #5 DIBUKA! ✨`).
+  2. **Gamified Milestone Journey Track (Concept B)**:
+     - Visual progress pipeline displaying `[ Start ] ─── [ ★ Cop #5 (Dibuka) ] ─── [ 🏆 Cop #10 ]`.
+     - Proportional progress bar fill showing exact customer journey towards the ultimate card goal.
+  3. **Luxe Notched Boarding Pass Ticket (Concept A)**:
+     - Authentic physical voucher ticket styling with top and bottom semi-circle notch cutouts (`14×14px` border notches matching the dark backdrop `#121217`).
+     - Vertical dashed perforation tear-line dividing the left voucher stub and the main ticket body.
+     - Left stub with brand primary color, crisp white gift badge, and vertical voucher ribbon text.
+     - Right body with merchant name, active status dot badge, 15px bold reward title, and interactive 1-tap copyable voucher code with "Copied!" visual feedback.
+  4. **Next Milestone Retention Teaser**:
+     - Dynamic motivational retention hook: *"Kumpul lagi X cop untuk tebus Ganjaran Utama: [Title]!"* motivating the customer to revisit.
+
+### 55. Milestone Celebration Modal: English Localization
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Refinement**:
+  - All copy inside the Milestone and Card Completion celebration popup modal is now fully standardized in clean, modern English:
+    - Badge: `MILESTONE STAMP #{X}` / `STAMP CARD 100% COMPLETED`
+    - Heading: `Milestone Reward Unlocked!` / `Congratulations! Card Completed!`
+    - Subtitle: `Congratulations! You reached Milestone Stamp #{X} and unlocked this exclusive voucher!`
+    - Progress Track: `Start` ─── `Stamp #{X}` ─── `Stamp #{Goal}`
+    - Voucher: `VOUCHER`, `ACTIVE`, `Valid 30 days • Redeem at store counter`
+    - Action CTAs: `Log In & Save Voucher` / `View in My Vouchers`, and `Stay Here & View Stamp Card`.
+
+### 56. Boarding Pass Ticket Layout & Notch Refinement
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Refinement Details**:
+  1. **Solved Milestone Pill Clipping**:
+     - Constrained the milestone badge with `maxWidth: '96%'`, `alignSelf: 'flex-start'`, and added `numberOfLines={1}` with `ellipsizeMode="tail"`.
+     - Added `paddingRight: 8` and `overflow: 'hidden'` to the main content body so badges never run underneath the dashed perforation line.
+  2. **Rebalanced Proportions & Free Space**:
+     - Slimmed the left brand band from `44px` to `36px` and the right stub from `105px` to `90px`, gaining **~23px of horizontal canvas** for the center content.
+     - Increased card height slightly to `165px` to provide breathing room for the reward title, progress bar, and milestone pill.
+  3. **Seamless Authentic Notches**:
+     - Removed the harsh `borderWidth: 1, borderColor: '#FFFFFF'` from the circular notches.
+     - Set the notch cutout background to `#100720` so the bite marks blend naturally into the page backdrop rather than appearing as white-bordered stickers.
+
+### 57. Post-Approval Next Visit Booking Card: Luxury Glassmorphism & English Standardization
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Refinements**:
+  1. **Contrast & Readability (Solved Wallpaper Conflict)**:
+     - Upgraded background from `rgba(255, 255, 255, 0.08)` to rich luxury dark glassmorphism `rgba(15, 15, 24, 0.76)` with `1.2px` subtle light border and soft drop shadow.
+     - Subtitle and title text are now 100% legible, preventing any visual bleed from busy background wallpapers.
+  2. **Elevated Pill Badge Tag**:
+     - Converted `PLAN YOUR NEXT VISIT` into a refined golden capsule pill (`postApprovalBookingTagPill`) with ambient golden glow and sparkle icon.
+  3. **High-Converting English Copy**:
+     - Tag: `✨ PLAN YOUR NEXT VISIT`
+     - Heading: `Loved today's visit? Skip the line next time!`
+     - Subtitle: `Book your next appointment seamlessly from your phone.`
+     - Primary Button: `Book Next Appointment ➔`
+     - Secondary Button: `View My Stamp Card`
+     - Receipt: `Payment of RM {amount} Successful` · `Receipt`
+
+### 58. Points Loyalty Hub Overhaul: Fresha x Apple iOS Grouped List Design System
+- **File**: [`app/(merchant)/rewards.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/rewards.tsx)
+- **Goal**: Harmonize the Points Loyalty configuration tab with the Stamp Loyalty tab using the Apple iOS x Fresha design system.
+- **Key Features Implemented**:
+  1. **Header & Interactive Status Capsule**:
+     - Modern typography (`Points Loyalty` + subtitle `Manage point earn rates, redemption value & limits`).
+     - Tappable status badge (`● Active` in `#F0FDF4` / `○ Inactive` in `#F8FAFC`).
+  2. **Flagship Hero Card ("YOUR POINTS PROGRAM")**:
+     - Golden 48×48 rounded squircle icon (`#FFCC00`) with star icon.
+     - Live dynamic program summary: `Earn 1 Pt per RM {spendPerPoint} spent` · `{pointsPerRm} Pts = RM 1.00 Discount ({rewardRatePercent}% Cashback)`.
+     - Tapping opens the interactive **Points Simulator & Calculator**.
+  3. **Grouped List 1: "Points Rules" (Apple iOS Settings Rows)**:
+     - **Earn Rate**: Emerald squircle `cash-outline` (`#D1FAE5`) ➔ `Spend RM {spendPerPoint} ➔ Earn 1 Point`.
+     - **Redemption Rate**: Amber squircle `gift-outline` (`#FEF3C7`) ➔ `{pointsPerRm} Pts = RM 1.00 Discount Value`.
+     - **Minimum Points to Redeem**: Blue squircle `shield-checkmark-outline` (`#DBEAFE`) ➔ `{parsedMin} Pts (RM min discount)` or `No minimum threshold`.
+  4. **Grouped List 2: "More Options"**:
+     - **Points Calculator & Simulator**: Violet squircle `calculator-outline` (`#EDE9FE`) ➔ Interactive spend slider, quick preset buttons (`RM 20`, `RM 50`, `RM 100`, `RM 200`), live cashback rate, and merchant net margin.
+     - **Redemption Limits & Fraud Guard**: Rose squircle `lock-closed-outline` (`#FFE4E6`) ➔ Max discount percentage per transaction.
+  5. **Apple 3/4 Bottom Sheet Modals (`pointsSubScreen`)**:
+     - Replaces heavy inline boxes with sleek bottom sheets containing pull handles, back buttons, 2×2 preset grids, custom input toggles, dual-metric preview strips, and sticky black `Save` buttons.
+
+### 59. NFC Tap Customer Journey: 2-Step Progressive Reveal Overhaul
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Goal**: Transform the NFC tap customer experience from a crowded single-page stack into a clean, luxury 2-step progressive reveal where the merchant's background wallpaper takes center stage.
+- **Key Changes Implemented**:
+  1. **Step 1 (After Tap) - Clean Wallpaper Hero View**:
+     - **Top Brand Strip**: Renders circular merchant logo + `Welcome to {Merchant Name}` on the left and white `risev` logo on the right.
+     - **Hidden Stamp Card & Voucher**: The VIP Stamp Card and Boarding Pass Voucher Ticket are strictly hidden during initial tap (`step === 'form'`).
+     - **Frosted Glass Card (`styles.innerFormCard`)**:
+       - `● VERIFIED NFC SCAN` pill.
+       - Title: `Claim Your Stamp` (or `Claim Your Points`).
+       - Subtitle: `Tap detected. Enter your phone number to continue.`
+       - Phone input with country prefix `🇲🇾 +60`, clear `x` button, and error handling.
+       - Primary action button: `Collect My Stamp ➔` (or `Collect My Points ➔`).
+       - Reassurance teaser note: `🔒 Reward preview will appear after request is sent.`
+       - Prominent `Walk-in: Book Appointment` button (`Tempah slot temujanji & pilih servis`) with `ATAU` divider.
+  2. **Step 2 (Waiting for Merchant Approval) - The Big Reveal**:
+     - When the customer taps `Collect My Stamp ➔` (`setStep('sent')`):
+       - The **VIP Stamp Card** and **Boarding Pass Reward Ticket** dynamically reveal!
+       - **Approval Status Box**: Yellow circular clock icon badge (`#FEF08A`), `Waiting for merchant approval` title, pulsing amber status dots, summary table with customer phone number and `🟡 Pending` status, and `Wrong number? Edit Phone` action.
+
+### 60. NFC Tap Card Overhaul: Pure White Apple-Grade Luxury Design
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Goal**: Replaced dark frosted glass with an Apple-grade pure white card matching the exact user design mockup.
+- **Key Features Implemented**:
+  1. **White Squircle Card**:
+     - `backgroundColor: '#FFFFFF'`, `borderRadius: 28`, `borderColor: '#F1F5F9'`, subtle ambient drop shadow (`shadowOpacity: 0.12, shadowRadius: 24`).
+  2. **Mint Green Status Pill**:
+     - `#ECFDF5` background with `#10B981` dot and `#047857` bold text: `● NFC tap successful`.
+  3. **High-Impact Typography**:
+     - Headline: `Collect your stamp.` (or `Collect your points.`) in 30px `PlusJakartaSans_800ExtraBold`, color `#000000`, letterSpacing `-0.8`.
+     - Subtitle: `Enter your phone number to continue.` in `#64748B`.
+  4. **Segmented Country Pill Phone Input**:
+     - Dual-tone input box (`#F8FAFC`, `borderRadius: 16`).
+     - Inner white country pill: `🇲🇾 +60 ⌄`.
+     - Hairline vertical divider (`#E2E8F0`).
+     - Black bold phone input text + circular gray clear button (`✕`).
+  5. **Golden Yellow Primary CTA**:
+     - `#FFCC00` capsule button with black extra bold text `Collect My Stamp ➔`.
+  6. **Loyalty Reassurance**:
+     - Centered lock icon with `Your number is used for loyalty rewards.` in `#64748B`.
+  7. **OR Divider & Walk-in Appointment Card**:
+     - Centered `OR` hairline divider.
+     - Squircle card with pastel yellow circular calendar icon, `Walk-In: Book Appointment` title, `Tempah slot temu janji & pilih servis` subtitle, and right chevron.
+
+### 61. NFC Screen Dynamic Contrast & Lowered Card Positioning
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Changes**:
+  1. **Removed Bottom Risev Logo**: Eliminated the redundant `fakeRisevLogoPhoneBg` image below the card container.
+  2. **Adaptive Contrast (Light vs Dark Wallpaper)**:
+     - Implemented dynamic top-strip luminance detection with HTML5 Canvas sampling and fallback to `getContrastColor(onboarding_primary_color)`.
+     - When background is bright (cerah): `Welcome to` & `[Merchant Name]` are black/dark navy (`#0F172A`), and `risev` top logo is tinted black (`#0F172A`).
+     - When background is dark (gelap/hitam): Text and `risev` logo adapt to crisp white (`#FFFFFF`).
+  3. **Lowered Card Position**:
+     - Configured `styles.scrollContent` with `flexGrow: 1, justifyContent: 'space-between'` and `styles.contentCard` with `flex: 1, justifyContent: 'space-between'`.
+     - Set card `marginTop: 'auto', marginBottom: 12`, cleanly anchoring the white card to the lower viewport and providing generous visibility for the merchant's wallpaper in the center.
+
+### 62. NFC Compact Card Overhaul & Integrated Appointment CTA
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Changes**:
+  1. **Compact Proportions**:
+     - Card container padding optimized to `paddingHorizontal: 20, paddingVertical: 18`, `borderRadius: 24`.
+     - Headline scaled to `fontSize: 22` (`letterSpacing: -0.6`), subtitle to `fontSize: 13`.
+     - Phone input streamlined to `height: 48` with compact country badge (`height: 36`).
+  2. **Direct Appointment Button Placement**:
+     - Replaced the large nested Walk-In appointment card and OR divider with a sleek secondary action button directly beneath `Collect My Stamp` (`height: 44`, `borderRadius: 14`, `#F8FAFC` background with `#E2E8F0` border and calendar icon).
+  3. **Visual Balance**:
+     - Reduced total card height by over 130px, completely unveiling the merchant's hero branding and wallpaper cup in the upper viewport while maintaining effortless one-thumb ergonomics.
+
+### 63. Milestone Reward Celebration Modal: 3D Gift Box & Perforated Boarding Pass Ticket
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Asset**: [`assets/reward_gift_box.png`](file:///Users/fazlihadir/Desktop/risev%20app/waly/assets/reward_gift_box.png)
+- **Design Overhaul**: Transformed the dark celebration popup into an Apple-grade, high-contrast floating white card modal that matches the user's design reference mockup with 100% fidelity.
+- **Key Features Implemented**:
+  1. **Floating White Card Modal**:
+     - `backgroundColor: '#FFFFFF'`, `borderRadius: 28`, `borderColor: '#F1F5F9'`, subtle ambient drop shadow (`shadowOpacity: 0.18, shadowRadius: 32`), with a clean top-right `✕` dismiss button.
+  2. **3D Gift Box Hero Celebration**:
+     - High-resolution 3D open white gift box with shiny golden ribbon bow, inner warm illumination, and sparkling golden confetti.
+     - Implemented `mixBlendMode: 'multiply'` for seamless background blending.
+  3. **Celebration Headline & Copy**:
+     - `You've unlocked a reward!` (22px `PlusJakartaSans_800ExtraBold`, `#0F172A`).
+     - `Amazing! You've collected [X] stamps at [Merchant Name].` (`#64748B`).
+  4. **Stamp Progress Box**:
+     - Header row with `Your stamp progress` and bold fraction `[X] / [Goal]` (e.g. `5 / 10`).
+     - Rounded track with dynamic yellow progress bar (`#FFCC00`).
+  5. **Horizontal Boarding Pass Voucher Ticket**:
+     - **Left Orange Stub**: Warm orange accent bar (`#EA580C`) with vertical text `[MERCHANT NAME] REWARD PASS` running vertically along the edge.
+     - **Middle Voucher Section**:
+       - Mini `PROGRESS` bar with percentage indicator (e.g. `50%`).
+       - `YOUR REWARD` label and bold reward title (e.g. `Free Artisan Coffee`).
+       - Location pin detail with stamps collected fraction.
+       - Milestone pill tag: `🎁 Milestone at [X] stamps: [Reward Name]`.
+     - **Perforation & Notches**: Semicircular top and bottom cutout notches (`width: 12, height: 12, borderRadius: 6`) with a vertical dashed tear-off perforation line (`borderStyle: 'dashed'`).
+     - **Right Orange Stub**: Merchant circular logo with store branding underneath in crisp white text.
+  6. **Next Milestone Retention Teaser**:
+     - Compact squircle card with pastel yellow circle trophy icon, `Next Milestone` title, and motivating text `Collect [X] more stamps to unlock your next reward!` with right chevron.
+  7. **High-Contrast Solid Black Action CTA**:
+     - Full-width black button (`backgroundColor: '#000000'`, `height: 48`, `borderRadius: 14`) with bold white text `Log In & Save Voucher ➔`.
+     - Secondary `Maybe later` link centered below for effortless modal dismissal.
+
+### 64. Milestone Modal Refinement: Grand Golden Gift Box & Realistic Boarding Pass Voucher
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Asset**: [`assets/golden_gift_box.png`](file:///Users/fazlihadir/Desktop/risev%20app/waly/assets/golden_gift_box.png)
+- **Refinement Summary**:
+  1. **Grand 3D Golden Gift Box Asset & Overlapping Typography**:
+     - Enlarged the round golden gift box with shimmering ribbon bow and swirling golden confetti streamers (`240 x 185`) to dominate the hero section with a festive 3D feel.
+     - Positioned the bold headline `You've unlocked a reward!` with `marginTop: -48`, allowing approximately 3/4 of the text block to overlap directly onto the bottom base of the golden gift box.
+     - Enhanced typography with subtle high-contrast drop shadow (`textShadowColor: 'rgba(255, 255, 255, 0.95)'`, `textShadowRadius: 8`) and `zIndex: 10` for crisp legibility over the 3D graphic.
+  2. **De-duplicated Progress Tracking**:
+     - Removed redundant mini progress bar from the inside of the voucher ticket, leaving the dedicated `Your stamp progress` box as the single source of truth (`5 / 10`).
+  3. **Realistic Boarding Pass Voucher Information**:
+     - **Header**: `YOUR REWARD` along with an amber countdown expiry pill (`⏳ Sah 30 Hari` / `Sah [N] Hari`).
+     - **Title**: High-impact bold 13px reward title (`Free Artisan Coffee`).
+     - **Code Pill**: `[barcode icon] KOD: WV-MILE-5555` with squircle pill background.
+     - **Eligibility Badge**: Mint green badge `⚡ Sah untuk kunjungan seterusnya` for instant redemption clarity.
+  4. **No-Scroll Mobile Viewport Fit (410x711)**:
+     - Tightened vertical margins and component heights across the hero, progress box, voucher, and next milestone card.
+     - Ensured the primary button (`Simpan Baucar ke Wallet ➔`) and secondary link (`Maybe later`) are 100% visible immediately upon modal appearance without needing any manual scrolling.
+
+### 65. Slide-Up Bottom Sheet Modal Transformation
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Transition**: Converted from centered floating popup dialog into an Apple iOS native slide-up bottom sheet (`animationType="slide"`).
+- **Key Enhancements**:
+  1. **Bottom Sheet Geometry**:
+     - `rewardModalBackdrop`: Aligned to `justifyContent: 'flex-end'`, `paddingHorizontal: 0`, `paddingVertical: 0`.
+     - `rewardModalCard`: Anchored flush to the bottom edge (`borderBottomLeftRadius: 0, borderBottomRightRadius: 0`, `borderTopLeftRadius: 32, borderTopRightRadius: 32`).
+  2. **Tactile iOS Handle Bar**:
+     - Added centered drag indicator pill (`width: 42, height: 4.5, borderRadius: 3, backgroundColor: '#CBD5E1'`) at the top of the sheet.
+  3. **Dismissal & Ergonomics**:
+     - Preserved circular close button `(✕)` at top-right for quick tap-to-dismiss.
+     - Backdrop tap to dismiss supported seamlessly.
+  4. **Title Position Fine-Tuning**:
+     - Adjusted `celebrationTitle` `marginTop` to `-24`, lowering the text so only the very top edge kisses the bottom ribbon rim of the golden gift box, leaving the open 3D box graphic completely unobstructed and legible.
+
+### 66. Milestone Voucher Standardization with Core Voucher System
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Standardization**: Replaced bespoke modal boarding pass ticket with the platform's standardized real voucher architecture (`getVoucherSpineTheme` from `@/theme` matching `app/(customer)/vouchers.tsx`).
+- **Key Enhancements**:
+  1. **Dynamic Category Color Spine (`realVoucherLeftSpine`)**:
+     - 38px left vertical spine utilizing `getVoucherSpineTheme(unlockedReward?.isMilestone ? 'milestone' : rewardType, title, brandColor)`.
+     - Centered `-90deg` rotated text with `MILESTONE REWARD` (or `STAMP REWARD`) and subtext `EXCLUSIVE PASS`.
+     - Auto-contrasted text (`#FFFFFF` or `#0F172A`) via YIQ luminance calculation.
+  2. **Three-Tier Center Information Grid (`realVoucherCenterZone`)**:
+     - **Top Row**: Amber `🎁 Ready to redeem` badge alongside golden `FREE ITEM` or dark `DISCOUNT` pill.
+     - **Middle**: Uppercase `YOUR REWARD` tracking label, primary reward title (14.5px ExtraBold), and contextual milestone subtitle.
+     - **Bottom Row**: Validity duration (`🕒 Sah 30 Hari`) on the left and barcode code pill (`WV-...`) on the right (removed redundant source pill for clean aesthetics).
+  3. **Realistic Perforation with Dual Semicircular Notches**:
+     - Perforation column with top and bottom semicircular circular cutouts (`width: 16, height: 16, borderRadius: 8`) and crisp dashed divider line.
+  4. **Merchant Brand Right Stub (`realVoucherRightStub`)**:
+     - Merchant brand color background seamlessly flowing from the perforation line to the right curved edge.
+     - Raised circular badge (`width: 44, height: 44, borderRadius: 22`) framing the store logo with subtle shadow and contrast border.
+     - Uppercase merchant store name with contrast-aware typography.
+
+### 67. Complete Stamp Card (100% Goal) Modal Architecture
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Standardization**: Differentiated celebration state for a 100% completed loyalty stamp card from incremental milestone passes.
+- **Key Enhancements**:
+  1. **Dynamic Progress Bar Lock**:
+     - When completed, locks label to `Status Kad Setem` and ratio to `10 / 10 (SELESAI)` with 100% glowing amber fill track (`#FFCC00`), replacing partial progress indicators.
+  2. **Grand Reward Spine & Tag**:
+     - Left spine dynamically presents `GRAND REWARD` with `EXCLUSIVE PASS` rotated label.
+     - Bottom badge presents `🏆 GRAND PRIZE` alongside unclipped `Sah 30 Hari` validity.
+  3. **Next Cycle Teaser Card**:
+     - Replaces blank space with mint pastel card (`#F0FDF4`, border `#BBF7D0`):
+     - `🔄 Kad Baharu Diaktifkan: Kumpul setem semula pada lawatan seterusnya untuk ganjaran baharu! ✨`
+  4. **Single-Tap Wallet Persistence**:
+     - Primary button `Simpan Baucar ke Wallet ➔` saves the grand reward voucher straight into customer storage.
+
+
+
+
+
+
+
+### 68. State-Adaptive Smart Billing & Membership Hub
+- **Files**: [`app/(merchant)/subscription.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/subscription.tsx), [`app/(merchant)/_layout.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/_layout.tsx)
+- **Standardization**: Transformed the subscription screen from a static upsell page into an adaptive VIP Membership and Billing Management Hub.
+- **Key Enhancements**:
+  1. **Dual Visual State Logic**:
+     - **Active Subscriber Mode (`renderActiveSubscriberHub`)**: Shown when `user?.merchant_status === "active" && activeSub?.status === "active"`. Presents an Executive VIP Black Card, live quota metrics, quick actions, and receipt/invoice history.
+     - **Non-Subscribed / Trial Mode (`renderUpgradeCatalog`)**: Shown when on free tier or inactive. Delivers a high-conversion value proposition, billing cycle switcher (Monthly vs Annual 20% savings), Starter vs PRO cards, feature matrix, and 1-tap checkout.
+  2. **Executive VIP Black & Gold Membership Card**:
+     - Deep slate/black card (`#0F172A`) with subtle gold border accent (`#F59E0B`).
+     - Live plan tier badge (`PRO MERCHANT` / `VIP STAND PASS`).
+     - Renewal / billing cycle date countdown (`Renews automatically on <date>` or `Perpetual Lifetime Access`).
+     - Status dot with live pulsating green active indicator.
+  3. **3-Column Squircle Live Entitlements Quota**:
+     - **Active Customers**: Real-time customer volume count vs quota (`Unlimited ♾️` for Pro/Perpetual).
+     - **Branches**: Active outlets vs plan quota (e.g. `1 / 5 Outlets`).
+     - **Staff Access**: Connected team accounts vs plan quota (e.g. `10 Seats`).
+  4. **Merchant Quick Actions**:
+     - `Order NFC Hardware`: Direct route to shop counter stands.
+     - `Redeem TikTok / Shopee Code`: Modal dialog with activation token verification for merchant counter stand bundles.
+     - `Switch / Upgrade Plan`: Collapsible smooth accordion exposing the plan switcher without cluttering the primary view.
+  5. **Global FAB Collision Prevention**:
+     - Excluded `subscription` route in `app/(merchant)/_layout.tsx` via `!pathname.includes("subscription")` to prevent the yellow `Need Help?` bubble from obstructing payment/checkout action buttons.
+     - Bottom scroll content padding calibrated to `140px` for seamless mobile browser scrolling.
+
+
+### 69. Post-Approval Appointment Booking Card Daylight Redesign
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Standardization**: Aligned the post-stamp approval booking prompt with the crisp, daylight white card aesthetic of the customer onboarding experience.
+- **Key Enhancements**:
+  1. **Daylight White Container (`postApprovalBookingCard`)**:
+     - Upgraded from dark translucent background (`rgba(15, 15, 24, 0.76)`) to crisp daylight white (`#FFFFFF`) with 24px squircle border radius, subtle slate border (`#F1F5F9`), and soft ambient shadow (`shadowOpacity: 0.10, shadowRadius: 20`).
+  2. **Mint Status Pill Badge (`postApprovalBookingTagPill`)**:
+     - Mint badge (`#ECFDF5`) featuring live emerald indicator dot (`#10B981`) and bold label `Plan your next visit` (`#047857`), replacing the high-contrast yellow tag.
+  3. **High-Contrast Left-Aligned Typography Hierarchy**:
+     - 20px ExtraBold dark heading (`#000000`): `Loved today's visit? Skip the line next time!`
+     - 13px slate subtitle (`#64748B`): `Book your next appointment seamlessly from your phone.`
+  4. **RiseV Yellow Primary Action Button (`postApprovalBookingBtn`)**:
+     - High-impact yellow button (`#FFCC00`) with pitch black typography (`#000000`), calendar icon, and forward arrow for single-tap navigation to the merchant booking screen.
+  5. **Secondary Walk-In Style Action Button (`postApprovalBookingSecondaryBtn`)**:
+     - Daylight off-white pill (`#F8FAFC`, border `#E2E8F0`) for `View My Stamp Card` / `View My Points Balance` with right chevron, eliminating dark button clash.
+  6. **Reassuring Trust Footnote**:
+     - Subtle lock icon footnote: `Instant booking confirmation · Skip the queue`.
+
+
+### 70. NFC Step 2: Waiting for Merchant Approval Luxury 3D Card Redesign
+- **File**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx)
+- **Asset**: `assets/images/waiting_approval_clock.png` (Transparent high-res 3D yellow clock & glass hourglass with sand).
+- **Design Metaphor**: Merged Image 2's centered luxury card & 3D hero with 100% of Image 1's operational information.
+- **Key Features Implemented**:
+  1. **Floating Luxury Squircle Card**:
+     - `borderRadius: 28`, pure white background (`#FFFFFF`), crisp subtle border (`#F1F5F9`), and soft ambient drop shadow (`shadowOpacity: 0.08, shadowRadius: 20`).
+  2. **Top-Right Cancel / Dismiss (`✕`) Button**:
+     - Discreet circular button (`32×32px`, `#F1F5F9`) allowing customers to back out and edit their phone number at any time without feeling trapped.
+  3. **3D Centerpiece Artwork with Warm Ambient Halo**:
+     - Center 3D yellow clock and hourglass asset (`116×116px`) illuminated by a soft radial amber backdrop (`#FEF08A` at 42% opacity).
+     - Subtle breathing/floating micro-animation using `beaconAnim` for continuous live visual feedback.
+  4. **Centered High-Contrast Typography**:
+     - Headline: `Waiting for approval` in 21px `PlusJakartaSans_800ExtraBold` (`#0F172A`).
+     - Subtitle: `Your stamp/point request has been sent to [Merchant Name].` with smooth bilingual Malay support.
+  5. **Inset Dual-Action Information Table (`#F8FAFC`, `borderRadius: 18`)**:
+     - **Row 1 (Phone & Direct Edit Action)**: Black circular squircle (`36×36px`) with white phone icon, customer's unmasked formatted phone number, and prominent white `[Edit]` pill button.
+     - **Row 2 (Approval Status)**: Black circular squircle (`36×36px`) with white shield icon, `Stamp Approval` title, and animated glowing `Pending` yellow pill badge (`#FEF9C3` with pulsing `#D97706` amber beacon dot).
+  6. **Dual-Item Reassurance Footer**:
+     - Left: `🔒 Auto-syncs in real-time`.
+     - Hairline vertical divider (`#CBD5E1`).
+     - Right: `📲 Keep screen open`.
+
+
+### 71. NFC Smart Active Voucher Slide-Up Prompt & Counter Sync
+- **Files**: [`app/nfc.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/nfc.tsx), [`components/NfcClaimModal.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/components/NfcClaimModal.tsx), [`pb_hooks/nfc_request.pb.js`](file:///Users/fazlihadir/Desktop/risev%20app/waly/pb_hooks/nfc_request.pb.js)
+- **Concept**: Integrated customer voucher redemption directly into the frictionless NFC counter stamp claim flow.
+- **Workflow**:
+  1. **Pre-Claim Active Voucher Check**:
+     - When customer enters phone number and taps `Collect My Stamp ➔`, an asynchronous call checks `/api/risev/nfc/customer-vouchers`.
+     - If the customer has existing active vouchers for this merchant, a luxury Apple Wallet-grade Slide-Up Modal smoothly presents.
+  2. **Slide-Up Voucher Modal (`VoucherPromptModal`)**:
+     - Pull handle, `#FEF08A` badge `BAUCAR SEDIA ADA`.
+     - Heading: `Gunakan Baucar Anda Hari Ini?` / `Use Your Voucher Today?`.
+     - Selectable list of active vouchers with gift squircle badges, reward descriptions, and checkmark selection state.
+     - Primary Action: `Gunakan Baucar di Kaunter ➔` (`#FFCC00`).
+     - Secondary Dismiss: `Simpan Untuk Nanti (Kumpul Cop Sahaja)`.
+  3. **Waiting Screen Dual Status Rows**:
+     - If customer chooses to use a voucher:
+       - Row 1: `Kumpul 1 Cop` -> `🟡 Pending`
+       - Row 2: `Tebus Baucar: [Voucher Title]` -> `🟡 Pending Approval`
+       - Compact phone number + edit pill positioned neatly below.
+  4. **Merchant Counter Terminal Auto-Selection & Visual Presentation**:
+     - **Transmission & Tag Persistence**: Claims carry the selected voucher via both `voucher_id` and metadata embedded in the customer name (`[VOUCHER:id#title]`), ensuring immediate transmission even across remote server environments.
+     - **Prominent Amber Highlight Card (`chosenVoucherCard`)**: Renders directly between order amounts and vouchers with `✨ PELANGGAN INGIN GUNAKAN BAUCAR INI`, large gift squircle, voucher title, code pill, and discount/free-item tag.
+     - **Customer Header Indicator**: Displays a golden `[🏷️ Guna Baucar]` badge alongside the session code.
+     - **Active Voucher Navigation Row**: Changes from generic text to `Baucar Digunakan (1 Dipilih)` with amber highlight and discount pill.
+     - **Sticky Checkout Footer**: Displays the active voucher benefit directly under `Total Amount` with auto-calculated net discount.
+     - Cashier can easily tap `Batal` to dismiss or proceed to payment and award stamps + burn voucher simultaneously in 1 tap!
+  5. **Stamp Stepper Layout Refinement (`stampIssueCard`)**:
+     - Fixed React Native Web `<TextInput>` auto-expansion overflow by constraining `stampStepperInput` with explicit `width: 32`, `maxWidth: 36`, `height: 26`, and `stampStepperRow` / buttons with `flexShrink: 0`.
+     - Preserved clean gap separation and alignment between `STAMPS TO GIVE` title and the counter stepper.
+

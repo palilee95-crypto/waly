@@ -443,6 +443,17 @@ export default function UnifiedRewardsScreen() {
   const [enableMilestones, setEnableMilestones] = useState<boolean>(true);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   const [showMilestoneEditorModal, setShowMilestoneEditorModal] = useState<boolean>(false);
+
+  // Points V3 Focused Editing Flow States (Fresha x Apple iOS x Risev Signature)
+  const [pointsSubScreen, setPointsSubScreen] = useState<null | 'earn_rate' | 'redeem_rate' | 'min_points' | 'simulator' | 'limits'>(null);
+  const [tempSpendPerPoint, setTempSpendPerPoint] = useState<string>('1');
+  const [isCustomSpendMode, setIsCustomSpendMode] = useState<boolean>(false);
+  const [tempPointsPerRm, setTempPointsPerRm] = useState<string>('100');
+  const [isCustomRedeemMode, setIsCustomRedeemMode] = useState<boolean>(false);
+  const [tempMinRedeemPoints, setTempMinRedeemPoints] = useState<string>('0');
+  const [isCustomMinPointsMode, setIsCustomMinPointsMode] = useState<boolean>(false);
+  const [tempMaxRedeemPercent, setTempMaxRedeemPercent] = useState<string>('0');
+  const [isCustomMaxPercentMode, setIsCustomMaxPercentMode] = useState<boolean>(false);
   const [milestoneFormStamp, setMilestoneFormStamp] = useState<number>(3);
   const [milestoneFormTitle, setMilestoneFormTitle] = useState<string>('');
   const [milestoneFormType, setMilestoneFormType] = useState<'free_item' | 'discount_percent' | 'discount_amount'>('free_item');
@@ -5078,7 +5089,7 @@ export default function UnifiedRewardsScreen() {
           );
         })()}
 
-        {/* TAB 3: Points Loyalty Dashboard (IMAGE 1 EXACT DESIGN) */}
+        {/* TAB 3: Points Loyalty Dashboard (Fresha x Apple iOS x Risev Signature) */}
         {activeTab === 'points_tiers' && (() => {
           const parsedSpend = parseFloat(spendPerPoint) || 1;
           const parsedRedeem = parseInt(pointsPerRm, 10) || 100;
@@ -5093,417 +5104,1061 @@ export default function UnifiedRewardsScreen() {
             ? ((parseFloat(calculatedDiscount) / testSpendNum) * 100).toFixed(1).replace(/\.0$/, '')
             : '0';
 
+          // Sub-screen Handlers
+          const openEarnRateScreen = () => {
+            setTempSpendPerPoint(spendPerPoint || '1');
+            setIsCustomSpendMode(!['1', '2', '5', '10'].includes(spendPerPoint));
+            setPointsSubScreen('earn_rate');
+          };
+
+          const openRedeemRateScreen = () => {
+            setTempPointsPerRm(pointsPerRm || '100');
+            setIsCustomRedeemMode(!['100', '50', '20'].includes(pointsPerRm));
+            setPointsSubScreen('redeem_rate');
+          };
+
+          const openMinPointsScreen = () => {
+            setTempMinRedeemPoints(minRedeemPoints || '0');
+            setIsCustomMinPointsMode(!['0', '50', '100'].includes(minRedeemPoints));
+            setPointsSubScreen('min_points');
+          };
+
+          const openSimulatorScreen = () => {
+            setPointsSubScreen('simulator');
+          };
+
+          const openLimitsScreen = () => {
+            setTempMaxRedeemPercent(maxRedeemPercent || '0');
+            setIsCustomMaxPercentMode(!['0', '30', '50'].includes(maxRedeemPercent));
+            setPointsSubScreen('limits');
+          };
+
+          // -------------------------------------------------------------
+          // 3/4 BOTTOM SHEET SUB-SCREENS CONTENT RENDERER
+          // -------------------------------------------------------------
+          const renderPointsSubScreenContent = () => {
+            // SCREEN 1: EARN RATE
+            if (pointsSubScreen === 'earn_rate') {
+              const currentSpendVal = isCustomSpendMode ? (parseFloat(tempSpendPerPoint) || 1) : parseFloat(tempSpendPerPoint);
+              return (
+                <View style={{ gap: 18, paddingBottom: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                      onPress={() => setPointsSubScreen(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#000000" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                        Set Earn Rate
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        How much must customers spend to earn 1 loyalty point?
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 2x2 Presets */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                    {[
+                      { amt: '1', label: 'RM 1', sub: 'Fast Earning (Popular)' },
+                      { amt: '2', label: 'RM 2', sub: 'Standard Retail' },
+                      { amt: '5', label: 'RM 5', sub: 'High-Ticket Services' },
+                    ].map((opt) => {
+                      const isSelected = !isCustomSpendMode && tempSpendPerPoint === opt.amt;
+                      return (
+                        <TouchableOpacity
+                          key={opt.amt}
+                          style={{
+                            width: '48%',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 18,
+                            paddingVertical: 18,
+                            paddingHorizontal: 16,
+                            borderWidth: isSelected ? 2 : 1,
+                            borderColor: isSelected ? '#FFCC00' : '#E2E8F0',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                          }}
+                          onPress={() => {
+                            setIsCustomSpendMode(false);
+                            setTempSpendPerPoint(opt.amt);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          {isSelected && (
+                            <View style={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              width: 20,
+                              height: 20,
+                              borderRadius: 10,
+                              backgroundColor: '#FFCC00',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Ionicons name="checkmark" size={13} color="#000000" />
+                            </View>
+                          )}
+                          <Text style={{ fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                            {opt.label}
+                          </Text>
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 2 }}>
+                            per 1 Point
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 3 }}>
+                            {opt.sub}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Custom Option */}
+                    <TouchableOpacity
+                      style={{
+                        width: '48%',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 18,
+                        paddingVertical: 18,
+                        paddingHorizontal: 16,
+                        borderWidth: isCustomSpendMode ? 2 : 1,
+                        borderColor: isCustomSpendMode ? '#FFCC00' : '#E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                      }}
+                      onPress={() => {
+                        setIsCustomSpendMode(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      {isCustomSpendMode && (
+                        <View style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          backgroundColor: '#FFCC00',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Ionicons name="checkmark" size={13} color="#000000" />
+                        </View>
+                      )}
+                      <Ionicons name="create-outline" size={26} color="#000000" />
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 4 }}>
+                        Custom
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        Set own rate
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Custom Input */}
+                  {isCustomSpendMode && (
+                    <View style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                        Spend Amount (RM)
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B' }}>RM</Text>
+                        <TextInput
+                          value={tempSpendPerPoint}
+                          onChangeText={setTempSpendPerPoint}
+                          keyboardType="numeric"
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 16,
+                            fontFamily: 'PlusJakartaSans_800ExtraBold',
+                            color: '#000000',
+                            minWidth: 80,
+                            textAlign: 'center',
+                          }}
+                          placeholder="1"
+                        />
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Live Metric Strip */}
+                  <View style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Spend</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 2 }}>
+                        RM {currentSpendVal || 1}
+                      </Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Customer Earns</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', marginTop: 2 }}>
+                        1 Point
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#000000',
+                      borderRadius: 14,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 4,
+                    }}
+                    onPress={() => {
+                      setSpendPerPoint(tempSpendPerPoint);
+                      setPointsSubScreen(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Save Earn Rate
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            // SCREEN 2: REDEEM RATE
+            if (pointsSubScreen === 'redeem_rate') {
+              const currentRedeemPts = isCustomRedeemMode ? (parseInt(tempPointsPerRm, 10) || 100) : parseInt(tempPointsPerRm, 10);
+              const cashbackRate = currentRedeemPts > 0 ? ((1 / currentRedeemPts) * 100 * (1 / (parseFloat(spendPerPoint) || 1))).toFixed(1) : '1.0';
+
+              return (
+                <View style={{ gap: 18, paddingBottom: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                      onPress={() => setPointsSubScreen(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#000000" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                        Set Redemption Value
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        How many points can customers redeem for RM 1.00 discount?
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 2x2 Presets */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                    {[
+                      { pts: '100', label: '100 Pts', sub: '1.0% Cashback (Standard)' },
+                      { pts: '50', label: '50 Pts', sub: '2.0% Cashback (Generous)' },
+                      { pts: '20', label: '20 Pts', sub: '5.0% Cashback (VIP)' },
+                    ].map((opt) => {
+                      const isSelected = !isCustomRedeemMode && tempPointsPerRm === opt.pts;
+                      return (
+                        <TouchableOpacity
+                          key={opt.pts}
+                          style={{
+                            width: '48%',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 18,
+                            paddingVertical: 18,
+                            paddingHorizontal: 16,
+                            borderWidth: isSelected ? 2 : 1,
+                            borderColor: isSelected ? '#FFCC00' : '#E2E8F0',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                          }}
+                          onPress={() => {
+                            setIsCustomRedeemMode(false);
+                            setTempPointsPerRm(opt.pts);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          {isSelected && (
+                            <View style={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              width: 20,
+                              height: 20,
+                              borderRadius: 10,
+                              backgroundColor: '#FFCC00',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Ionicons name="checkmark" size={13} color="#000000" />
+                            </View>
+                          )}
+                          <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                            {opt.label}
+                          </Text>
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000', marginTop: 2 }}>
+                            = RM 1.00
+                          </Text>
+                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 3 }}>
+                            {opt.sub}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Custom Option */}
+                    <TouchableOpacity
+                      style={{
+                        width: '48%',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 18,
+                        paddingVertical: 18,
+                        paddingHorizontal: 16,
+                        borderWidth: isCustomRedeemMode ? 2 : 1,
+                        borderColor: isCustomRedeemMode ? '#FFCC00' : '#E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                      }}
+                      onPress={() => {
+                        setIsCustomRedeemMode(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      {isCustomRedeemMode && (
+                        <View style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          backgroundColor: '#FFCC00',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Ionicons name="checkmark" size={13} color="#000000" />
+                        </View>
+                      )}
+                      <Ionicons name="create-outline" size={26} color="#000000" />
+                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginTop: 4 }}>
+                        Custom
+                      </Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        Set points value
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Custom Input */}
+                  {isCustomRedeemMode && (
+                    <View style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                        Points for RM 1.00
+                      </Text>
+                      <TextInput
+                        value={tempPointsPerRm}
+                        onChangeText={setTempPointsPerRm}
+                        keyboardType="numeric"
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          fontSize: 16,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#000000',
+                          minWidth: 80,
+                          textAlign: 'center',
+                        }}
+                        placeholder="100"
+                      />
+                    </View>
+                  )}
+
+                  {/* Dual Metric Strip */}
+                  <View style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Points Redeemed</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 2 }}>
+                        {currentRedeemPts || 100} Pts
+                      </Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Cashback Discount</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706', marginTop: 2 }}>
+                        RM 1.00
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#000000',
+                      borderRadius: 14,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 4,
+                    }}
+                    onPress={() => {
+                      setPointsPerRm(tempPointsPerRm);
+                      setPointsSubScreen(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Save Redemption Value
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            // SCREEN 3: MINIMUM POINTS
+            if (pointsSubScreen === 'min_points') {
+              return (
+                <View style={{ gap: 18, paddingBottom: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                      onPress={() => setPointsSubScreen(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#000000" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                        Minimum Redemption
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        Set a minimum points threshold before customers can redeem discounts.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Presets */}
+                  <View style={{ gap: 10 }}>
+                    {[
+                      { pts: '0', title: 'No Minimum (Any Balance)', desc: 'Customers can redeem starting from 1 point' },
+                      { pts: '50', title: '50 Points Minimum', desc: `Worth RM ${(50 / parsedRedeem).toFixed(2)} discount` },
+                      { pts: '100', title: '100 Points Minimum', desc: `Worth RM ${(100 / parsedRedeem).toFixed(2)} discount` },
+                    ].map((opt) => {
+                      const isSelected = !isCustomMinPointsMode && tempMinRedeemPoints === opt.pts;
+                      return (
+                        <TouchableOpacity
+                          key={opt.pts}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            padding: 16,
+                            borderWidth: isSelected ? 2 : 1,
+                            borderColor: isSelected ? '#FFCC00' : '#E2E8F0',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                          onPress={() => {
+                            setIsCustomMinPointsMode(false);
+                            setTempMinRedeemPoints(opt.pts);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                              {opt.title}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {opt.desc}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="checkmark" size={14} color="#000000" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#000000',
+                      borderRadius: 14,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 4,
+                    }}
+                    onPress={() => {
+                      setMinRedeemPoints(tempMinRedeemPoints);
+                      setPointsSubScreen(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Save Minimum Threshold
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            // SCREEN 4: REDEMPTION LIMITS
+            if (pointsSubScreen === 'limits') {
+              return (
+                <View style={{ gap: 18, paddingBottom: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                      onPress={() => setPointsSubScreen(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#000000" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                        Redemption Limits & Fraud Guard
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        Cap maximum discount percentage per bill to safeguard your profit margins.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Presets */}
+                  <View style={{ gap: 10 }}>
+                    {[
+                      { pct: '0', title: 'No Limit (100% of bill)', desc: 'Points can cover up to 100% of the checkout total' },
+                      { pct: '50', title: 'Max 50% of bill total', desc: 'Customer must pay at least 50% in cash/card' },
+                      { pct: '30', title: 'Max 30% of bill total', desc: 'Customer must pay at least 70% in cash/card' },
+                    ].map((opt) => {
+                      const isSelected = !isCustomMaxPercentMode && tempMaxRedeemPercent === opt.pct;
+                      return (
+                        <TouchableOpacity
+                          key={opt.pct}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            padding: 16,
+                            borderWidth: isSelected ? 2 : 1,
+                            borderColor: isSelected ? '#FFCC00' : '#E2E8F0',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                          onPress={() => {
+                            setIsCustomMaxPercentMode(false);
+                            setTempMaxRedeemPercent(opt.pct);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
+                              {opt.title}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                              {opt.desc}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="checkmark" size={14} color="#000000" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#000000',
+                      borderRadius: 14,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 4,
+                    }}
+                    onPress={() => {
+                      setMaxRedeemPercent(tempMaxRedeemPercent);
+                      setPointsSubScreen(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Save Redemption Limits
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            // SCREEN 5: SIMULATOR & CALCULATOR
+            if (pointsSubScreen === 'simulator') {
+              return (
+                <View style={{ gap: 18, paddingBottom: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }} 
+                      onPress={() => setPointsSubScreen(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#000000" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                        Points Simulator & Calculator
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                        Test customer spend to calculate cashback rewards and net margin.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Spend Input Box */}
+                  <View style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    padding: 16,
+                    gap: 12,
+                  }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Customer Bill Amount
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>RM</Text>
+                      <TextInput
+                        value={testSpend}
+                        onChangeText={setTestSpend}
+                        keyboardType="numeric"
+                        style={{
+                          flex: 1,
+                          fontSize: 28,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#0F172A',
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                        }}
+                        placeholder="100"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+
+                    {/* Spend Quick Presets */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {['20', '50', '100', '200'].map((amt) => {
+                        const isSelected = testSpend === amt;
+                        return (
+                          <TouchableOpacity
+                            key={amt}
+                            onPress={() => setTestSpend(amt)}
+                            style={{
+                              flex: 1,
+                              paddingVertical: 8,
+                              borderRadius: 8,
+                              backgroundColor: isSelected ? '#000000' : '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 12,
+                              fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold',
+                              color: isSelected ? '#FFCC00' : '#0F172A',
+                            }}>
+                              RM {amt}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Calculations Breakdown Card */}
+                  <View style={{
+                    backgroundColor: '#FEFCE8',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#FEF08A',
+                    padding: 18,
+                    gap: 14,
+                  }}>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      LIVE CALCULATION BREAKDOWN
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Points Earned</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{calculatedPoints} Pts</Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Cashback Discount Value</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669' }}>RM {calculatedDiscount}</Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Effective Cashback Rate</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706' }}>{rewardRatePercent}%</Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Net Merchant Revenue</Text>
+                      <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        RM {(testSpendNum - parseFloat(calculatedDiscount)).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#000000',
+                      borderRadius: 14,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 4,
+                    }}
+                    onPress={() => setPointsSubScreen(null)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      Close Simulator
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            return null;
+          };
+
+          // -------------------------------------------------------------
+          // MAIN POINTS OVERVIEW (Fresha x Apple iOS x Risev Signature)
+          // -------------------------------------------------------------
           return (
-            <View style={{ marginTop: 12, gap: 14 }}>
-              {/* Header: Points Loyalty Title + Live Active Status Toggle */}
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 4,
-                marginBottom: 2,
-              }}>
+            <View style={{ gap: 20, paddingBottom: 24, marginTop: 4 }}>
+              {/* Header: Title + Active Status Pill */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', letterSpacing: -0.3 }}>
-                    {locale === 'en' ? 'Points Loyalty' : 'Mata Ganjaran'}
+                  <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.4 }}>
+                    Points Loyalty
                   </Text>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                    {locale === 'en' ? 'Reward customers for every purchase.' : 'Ganjarkan pelanggan bagi setiap pembelian.'}
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    Manage point earn rates, redemption value & limits
                   </Text>
                 </View>
 
-                {/* Status Badge with Toggle */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{
+                {/* Status Pill Toggle */}
+                <TouchableOpacity
+                  style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 5,
-                    backgroundColor: enablePoints ? '#ECFDF5' : '#F1F5F9',
-                    paddingHorizontal: 9,
-                    paddingVertical: 3.5,
-                    borderRadius: 9999,
+                    backgroundColor: enablePoints ? '#F0FDF4' : '#F8FAFC',
                     borderWidth: 1,
-                    borderColor: enablePoints ? '#A7F3D0' : '#E2E8F0',
-                  }}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: enablePoints ? '#10B981' : '#94A3B8' }} />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: enablePoints ? '#059669' : '#64748B' }}>
-                      {enablePoints ? (locale === 'en' ? 'Active' : 'Aktif') : (locale === 'en' ? 'Paused' : 'Dijeda')}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={enablePoints}
-                    onValueChange={(val) => {
-                      if (!val && !enableStamps) {
-                        Alert.alert('Action Restricted', locale === 'en' ? 'At least one loyalty module (Stamps or Points) must remain active.' : 'Sekurang-kurangnya satu modul mesti aktif.');
-                        return;
-                      }
-                      setEnablePoints(val);
-                    }}
-                    trackColor={{ false: '#E2E8F0', true: '#000000' }}
-                    thumbColor="#FFFFFF"
-                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                  />
-                </View>
-              </View>
-
-              {/* CARD 1: EARN POINTS (IMAGE 1 EXACT) */}
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                padding: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
-              }}>
-                {/* Header Row */}
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}
-                  onPress={() => setShowEarnRateModal(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
-                    <View style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 12,
-                      backgroundColor: '#FEF08A',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Ionicons name="cash-outline" size={22} color="#000000" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                        {locale === 'en' ? 'Earn Points' : 'Dapatkan Mata'}
-                      </Text>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                        {locale === 'en' ? 'Set how much customers need to spend to earn 1 point.' : 'Tetapkan jumlah belanja untuk dapatkan 1 mata.'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </TouchableOpacity>
-
-                {/* Quick Presets Pills */}
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  {['1', '2', '5', '10'].map((amt) => {
-                    const isSelected = spendPerPoint === amt;
-                    return (
-                      <TouchableOpacity
-                        key={amt}
-                        onPress={() => setSpendPerPoint(amt)}
-                        style={{
-                          flex: 1,
-                          height: 38,
-                          borderRadius: 10,
-                          backgroundColor: isSelected ? '#000000' : '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: isSelected ? '#000000' : '#E2E8F0',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={{
-                          fontSize: 12.5,
-                          fontFamily: isSelected ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold',
-                          color: isSelected ? '#FFCC00' : '#0F172A',
-                        }}>
-                          RM {amt}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Split Dual-Metric Display */}
-                <View style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#E2E8F0',
-                  flexDirection: 'row',
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                }}>
-                  {/* Left: Spend */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Spend' : 'Belanja'}
-                    </Text>
-                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      RM {spendPerPoint || '1'}
-                    </Text>
-                  </View>
-
-                  {/* Vertical Hairline Divider */}
-                  <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
-
-                  {/* Right: Earn */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Earn' : 'Dapat'}
-                    </Text>
-                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      1 Point
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* CARD 2: REDEEM VALUE (IMAGE 1 EXACT) */}
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                padding: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
-              }}>
-                {/* Header Row */}
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}
-                  onPress={() => setShowRedeemRateModal(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
-                    <View style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 12,
-                      backgroundColor: '#FEF08A',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Ionicons name="gift-outline" size={22} color="#000000" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                        {locale === 'en' ? 'Redeem Value' : 'Nilai Tebus'}
-                      </Text>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                        {locale === 'en' ? 'Set how many points can be redeemed for a discount.' : 'Tetapkan berapa mata untuk ditebus sebagai diskaun.'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </TouchableOpacity>
-
-                {/* Split Dual-Metric Display */}
-                <TouchableOpacity
-                  onPress={() => setShowRedeemRateModal(true)}
-                  activeOpacity={0.8}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    flexDirection: 'row',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                  }}
-                >
-                  {/* Left: Points */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Points' : 'Mata'}
-                    </Text>
-                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      {pointsPerRm || '100'} Pts
-                    </Text>
-                  </View>
-
-                  {/* Vertical Hairline Divider */}
-                  <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16 }} />
-
-                  {/* Right: Discount Value */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Discount Value' : 'Nilai Diskaun'}
-                    </Text>
-                    <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      RM 1.00
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* CARD 3: PREVIEW EXAMPLE (LIVE CALCULATOR - IMAGE 1 EXACT) */}
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                padding: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
-              }}>
-                {/* Header Row with Inline Test Spend Input */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 10 }}>
-                    <View style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 12,
-                      backgroundColor: '#F1F5F9',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Ionicons name="calculator-outline" size={22} color="#0F172A" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                        {locale === 'en' ? 'Preview Example' : 'Contoh Pratonton'}
-                      </Text>
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                        {locale === 'en' ? 'See how it works at checkout.' : 'Lihat kiraan semasa pembayaran.'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Interactive Spending Input Box */}
-                  <View style={{
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 10,
+                    borderColor: enablePoints ? '#BBF7D0' : '#E2E8F0',
                     paddingHorizontal: 10,
                     paddingVertical: 5,
-                    minWidth: 110,
-                    alignItems: 'flex-end',
-                  }}>
-                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 1 }}>
-                      {locale === 'en' ? 'Customer spending (RM)' : 'Belanja Pelanggan (RM)'}
-                    </Text>
-                    <TextInput
-                      value={testSpend}
-                      onChangeText={setTestSpend}
-                      keyboardType="numeric"
-                      style={{
-                        fontSize: 16,
-                        fontFamily: 'PlusJakartaSans_800ExtraBold',
-                        color: '#0F172A',
-                        textAlign: 'right',
-                        padding: 0,
-                        minWidth: 50,
-                      }}
-                      placeholder="100"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
+                    borderRadius: 20,
+                  }}
+                  onPress={() => {
+                    if (enablePoints && !enableStamps) {
+                      Alert.alert('Action Restricted', 'At least one loyalty module (Stamps or Points) must remain active.');
+                      return;
+                    }
+                    setEnablePoints(!enablePoints);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: enablePoints ? '#16A34A' : '#94A3B8' }} />
+                  <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: enablePoints ? '#16A34A' : '#64748B' }}>
+                    {enablePoints ? 'Active' : 'Inactive'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-                {/* Calculation Summary Strip (Creamy Gold) */}
-                <View style={{
-                  backgroundColor: '#FEFCE8',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#FEF08A',
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                }}>
-                  {/* Points Earned */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Points earned' : 'Mata diperoleh'}
-                    </Text>
-                    <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      {calculatedPoints} Pts
-                    </Text>
-                  </View>
-
-                  {/* Hairline Divider */}
-                  <View style={{ width: 1, backgroundColor: '#FDE047', marginHorizontal: 8, opacity: 0.6 }} />
-
-                  {/* Discount Value */}
-                  <View style={{ flex: 1.1 }}>
-                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Discount value' : 'Nilai diskaun'}
-                    </Text>
-                    <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      RM {calculatedDiscount}
-                    </Text>
-                  </View>
-
-                  {/* Hairline Divider */}
-                  <View style={{ width: 1, backgroundColor: '#FDE047', marginHorizontal: 8, opacity: 0.6 }} />
-
-                  {/* Reward Rate */}
-                  <View style={{ flex: 1.1 }}>
-                    <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12', marginBottom: 2 }}>
-                      {locale === 'en' ? 'Reward rate' : 'Kadar ganjaran'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-                      <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                        {rewardRatePercent}%
+              {/* YOUR POINTS PROGRAM Hero Card (Apple Signature Hero) */}
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>
+                  YOUR POINTS PROGRAM
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.04,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}
+                  onPress={openSimulatorScreen}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, paddingRight: 8 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="star" size={24} color="#000000" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', letterSpacing: -0.3 }} numberOfLines={1}>
+                        Earn 1 Pt per RM {spendPerPoint || '1'} spent
                       </Text>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#713F12' }}>
-                        {locale === 'en' ? 'of spend' : 'belanja'}
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 3 }} numberOfLines={1}>
+                        {pointsPerRm || '100'} Pts = RM 1.00 Discount ({rewardRatePercent}% Cashback)
                       </Text>
                     </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Grouped Section: Points Rules */}
+              <View>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginBottom: 12 }}>
+                  Points Rules
+                </Text>
+
+                <View style={{ gap: 10 }}>
+                  {/* Row 1: Earn Rate */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openEarnRateScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="cash-outline" size={20} color="#059669" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Earn Rate
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          Spend RM {spendPerPoint || '1'} ➔ Earn 1 Point
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 2: Redemption Value */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openRedeemRateScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="gift-outline" size={20} color="#D97706" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Redemption Rate
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          {pointsPerRm || '100'} Pts = RM 1.00 Discount Value
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 3: Minimum Redemption */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openMinPointsScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#2563EB" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Minimum Points to Redeem
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          {parsedMin > 0 ? `${parsedMin} Pts (RM ${(parsedMin / parsedRedeem).toFixed(2)} min discount)` : 'No minimum threshold'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              {/* CARD 4: RULES & LIMITS (IMAGE 1 EXACT) */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: '#E2E8F0',
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 3,
-                  elevation: 1,
-                }}
-                onPress={() => setShowPointsRulesModal(true)}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
-                  <View style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    backgroundColor: '#F1F5F9',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Ionicons name="shield-checkmark-outline" size={22} color="#0F172A" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                      {locale === 'en' ? 'Rules & Limits' : 'Peraturan & Had'}
-                    </Text>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                      {locale === 'en'
-                        ? 'Set redemption rules, limits and fraud protection.'
-                        : 'Tetapkan syarat penebusan, had minima dan keselamatan.'}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-              </TouchableOpacity>
+              {/* Grouped Section: More Options */}
+              <View>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000', marginBottom: 12 }}>
+                  More Options
+                </Text>
 
-              {/* Primary Save Action Button (IMAGE 1 EXACT CAPSULE) */}
+                <View style={{ gap: 10 }}>
+                  {/* Row 1: Points Calculator & Simulator */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openSimulatorScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="calculator-outline" size={20} color="#7C3AED" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Points Calculator & Simulator
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          Simulate customer spending, cashback & profit margins
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+
+                  {/* Row 2: Redemption Limits & Fraud Guard */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={openLimitsScreen}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFE4E6', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="lock-closed-outline" size={20} color="#E11D48" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>
+                          Redemption Limits & Fraud Guard
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                          {parsedMax > 0 ? `Max ${parsedMax}% discount per transaction` : 'No bill limit (100% allowed)'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Bottom Sticky Action Button */}
               <TouchableOpacity
                 style={[{
                   backgroundColor: '#000000',
@@ -5511,7 +6166,7 @@ export default function UnifiedRewardsScreen() {
                   borderRadius: 9999,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginTop: 6,
+                  marginTop: 8,
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.15,
@@ -5526,10 +6181,64 @@ export default function UnifiedRewardsScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
-                    {locale === 'en' ? 'Save Changes' : 'Simpan Perubahan'}
+                    Save All Changes
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* 3/4 Bottom Sheet Modal for Points Editing Subscreens */}
+              <Modal
+                visible={!!pointsSubScreen}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setPointsSubScreen(null)}
+              >
+                <View style={{
+                  flex: 1,
+                  backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                  justifyContent: 'flex-end',
+                }}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    activeOpacity={1}
+                    onPress={() => setPointsSubScreen(null)}
+                  />
+
+                  <View style={{
+                    backgroundColor: '#F8FAFC',
+                    borderTopLeftRadius: 28,
+                    borderTopRightRadius: 28,
+                    maxHeight: '88%',
+                    minHeight: '48%',
+                    paddingTop: 12,
+                    paddingHorizontal: 20,
+                    paddingBottom: 24,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 12,
+                    elevation: 16,
+                  }}>
+                    {/* Pull Handle */}
+                    <View style={{
+                      width: 38,
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: '#CBD5E1',
+                      alignSelf: 'center',
+                      marginBottom: 14,
+                    }} />
+
+                    <ScrollView
+                      style={{ flex: 1 }}
+                      contentContainerStyle={{ paddingBottom: 20 }}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {renderPointsSubScreenContent()}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
             </View>
           );
         })()}

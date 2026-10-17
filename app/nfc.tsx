@@ -16,6 +16,7 @@ import {
   Easing,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -27,6 +28,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
+import { getVoucherSpineTheme } from '@/theme';
+import * as Clipboard from 'expo-clipboard';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -696,6 +699,19 @@ export default function NfcLandingScreen() {
     return '#FFFFFF';
   };
 
+  // Helper to format Malaysian phone numbers cleanly (e.g. +60 11-1020 9669)
+  const formatDisplayPhone = (raw: string) => {
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '').replace(/^60/, '').replace(/^0/, '');
+    if (digits.length >= 9) {
+      if (digits.startsWith('11') || digits.startsWith('15')) {
+        return `+60 ${digits.slice(0, 2)}-${digits.slice(2, 6)} ${digits.slice(6)}`;
+      }
+      return `+60 ${digits.slice(0, 2)}-${digits.slice(2, 5)} ${digits.slice(5)}`;
+    }
+    return `+60 ${raw}`;
+  };
+
   const [merchant, setMerchant] = useState<any>(null);
   const [branch, setBranch] = useState<any>(null);
   const [program, setProgram] = useState<any>(null);
@@ -706,6 +722,9 @@ export default function NfcLandingScreen() {
   const [approvedStamps, setApprovedStamps] = useState<number | null>(null);
   const [step, setStep] = useState<'loading' | 'form' | 'sent' | 'card' | 'pairing' | 'invalid'>('loading');
   const [invalidReason, setInvalidReason] = useState('');
+  
+  // Adaptive background brightness (for light vs dark wallpaper contrast)
+  const [isLightBg, setIsLightBg] = useState<boolean>(true);
   
   // Digital Receipt state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -729,9 +748,46 @@ export default function NfcLandingScreen() {
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Customer active vouchers slide-up modal state
+  const [showVoucherPrompt, setShowVoucherPrompt] = useState(false);
+  const [availableCustomerVouchers, setAvailableCustomerVouchers] = useState<any[]>([]);
+  const [selectedVoucherToUse, setSelectedVoucherToUse] = useState<any>(null);
+  const [appliedVoucherForClaim, setAppliedVoucherForClaim] = useState<any>(null);
   
   const pulseAnim = useRef(new Animated.Value(0.2)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  // Real-time counter waiting animations
+  const beaconAnim = useRef(new Animated.Value(0.4)).current;
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    // Beacon breathing loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(beaconAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(beaconAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // 3-dots wave
+    const animateDot = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 350, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 350, useNativeDriver: true }),
+          Animated.delay(700 - delay),
+        ])
+      ).start();
+    };
+    animateDot(dot1, 0);
+    animateDot(dot2, 200);
+    animateDot(dot3, 400);
+  }, []);
 
   useEffect(() => {
     if (step === 'pairing') {
@@ -790,6 +846,14 @@ export default function NfcLandingScreen() {
 
   // 🎁 Unlocked Milestone or Completed Card Reward Voucher Modal
   const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
+  const hasDismissedRewardRef = useRef<boolean>(false);
+  const hasShownRewardForClaimRef = useRef<string | null>(null);
+
+  const handleCloseRewardModal = () => {
+    hasDismissedRewardRef.current = true;
+    setShowRewardModal(false);
+  };
+
   const [unlockedReward, setUnlockedReward] = useState<{
     id?: string;
     code?: string;
@@ -800,6 +864,17 @@ export default function NfcLandingScreen() {
     discountValue?: number;
     snapshotType?: string;
   } | null>(null);
+  const [copiedVoucherCode, setCopiedVoucherCode] = useState<boolean>(false);
+
+  const copyVoucherCode = async (code: string) => {
+    try {
+      await Clipboard.setStringAsync(code);
+      setCopiedVoucherCode(true);
+      setTimeout(() => setCopiedVoucherCode(false), 2000);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Debug/preview support
   useEffect(() => {
@@ -811,22 +886,26 @@ export default function NfcLandingScreen() {
       setIsApproved(true);
     }
     if (previewReward === 'milestone') {
-      setUnlockedReward({
-        title: 'Free Artisan Coffee',
-        description: 'Milestone Reward for Stamp #5',
-        isMilestone: true,
-        atStamp: 5,
-        code: 'WV-MILE-5555',
-      });
-      setShowRewardModal(true);
+      if (!hasDismissedRewardRef.current) {
+        setUnlockedReward({
+          title: 'Free Artisan Coffee',
+          description: 'Milestone Reward for Stamp #5',
+          isMilestone: true,
+          atStamp: 5,
+          code: 'WV-MILE-5555',
+        });
+        setShowRewardModal(true);
+      }
     } else if (previewReward === 'goal') {
-      setUnlockedReward({
-        title: 'Complete Free Meal Voucher',
-        description: 'Full Loyalty Card Completion Reward',
-        isMilestone: false,
-        code: 'WV-GOAL-9999',
-      });
-      setShowRewardModal(true);
+      if (!hasDismissedRewardRef.current) {
+        setUnlockedReward({
+          title: 'Complete Free Meal Voucher',
+          description: 'Full Loyalty Card Completion Reward',
+          isMilestone: false,
+          code: 'WV-GOAL-9999',
+        });
+        setShowRewardModal(true);
+      }
     }
   }, [params.preview_step, params.preview_approved, (params as any)?.preview_reward]);
   const [reviewSubmitted, setReviewSubmitted] = useState<boolean>(false);
@@ -859,7 +938,7 @@ export default function NfcLandingScreen() {
             toValue: 1,
             friction: 7,
             tension: 50,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(voucherProgressAnim, {
             toValue: 1,
@@ -869,6 +948,10 @@ export default function NfcLandingScreen() {
           })
         ])
       ]).start();
+    } else {
+      voucherSlideAnim.setValue(0);
+      voucherProgressAnim.setValue(0);
+    }
 
       // Trigger Review Funnel if customer hasn't reviewed yet and merchant has configured reviews
       if (merchant?.id) {
@@ -911,7 +994,6 @@ export default function NfcLandingScreen() {
 
         checkAndTriggerReview();
       }
-    }
   }, [isApproved, merchant?.id, phoneInput, user?.phone]);
 
   const handleSelectStar = async (star: number) => {
@@ -1045,7 +1127,7 @@ export default function NfcLandingScreen() {
   };
 
   const handleClaimVoucherLogin = () => {
-    setShowRewardModal(false);
+    handleCloseRewardModal();
     const isAuthenticated = !!(user || (pb.authStore.isValid && pb.authStore.record));
     if (isAuthenticated) {
       router.push('/(customer)/vouchers' as any);
@@ -1415,19 +1497,25 @@ export default function NfcLandingScreen() {
               requestKey: null,
             }).then(res => {
               if (res?.earned_voucher) {
-                setUnlockedReward({
-                  id: res.earned_voucher.id,
-                  code: res.earned_voucher.code,
-                  title: res.earned_voucher.title,
-                  description: res.earned_voucher.description,
-                  isMilestone: res.earned_voucher.is_sub_reward === true,
-                  atStamp: res.earned_voucher.at_stamp,
-                  discountValue: res.earned_voucher.discount_value,
-                  snapshotType: res.earned_voucher.snapshot_type,
-                });
-                setTimeout(() => {
-                  setShowRewardModal(true);
-                }, 1200);
+                const voucherKey = res.earned_voucher.id || cid;
+                if (hasShownRewardForClaimRef.current !== voucherKey && !hasDismissedRewardRef.current) {
+                  hasShownRewardForClaimRef.current = voucherKey;
+                  setUnlockedReward({
+                    id: res.earned_voucher.id,
+                    code: res.earned_voucher.code,
+                    title: res.earned_voucher.title,
+                    description: res.earned_voucher.description,
+                    isMilestone: res.earned_voucher.is_sub_reward === true,
+                    atStamp: res.earned_voucher.at_stamp,
+                    discountValue: res.earned_voucher.discount_value,
+                    snapshotType: res.earned_voucher.snapshot_type,
+                  });
+                  setTimeout(() => {
+                    if (!hasDismissedRewardRef.current) {
+                      setShowRewardModal(true);
+                    }
+                  }, 1200);
+                }
               }
             }).catch(() => {});
           }
@@ -1447,11 +1535,12 @@ export default function NfcLandingScreen() {
 
   // 3. Robust Polling & Tab Visibility Listener for Mobile Browsers (iOS Safari / Android Chrome)
   useEffect(() => {
-    if (step !== 'sent' || !merchant) return;
+    if (step !== 'sent' || !merchant || isApproved) return;
 
     let isMounted = true;
 
     const checkApprovalStatus = async () => {
+      if (!isMounted || isApproved) return;
       try {
         // 1. Check claim status endpoint
         if (claimId) {
@@ -1473,19 +1562,25 @@ export default function NfcLandingScreen() {
               setIsWaitingConfirm(false);
 
               if (res.earned_voucher) {
-                setUnlockedReward({
-                  id: res.earned_voucher.id,
-                  code: res.earned_voucher.code,
-                  title: res.earned_voucher.title,
-                  description: res.earned_voucher.description,
-                  isMilestone: res.earned_voucher.is_sub_reward === true,
-                  atStamp: res.earned_voucher.at_stamp,
-                  discountValue: res.earned_voucher.discount_value,
-                  snapshotType: res.earned_voucher.snapshot_type,
-                });
-                setTimeout(() => {
-                  setShowRewardModal(true);
-                }, 1200);
+                const voucherKey = res.earned_voucher.id || claimId;
+                if (hasShownRewardForClaimRef.current !== voucherKey && !hasDismissedRewardRef.current) {
+                  hasShownRewardForClaimRef.current = voucherKey;
+                  setUnlockedReward({
+                    id: res.earned_voucher.id,
+                    code: res.earned_voucher.code,
+                    title: res.earned_voucher.title,
+                    description: res.earned_voucher.description,
+                    isMilestone: res.earned_voucher.is_sub_reward === true,
+                    atStamp: res.earned_voucher.at_stamp,
+                    discountValue: res.earned_voucher.discount_value,
+                    snapshotType: res.earned_voucher.snapshot_type,
+                  });
+                  setTimeout(() => {
+                    if (!hasDismissedRewardRef.current) {
+                      setShowRewardModal(true);
+                    }
+                  }, 1200);
+                }
               }
               return;
             }
@@ -1538,7 +1633,7 @@ export default function NfcLandingScreen() {
         }
       }
     };
-  }, [step, merchant, claimId, user, loyaltyCard]);
+  }, [step, merchant, claimId, user, loyaltyCard, isApproved]);
 
   // Brand Tokens & Assets
   const merchantName = merchant?.name || 'Risev Merchant';
@@ -1554,6 +1649,59 @@ export default function NfcLandingScreen() {
 
   const primaryColor = merchant?.onboarding_primary_color || program?.card_color || '#5C3BCC';
   const contrastTextColor = getContrastColor(primaryColor);
+
+  // Dynamic background luminance detection (analyzes wallpaper to set text/logo to black or white)
+  useEffect(() => {
+    if (merchantBgUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const img = new (window as any).Image();
+        img.crossOrigin = 'anonymous';
+        img.src = merchantBgUrl;
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              // Sample the top 25% where the header sits
+              ctx.drawImage(img, 0, 0, img.naturalWidth, Math.min(img.naturalHeight, img.naturalWidth * 0.25), 0, 0, 32, 32);
+              const data = ctx.getImageData(0, 0, 32, 32).data;
+              let totalBrightness = 0;
+              let count = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                totalBrightness += (r * 299 + g * 587 + b * 114) / 1000;
+                count++;
+              }
+              const avg = count > 0 ? totalBrightness / count : 180;
+              setIsLightBg(avg >= 145);
+            }
+          } catch {
+            const contrast = getContrastColor(merchant?.onboarding_primary_color || primaryColor || '#FFC700');
+            setIsLightBg(contrast === '#1A1400');
+          }
+        };
+        img.onerror = () => {
+          const contrast = getContrastColor(merchant?.onboarding_primary_color || primaryColor || '#FFC700');
+          setIsLightBg(contrast === '#1A1400');
+        };
+      } catch {
+        setIsLightBg(true);
+      }
+    } else {
+      const colorToCheck = merchant?.onboarding_bg_color || merchant?.onboarding_primary_color || primaryColor || '#FFFFFF';
+      const contrast = getContrastColor(colorToCheck);
+      setIsLightBg(contrast === '#1A1400');
+    }
+  }, [merchantBgUrl, merchant, primaryColor]);
+
+  // Adaptive header colors based on background brightness
+  const headerTextColor = isLightBg ? '#0F172A' : '#FFFFFF';
+  const headerSubtextColor = isLightBg ? 'rgba(15, 23, 42, 0.70)' : 'rgba(255, 255, 255, 0.85)';
+  const headerLogoTint = isLightBg ? '#0F172A' : '#FFFFFF';
   
   // Exact Loyalty Card Tokens configured by Merchant
   const cardBgColor = program?.card_color || merchant?.onboarding_primary_color || '#5C3BCC';
@@ -1717,41 +1865,168 @@ export default function NfcLandingScreen() {
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
       const displayName = finalName;
 
-      // 1. Send Direct API Request to PocketBase (INSTANT & FAIL-SAFE)
-      // NOTE: We do NOT auto-login or quickRegister session onto the browser to prevent security hijack.
-      let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      let createdClaimId = '';
-      try {
-        const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string; current_stamps?: number }>('/api/risev/nfc/request', {
-          method: 'POST',
-          body: {
-            merchant_id: merchant.id,
-            phone: cleanPhone,
-            name: displayName,
-            branch_id: branch?.branch_id || params.b || params.branch || undefined,
-            branch_name: branch?.branch_name || undefined,
-          },
-        });
-        if (reqRes?.claim_id) {
-          setClaimId(reqRes.claim_id);
-          createdClaimId = reqRes.claim_id;
+      // 2. Check if customer has existing active vouchers for this store
+      if (!appliedVoucherForClaim) {
+        let foundVouchers: any[] = [];
+
+        // Method A: Check client-authenticated user if logged in in this browser session
+        const activeUserId = user?.id || pb.authStore.record?.id;
+        if (activeUserId) {
+          try {
+            const vList = await pb.collection('vouchers').getFullList({
+              filter: `customer = "${activeUserId}" && status = "active"`,
+              expand: 'reward,reward.merchant,campaign,campaign.merchant',
+              sort: '-created',
+              requestKey: null,
+            });
+
+            foundVouchers = vList
+              .map((v: any) => {
+                const reward = v.expand?.reward;
+                const campaign = v.expand?.campaign;
+                const mId =
+                  reward?.merchant ||
+                  reward?.expand?.merchant?.id ||
+                  campaign?.merchant ||
+                  campaign?.expand?.merchant?.id;
+
+                let meta: any = {};
+                try {
+                  meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
+                } catch (e) {}
+
+                const title =
+                  reward?.name ||
+                  reward?.title ||
+                  campaign?.name ||
+                  campaign?.title ||
+                  meta.snapshot_title ||
+                  'Reward Voucher';
+                const description =
+                  reward?.description ||
+                  campaign?.description ||
+                  meta.snapshot_description ||
+                  'Tebus di kaunter';
+
+                return {
+                  id: v.id,
+                  code: v.code || '',
+                  title,
+                  description,
+                  merchantId: mId,
+                  expires_at: v.expires_at || v.valid_until || '',
+                };
+              })
+              .filter((v: any) => !v.merchantId || v.merchantId === merchant?.id);
+          } catch (dirErr) {
+            console.warn('[NFC] Direct voucher check notice:', dirErr);
+          }
         }
-        if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
-        if (typeof reqRes?.current_stamps === 'number') {
-          setApprovedStamps(reqRes.current_stamps);
+
+        // Method B: Call server endpoint /api/risev/nfc/customer-vouchers (for guest / phone lookup)
+        if (foundVouchers.length === 0) {
+          try {
+            const vCheck = await pb.send<{ success: boolean; vouchers: any[] }>('/api/risev/nfc/customer-vouchers', {
+              method: 'POST',
+              body: {
+                merchant_id: merchant.id,
+                phone: cleanPhone,
+              },
+              requestKey: null,
+            });
+
+            if (vCheck?.vouchers && vCheck.vouchers.length > 0) {
+              foundVouchers = vCheck.vouchers;
+            }
+          } catch (vErr) {
+            console.warn('[NFC] customer-vouchers server endpoint note:', vErr);
+          }
         }
-      } catch (apiErr) {
-        console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
+
+        if (foundVouchers.length > 0) {
+          setAvailableCustomerVouchers(foundVouchers);
+          setSelectedVoucherToUse(foundVouchers[0]);
+          setShowVoucherPrompt(true);
+          setIsLoading(false);
+          return; // Pause execution to show slide-up modal!
+        }
+      }
+
+      await executeNfcClaim(cleanPhone, displayName, null);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to submit NFC claim.');
+      setIsLoading(false);
+    }
+  };
+
+  // Helper to execute the actual NFC claim submission to PocketBase
+  const executeNfcClaim = async (cleanPhone: string, displayName: string, voucherToApply?: any) => {
+    setIsLoading(true);
+    let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    let createdClaimId = '';
+    try {
+      const voucherTag = voucherToApply ? ` [VOUCHER:${voucherToApply.id}#${voucherToApply.title || voucherToApply.code || ''}]` : '';
+      const encodedName = `${displayName}${voucherTag}`;
+
+      const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string; current_stamps?: number }>('/api/risev/nfc/request', {
+        method: 'POST',
+        body: {
+          merchant_id: merchant.id,
+          phone: cleanPhone,
+          name: encodedName,
+          branch_id: branch?.branch_id || params.b || params.branch || undefined,
+          branch_name: branch?.branch_name || undefined,
+          voucher_id: voucherToApply?.id || undefined,
+          voucher_name: voucherToApply?.title || undefined,
+          voucher_code: voucherToApply?.code || undefined,
+        },
+      });
+      if (reqRes?.claim_id) {
+        setClaimId(reqRes.claim_id);
+        createdClaimId = reqRes.claim_id;
+      }
+      if (reqRes?.session_code) claimSessionCode = reqRes.session_code;
+      if (typeof reqRes?.current_stamps === 'number') {
+        setApprovedStamps(reqRes.current_stamps);
       }
 
       setIsWaitingConfirm(true);
       setHasSentWhatsapp(true);
       setStep('sent');
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to submit NFC claim.');
+    } catch (apiErr: any) {
+      console.warn('[NFC] /api/risev/nfc/request error:', apiErr);
+      setErrorMsg(apiErr?.message || 'Failed to submit NFC claim.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Customer chooses to redeem selected voucher at counter
+  const handleUseVoucherAndProceed = async () => {
+    setShowVoucherPrompt(false);
+    setAppliedVoucherForClaim(selectedVoucherToUse);
+
+    let digits = phoneInput.trim().replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '6' + digits;
+    if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+    const cleanPhone = '+' + digits;
+    const displayName = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+
+    await executeNfcClaim(cleanPhone, displayName, selectedVoucherToUse);
+  };
+
+  // Customer chooses to skip voucher and collect stamps only
+  const handleDismissVoucherAndProceed = async () => {
+    setShowVoucherPrompt(false);
+    setAppliedVoucherForClaim(null);
+
+    let digits = phoneInput.trim().replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '6' + digits;
+    if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+    const cleanPhone = '+' + digits;
+    const displayName = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+
+    await executeNfcClaim(cleanPhone, displayName, null);
   };
 
   // ══════════════════════════════════════════════════════════════════
@@ -2045,7 +2320,7 @@ export default function NfcLandingScreen() {
     const textColor = '#111827';
     const subtextColor = '#4B5563';
     const dividerColor = 'rgba(0, 0, 0, 0.15)';
-    const notchColor = '#0F172A'; // Dark background matching the page
+    const notchColor = '#100720'; // Seamless dark cutout blending with page backdrop
 
     const isComplete = currentStamps >= stampGoal;
     const remainingStamps = Math.max(0, stampGoal - currentStamps);
@@ -2053,14 +2328,24 @@ export default function NfcLandingScreen() {
 
     const serialNo = `#WLY-${(merchant?.id || '88421').slice(-5).toUpperCase()}`;
 
+    const animatedMaxHeight = (step === 'form') ? 185 : voucherSlideAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 185]
+    });
+
+    const animatedMarginBottom = (step === 'form') ? 14 : voucherSlideAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, isApproved ? 6 : 10]
+    });
+
     const animatedTranslateY = (step === 'form') ? 0 : voucherSlideAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [-60, 0]
+      outputRange: [-24, 0]
     });
     
     const animatedOpacity = (step === 'form') ? 1 : voucherSlideAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1]
+      inputRange: [0, 0.35, 1],
+      outputRange: [0, 0.4, 1]
     });
 
     const animatedWidth: any = (step === 'form') ? `${progressPercent}%` : voucherProgressAnim.interpolate({
@@ -2069,7 +2354,16 @@ export default function NfcLandingScreen() {
     });
 
     return (
-      <Animated.View style={[styles.voucherPreviewContainer, { opacity: animatedOpacity, transform: [{ translateY: animatedTranslateY }] }]}>
+      <Animated.View style={[
+        styles.voucherPreviewContainer,
+        {
+          maxHeight: animatedMaxHeight,
+          marginBottom: animatedMarginBottom,
+          opacity: animatedOpacity,
+          transform: [{ translateY: animatedTranslateY }],
+          overflow: 'hidden',
+        }
+      ]}>
         {/* Boarding Pass Ticket Card Container */}
         <View style={[styles.boardingPassCard, { backgroundColor: cardBg }]}>
           
@@ -2087,11 +2381,11 @@ export default function NfcLandingScreen() {
 
           {/* Middle Main Body */}
           <View style={styles.boardingPassMainBody}>
-            <View style={{ flex: 1, justifyContent: 'center', gap: 14 }}>
+            <View style={{ flex: 1, justifyContent: 'center', gap: 12 }}>
               
               {/* Top: Premium Progress Bar */}
               <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                   <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#6B7280', letterSpacing: 0.5 }}>
                     PROGRESS
                   </Text>
@@ -2099,26 +2393,26 @@ export default function NfcLandingScreen() {
                     {isComplete ? 'UNLOCKED' : `${progressPercent}%`}
                   </Text>
                 </View>
-                <View style={{ height: 10, backgroundColor: '#E5E7EB', borderRadius: 5, overflow: 'hidden' }}>
-                  <Animated.View style={{ height: '100%', width: animatedWidth, backgroundColor: headerBg, borderRadius: 5 }} />
+                <View style={{ height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' }}>
+                  <Animated.View style={{ height: '100%', width: animatedWidth, backgroundColor: headerBg, borderRadius: 4 }} />
                 </View>
               </View>
 
               {/* Middle: Reward Info */}
               <View>
-                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' }}>
                   Your Reward
                 </Text>
-                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: 0.2 }} numberOfLines={2}>
+                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: 0.1 }} numberOfLines={2}>
                   {rewardTitle}
                 </Text>
               </View>
 
               {/* Bottom: Stamp Status & Next Milestone */}
               <View style={{ gap: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="gift-outline" size={14} color="#6B7280" />
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="gift-outline" size={13} color="#6B7280" />
+                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>
                     {isComplete ? 'Ready to claim!' : `${currentStamps} out of ${stampGoal} stamps collected`}
                   </Text>
                 </View>
@@ -2128,9 +2422,22 @@ export default function NfcLandingScreen() {
                     .sort((a: any, b: any) => Number(a.at_stamp) - Number(b.at_stamp))[0];
                   if (nextMilestone) {
                     return (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#FDE68A' }}>
-                          <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
+                        <View style={{ 
+                          backgroundColor: '#FEF3C7', 
+                          paddingHorizontal: 7, 
+                          paddingVertical: 2.5, 
+                          borderRadius: 6, 
+                          borderWidth: 1, 
+                          borderColor: '#FDE68A',
+                          maxWidth: '96%',
+                          alignSelf: 'flex-start'
+                        }}>
+                          <Text 
+                            style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
                             🎁 Milestone at {nextMilestone.at_stamp} stamps: {nextMilestone.reward_title}
                           </Text>
                         </View>
@@ -2164,31 +2471,31 @@ export default function NfcLandingScreen() {
 
           {/* Right Stub */}
           <View style={[styles.boardingPassRightStub, { backgroundColor: headerBg }]}>
-            <View style={[styles.boardingPassStubBody, { justifyContent: 'center', alignItems: 'center', gap: 12 }]}>
+            <View style={[styles.boardingPassStubBody, { justifyContent: 'center', alignItems: 'center', gap: 6, padding: 6 }]}>
               {merchantLogoUrl && !merchantLogoUrl.includes('placeholder') ? (
                 <View style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 27,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
                   backgroundColor: '#FFFFFF',
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
-                  borderColor: 'rgba(0,0,0,0.05)',
+                  borderColor: 'rgba(0,0,0,0.06)',
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
+                  shadowOpacity: 0.1,
                   shadowRadius: 3,
                   elevation: 2,
                   padding: 2,
                 }}>
-                  <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 25 }} resizeMode="contain" />
+                  <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 22 }} resizeMode="contain" />
                 </View>
               ) : (
                 <View style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 27,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
                   backgroundColor: '#FFFFFF',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2198,11 +2505,11 @@ export default function NfcLandingScreen() {
                   shadowRadius: 3,
                   elevation: 2,
                 }}>
-                  <Ionicons name="storefront" size={24} color={headerBg} />
+                  <Ionicons name="storefront" size={22} color={headerBg} />
                 </View>
               )}
               
-              <Text style={[styles.boardingPassStubValueText, { textAlign: 'center', fontSize: 11, color: headerTextColor }]} numberOfLines={2}>
+              <Text style={[styles.boardingPassStubValueText, { textAlign: 'center', fontSize: 10, color: headerTextColor, letterSpacing: 0.3 }]} numberOfLines={2}>
                 {merchantName.toUpperCase()}
               </Text>
             </View>
@@ -2217,37 +2524,105 @@ export default function NfcLandingScreen() {
   // ══════════════════════════════════════════════════════════════════
   const renderCardContent = () => (
     <>
-      {/* Top Navigation & Action Bar */}
-          <View style={styles.cardHeaderRow}>
-            <TouchableOpacity 
-              style={styles.iconCircleBtn} 
-              onPress={() => {
-                if (step === 'sent' && !isApproved) {
-                  setStep('form');
-                  setIsWaitingConfirm(false);
-                } else {
-                  handleViewStampCard();
-                }
-              }}
-            >
-              <Ionicons name="chevron-back" size={20} color="#000000" />
-            </TouchableOpacity>
-            {step !== 'form' && step !== 'sent' && (
-              <TouchableOpacity 
-                style={[styles.iconCircleBtn, { backgroundColor: '#000000' }]} 
-                onPress={() => setShowBack(prev => !prev)}
-              >
-                <Ionicons name={showBack ? 'time-outline' : 'card-outline'} size={18} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* Step 1: Top Brand Strip (Merchant Logo + Welcome + Risev Mark) */}
+          {step === 'form' && (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+              paddingHorizontal: 4,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {merchantLogoUrl ? (
+                  <View style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: '#FFFFFF',
+                    padding: 2,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}>
+                    <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+                  </View>
+                ) : (
+                  <View style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}>
+                    <Ionicons name="storefront" size={22} color="#0F172A" />
+                  </View>
+                )}
+                <View>
+                  <Text style={{
+                    fontSize: 11,
+                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                    color: headerSubtextColor,
+                    letterSpacing: 0.2,
+                  }}>
+                    Welcome to
+                  </Text>
+                  <Text style={{
+                    fontSize: 16.5,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: headerTextColor,
+                    letterSpacing: -0.3,
+                  }} numberOfLines={1}>
+                    {merchantName}
+                  </Text>
+                </View>
+              </View>
 
-          {/* Merchant Brand Logo & Header / Animated Flipping Loyalty Card */}
-          {(step === 'form' || step === 'sent') ? (
+              <Image
+                source={require('../assets/risev logo.png')}
+                style={{ width: 56, height: 20, resizeMode: 'contain', tintColor: headerLogoTint }}
+              />
+            </View>
+          )}
+
+          {/* Step 2 & Beyond: Top Navigation Bar */}
+          {step !== 'form' && (
+            <View style={[styles.cardHeaderRow, { marginBottom: 16 }]}>
+              <TouchableOpacity 
+                style={styles.iconCircleBtn} 
+                onPress={() => {
+                  if (step === 'sent' && !isApproved) {
+                    setStep('form');
+                    setIsWaitingConfirm(false);
+                  } else {
+                    handleViewStampCard();
+                  }
+                }}
+              >
+                <Ionicons name="chevron-back" size={20} color="#000000" />
+              </TouchableOpacity>
+              
+              <Image
+                source={require('../assets/risev logo.png')}
+                style={{ width: 56, height: 20, resizeMode: 'contain', tintColor: headerLogoTint }}
+              />
+            </View>
+          )}
+
+          {/* Merchant Brand Logo & Header / Animated Flipping Loyalty Card (Revealed on Step 2 / Approved) */}
+          {(step === 'sent' || isApproved) ? (
             <TouchableOpacity
               activeOpacity={0.95}
               onPress={() => setShowBack(prev => !prev)}
-              style={{ marginBottom: 20, position: 'relative' }}
+              style={{ marginBottom: 16, position: 'relative' }}
             >
               {/* Front Card Panel */}
               <Animated.View
@@ -2564,12 +2939,12 @@ export default function NfcLandingScreen() {
           ) : null}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* REWARD VOUCHER PREVIEW TICKET (Between Card & Claim Form)  */}
+          {/* REWARD VOUCHER PREVIEW TICKET (Revealed on Step 2 / Approved) */}
           {/* ───────────────────────────────────────────────────────── */}
-          {(step === 'form' || isApproved) && !isPointsOnly && renderRewardVoucherPreview()}
+          {(step === 'sent' || isApproved) && !isPointsOnly && renderRewardVoucherPreview()}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 1: Phone Input Form */}
+          {/* STEP 1: Phone Input Form (Clean Wallpaper Hero View) */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'form' && (() => {
             const getIsLight = (color: string) => {
@@ -2607,86 +2982,191 @@ export default function NfcLandingScreen() {
 
             return (
               <>
-                <BlurView 
-                  intensity={40} 
-                  tint="dark"
-                  style={[styles.innerFormCard, { 
-                  backgroundColor: getHexAlpha(primaryColor, 0.4),
+                <View style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 24,
+                  paddingHorizontal: 20,
+                  paddingVertical: 18,
                   borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.15)',
+                  borderColor: '#F1F5F9',
                   shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 10 },
+                  shadowOpacity: 0.10,
+                  shadowRadius: 20,
                   elevation: 8,
-                  padding: 24,
-                  borderRadius: 20,
-                  overflow: 'hidden'
-                }]}>
-                  <View style={[styles.nfcBadgeRow, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', marginBottom: 4 }]}>
-                    <View style={[styles.nfcBadgeDot, { backgroundColor: brandTextColor }]} />
-                    <Text style={[styles.nfcBadgeTitle, { color: brandTextColor }]}>VERIFIED NFC SCAN</Text>
+                  marginTop: 'auto',
+                  marginBottom: 12,
+                }}>
+                  {/* NFC Tap Successful Green Pill */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    backgroundColor: '#ECFDF5',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 9999,
+                    gap: 6,
+                    marginBottom: 10,
+                  }}>
+                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' }} />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#047857' }}>
+                      NFC tap successful
+                    </Text>
                   </View>
 
-                  <Text style={[styles.formWelcomeTitle, { color: brandTextColor, marginTop: 12, marginBottom: 12, fontSize: 22 }]}>Claim Your Stamps</Text>
+                  {/* Title & Subtitle */}
+                  <Text style={{
+                    fontSize: 22,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: '#000000',
+                    letterSpacing: -0.6,
+                    marginBottom: 2,
+                  }}>
+                    {isPointsOnly ? 'Collect your points.' : 'Collect your stamp.'}
+                  </Text>
+                  <Text style={{
+                    fontSize: 13,
+                    fontFamily: 'PlusJakartaSans_500Medium',
+                    color: '#64748B',
+                    marginBottom: 12,
+                  }}>
+                    Enter your phone number to continue.
+                  </Text>
 
-                  {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+                  {errorMsg ? (
+                    <View style={{
+                      backgroundColor: '#FEF2F2',
+                      borderWidth: 1,
+                      borderColor: '#FCA5A5',
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      marginBottom: 10,
+                    }}>
+                      <Text style={{ color: '#DC2626', fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold' }}>
+                        {errorMsg}
+                      </Text>
+                    </View>
+                  ) : null}
 
-                  {/* Phone Input */}
-                  <View style={[styles.inputContainer, { marginBottom: 20 }]}>
-                    <Text style={[styles.inputLabel, { color: brandSubtextColor, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 10, letterSpacing: 0.5, marginBottom: 8 }]}>PHONE NUMBER</Text>
-                    <View style={[styles.inputGroup, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor, borderWidth: 1, paddingLeft: 6, borderRadius: 12, height: 48 }]}>
-                      <View style={[styles.prefixBox, { backgroundColor: '#FFFFFF', borderRadius: 8, height: 36, paddingHorizontal: 10, marginVertical: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Text style={{ fontSize: 14, marginRight: 4 }}>🇲🇾</Text>
-                        <Text style={[styles.prefixCode, { color: '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 14 }]}>+60</Text>
-                      </View>
-                      <TextInput
-                        style={[
-                          styles.input, 
-                          { color: brandTextColor, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold', marginLeft: 12 },
-                          Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
-                        ]}
-                        placeholder="11-234 5678"
-                        placeholderTextColor={isLightBrandColor ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.5)'}
-                        value={phoneInput}
-                        onChangeText={(text) => {
-                          setPhoneInput(formatMalaysianPhone(text));
+                  {/* Phone Input Box */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 14,
+                    padding: 5,
+                    height: 48,
+                    marginBottom: 10,
+                  }}>
+                    {/* Country Selector Pill */}
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 10,
+                      paddingHorizontal: 8,
+                      height: 36,
+                      gap: 4,
+                    }}>
+                      <Text style={{ fontSize: 14 }}>🇲🇾</Text>
+                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                        +60
+                      </Text>
+                      <Ionicons name="chevron-down" size={12} color="#64748B" />
+                    </View>
+
+                    {/* Hairline Divider */}
+                    <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0', marginHorizontal: 8 }} />
+
+                    {/* Phone TextInput */}
+                    <TextInput
+                      style={[
+                        {
+                          flex: 1,
+                          fontSize: 16,
+                          fontFamily: 'PlusJakartaSans_700Bold',
+                          color: '#0F172A',
+                          height: '100%',
+                        },
+                        Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
+                      ]}
+                      placeholder="1110209669"
+                      placeholderTextColor="#94A3B8"
+                      value={phoneInput}
+                      onChangeText={(text) => {
+                        setPhoneInput(formatMalaysianPhone(text));
+                        setErrorMsg('');
+                      }}
+                      keyboardType="phone-pad"
+                    />
+
+                    {/* Circular Clear Button */}
+                    {phoneInput ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setPhoneInput('');
                           setErrorMsg('');
                         }}
-                        keyboardType="phone-pad"
-                      />
-                    </View>
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 13,
+                          backgroundColor: '#E2E8F0',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 6,
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="close" size={14} color="#64748B" />
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
 
                   {/* Full Name Input (New Customer) */}
                   {showNameField && (
-                    <View style={{ marginTop: 4, marginBottom: 20 }}>
+                    <View style={{ marginBottom: 16 }}>
                       <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.10)',
-                        borderRadius: 10,
+                        backgroundColor: '#F0FDF4',
+                        borderRadius: 12,
                         paddingHorizontal: 12,
                         paddingVertical: 10,
-                        marginBottom: 16,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#DCFCE7',
                       }}>
                         <Text style={{ fontSize: 16, marginRight: 8 }}>👋</Text>
-                        <Text style={{ flex: 1, fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: brandSubtextColor, lineHeight: 18 }}>
+                        <Text style={{ flex: 1, fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#166534', lineHeight: 18 }}>
                           Looks like you're new here! Just tell us your name to claim.
                         </Text>
                       </View>
 
-                      <Text style={[styles.inputLabel, { color: brandSubtextColor, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 10, letterSpacing: 0.5, marginBottom: 8 }]}>YOUR NAME</Text>
-                      <View style={[styles.inputGroup, { backgroundColor: brandInputBgColor, borderColor: brandInputBorderColor, borderWidth: 1, paddingLeft: 12, borderRadius: 12, height: 48 }]}>
-                        <Ionicons name="person-outline" size={18} color={brandSubtextColor} style={{ marginRight: 8 }} />
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#F8FAFC',
+                        borderColor: '#E2E8F0',
+                        borderWidth: 1,
+                        borderRadius: 14,
+                        paddingHorizontal: 12,
+                        height: 50,
+                      }}>
+                        <Ionicons name="person-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
                         <TextInput
                           style={[
-                            styles.input,
-                            { color: brandTextColor, fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold' },
+                            { flex: 1, color: '#0F172A', fontSize: 15, fontFamily: 'PlusJakartaSans_600SemiBold' },
                             Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                           ]}
                           placeholder="e.g. Ahmad Rizal"
-                          placeholderTextColor={isLightBrandColor ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.5)'}
+                          placeholderTextColor="#94A3B8"
                           value={nameInput}
                           onChangeText={setNameInput}
                           autoFocus
@@ -2696,117 +3176,501 @@ export default function NfcLandingScreen() {
                     </View>
                   )}
 
+                  {/* Yellow Primary Action Button */}
                   <TouchableOpacity
                     style={[
-                      styles.primaryActionBtn,
-                      { backgroundColor: isLightBrandColor ? '#0F172A' : '#FFFFFF', borderRadius: 14, height: 48, marginTop: 4 },
-                      (isLoading || isCheckingPhone) && { opacity: 0.5 }
+                      {
+                        backgroundColor: '#FFCC00',
+                        borderRadius: 14,
+                        height: 48,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#FFCC00',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 3,
+                      },
+                      (isLoading || isCheckingPhone) && { opacity: 0.6 }
                     ]}
                     onPress={handleNfcSubmit}
                     disabled={isLoading || isCheckingPhone}
                     activeOpacity={0.85}
                   >
                     {isLoading || isCheckingPhone ? (
-                      <ActivityIndicator color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} />
+                      <ActivityIndicator color="#000000" />
                     ) : (
-                      <>
-                        <Text style={[styles.primaryActionBtnText, { color: isLightBrandColor ? '#FFFFFF' : '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, marginRight: 8 }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{
+                          fontSize: 15,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#000000',
+                        }}>
                           {showNameField
                             ? (isPointsOnly ? 'Complete Points Claim' : 'Complete Stamp Claim')
-                            : (isPointsOnly ? 'Claim Points Now' : 'Claim Stamps Now')}
+                            : (isPointsOnly ? 'Collect My Points' : 'Collect My Stamp')}
                         </Text>
-                        <Ionicons 
-                          name="arrow-forward" 
-                          size={18} 
-                          color={isLightBrandColor ? '#FFFFFF' : '#0F172A'} 
-                        />
-                      </>
+                        <Ionicons name="arrow-forward" size={17} color="#000000" />
+                      </View>
                     )}
                   </TouchableOpacity>
 
-                  {/* OR: Walk-in Book Appointment Button */}
-                  {canBookAppointment && bookingSlug && (
-                    <>
-                      <View style={styles.orDividerRow}>
-                        <View style={[styles.orDividerLine, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)' }]} />
-                        <Text style={[styles.orDividerText, { color: brandSubtextColor }]}>ATAU</Text>
-                        <View style={[styles.orDividerLine, { backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)' }]} />
-                      </View>
+                  {/* Secondary Book Appointment Button (Directly under Collect Button) */}
+                  {canBookAppointment && bookingSlug ? (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 14,
+                        height: 44,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                      onPress={handleNavigateToBooking}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color="#0F172A" />
+                      <Text style={{
+                        fontSize: 13.5,
+                        fontFamily: 'PlusJakartaSans_700Bold',
+                        color: '#0F172A',
+                      }}>
+                        Walk-In Customer Booking
+                      </Text>
+                      <Ionicons name="chevron-forward" size={14} color="#64748B" />
+                    </TouchableOpacity>
+                  ) : null}
 
-                      <TouchableOpacity
-                        style={[
-                          styles.walkinAppointmentBtn,
-                          {
-                            borderColor: isLightBrandColor ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.25)',
-                            backgroundColor: isLightBrandColor ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.08)',
-                          }
-                        ]}
-                        onPress={handleNavigateToBooking}
-                        activeOpacity={0.85}
-                      >
-                        <View style={[styles.walkinBtnIconBox, { backgroundColor: isLightBrandColor ? '#FEF3C7' : 'rgba(251,191,36,0.18)' }]}>
-                          <Ionicons name="calendar" size={17} color="#D97706" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.walkinBtnTitle, { color: brandTextColor }]}>
-                            Walk-in: Book Appointment
-                          </Text>
-                          <Text style={[styles.walkinBtnSub, { color: brandSubtextColor }]}>
-                            Tempah slot temujanji & pilih servis
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color={brandSubtextColor} />
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {/* Trust Footer */}
-                  <View style={[styles.fakeTrustFooter, { marginTop: 16 }]}>
-                    <Ionicons name="lock-closed" size={12} color={brandSubtextColor} />
-                    <Text style={[styles.fakeTrustText, { color: brandSubtextColor, fontSize: 11 }]}>Secure connection by risev.app</Text>
+                  {/* Privacy / Loyalty Note */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 }}>
+                    <Ionicons name="lock-closed" size={12} color="#64748B" />
+                    <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      Your number is used for loyalty rewards.
+                    </Text>
                   </View>
-                </BlurView>
-
-                {/* Risev Logo below the card */}
-                <Image 
-                  source={require('../assets/risev logo.png')}
-                  style={styles.fakeRisevLogoPhoneBg}
-                  resizeMode="contain"
-                />
+                </View>
               </>
             );
           })()}
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 2: Real-Time Store Approval (Seamless Card Flip) */}
+          {/* STEP 2: Real-Time Store Approval (Waiting Card & Live Pulse) */}
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* STEP 2: Real-Time Store Approval (Waiting Card & Live Pulse) */}
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
-            <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 20 }}>
-              <View style={styles.radarStatusPill}>
-                <View style={[styles.radarStatusDot, { backgroundColor: isApproved ? '#34D399' : '#F59E0B' }]} />
-                <Text style={styles.radarStatusPillText}>
-                  {isApproved
-                    ? (isPointsOnly ? '✨ POINTS APPROVED!' : '🎉 STAMP APPROVED!')
-                    : '⏳ WAITING FOR CASHIER...'}
-                </Text>
-              </View>
-              
-              {!isApproved && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setStep('form');
-                    setIsWaitingConfirm(false);
-                  }}
-                  activeOpacity={0.7}
-                  style={styles.radarChangePhoneBtn}
-                >
-                  <Ionicons name="create-outline" size={13} color="rgba(255, 255, 255, 0.65)" style={{ marginRight: 5 }} />
-                  <Text style={styles.radarChangePhoneText}>Wrong phone number? Tap to edit</Text>
-                </TouchableOpacity>
+            <View style={{ alignItems: 'center', width: '100%', marginTop: 0, marginBottom: 0 }}>
+              {!isApproved ? (
+                <View style={{
+                  width: '100%',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 28,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                  paddingHorizontal: 18,
+                  paddingTop: 16,
+                  paddingBottom: 18,
+                  marginTop: 0,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 20,
+                  elevation: 6,
+                  position: 'relative',
+                }}>
+                  {/* Top-Right Dismiss / Cancel (X) Button */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setStep('form');
+                      setIsWaitingConfirm(false);
+                    }}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={{
+                      position: 'absolute',
+                      top: 14,
+                      right: 14,
+                      zIndex: 10,
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color="#0F172A" />
+                  </TouchableOpacity>
+
+                  {/* 3D Centerpiece Illustration with Ambient Warm Halo */}
+                  <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 10 }}>
+                    {/* Soft warm radial halo */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: 108,
+                        height: 108,
+                        borderRadius: 54,
+                        backgroundColor: '#FEF08A',
+                        opacity: 0.42,
+                      }}
+                    />
+                    {/* Floating 3D clock & hourglass asset */}
+                    <Animated.View
+                      style={{
+                        transform: [
+                          {
+                            translateY: beaconAnim.interpolate({
+                              inputRange: [0.3, 1],
+                              outputRange: [0, -3.5],
+                            }),
+                          },
+                          {
+                            scale: beaconAnim.interpolate({
+                              inputRange: [0.3, 1],
+                              outputRange: [0.98, 1.02],
+                            }),
+                          },
+                        ],
+                      }}
+                    >
+                      <Image
+                        source={require('../assets/images/waiting_approval_clock.png')}
+                        style={{ width: 116, height: 116, resizeMode: 'contain' }}
+                      />
+                    </Animated.View>
+                  </View>
+
+                  {/* Centered Typography: Title & Subtitle */}
+                  <Text style={{
+                    fontSize: 21,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: '#0F172A',
+                    textAlign: 'center',
+                    letterSpacing: -0.4,
+                  }}>
+                    {locale === 'en' ? 'Waiting for approval' : 'Menunggu kelulusan'}
+                  </Text>
+                  <Text style={{
+                    fontSize: 12.5,
+                    fontFamily: 'PlusJakartaSans_500Medium',
+                    color: '#64748B',
+                    textAlign: 'center',
+                    lineHeight: 17,
+                    marginTop: 4,
+                    paddingHorizontal: 8,
+                  }}>
+                    {appliedVoucherForClaim
+                      ? (locale === 'en'
+                          ? `Stamp & voucher redemption sent to ${merchantName}.`
+                          : `Permintaan cop & baucar dihantar ke ${merchantName}.`)
+                      : (locale === 'en'
+                          ? `Your ${isPointsOnly ? 'point' : 'stamp'} request has been sent to ${merchantName}.`
+                          : `Permintaan ${isPointsOnly ? 'mata ganjaran' : 'cop'} anda telah dihantar ke ${merchantName}.`)}
+                  </Text>
+
+                  {/* Dual Inset Rows (Dynamic: Stamp + Voucher OR Phone + Status) */}
+                  <View style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    marginTop: 14,
+                    gap: 8,
+                  }}>
+                    {appliedVoucherForClaim ? (
+                      <>
+                        {/* Row 1: Stamp Collection Request */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#0F172A',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}>
+                              <Ionicons name="ribbon" size={16} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                                {locale === 'en'
+                                  ? (isPointsOnly ? 'Collect Points' : 'Collect 1 Stamp')
+                                  : (isPointsOnly ? 'Kumpul Mata' : 'Kumpul 1 Cop')}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                                {locale === 'en' ? 'Awaiting merchant review' : 'Menunggu semakan juruwang'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#FEF9C3',
+                            borderWidth: 1,
+                            borderColor: '#FDE047',
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 99,
+                          }}>
+                            <Animated.View style={{
+                              width: 5.5,
+                              height: 5.5,
+                              borderRadius: 2.75,
+                              backgroundColor: '#D97706',
+                              opacity: dot1,
+                            }} />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                              {locale === 'en' ? 'Pending' : 'Menunggu'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={{ height: 1, backgroundColor: '#EDF2F7' }} />
+
+                        {/* Row 2: Customer Voucher Redemption Request */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#D97706',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}>
+                              <Ionicons name="gift" size={17} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>
+                                {appliedVoucherForClaim.title || 'Tebus Baucar'}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309', marginTop: 1 }}>
+                                {locale === 'en' ? 'Voucher to redeem' : 'Baucar ditebus di kaunter'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#FEF9C3',
+                            borderWidth: 1,
+                            borderColor: '#FDE047',
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 99,
+                          }}>
+                            <Animated.View style={{
+                              width: 5.5,
+                              height: 5.5,
+                              borderRadius: 2.75,
+                              backgroundColor: '#D97706',
+                              opacity: dot2,
+                            }} />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                              {locale === 'en' ? 'Pending' : 'Menunggu'}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        {/* Row 1: Phone + Direct Edit Action */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#0F172A',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}>
+                              <Ionicons name="call" size={16} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                                {locale === 'en' ? 'Phone Number' : 'Nombor Telefon'}
+                              </Text>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginTop: 1 }}>
+                                {formatDisplayPhone(phoneInput)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => {
+                              setStep('form');
+                              setIsWaitingConfirm(false);
+                            }}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 3.5,
+                              backgroundColor: '#FFFFFF',
+                              borderWidth: 1,
+                              borderColor: '#CBD5E1',
+                              paddingHorizontal: 9,
+                              paddingVertical: 4.5,
+                              borderRadius: 8,
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.04,
+                              shadowRadius: 2,
+                              elevation: 1,
+                            }}
+                          >
+                            <Ionicons name="create-outline" size={11.5} color="#0F172A" />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                              {locale === 'en' ? 'Edit' : 'Tukar'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={{ height: 1, backgroundColor: '#EDF2F7' }} />
+
+                        {/* Row 2: Status with Pulsing Amber Pill */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#0F172A',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}>
+                              <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                                {locale === 'en'
+                                  ? (isPointsOnly ? 'Points Approval' : 'Stamp Approval')
+                                  : (isPointsOnly ? 'Kelulusan Mata' : 'Kelulusan Cop')}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                                {locale === 'en' ? 'Awaiting merchant confirmation' : 'Menunggu kelulusan juruwang'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#FEF9C3',
+                            borderWidth: 1,
+                            borderColor: '#FDE047',
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 99,
+                          }}>
+                            <Animated.View style={{
+                              width: 5.5,
+                              height: 5.5,
+                              borderRadius: 2.75,
+                              backgroundColor: '#D97706',
+                              opacity: dot1,
+                            }} />
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                              {locale === 'en' ? 'Pending' : 'Menunggu'}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </View>
+
+                  {/* If voucher is applied, show phone + edit action in compact bar below */}
+                  {appliedVoucherForClaim && (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      marginTop: 6,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons name="call" size={12} color="#64748B" />
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#475569' }}>
+                          {formatDisplayPhone(phoneInput)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setStep('form');
+                          setIsWaitingConfirm(false);
+                        }}
+                        activeOpacity={0.7}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                      >
+                        <Ionicons name="create-outline" size={11} color="#0F172A" />
+                        <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                          {locale === 'en' ? 'Edit' : 'Tukar'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Dual Reassurance Footer: Real-Time Sync & Keep Screen Open */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingTop: 12,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="lock-closed" size={11.5} color="#64748B" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Auto-syncs in real-time' : 'Auto-sinkronisasi'}
+                      </Text>
+                    </View>
+
+                    <View style={{ width: 1, height: 11, backgroundColor: '#CBD5E1', marginHorizontal: 9 }} />
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="phone-portrait-outline" size={11.5} color="#64748B" />
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                        {locale === 'en' ? 'Keep screen open' : 'Kekalkan skrin'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.radarStatusPill}>
+                  <View style={[styles.radarStatusDot, { backgroundColor: '#34D399' }]} />
+                  <Text style={styles.radarStatusPillText}>
+                    {isPointsOnly ? '✨ POINTS APPROVED!' : '🎉 STAMP APPROVED!'}
+                  </Text>
+                </View>
               )}
 
               {isApproved && (
-                <View style={{ width: '100%', alignItems: 'center', marginTop: 12 }}>
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 0 }}>
                   {receiptData && (
                     <TouchableOpacity 
                       style={styles.receiptBanner}
@@ -2815,67 +3679,86 @@ export default function NfcLandingScreen() {
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                        <Text style={styles.receiptBannerText}>Pembayaran RM {parseFloat(receiptData.total_amount || 0).toFixed(2)} Berjaya</Text>
+                        <Text style={styles.receiptBannerText}>Payment of RM {parseFloat(receiptData.total_amount || 0).toFixed(2)} Successful</Text>
                       </View>
                       <View style={styles.receiptBannerBtn}>
                         <Ionicons name="receipt-outline" size={14} color="#0F172A" />
-                        <Text style={styles.receiptBannerBtnText}>Resit</Text>
+                        <Text style={styles.receiptBannerBtnText}>Receipt</Text>
                       </View>
                     </TouchableOpacity>
                   )}
 
                   {canBookAppointment && bookingSlug ? (
-                    <View style={{ width: '100%', maxWidth: 360, marginTop: 14 }}>
+                    <View style={{ width: '100%', maxWidth: 360, marginTop: receiptData ? 8 : 0 }}>
                       <View style={styles.postApprovalBookingCard}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <Ionicons name="sparkles" size={13} color="#FFC700" />
-                          <Text style={styles.postApprovalBookingTag}>PLAN YOUR NEXT VISIT</Text>
+                        {/* Green Pill Tag matching Image 2 */}
+                        <View style={styles.postApprovalBookingTagPill}>
+                          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' }} />
+                          <Text style={styles.postApprovalBookingTag}>Plan your next visit</Text>
                         </View>
-                        <Text style={styles.postApprovalBookingTitle}>
-                          Suka servis hari ini? Elakkan beratur!
-                        </Text>
-                        <Text style={styles.postApprovalBookingSub}>
-                          Tempah slot temujanji seterusnya terus dari telefon anda.
-                        </Text>
-                        <TouchableOpacity
-                          style={[styles.postApprovalBookingBtn, { backgroundColor: primaryColor || '#10B981' }]}
-                          onPress={handleNavigateToBooking}
-                          activeOpacity={0.88}
-                        >
-                          <Ionicons name="calendar" size={16} color={getContrastColor(primaryColor || '#10B981')} style={{ marginRight: 6 }} />
-                          <Text style={[styles.postApprovalBookingBtnText, { color: getContrastColor(primaryColor || '#10B981') }]}>
-                            Tempah Temujanji Seterusnya
-                          </Text>
-                          <Ionicons name="arrow-forward" size={15} color={getContrastColor(primaryColor || '#10B981')} style={{ marginLeft: 6 }} />
-                        </TouchableOpacity>
-                      </View>
 
-                      <TouchableOpacity
-                        style={[styles.radarSuccessBtn, { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', marginTop: 8 }]}
-                        onPress={handleViewStampCard}
-                        activeOpacity={0.88}
-                      >
-                        <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
-                          {isPointsOnly ? 'Lihat Baki Mata Ganjaran' : 'Lihat Kad Cop Saya'}
+                        {/* Title matching Image 2 */}
+                        <Text style={styles.postApprovalBookingTitle}>
+                          Loved today's visit? Skip the line next time!
                         </Text>
-                      </TouchableOpacity>
+
+                        {/* Subtitle matching Image 2 */}
+                        <Text style={styles.postApprovalBookingSub}>
+                          Book your next appointment seamlessly from your phone.
+                        </Text>
+
+                        {/* Primary Button matching Image 2 */}
+                        <TouchableOpacity
+                          style={styles.postApprovalBookingBtn}
+                          onPress={handleNavigateToBooking}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="calendar" size={17} color="#000000" />
+                            <Text style={styles.postApprovalBookingBtnText}>
+                              Book Next Appointment
+                            </Text>
+                            <Ionicons name="arrow-forward" size={17} color="#000000" />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Secondary Button matching Image 2 Walk-In Booking Style */}
+                        <TouchableOpacity
+                          style={styles.postApprovalBookingSecondaryBtn}
+                          onPress={handleViewStampCard}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="card-outline" size={16} color="#0F172A" />
+                          <Text style={styles.postApprovalBookingSecondaryBtnText}>
+                            {isPointsOnly ? 'View My Points Balance' : 'View My Stamp Card'}
+                          </Text>
+                          <Ionicons name="chevron-forward" size={14} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {/* Footnote matching Image 2 */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 }}>
+                          <Ionicons name="lock-closed" size={12} color="#64748B" />
+                          <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                            Instant booking confirmation · Skip the queue
+                          </Text>
+                        </View>
+                      </View>
                     </View>
                   ) : (
-                    <View style={{ flexDirection: 'row', gap: 8, width: '100%', maxWidth: 360, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, width: '100%', maxWidth: 360, marginTop: receiptData ? 8 : 2 }}>
                       <TouchableOpacity
-                        style={[styles.radarSuccessBtn, { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: 0 }]}
+                        style={[styles.radarSuccessBtn, { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', marginTop: 0, height: 48, borderRadius: 24 }]}
                         onPress={handleViewStampCard}
                         activeOpacity={0.88}
                       >
                         <Ionicons name="card" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13 }]}>
-                          {isPointsOnly ? 'My Points' : 'Kad Saya'}
+                        <Text style={[styles.radarSuccessBtnText, { color: '#FFFFFF', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' }]}>
+                          {isPointsOnly ? 'My Points' : 'View My Card'}
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0 }]}
+                        style={[styles.radarSuccessBtn, { flex: 1.5, backgroundColor: primaryColor || '#000', marginTop: 0, height: 48, borderRadius: 24 }]}
                         onPress={() => {
                           if (merchant?.slug) router.push(`/b/${merchant.slug}`);
                           else router.push(`/b/${merchant?.id}`);
@@ -2883,7 +3766,7 @@ export default function NfcLandingScreen() {
                         activeOpacity={0.88}
                       >
                         <Ionicons name="download-outline" size={18} color={getContrastColor(primaryColor || '#000')} style={{ marginRight: 6 }} />
-                        <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#000'), fontSize: 13 }]}>
+                        <Text style={[styles.radarSuccessBtnText, { color: getContrastColor(primaryColor || '#000'), fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
                           Download App
                         </Text>
                       </TouchableOpacity>
@@ -3241,12 +4124,17 @@ export default function NfcLandingScreen() {
             <ScrollView
               contentContainerStyle={[
                 styles.scrollContent,
-                isDesktop && styles.desktopScrollContent
+                isDesktop && styles.desktopScrollContent,
+                step === 'form' && { flexGrow: 1, justifyContent: 'space-between' }
               ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={[styles.contentCard, isDesktop && (step === 'sent' ? styles.desktopCardGlass : styles.desktopCard)]}>
+              <View style={[
+                styles.contentCard, 
+                isDesktop && (step === 'sent' ? styles.desktopCardGlass : styles.desktopCard),
+                step === 'form' && { flex: 1, justifyContent: 'space-between' }
+              ]}>
                 {renderCardContent()}
               </View>
             </ScrollView>
@@ -3259,18 +4147,247 @@ export default function NfcLandingScreen() {
             <ScrollView
               contentContainerStyle={[
                 styles.scrollContent,
-                isDesktop && styles.desktopScrollContent
+                isDesktop && styles.desktopScrollContent,
+                step === 'form' && { flexGrow: 1, justifyContent: 'space-between' }
               ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={[styles.contentCard, isDesktop && (step === 'sent' ? styles.desktopCardGlass : styles.desktopCard)]}>
+              <View style={[
+                styles.contentCard, 
+                isDesktop && (step === 'sent' ? styles.desktopCardGlass : styles.desktopCard),
+                step === 'form' && { flex: 1, justifyContent: 'space-between' }
+              ]}>
                 {renderCardContent()}
               </View>
             </ScrollView>
           </SafeAreaView>
         </View>
       )}
+
+      {/* 🌟 VOUCHER REDEMPTION PROMPT SLIDE-UP MODAL */}
+      <Modal
+        visible={showVoucherPrompt}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleDismissVoucherAndProceed}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.65)' }}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={handleDismissVoucherAndProceed}
+          />
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderTopLeftRadius: 30,
+            borderTopRightRadius: 30,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+            maxHeight: '85%',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 16,
+            elevation: 10,
+          }}>
+            {/* Drag Handle Bar */}
+            <View style={{
+              width: 38,
+              height: 4.5,
+              borderRadius: 2.5,
+              backgroundColor: '#CBD5E1',
+              alignSelf: 'center',
+              marginBottom: 14,
+            }} />
+
+            {/* Top Close Button */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 4 }}>
+              <TouchableOpacity
+                onPress={handleDismissVoucherAndProceed}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="close" size={16} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Heading & Subtitle */}
+            <Text style={{
+              fontSize: 20,
+              fontFamily: 'PlusJakartaSans_800ExtraBold',
+              color: '#0F172A',
+              letterSpacing: -0.4,
+              lineHeight: 25,
+            }}>
+              {locale === 'en' ? 'Use Your Voucher Today?' : 'Gunakan Baucar Anda Hari Ini?'}
+            </Text>
+            <Text style={{
+              fontSize: 12.5,
+              fontFamily: 'PlusJakartaSans_500Medium',
+              color: '#64748B',
+              lineHeight: 18,
+              marginTop: 4,
+              marginBottom: 14,
+            }}>
+              {locale === 'en'
+                ? `You have collected voucher(s) at ${merchantName}. Would you like to redeem one at the counter now?`
+                : `Anda mempunyai baucar ganjaran sedia ada di ${merchantName}. Mahu gunakan sekarang di kaunter bersama cop anda?`}
+            </Text>
+
+            {/* Voucher Cards Selection List */}
+            <ScrollView
+              style={{ maxHeight: 220, marginBottom: 14 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={{ gap: 8 }}>
+                {availableCustomerVouchers.map((v) => {
+                  const isSelected = selectedVoucherToUse?.id === v.id;
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      onPress={() => setSelectedVoucherToUse(v)}
+                      activeOpacity={0.8}
+                      style={{
+                        backgroundColor: isSelected ? '#FFFDF0' : '#F8FAFC',
+                        borderRadius: 16,
+                        borderWidth: isSelected ? 1.5 : 1,
+                        borderColor: isSelected ? '#F59E0B' : '#E2E8F0',
+                        padding: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                        shadowColor: isSelected ? '#F59E0B' : 'transparent',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isSelected ? 0.12 : 0,
+                        shadowRadius: 6,
+                        elevation: isSelected ? 2 : 0,
+                      }}
+                    >
+                      <View style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: isSelected ? '#FEF08A' : '#E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Ionicons name="gift" size={20} color={isSelected ? '#B45309' : '#64748B'} />
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={{
+                          fontSize: 13.5,
+                          fontFamily: 'PlusJakartaSans_800ExtraBold',
+                          color: '#0F172A',
+                        }} numberOfLines={1}>
+                          {v.title}
+                        </Text>
+                        <Text style={{
+                          fontSize: 11.5,
+                          fontFamily: 'PlusJakartaSans_500Medium',
+                          color: '#64748B',
+                          marginTop: 1,
+                        }} numberOfLines={1}>
+                          {v.description || 'Tebus di kaunter'}
+                        </Text>
+                        {v.code ? (
+                          <Text style={{
+                            fontSize: 10,
+                            fontFamily: 'PlusJakartaSans_700Bold',
+                            color: '#94A3B8',
+                            marginTop: 2,
+                            letterSpacing: 0.5,
+                          }}>
+                            CODE: {v.code}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      <View style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        borderWidth: isSelected ? 0 : 1.5,
+                        borderColor: '#CBD5E1',
+                        backgroundColor: isSelected ? '#D97706' : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#FFCC00',
+                borderRadius: 14,
+                height: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                shadowColor: '#FFCC00',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 3,
+              }}
+              onPress={handleUseVoucherAndProceed}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="gift" size={17} color="#000000" />
+              <Text style={{
+                fontSize: 14.5,
+                fontFamily: 'PlusJakartaSans_800ExtraBold',
+                color: '#000000',
+              }}>
+                {locale === 'en' ? 'Use Voucher at Counter ➔' : 'Gunakan Baucar di Kaunter ➔'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                borderRadius: 14,
+                height: 42,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 8,
+              }}
+              onPress={handleDismissVoucherAndProceed}
+              activeOpacity={0.8}
+            >
+              <Text style={{
+                fontSize: 12.5,
+                fontFamily: 'PlusJakartaSans_700Bold',
+                color: '#64748B',
+              }}>
+                {locale === 'en' ? 'Keep for Later (Collect Stamp Only)' : 'Simpan Untuk Nanti (Kumpul Cop Sahaja)'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* 🌟 GOOGLE & STORE REVIEW MODAL */}
       <Modal
@@ -3456,31 +4573,33 @@ export default function NfcLandingScreen() {
         </Modal>
       )}
 
-      {/* 🎁 MILESTONE & CARD COMPLETION REWARD CELEBRATION MODAL */}
+      {/* 🎁 MILESTONE & CARD COMPLETION REWARD CELEBRATION SLIDE-UP MODAL */}
       <Modal
         visible={showRewardModal && !!unlockedReward}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         statusBarTranslucent={true}
-        onRequestClose={() => setShowRewardModal(false)}
+        onRequestClose={handleCloseRewardModal}
       >
         <View style={styles.rewardModalBackdrop}>
           {/* Backdrop Tap to Dismiss (Click outside card to close) */}
           <Pressable 
             style={StyleSheet.absoluteFill} 
-            onPress={() => setShowRewardModal(false)} 
+            onPress={handleCloseRewardModal} 
           />
 
-          <View style={[styles.rewardModalCard, isDesktop && { maxWidth: 420 }]}>
-            {/* Top Close Button */}
+          <View style={[styles.rewardModalCard, isDesktop && { maxWidth: 410 }]}>
+            {/* Top Close Button (Circular Gray button with dark icon) */}
             <TouchableOpacity
               style={styles.rewardModalCloseBtn}
-              onPress={() => setShowRewardModal(false)}
+              onPress={handleCloseRewardModal}
               activeOpacity={0.7}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="close" size={20} color="#FFFFFF" />
+              <Ionicons name="close" size={16} color="#0F172A" />
             </TouchableOpacity>
+
+            <View style={styles.modalSheetHandleBar} />
 
             <ScrollView
               showsVerticalScrollIndicator={false}
@@ -3488,118 +4607,233 @@ export default function NfcLandingScreen() {
               style={{ width: '100%' }}
               bounces={false}
             >
-              {/* Glowing Hero Icon Badge */}
-              <View style={styles.rewardHeroBadgeWrap}>
-                <View style={[
-                  styles.rewardHeroGlow, 
-                  { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.35)' : 'rgba(52, 211, 153, 0.35)' }
-                ]} />
-                <View style={[
-                  styles.rewardHeroIconBox,
-                  { borderColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.6)' : 'rgba(52, 211, 153, 0.6)' }
-                ]}>
-                  <Text style={{ fontSize: 42 }}>
-                    {unlockedReward?.isMilestone ? '🎁' : '🏆'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Badge Pill */}
-              <View style={[
-                styles.rewardTypePill,
-                { backgroundColor: unlockedReward?.isMilestone ? 'rgba(255, 204, 0, 0.15)' : 'rgba(52, 211, 153, 0.15)' }
-              ]}>
-                <Text style={[
-                  styles.rewardTypePillText,
-                  { color: unlockedReward?.isMilestone ? '#FFCC00' : '#34D399' }
-                ]}>
-                  {unlockedReward?.isMilestone 
-                    ? (isEn ? `MILESTONE STAMP #${unlockedReward.atStamp || 'REWARD'}` : `MILESTONE COP #${unlockedReward.atStamp || 'REWARD'}`) 
-                    : (isEn ? 'STAMP CARD 100% COMPLETED' : 'KAD COP LENGKAP 100%')}
-                </Text>
+              {/* 🎁 3D CELEBRATION GIFT BOX */}
+              <View style={styles.celebrationHeroContainer}>
+                <Image
+                  source={require('../assets/reward_gift_box.png')}
+                  style={[
+                    styles.celebrationGiftImg,
+                    Platform.OS === 'web' ? ({ mixBlendMode: 'multiply' } as any) : {}
+                  ]}
+                  resizeMode="contain"
+                />
               </View>
 
               {/* Title & Subtitle */}
-              <Text style={styles.rewardModalTitle}>
+              <Text style={styles.celebrationTitle}>
                 {unlockedReward?.isMilestone 
-                  ? (isEn ? 'Milestone Reward Unlocked!' : 'Ganjaran Milestone Dibuka!') 
-                  : (isEn ? 'Congratulations! Card Completed!' : 'Tahniah! Kad Cop Selesai!')}
+                  ? "You've unlocked\na reward!" 
+                  : "Card 100%\nCompleted!"}
               </Text>
-              <Text style={styles.rewardModalSubtitle}>
+              <Text style={styles.celebrationSubtitle}>
                 {unlockedReward?.isMilestone
-                  ? (isEn
-                      ? `Congratulations! You have reached Milestone Stamp #${unlockedReward.atStamp || ''} and unlocked this special voucher!`
-                      : `Tahniah! Anda telah mencapai Milestone Cop #${unlockedReward.atStamp || ''} dan membuka baucar istimewa ini!`)
-                  : (isEn
-                      ? 'Congratulations! You completed your loyalty card and unlocked the main reward voucher!'
-                      : 'Tahniah! Anda telah melengkapkan kad kesetiaan dan membuka baucar ganjaran utama!')}
+                  ? `Amazing! You've collected ${unlockedReward.atStamp || currentStamps || 5} stamps\nat ${merchantName}.`
+                  : `Amazing! You've completed all ${stampGoal || 10} stamps\nat ${merchantName}!`}
               </Text>
 
-              {/* Boarding Pass Style Voucher Ticket */}
-              <View style={styles.rewardTicketContainer}>
-                {/* Left Spine */}
-                <View style={[styles.rewardTicketSpine, { backgroundColor: primaryColor || '#FFCC00' }]}>
-                  <Ionicons name="gift" size={20} color={getContrastColor(primaryColor || '#FFCC00')} />
-                </View>
-
-                {/* Main Ticket Info */}
-                <View style={styles.rewardTicketContent}>
-                  <View style={styles.rewardTicketHeaderRow}>
-                    <Text style={styles.rewardTicketStoreName} numberOfLines={1}>
-                      {merchantName.toUpperCase()}
-                    </Text>
-                    <View style={styles.rewardTicketActiveBadge}>
-                      <Text style={styles.rewardTicketActiveBadgeText}>{isEn ? 'ACTIVE' : 'AKTIF'}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.rewardTicketTitle} numberOfLines={2}>
-                    {unlockedReward?.title || (isEn ? 'Exclusive Reward Voucher' : 'Baucar Ganjaran Istimewa')}
+              {/* 📊 STAMP PROGRESS BOX (Dynamic 100% Completed for Goal Card vs Incremental Milestone) */}
+              <View style={styles.stampProgressBarBox}>
+                <View style={styles.stampProgressHeaderRow}>
+                  <Text style={styles.stampProgressLabel}>
+                    {unlockedReward?.isMilestone ? 'Your stamp progress' : 'Status Kad Setem'}
                   </Text>
-
-                  {unlockedReward?.code ? (
-                    <View style={styles.rewardTicketCodeRow}>
-                      <Ionicons name="barcode-outline" size={13} color="#94A3B8" />
-                      <Text style={styles.rewardTicketCodeText}>{unlockedReward.code}</Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.rewardTicketFooterRow}>
-                    <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                    <Text style={styles.rewardTicketExpiryText}>
-                      {isEn ? 'Valid 30 days • Redeem at store counter' : 'Sah 30 hari • Tebus di kaunter kedai'}
-                    </Text>
-                  </View>
+                  <Text style={styles.stampProgressRatio}>
+                    {unlockedReward?.isMilestone
+                      ? `${unlockedReward?.atStamp || currentStamps || 5} / ${stampGoal || 10}`
+                      : `${stampGoal || 10} / ${stampGoal || 10} (SELESAI)`}
+                  </Text>
+                </View>
+                <View style={styles.stampProgressTrackBg}>
+                  <View style={[
+                    styles.stampProgressTrackFill,
+                    {
+                      width: unlockedReward?.isMilestone
+                        ? `${Math.min(100, Math.max(10, (((unlockedReward?.atStamp || currentStamps || 5) / (stampGoal || 10)) * 100)))}%`
+                        : '100%',
+                      backgroundColor: '#FFCC00',
+                    }
+                  ]} />
                 </View>
               </View>
 
-              {/* Action Buttons */}
+              {/* 🎟️ REAL VOUCHER DESIGN (Standardized with Waly Vouchers System) */}
+              {(() => {
+                const voucherBrandColor = merchant?.onboarding_primary_color || merchant?.pwa_brand_color || merchant?.brand_color || primaryColor || '#050505';
+                const isLightBrand = (() => {
+                  const hex = (voucherBrandColor || '#050505').replace('#', '');
+                  const r = parseInt(hex.substring(0, 2), 16) || 0;
+                  const g = parseInt(hex.substring(2, 4), 16) || 0;
+                  const b = parseInt(hex.substring(4, 6), 16) || 0;
+                  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+                  return yiq >= 160;
+                })();
+                const brandTextColor = isLightBrand ? '#0F172A' : '#FFFFFF';
+                const spineTheme = getVoucherSpineTheme(
+                  unlockedReward?.isMilestone ? 'milestone' : (unlockedReward?.snapshotType || 'free_item'),
+                  unlockedReward?.title || 'Reward Voucher',
+                  voucherBrandColor
+                );
+
+                return (
+                  <View style={styles.realVoucherCard}>
+                    {/* 1. LEFT STUB: Voucher Category Color Spine */}
+                    <View style={[styles.realVoucherLeftSpine, { backgroundColor: voucherBrandColor }]}>
+                      <View style={styles.realVoucherSpineTextWrapper}>
+                        <Text style={[styles.realVoucherSpineText, { color: brandTextColor }]} numberOfLines={1}>
+                          {unlockedReward?.isMilestone ? 'MILESTONE REWARD' : 'GRAND REWARD'}
+                        </Text>
+                        <Text style={[styles.realVoucherSpineSubtext, { color: brandTextColor }]}>
+                          EXCLUSIVE PASS
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 2. CENTER ZONE: Reward Information on Pure White */}
+                    <View style={styles.realVoucherCenterZone}>
+                      {/* Top Row: Ready to redeem pill + Discount tag */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{
+                          backgroundColor: '#FFFBEB',
+                          borderWidth: 1,
+                          borderColor: '#FDE68A',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 3.5,
+                        }}>
+                          <Ionicons name="gift" size={10} color="#B45309" />
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
+                            Ready to redeem
+                          </Text>
+                        </View>
+
+                        <View style={{
+                          backgroundColor: unlockedReward?.discountValue ? '#0F172A' : '#FFCC00',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                        }}>
+                          <Text style={{
+                            fontSize: 8,
+                            fontFamily: 'PlusJakartaSans_800ExtraBold',
+                            color: unlockedReward?.discountValue ? '#FFFFFF' : '#050505',
+                            letterSpacing: 0.5,
+                          }}>
+                            {unlockedReward?.discountValue ? 'DISCOUNT' : 'FREE ITEM'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Middle: YOUR REWARD + Title + Subtitle */}
+                      <View style={{ marginVertical: 2 }}>
+                        <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 1, textTransform: 'uppercase' }}>
+                          YOUR REWARD
+                        </Text>
+                        <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.2, lineHeight: 18 }} numberOfLines={1}>
+                          {unlockedReward?.title || (unlockedReward?.isMilestone ? 'Free Artisan Coffee' : 'Complete Free Meal Voucher')}
+                        </Text>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1, lineHeight: 14 }} numberOfLines={1}>
+                          {unlockedReward?.description || (unlockedReward?.isMilestone ? 'Sah untuk kunjungan seterusnya' : 'Hadiah Utama Lengkap Kad Setem')}
+                        </Text>
+                      </View>
+
+                      {/* Bottom Row: Validity + Code Pill */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="time-outline" size={11} color="#64748B" />
+                          <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
+                            Sah 30 Hari
+                          </Text>
+                        </View>
+
+                        {/* Code Badge */}
+                        <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E2E8F0', flexShrink: 0 }}>
+                          <Ionicons name="barcode-outline" size={10} color="#0F172A" />
+                          <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
+                            {unlockedReward?.code || (unlockedReward?.isMilestone ? 'WV-8821' : 'WV-GOAL-9999')}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* 3. PERFORATION COLUMN */}
+                    <View style={styles.realVoucherPerforationCol} pointerEvents="none">
+                      <View style={[styles.realVoucherPerforationBgRight, { backgroundColor: voucherBrandColor }]} />
+                      <View style={styles.realVoucherDashedLine} />
+                      <View style={styles.realVoucherNotchTop} />
+                      <View style={styles.realVoucherNotchBottom} />
+                    </View>
+
+                    {/* 4. RIGHT STUB */}
+                    <View style={[styles.realVoucherRightStub, { backgroundColor: voucherBrandColor }]}>
+                      <View style={[
+                        styles.realVoucherLogoCircle,
+                        { borderColor: isLightBrand ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.3)' }
+                      ]}>
+                        {merchantLogoUrl && !merchantLogoUrl.includes('placeholder') ? (
+                          <Image source={{ uri: merchantLogoUrl }} style={styles.realVoucherLogoImg} resizeMode="cover" />
+                        ) : (
+                          <Text style={{ fontSize: 18 }}>🍦</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.realVoucherStoreName, { color: brandTextColor }]} numberOfLines={2}>
+                        {(merchantName || 'STORE').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* 🏆 TEASER BOX: Next Milestone (Incremental) OR New Card Journey (Goal Complete) */}
+              {unlockedReward?.isMilestone && stampGoal ? (
+                <View style={styles.nextMilestoneCard}>
+                  <View style={styles.nextMilestoneIconWrap}>
+                    <Ionicons name="trophy" size={16} color="#000000" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nextMilestoneTitle}>Next Milestone</Text>
+                    <Text style={styles.nextMilestoneDesc}>
+                      {`Collect ${Math.max(1, stampGoal - (unlockedReward.atStamp || currentStamps || 5))} more stamps to unlock your next reward!`}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#0F172A" />
+                </View>
+              ) : (
+                <View style={[styles.nextMilestoneCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <View style={[styles.nextMilestoneIconWrap, { backgroundColor: '#DCFCE7' }]}>
+                    <Ionicons name="refresh" size={16} color="#15803D" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.nextMilestoneTitle, { color: '#15803D' }]}>Kad Baharu Diaktifkan</Text>
+                    <Text style={[styles.nextMilestoneDesc, { color: '#166534' }]}>
+                      Kumpul setem semula pada lawatan seterusnya untuk ganjaran baharu!
+                    </Text>
+                  </View>
+                  <Ionicons name="sparkles" size={16} color="#15803D" />
+                </View>
+              )}
+
+              {/* 🔘 ACTION BUTTONS */}
               <TouchableOpacity
                 style={styles.rewardModalPrimaryBtn}
                 onPress={handleClaimVoucherLogin}
                 activeOpacity={0.88}
               >
-                <Ionicons 
-                  name={user ? "wallet" : "log-in-outline"} 
-                  size={19} 
-                  color="#000000" 
-                  style={{ marginRight: 8 }} 
-                />
                 <Text style={styles.rewardModalPrimaryBtnText}>
-                  {user 
-                    ? (isEn ? 'View in My Vouchers' : 'Lihat Dalam Baucar Saya') 
-                    : (isEn ? 'Log In & Save Voucher' : 'Log Masuk & Simpan Baucar')}
+                  {user ? 'View My Voucher' : 'Simpan Baucar ke Wallet'}
                 </Text>
-                <Ionicons name="arrow-forward" size={18} color="#000000" style={{ marginLeft: 6 }} />
+                <Ionicons name="arrow-forward" size={17} color="#FFFFFF" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.rewardModalDismissBtn}
-                onPress={() => setShowRewardModal(false)}
+                onPress={handleCloseRewardModal}
                 activeOpacity={0.7}
               >
                 <Text style={styles.rewardModalDismissText}>
-                  {isEn ? 'Stay Here & View Stamp Card' : 'Kekal Di Sini & Lihat Kad Cop'}
+                  Maybe later
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -3613,207 +4847,332 @@ export default function NfcLandingScreen() {
 const styles = StyleSheet.create({
   rewardModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     zIndex: 99999,
     ...(Platform.OS === 'web' ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 } as any : {}),
   },
   rewardModalCard: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 440,
     maxHeight: '92%',
-    backgroundColor: '#121217',
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 204, 0, 0.45)',
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: '#F1F5F9',
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 22,
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.6,
-    shadowRadius: 30,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    elevation: 25,
     overflow: 'hidden',
     position: 'relative',
     zIndex: 100000,
   },
   rewardModalCloseBtn: {
     position: 'absolute',
-    top: 16,
+    top: 14,
     right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
+  },
+  modalSheetHandleBar: {
+    width: 42,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 4,
+  },
+  celebrationHeroContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+    marginBottom: 0,
+    width: '100%',
+    height: 185,
+    position: 'relative',
+  },
+  celebrationGiftImg: {
+    width: 240,
+    height: 185,
+  },
+  celebrationTitle: {
+    fontSize: 23,
+    lineHeight: 27,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginTop: -24,
+    marginBottom: 4,
+    letterSpacing: -0.5,
+    zIndex: 10,
+    elevation: 10,
+    textShadowColor: 'rgba(255, 255, 255, 0.95)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
+  celebrationSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 8,
+    paddingHorizontal: 10,
     zIndex: 10,
   },
-  rewardHeroBadgeWrap: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  rewardHeroGlow: {
-    position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    opacity: 0.8,
-  },
-  rewardHeroIconBox: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rewardTypePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 10,
-  },
-  rewardTypePillText: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 0.8,
-  },
-  rewardModalTitle: {
-    fontSize: 21,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 6,
-    letterSpacing: -0.3,
-  },
-  rewardModalSubtitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 18,
-    paddingHorizontal: 6,
-  },
-  rewardTicketContainer: {
+  stampProgressBarBox: {
     width: '100%',
-    backgroundColor: '#1E1E24',
-    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    flexDirection: 'row',
-    overflow: 'hidden',
-    marginBottom: 20,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 7,
   },
-  rewardTicketSpine: {
-    width: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rewardTicketContent: {
-    flex: 1,
-    padding: 14,
-  },
-  rewardTicketHeaderRow: {
+  stampProgressHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  rewardTicketStoreName: {
-    fontSize: 10,
+  stampProgressLabel: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#0F172A',
+  },
+  stampProgressRatio: {
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 0.5,
-    flex: 1,
-    marginRight: 6,
+    color: '#0F172A',
   },
-  rewardTicketActiveBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 0.5,
-    borderColor: 'rgba(16, 185, 129, 0.5)',
+  stampProgressTrackBg: {
+    width: '100%',
+    height: 7,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
-  rewardTicketActiveBadgeText: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#34D399',
-    letterSpacing: 0.5,
+  stampProgressTrackFill: {
+    height: '100%',
+    borderRadius: 4,
   },
-  rewardTicketTitle: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  rewardTicketCodeRow: {
+  realVoucherCard: {
+    height: 126,
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+    position: 'relative',
     marginBottom: 8,
   },
-  rewardTicketCodeText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#CBD5E1',
-    letterSpacing: 1,
+  realVoucherLeftSpine: {
+    width: 38,
+    alignItems: 'center',
+    position: 'relative',
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+    overflow: 'hidden',
   },
-  rewardTicketFooterRow: {
+  realVoucherSpineTextWrapper: {
+    width: 126,
+    height: 38,
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -63,
+    marginTop: -19,
+    transform: [{ rotate: '-90deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  realVoucherSpineText: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+  },
+  realVoucherSpineSubtext: {
+    fontSize: 6.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    opacity: 0.85,
+    letterSpacing: 1.2,
+    marginTop: 1,
+  },
+  realVoucherCenterZone: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+    justifyContent: 'space-between',
+  },
+  realVoucherPerforationCol: {
+    width: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'relative',
+    zIndex: 3,
+  },
+  realVoucherPerforationBgRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 8,
+  },
+  realVoucherDashedLine: {
+    width: 1,
+    height: '100%',
+    borderColor: '#FFFFFF',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    zIndex: 1,
+  },
+  realVoucherNotchTop: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    top: -8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 2,
+  },
+  realVoucherNotchBottom: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    bottom: -8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 2,
+  },
+  realVoucherRightStub: {
+    width: 88,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  realVoucherLogoCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+    marginBottom: 4,
+  },
+  realVoucherLogoImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  realVoucherStoreName: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    textAlign: 'center',
+    width: '100%',
+    letterSpacing: 0.3,
+  },
+  nextMilestoneCard: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
+    marginBottom: 8,
   },
-  rewardTicketExpiryText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.5)',
+  nextMilestoneIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FEF08A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextMilestoneTitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+  },
+  nextMilestoneDesc: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+    marginTop: 1,
   },
   rewardModalPrimaryBtn: {
     width: '100%',
-    height: 50,
-    backgroundColor: '#FFCC00',
-    borderRadius: 14,
+    height: 44,
+    backgroundColor: '#000000',
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FFCC00',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-    marginBottom: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 3,
   },
   rewardModalPrimaryBtnText: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   rewardModalDismissBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 3,
+    paddingHorizontal: 14,
   },
   rewardModalDismissText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.55)',
+    color: '#64748B',
   },
   reviewModalBackdrop: {
     flex: 1,
@@ -4084,7 +5443,6 @@ const styles = StyleSheet.create({
 
   // Voucher Ticket Preview (Between Card & Form)
   voucherPreviewContainer: {
-    marginBottom: 20,
     width: '100%',
   },
   voucherRibbonTag: {
@@ -4119,41 +5477,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 8,
-    height: 160,
+    height: 165,
   },
   boardingPassBrandBand: {
-    width: 44,
+    width: 36,
     alignItems: 'center',
     position: 'relative',
     borderTopLeftRadius: 14,
     borderBottomLeftRadius: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: '#FFFFFF',
   },
   boardingPassBandTextWrapper: {
-    width: 160,
-    height: 44,
+    width: 165,
+    height: 36,
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -80,
-    marginTop: -22,
+    marginLeft: -82.5,
+    marginTop: -18,
     transform: [{ rotate: '-90deg' }],
     alignItems: 'center',
     justifyContent: 'center',
   },
   boardingPassBandText: {
-    fontSize: 12,
+    fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textAlign: 'center',
   },
   boardingPassBandSubtext: {
-    fontSize: 7.5,
+    fontSize: 7,
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     marginTop: 1,
   },
   boardingPassBandIcon: {
@@ -4163,11 +5517,11 @@ const styles = StyleSheet.create({
   },
   boardingPassMainBody: {
     flex: 1,
-    padding: 14,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    paddingRight: 8,
     justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#FFFFFF',
+    overflow: 'hidden',
   },
   boardingPassRouteRow: {
     flexDirection: 'row',
@@ -4222,24 +5576,20 @@ const styles = StyleSheet.create({
   },
   voucherNotchTop: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    top: -10,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    top: -9,
   },
   voucherNotchBottom: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    bottom: -10,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    bottom: -9,
   },
   boardingPassRightStub: {
-    width: 105,
+    width: 90,
     backgroundColor: '#FFFFFF',
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
@@ -5181,13 +6531,14 @@ const styles = StyleSheet.create({
   radarStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    marginBottom: 14,
+    borderColor: '#A7F3D0',
+    marginTop: 2,
+    marginBottom: 6,
   },
   radarStatusDot: {
     width: 7,
@@ -5198,7 +6549,7 @@ const styles = StyleSheet.create({
   radarStatusPillText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#047857',
     letterSpacing: 0.8,
   },
   radarHeading: {
@@ -5322,51 +6673,87 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   postApprovalBookingCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center',
+    borderColor: '#F1F5F9',
     width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    elevation: 8,
+    alignItems: 'stretch',
+  },
+  postApprovalBookingTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    gap: 6,
+    marginBottom: 10,
   },
   postApprovalBookingTag: {
-    fontSize: 10,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFC700',
-    letterSpacing: 0.8,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#047857',
   },
   postApprovalBookingTitle: {
-    fontSize: 15,
+    fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    color: '#000000',
+    letterSpacing: -0.6,
+    lineHeight: 25,
+    textAlign: 'left',
     marginBottom: 4,
   },
   postApprovalBookingSub: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
-    textAlign: 'center',
+    color: '#64748B',
+    textAlign: 'left',
+    lineHeight: 18,
     marginBottom: 14,
-    lineHeight: 17,
   },
   postApprovalBookingBtn: {
+    backgroundColor: '#FFCC00',
+    borderRadius: 14,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    height: 46,
-    borderRadius: 23,
-    shadowColor: '#000',
+    shadowColor: '#FFCC00',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
   postApprovalBookingBtnText: {
-    fontSize: 13.5,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  postApprovalBookingSecondaryBtn: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  postApprovalBookingSecondaryBtnText: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   voucherBookingPillWrapper: {
     alignItems: 'center',

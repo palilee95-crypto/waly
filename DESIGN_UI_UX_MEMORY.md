@@ -127,6 +127,26 @@ Visualizing the user's appointment state with high clarity:
      4. `Stamp Card` $\rightarrow$ `/(customer)/my-cards` (with active cards count badge).
 5. **Favorite Stores**: Horizontal card carousel with merchant ratings, distance, Pro badges, and instant `Book now >` CTA.
 
+### 5.1B. NFC Tap Loyalty Hub & Milestone Celebration Modal (`app/nfc.tsx`)
+- **NFC Tap Interface**:
+  - Anchored lowered white squircle card (`borderRadius: 24`, `padding: 20px 18px`) that preserves wallpaper visibility.
+  - Adaptive contrast header (`Welcome to` + store title + `risev` logo adapt to light/dark wallpaper luminance).
+  - Mint green status pill: `● NFC tap successful` (`#ECFDF5` / `#047857`).
+  - High-impact headline: `Collect your stamp.` + subtitle.
+  - Dual-tone phone input with Malaysian prefix pill `🇲🇾 +60 ⌄`.
+  - Risev Yellow `#FFCC00` action CTA `Collect My Stamp ➔` + streamlined Walk-In Appointment button underneath.
+- **Milestone Celebration Modal**:
+  - Apple-grade floating pure white modal card (`#FFFFFF`, `borderRadius: 28`, `shadowOpacity: 0.18`, top-right `✕` dismiss).
+  - 3D open white gift box asset with golden ribbon bow and exploding confetti sparks.
+  - Stamp progress box: `Your stamp progress` with fraction `X / Y` and `#FFCC00` track fill.
+  - Horizontal Boarding Pass Ticket:
+    - Left orange stub (`#EA580C`) with vertical `[STORE] REWARD PASS` text.
+    - Middle: Progress bar (e.g. `50%`), `YOUR REWARD` title, stamps collected fraction, and milestone pill tag.
+    - Semicircle cutout notches and dashed tear-off perforation line.
+    - Right orange stub with merchant circular logo and store name.
+  - Next Milestone retention teaser card (trophy icon, next reward threshold, and chevron).
+  - High-contrast solid black action CTA: `Log In & Save Voucher ➔` with `Maybe later` link below.
+
 ### 5.2. Customer Booking Flow (`app/b/[slug].tsx`)
 - **Step 0 — Storefront Profile**:
   - Cover photo with gradient overlay, verified store badge, operating hours popup trigger.
@@ -1503,3 +1523,88 @@ Visualizing the user's appointment state with high clarity:
        - Compact 6-row comparison table: Customer capacity (300 vs Unlimited ♾️), Booking engine (30/mo vs Unlimited), Business outlets (1 vs 5 Outlets), Staff accounts (Up to 5 vs 10 + Comm), Milestone loyalty (Standard vs All Engines 🎁), and Active vouchers (5 Max vs Unlimited).
 - **Verification**:
   - Passed `npx tsc --noEmit` with **0 errors**.
+
+---
+
+### 53. Reward Modal Architecture: Real Voucher Standardization (`app/nfc.tsx`)
+- **Context & Motivation**:
+  - User requested: *"refine and use real voucher design"* for the unlocked milestone reward modal.
+  - Previous implementation had an ad-hoc orange boarding pass container with clipped vertical text and non-standard layout.
+- **Solution & Standardization**:
+  1. Integrated the platform's core voucher design from `app/(customer)/vouchers.tsx` and `getVoucherSpineTheme` (`theme/index.ts`).
+  2. **Left Vertical Spine**: 38px left color band adopting the merchant's exact brand color (`voucherBrandColor`), with clean `-90deg` rotated text (`MILESTONE REWARD` / `EXCLUSIVE PASS`) and YIQ brightness-based contrast text.
+  3. **Center Zone**:
+     - Top row: `🎁 Ready to redeem` amber badge + golden `FREE ITEM` / dark `DISCOUNT` tag.
+     - Middle row: Uppercase `YOUR REWARD` tracking label + bold title + description.
+     - Bottom row: `🕒 Sah 30 Hari` validity on the left + `[barcode] WV-...` voucher code pill on the right (removed redundant milestone pill for clean aesthetics).
+  4. **Perforation Column**: Semicircular top and bottom notches (`width: 16, height: 16`) with crisp white dashed divider.
+  5. **Right Stub**: Circular white logo avatar container with subtle shadow and uppercase merchant store name.
+- **Verification**:
+  - Tested on `http://localhost:8081/nfc?m=fywm62r7q3e29gd&preview_reward=milestone` on mobile viewport (410×711).
+  - TypeScript checked with `npx tsc --noEmit` passing with **0 errors**.
+
+---
+
+### 54. Complete Stamp Card (100% Goal) Modal Architecture (`app/nfc.tsx`)
+- **Context & Motivation**:
+  - User requested: *"brainstorm for complete stamp iwant it like this to"*.
+  - Standardized the 100% completed card modal to match the new Real Voucher aesthetics while adding celebration milestones and future visit retention loops.
+- **Implemented Changes**:
+  1. **Dynamic Progress Bar Lock**:
+     - When completed, locks label to `Status Kad Setem` and ratio to `10 / 10 (SELESAI)` with 100% glowing amber fill track (`#FFCC00`), replacing partial progress indicators.
+  2. **Grand Reward Spine & Tag**:
+     - Left spine dynamically presents `GRAND REWARD` with `EXCLUSIVE PASS` rotated label.
+     - Bottom badge presents `🏆 GRAND PRIZE` alongside unclipped `Sah 30 Hari` validity.
+  3. **Next Cycle Teaser Card**:
+     - Replaces blank space with mint pastel card (`#F0FDF4`, border `#BBF7D0`):
+     - `🔄 Kad Baharu Diaktifkan: Kumpul setem semula pada lawatan seterusnya untuk ganjaran baharu! ✨`
+  4. **Single-Tap Wallet Persistence**:
+     - Primary button `Simpan Baucar ke Wallet ➔` saves the grand reward voucher straight into customer storage.
+- **Verification**:
+  - Tested on `http://localhost:8081/nfc?m=fywm62r7q3e29gd&preview_reward=goal` on mobile viewport (410×711).
+  - TypeScript checked with `npx tsc --noEmit` passing with **0 errors**.
+
+
+
+---
+
+### 55. State-Adaptive Smart Billing & Membership Hub (`app/(merchant)/subscription.tsx`)
+- **Context & Motivation**:
+  - User requested: *"now lets brainstorm this page design"* followed by *"create implementation plan"* for `localhost:8081/subscription`.
+  - Replaced the cluttered one-size-fits-all upsell screen with an Apple/Shopify/Stripe-caliber State-Adaptive Billing & Membership Hub.
+- **Implemented Changes**:
+  1. **Dual State Visual Modes**:
+     - **Active Subscriber Mode**: Displays an Executive VIP Black & Gold Membership Card with live plan tier, expiration/renewal status, and 3-column quota metrics (`Active Customers`, `Branches`, `Staff Access`).
+     - **Non-Subscribed / Trial Mode**: Clean conversion hero, billing cycle toggle (Monthly vs Annual -20%), Starter vs PRO comparative tier cards, feature matrix checklist, and direct payment flow.
+  2. **Merchant Quick Actions**:
+     - Direct order shortcut for NFC hardware stands (`/hardware`).
+     - TikTok Shop & Shopee Stand Activation Code redemption modal (`showCodeBox`).
+     - Collapsible Plan Switcher accordion allowing active subscribers to seamlessly upgrade without visual clutter.
+  3. **Global Layout Collision Fix**:
+     - Updated `app/(merchant)/_layout.tsx` to exclude `subscription` route from the persistent floating yellow `Need Help?` chat bubble (`!pathname.includes("subscription")`), clearing obstructions from checkout and billing actions.
+     - Bottom scroll padding increased to `140px` to guarantee zero thumb-zone clipping on mobile viewports.
+- **Verification**:
+  - TypeScript checked with `npx tsc --noEmit` passing with **0 errors**.
+  - Dev server verified at `http://localhost:8081/subscription`.
+---
+
+### 56. Post-Approval Appointment Booking Card Daylight Redesign (`app/nfc.tsx`)
+- **Context & Motivation**:
+  - The post-approval booking prompt previously rendered in a dark translucent glass container (`rgba(15, 15, 24, 0.76)`) with a high-contrast green button, jarring against the clean daylight white card aesthetic of the onboarding and customer booking card.
+  - Redesigned to match the clean, elevated aesthetic of Image 2 (walk-in customer booking card).
+- **Implemented Changes**:
+  1. **Daylight White Container (`postApprovalBookingCard`)**:
+     - Upgraded from dark translucent background (`rgba(15, 15, 24, 0.76)`) to crisp daylight white (`#FFFFFF`) with 24px squircle border radius, subtle slate border (`#F1F5F9`), and soft ambient shadow (`shadowOpacity: 0.10, shadowRadius: 20`).
+  2. **Mint Status Pill Badge (`postApprovalBookingTagPill`)**:
+     - Mint badge (`#ECFDF5`) featuring live emerald indicator dot (`#10B981`) and bold label `Plan your next visit` (`#047857`).
+  3. **High-Contrast Left-Aligned Typography Hierarchy**:
+     - 20px ExtraBold dark heading (`#000000`): `Loved today's visit? Skip the line next time!`
+     - 13px slate subtitle (`#64748B`): `Book your next appointment seamlessly from your phone.`
+  4. **RiseV Yellow Primary Action Button (`postApprovalBookingBtn`)**:
+     - High-impact yellow button (`#FFCC00`) with pitch black typography (`#000000`), calendar icon, and forward arrow for single-tap navigation to the merchant booking screen.
+  5. **Secondary Walk-In Style Action Button (`postApprovalBookingSecondaryBtn`)**:
+     - Daylight off-white pill (`#F8FAFC`, border `#E2E8F0`) for `View My Stamp Card` / `View My Points Balance` with right chevron.
+  6. **Reassuring Trust Footnote**:
+     - Subtle lock icon footnote: `Instant booking confirmation · Skip the queue`.
+- **Verification**:
+  - TypeScript checked with `npx tsc --noEmit` passing with **0 errors**.
