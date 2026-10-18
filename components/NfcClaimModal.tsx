@@ -1647,7 +1647,7 @@ export default function NfcClaimModal() {
                                       📌 {discType === 'none' || v.expand?.reward?.type === 'free_item' ? `Item: ${applicableText}` : `${locale === 'en' ? 'Valid for' : 'Sah'}: ${applicableText}`}
                                     </Text>
                                   ) : null}
-                                  <Text style={styles.figmaVoucherCode}>Code: {v.code}</Text>
+                                  <Text style={styles.figmaVoucherCode}>{locale === 'en' ? 'Code' : 'Kod'}: {v.code}</Text>
                                 </View>
 
                                 <TouchableOpacity

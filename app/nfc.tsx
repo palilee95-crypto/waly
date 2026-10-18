@@ -4342,7 +4342,7 @@ export default function NfcLandingScreen() {
                             marginTop: 2,
                             letterSpacing: 0.5,
                           }}>
-                            CODE: {v.code}
+                            {locale === 'en' ? 'CODE' : 'KOD'}: {v.code}
                           </Text>
                         ) : null}
                       </View>
@@ -4667,12 +4667,14 @@ export default function NfcLandingScreen() {
               <View style={styles.stampProgressBarBox}>
                 <View style={styles.stampProgressHeaderRow}>
                   <Text style={styles.stampProgressLabel}>
-                    {unlockedReward?.isMilestone ? 'Your stamp progress' : 'Status Kad Setem'}
+                    {unlockedReward?.isMilestone
+                      ? (locale === 'en' ? 'Your stamp progress' : 'Kemajuan setem anda')
+                      : (locale === 'en' ? 'Stamp Card Status' : 'Status Kad Setem')}
                   </Text>
                   <Text style={styles.stampProgressRatio}>
                     {unlockedReward?.isMilestone
                       ? `${unlockedReward?.atStamp || currentStamps || 5} / ${stampGoal || 10}`
-                      : `${stampGoal || 10} / ${stampGoal || 10} (SELESAI)`}
+                      : `${stampGoal || 10} / ${stampGoal || 10} ${locale === 'en' ? '(COMPLETE)' : '(SELESAI)'}`}
                   </Text>
                 </View>
                 <View style={styles.stampProgressTrackBg}>
@@ -4767,7 +4769,9 @@ export default function NfcLandingScreen() {
                           {unlockedReward?.title || (unlockedReward?.isMilestone ? 'Free Artisan Coffee' : 'Complete Free Meal Voucher')}
                         </Text>
                         <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1, lineHeight: 14 }} numberOfLines={1}>
-                          {unlockedReward?.description || (unlockedReward?.isMilestone ? 'Sah untuk kunjungan seterusnya' : 'Hadiah Utama Lengkap Kad Setem')}
+                          {unlockedReward?.description || (unlockedReward?.isMilestone
+                            ? (locale === 'en' ? 'Valid for your next visit' : 'Sah untuk kunjungan seterusnya')
+                            : (locale === 'en' ? 'Main Stamp Card Reward Completed' : 'Hadiah Utama Lengkap Kad Setem'))}
                         </Text>
                       </View>
 
@@ -4776,7 +4780,7 @@ export default function NfcLandingScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <Ionicons name="time-outline" size={11} color="#64748B" />
                           <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                            Sah 30 Hari
+                            {locale === 'en' ? 'Valid 30 Days' : 'Sah 30 Hari'}
                           </Text>
                         </View>
 
@@ -4838,9 +4842,9 @@ export default function NfcLandingScreen() {
                     <Ionicons name="refresh" size={16} color="#15803D" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.nextMilestoneTitle, { color: '#15803D' }]}>Kad Baharu Diaktifkan</Text>
+                    <Text style={[styles.nextMilestoneTitle, { color: '#15803D' }]}>{locale === 'en' ? 'New Card Activated' : 'Kad Baharu Diaktifkan'}</Text>
                     <Text style={[styles.nextMilestoneDesc, { color: '#166534' }]}>
-                      Kumpul setem semula pada lawatan seterusnya untuk ganjaran baharu!
+                      {locale === 'en' ? 'Collect stamps again on your next visit for new rewards!' : 'Kumpul setem semula pada lawatan seterusnya untuk ganjaran baharu!'}
                     </Text>
                   </View>
                   <Ionicons name="sparkles" size={16} color="#15803D" />
