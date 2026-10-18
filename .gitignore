@@ -67,6 +67,7 @@ opencode.jsonc
 # Agent customizations
 .agents/
 .commandcode/
+.mcp.json
 
 # Agent Persistent Memory & Daily Journals
 MEMORY/

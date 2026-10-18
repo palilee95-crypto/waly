@@ -16,12 +16,13 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
 import * as Clipboard from 'expo-clipboard';
+import BranchFormModal, { StaffOption } from '@/components/BranchFormModal';
 
 interface Branch {
   id: string;
@@ -40,16 +41,9 @@ interface Branch {
   assigned_stands?: string[];
 }
 
-export interface StaffOption {
-  id: string;
-  name: string;
-  phone?: string;
-  role_title?: string;
-  is_owner?: boolean;
-}
-
 export default function BranchesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ linked_stand?: string; branch_id?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -60,7 +54,18 @@ export default function BranchesScreen() {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  // Stand linking toast banner state
+  const [linkedStandBanner, setLinkedStandBanner] = useState<{ code: string; branchId?: string } | null>(null);
+
+  useEffect(() => {
+    if (params.linked_stand) {
+      setLinkedStandBanner({
+        code: String(params.linked_stand),
+        branchId: params.branch_id ? String(params.branch_id) : undefined,
+      });
+    }
+  }, [params.linked_stand, params.branch_id]);
   
   // Delete modal state
   const [deleteConfirmBranch, setDeleteConfirmBranch] = useState<Branch | null>(null);
@@ -75,27 +80,14 @@ export default function BranchesScreen() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const subPlan = subscription && subscription.status === 'active' ? (subscription.plan || 'starter') : 'none';
-  const isBusinessPlan = subPlan === 'business' || subPlan === 'enterprise';
   const isProPlan = subPlan === 'pro';
-  // Starter / Stand Bundle / None: 1 (HQ only)
-  // PRO: 5 (1 HQ + 4 Branches)
-  // Business / Enterprise: Unlimited
-  const maxAllowedBranches = isBusinessPlan ? 999 : (isProPlan ? 5 : 1);
+  // Stand bundle: 2 (1 HQ + 1 Branch)
+  // PRO: Unlimited (999)
+  // Starter / Free Trial: 1 (HQ only)
+  const maxAllowedBranches = isProPlan ? 999 : (subPlan === 'stand_bundle' ? 2 : 1);
 
-  // Form states
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [phone, setPhone] = useState('');
-  const [managerName, setManagerName] = useState('');
-  const [isHq, setIsHq] = useState(false);
-  const [googleReviewUrl, setGoogleReviewUrl] = useState('');
-  const [resolvingGoogleUrl, setResolvingGoogleUrl] = useState(false);
   const [merchantName, setMerchantName] = useState('');
   const [availableStaff, setAvailableStaff] = useState<StaffOption[]>([]);
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [isCustomManager, setIsCustomManager] = useState<boolean>(false);
-  const [showStaffPickerModal, setShowStaffPickerModal] = useState<boolean>(false);
 
   useEffect(() => {
     fetchBranches();
@@ -299,186 +291,13 @@ export default function BranchesScreen() {
       setShowUpgradeModal(true);
       return;
     }
-
     setEditingBranch(null);
-    setName('');
-    setAddress('');
-    setCity('');
-    setGoogleReviewUrl('');
-    setIsHq(branches.length === 0);
-
-    const defaultStaff = availableStaff.find(s => s.is_owner) || availableStaff[0];
-    if (defaultStaff) {
-      setManagerName(defaultStaff.name);
-      setPhone(defaultStaff.phone || '');
-      setSelectedStaffId(defaultStaff.id);
-      setIsCustomManager(false);
-    } else {
-      setManagerName(user?.name || '');
-      setPhone(user?.phone || '');
-      setSelectedStaffId(user?.id || '');
-      setIsCustomManager(false);
-    }
-
     setModalVisible(true);
   };
 
   const handleOpenEditModal = (branch: Branch) => {
     setEditingBranch(branch);
-    setName(branch.name);
-    setAddress(branch.address);
-    setCity(branch.city);
-    setPhone(branch.phone);
-    setManagerName(branch.manager_name);
-    setGoogleReviewUrl(branch.google_review_url || '');
-    setIsHq(Boolean(branch.is_hq));
-
-    const matched = availableStaff.find(s => 
-      s.name.trim().toLowerCase() === (branch.manager_name || '').trim().toLowerCase()
-    );
-    if (matched) {
-      setSelectedStaffId(matched.id);
-      setIsCustomManager(false);
-    } else {
-      setSelectedStaffId('');
-      setIsCustomManager(Boolean(branch.manager_name));
-    }
-
     setModalVisible(true);
-  };
-
-  const handleTestGoogleReviewUrl = async () => {
-    if (!googleReviewUrl.trim()) return;
-    setResolvingGoogleUrl(true);
-    try {
-      const res = await pb.send<any>('/api/risev/google-review/resolve', {
-        method: 'POST',
-        body: { url: googleReviewUrl.trim() }
-      });
-      if (res?.direct_url) {
-        setGoogleReviewUrl(res.direct_url);
-        Alert.alert(
-          locale === 'en' ? 'Google Review Link Verified' : 'Pautan Review Google Disahkan',
-          locale === 'en' ? 'Optimized 1-click Direct Review URL generated!' : 'Pautan 1-klik Google Review berjaya dijana!'
-        );
-      }
-    } catch (err: any) {
-      Alert.alert('Notice', 'Using link as entered.');
-    } finally {
-      setResolvingGoogleUrl(false);
-    }
-  };
-
-  const handleSaveBranch = async () => {
-    if (!name.trim()) {
-      Alert.alert(locale === 'en' ? 'Validation' : 'Pengesahan', locale === 'en' ? 'Branch name is required.' : 'Nama cawangan diperlukan.');
-      return;
-    }
-
-    if (!editingBranch && branches.length >= maxAllowedBranches) {
-      setModalVisible(false);
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    const finalIsHq = isHq;
-
-    setSubmitting(true);
-    try {
-      if (editingBranch) {
-        // Update in PB
-        try {
-          if (editingBranch.id && editingBranch.id !== 'hq-default' && !editingBranch.id.startsWith('branch-')) {
-            await pb.collection('branches').update(editingBranch.id, {
-              name: name.trim(),
-              address: address.trim(),
-              city: city.trim(),
-              phone: phone.trim(),
-              manager_name: managerName.trim(),
-              is_hq: finalIsHq,
-              google_review_url: googleReviewUrl.trim()
-            });
-          }
-
-          // If this branch became HQ, unset other branches
-          if (finalIsHq && user?.merchant_id) {
-            const otherHqs = branches.filter(b => b.is_hq && b.id !== editingBranch.id);
-            for (const o of otherHqs) {
-              if (o.id && !o.id.startsWith('branch-')) {
-                pb.collection('branches').update(o.id, { is_hq: false }).catch(() => null);
-              }
-            }
-          }
-        } catch (e) {
-          console.log('PB update branch notice:', e);
-        }
-
-        setBranches(prev => prev.map(b => b.id === editingBranch.id ? {
-          ...b,
-          name: name.trim(),
-          address: address.trim(),
-          city: city.trim(),
-          phone: phone.trim(),
-          manager_name: managerName.trim(),
-          is_hq: finalIsHq,
-          google_review_url: googleReviewUrl.trim()
-        } : (finalIsHq ? { ...b, is_hq: false } : b)));
-
-        Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'Branch updated successfully.' : 'Cawangan berjaya dikemaskini.');
-      } else {
-        // Create new branch in PB
-        try {
-          if (user?.merchant_id) {
-            // If new branch is HQ, unset others first
-            if (finalIsHq) {
-              const otherHqs = branches.filter(b => b.is_hq);
-              for (const o of otherHqs) {
-                if (o.id && !o.id.startsWith('branch-')) {
-                  pb.collection('branches').update(o.id, { is_hq: false }).catch(() => null);
-                }
-              }
-            }
-
-            const created = await pb.collection('branches').create({
-              merchant: user.merchant_id,
-              name: name.trim(),
-              address: address.trim(),
-              city: city.trim(),
-              phone: phone.trim(),
-              manager_name: managerName.trim(),
-              is_hq: finalIsHq,
-              google_review_url: googleReviewUrl.trim(),
-              status: 'active'
-            });
-            if (created?.id) {
-              const newEnriched: Branch = {
-                ...(created as any),
-                total_sales: 0,
-                total_stamps: 0,
-                customer_count: 0,
-                staff_count: 1,
-                assigned_stands: []
-              };
-              setBranches(prev => finalIsHq 
-                ? [newEnriched, ...prev.map(b => ({ ...b, is_hq: false }))]
-                : [...prev, newEnriched]
-              );
-              setModalVisible(false);
-              setSubmitting(false);
-              Alert.alert(locale === 'en' ? 'Success' : 'Berjaya', locale === 'en' ? 'New branch added successfully.' : 'Cawangan baru berjaya ditambah.');
-              return;
-            }
-          }
-        } catch (e) {
-          console.log('PB create branch error:', e);
-        }
-      }
-      setModalVisible(false);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save branch.');
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleDeleteBranch = (branch: Branch) => {
@@ -552,6 +371,37 @@ export default function BranchesScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Linked Stand Celebratory Toast Banner */}
+          {linkedStandBanner && (
+            <View style={styles.standBannerCard}>
+              <View style={styles.standBannerIconWrap}>
+                <Ionicons name="hardware-chip" size={20} color="#000000" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.standBannerTitle}>
+                    {locale === 'en' ? 'Smart Stand Successfully Linked!' : 'Smart Stand Berjaya Dihubungkan!'}
+                  </Text>
+                  <View style={styles.standBannerPill}>
+                    <Text style={styles.standBannerPillText}>{linkedStandBanner.code}</Text>
+                  </View>
+                </View>
+                <Text style={styles.standBannerSubtitle}>
+                  {locale === 'en'
+                    ? 'This stand is now active and ready for customer taps.'
+                    : 'Stand ini kini aktif dan sedia untuk imbasan pelanggan.'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setLinkedStandBanner(null)}
+                style={styles.standBannerCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Executive Brand KPI Summary Card (Concept A) */}
           <View style={styles.kpiCard}>
             <View style={styles.kpiHeaderRow}>
@@ -911,379 +761,51 @@ export default function BranchesScreen() {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Add / Edit Branch Modal */}
-        <Modal
+        {/* Reusable Add / Edit Branch Modal */}
+        <BranchFormModal
           visible={modalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, isDesktop && { maxWidth: 500 }]}>
-              {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {editingBranch ? (locale === 'en' ? 'Edit Branch' : 'Kemaskini Cawangan') : (locale === 'en' ? 'Add New Branch' : 'Tambah Cawangan Baru')}
-                </Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                  <Ionicons name="close" size={20} color="#050505" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                {/* Branch Name */}
-                <Text style={styles.inputLabel}>{locale === 'en' ? 'BRANCH NAME *' : 'NAMA CAWANGAN *'}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Bangi Gateway Outlet"
-                  placeholderTextColor="#94A3B8"
-                  value={name}
-                  onChangeText={setName}
-                />
-
-                {/* City / Area */}
-                <Text style={styles.inputLabel}>{locale === 'en' ? 'CITY / AREA' : 'BANDAR / KAWASAN'}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Bandar Baru Bangi, Selangor"
-                  placeholderTextColor="#94A3B8"
-                  value={city}
-                  onChangeText={setCity}
-                />
-
-                {/* Address */}
-                <Text style={styles.inputLabel}>{locale === 'en' ? 'FULL ADDRESS' : 'ALAMAT PENUH'}</Text>
-                <TextInput
-                  style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
-                  placeholder="e.g. No 12, Jalan Gerbang, Seksyen 15"
-                  placeholderTextColor="#94A3B8"
-                  value={address}
-                  onChangeText={setAddress}
-                  multiline
-                />
-
-                {/* Branch-Specific Google Review Link */}
-                <Text style={styles.inputLabel}>
-                  {locale === 'en' ? 'OUTLET GOOGLE REVIEW URL (OPTIONAL)' : 'URL GOOGLE REVIEW CAWANGAN (PILIHAN)'}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-                  <TextInput
-                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                    placeholder="https://maps.app.goo.gl/... or g.page"
-                    placeholderTextColor="#94A3B8"
-                    value={googleReviewUrl}
-                    onChangeText={setGoogleReviewUrl}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    onPress={handleTestGoogleReviewUrl}
-                    disabled={resolvingGoogleUrl || !googleReviewUrl.trim()}
-                    style={{
-                      backgroundColor: '#050505',
-                      paddingHorizontal: 14,
-                      borderRadius: 14,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: googleReviewUrl.trim() ? 1 : 0.5
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {resolvingGoogleUrl ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                        {locale === 'en' ? 'Verify' : 'Sahkan'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Branch Manager Selection (From Staff Management) */}
-                <View style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={styles.inputLabel}>
-                      {locale === 'en' ? 'BRANCH MANAGER' : 'PENGURUS CAWANGAN'}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        if (isCustomManager) {
-                          setIsCustomManager(false);
-                          const def = availableStaff[0];
-                          if (def) {
-                            setManagerName(def.name);
-                            if (def.phone) setPhone(def.phone);
-                            setSelectedStaffId(def.id);
-                          }
-                        } else {
-                          setIsCustomManager(true);
-                          setSelectedStaffId('');
-                        }
-                      }}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={styles.toggleCustomText}>
-                        {isCustomManager 
-                          ? (locale === 'en' ? '← Choose from Staff' : '← Pilih Dari Staf') 
-                          : (locale === 'en' ? '+ Custom Name' : '+ Tulis Nama Manual')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {!isCustomManager && availableStaff.length > 0 ? (
-                    <View>
-                      {/* Selected Staff Card Trigger */}
-                      <TouchableOpacity
-                        style={styles.staffPickerTrigger}
-                        onPress={() => setShowStaffPickerModal(true)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                          <View style={styles.staffPickerAvatar}>
-                            <Text style={styles.staffPickerAvatarText}>
-                              {(managerName || 'P').charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={styles.staffPickerSelectedName} numberOfLines={1}>
-                                {managerName || (locale === 'en' ? 'Select a manager' : 'Pilih pengurus')}
-                              </Text>
-                              {availableStaff.find(s => s.name.trim().toLowerCase() === managerName.trim().toLowerCase())?.is_owner && (
-                                <View style={styles.ownerBadge}>
-                                  <Text style={styles.ownerBadgeText}>OWNER</Text>
-                                </View>
-                              )}
-                            </View>
-                            <Text style={styles.staffPickerRoleText}>
-                              {availableStaff.find(s => s.name.trim().toLowerCase() === managerName.trim().toLowerCase())?.role_title || 
-                               (locale === 'en' ? 'Staff Member' : 'Staf Berdaftar')}
-                              {phone ? ` · ${phone}` : ''}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.staffPickerChevronBox}>
-                          <Ionicons name="swap-vertical" size={15} color="#000000" />
-                        </View>
-                      </TouchableOpacity>
-
-                      {/* Quick Select Horizontal Chips */}
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false} 
-                        contentContainerStyle={{ gap: 6, paddingTop: 8, paddingBottom: 2 }}
-                      >
-                        {availableStaff.map((staff) => {
-                          const isSelected = managerName.trim().toLowerCase() === staff.name.trim().toLowerCase();
-                          return (
-                            <TouchableOpacity
-                              key={staff.id}
-                              onPress={() => {
-                                setManagerName(staff.name);
-                                if (staff.phone) {
-                                  setPhone(staff.phone);
-                                }
-                                setSelectedStaffId(staff.id);
-                                setIsCustomManager(false);
-                              }}
-                              style={[styles.staffChip, isSelected && styles.staffChipActive]}
-                              activeOpacity={0.8}
-                            >
-                              <View style={[styles.staffChipDot, isSelected && styles.staffChipDotActive]} />
-                              <Text style={[styles.staffChipText, isSelected && styles.staffChipTextActive]}>
-                                {staff.name} {staff.is_owner ? '👑' : ''}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-                  ) : (
-                    <TextInput
-                      style={styles.input}
-                      placeholder={locale === 'en' ? 'e.g. Encik Farhan' : 'cth: Encik Farhan'}
-                      placeholderTextColor="#94A3B8"
-                      value={managerName}
-                      onChangeText={setManagerName}
-                    />
-                  )}
-                </View>
-
-                {/* Contact Phone */}
-                <Text style={styles.inputLabel}>{locale === 'en' ? 'CONTACT NUMBER' : 'NOMBOR TELEFON'}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 0123456789"
-                  placeholderTextColor="#94A3B8"
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                />
-
-                {/* Set as HQ Switch */}
-                <TouchableOpacity
-                  style={styles.hqSwitchRow}
-                  onPress={() => setIsHq(!isHq)}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.hqSwitchTitle}>{locale === 'en' ? 'Set as HQ / Main Outlet' : 'Tetapkan sebagai Cawangan Utama HQ'}</Text>
-                    <Text style={styles.hqSwitchSubtitle}>{locale === 'en' ? 'Primary branch for default staff assignments' : 'Cawangan utama untuk default staf'}</Text>
-                  </View>
-                  <View style={[styles.customToggle, isHq && styles.customToggleActive]}>
-                    <View style={[styles.toggleCircle, isHq && styles.toggleCircleActive]} />
-                  </View>
-                </TouchableOpacity>
-              </ScrollView>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSaveBranch}
-                disabled={submitting}
-                activeOpacity={0.85}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#050505" />
-                ) : (
-                  <Text style={styles.saveBtnText}>
-                    {editingBranch ? (locale === 'en' ? 'Save Changes' : 'Simpan Perubahan') : (locale === 'en' ? 'Create Branch' : 'Daftar Cawangan')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              {/* Delete Branch Option in Edit Modal */}
-              {editingBranch && (
-                <TouchableOpacity
-                  style={{
-                    marginTop: 10,
-                    paddingVertical: 13,
-                    borderRadius: 14,
-                    backgroundColor: '#FEF2F2',
-                    borderWidth: 1,
-                    borderColor: '#FEE2E2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6
-                  }}
-                  onPress={() => handleDeleteBranch(editingBranch)}
-                  activeOpacity={0.7}
-                >
-                  <Feather name="trash-2" size={15} color="#EF4444" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#EF4444' }}>
-                    {locale === 'en' ? 'Delete This Branch' : 'Padam Cawangan Ini'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Modal>
-
-        {/* Staff Picker Sheet Modal */}
-        <Modal
-          visible={showStaffPickerModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowStaffPickerModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, isDesktop && { maxWidth: 460 }]}>
-              <View style={styles.modalHeader}>
-                <View>
-                  <Text style={styles.modalTitle}>
-                    {locale === 'en' ? 'Select Branch Manager' : 'Pilih Pengurus Cawangan'}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                    {locale === 'en' ? 'Registered staff from Staff Management' : 'Staf berdaftar dari Pengurusan Staf'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowStaffPickerModal(false)} style={styles.modalCloseBtn}>
-                  <Ionicons name="close" size={20} color="#050505" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                {availableStaff.map((staff) => {
-                  const isSelected = managerName.trim().toLowerCase() === staff.name.trim().toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={staff.id}
-                      style={[styles.staffItemRow, isSelected && styles.staffItemRowActive]}
-                      onPress={() => {
-                        setManagerName(staff.name);
-                        if (staff.phone) {
-                          setPhone(staff.phone);
-                        }
-                        setSelectedStaffId(staff.id);
-                        setIsCustomManager(false);
-                        setShowStaffPickerModal(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                        <View style={[styles.staffPickerAvatar, isSelected && { backgroundColor: '#000000' }]}>
-                          <Text style={styles.staffPickerAvatarText}>
-                            {staff.name.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <Text style={[styles.staffItemName, isSelected && { fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }]}>
-                              {staff.name}
-                            </Text>
-                            {staff.is_owner && (
-                              <View style={styles.ownerBadge}>
-                                <Text style={styles.ownerBadgeText}>OWNER</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.staffItemSubtitle}>
-                            {staff.role_title} {staff.phone ? `· ${staff.phone}` : ''}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {isSelected ? (
-                        <View style={styles.selectedCheckWrap}>
-                          <Ionicons name="checkmark" size={14} color="#000000" />
-                        </View>
-                      ) : (
-                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {/* Option to enter custom name */}
-                <TouchableOpacity
-                  style={[styles.staffItemRow, { borderStyle: 'dashed', backgroundColor: '#FFFFFF', borderColor: '#CBD5E1', marginTop: 4 }]}
-                  onPress={() => {
-                    setIsCustomManager(true);
-                    setSelectedStaffId('');
-                    setShowStaffPickerModal(false);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                    <View style={[styles.staffPickerAvatar, { backgroundColor: '#F1F5F9' }]}>
-                      <Ionicons name="create-outline" size={16} color="#475569" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.staffItemName, { color: '#000000' }]}>
-                        {locale === 'en' ? 'Enter Custom Manager Name' : 'Tulis Nama Pengurus Manual'}
-                      </Text>
-                      <Text style={styles.staffItemSubtitle}>
-                        {locale === 'en' ? 'Type a name not in staff list' : 'Taip nama selain daripada senarai staf'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setModalVisible(false)}
+          onSuccess={(savedBranch) => {
+            if (editingBranch) {
+              setBranches((prev) =>
+                prev.map((b) =>
+                  b.id === savedBranch.id
+                    ? { ...b, ...savedBranch }
+                    : savedBranch.is_hq
+                    ? { ...b, is_hq: false }
+                    : b
+                )
+              );
+              Alert.alert(
+                locale === 'en' ? 'Success' : 'Berjaya',
+                locale === 'en' ? 'Branch updated successfully.' : 'Cawangan berjaya dikemaskini.'
+              );
+            } else {
+              const newEnriched: Branch = {
+                ...(savedBranch as any),
+                total_sales: 0,
+                total_stamps: 0,
+                customer_count: 0,
+                staff_count: 1,
+                assigned_stands: [],
+              };
+              setBranches((prev) =>
+                savedBranch.is_hq
+                  ? [newEnriched, ...prev.map((b) => ({ ...b, is_hq: false }))]
+                  : [...prev, newEnriched]
+              );
+              Alert.alert(
+                locale === 'en' ? 'Success' : 'Berjaya',
+                locale === 'en' ? 'New branch added successfully.' : 'Cawangan baru berjaya ditambah.'
+              );
+            }
+          }}
+          merchantId={user?.merchant_id || ''}
+          editingBranch={editingBranch}
+          availableStaff={availableStaff}
+          existingBranchesCount={branches.length}
+          onDeleteBranch={handleDeleteBranch}
+        />
 
         {/* Custom In-App Delete Confirmation Modal */}
         <Modal
@@ -2351,6 +1873,62 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // ── Stand Linking Celebratory Banner ──
+  standBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  standBannerIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  standBannerTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  standBannerPill: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  standBannerPillText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFCC00',
+    letterSpacing: 0.5,
+  },
+  standBannerSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#92400E',
+    marginTop: 2,
+  },
+  standBannerCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
   },

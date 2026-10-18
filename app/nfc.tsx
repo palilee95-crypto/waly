@@ -17,6 +17,7 @@ import {
   Modal,
   Pressable,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -30,6 +31,7 @@ import { formatMalaysianPhone } from '@/lib/emailValidator';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 import { getVoucherSpineTheme } from '@/theme';
 import * as Clipboard from 'expo-clipboard';
+import BranchFormModal, { StaffOption } from '@/components/BranchFormModal';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -741,6 +743,8 @@ export default function NfcLandingScreen() {
   const [isPairing, setIsPairing] = useState(false);
   const [pairingBranches, setPairingBranches] = useState<any[]>([]);
   const [selectedPairingBranchId, setSelectedPairingBranchId] = useState<string>('');
+  const [showAddBranchModal, setShowAddBranchModal] = useState<boolean>(false);
+  const [pairingStaff, setPairingStaff] = useState<StaffOption[]>([]);
 
   const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
   const [nameInput, setNameInput] = useState(user?.name || '');
@@ -811,9 +815,75 @@ export default function NfcLandingScreen() {
             setSelectedPairingBranchId(hq.id);
           }
         }).catch(() => {});
+
+        pb.collection('users').getFullList({
+          filter: `merchant_id = "${user.merchant_id}" && (role = "merchant" || role = "both" || role = "staff")`,
+          requestKey: null,
+        }).then(users => {
+          const ownerName = user?.name || (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai');
+          const list: StaffOption[] = [{
+            id: user?.id || 'owner_id',
+            name: ownerName,
+            phone: user?.phone || '',
+            role_title: locale === 'en' ? 'Store Owner' : 'Pemilik Kedai',
+            is_owner: true,
+          }];
+          users.forEach((u: any) => {
+            const cleanName = (u.name || '').trim();
+            if (cleanName && cleanName.toLowerCase() !== ownerName.toLowerCase()) {
+              list.push({
+                id: u.id,
+                name: cleanName,
+                phone: u.phone || '',
+                role_title: u.role_title || (locale === 'en' ? 'Staff' : 'Staf'),
+              });
+            }
+          });
+          setPairingStaff(list);
+        }).catch(() => {});
       }
     }
   }, [step, user?.merchant_id]);
+
+  const handleOpenAddBranchModal = async () => {
+    let allowed = 2; // Stand Bundle default: 1 HQ + 1 Branch
+    try {
+      const sub = await pb.collection('subscriptions').getFirstListItem(`merchant = "${user?.merchant_id}"`).catch(() => null);
+      if (sub && sub.status === 'active') {
+        if (sub.plan === 'pro') allowed = 999;
+        else if (sub.plan === 'stand_bundle') allowed = 2;
+        else allowed = 1;
+      }
+    } catch (e) {}
+
+    if (pairingBranches.length >= allowed) {
+      Alert.alert(
+        locale === 'en' ? 'Branch Limit Reached' : 'Had Cawangan Dicapai',
+        locale === 'en'
+          ? `Your current plan supports up to ${allowed} outlet(s). Upgrade to PRO for unlimited outlets.`
+          : `Pelan semasa anda menyokong sehingga ${allowed} cawangan. Naik taraf ke PRO untuk cawangan tanpa had.`
+      );
+      return;
+    }
+
+    setShowAddBranchModal(true);
+  };
+
+  const handleBranchCreated = (newBranch: any) => {
+    const branchObj = {
+      id: newBranch.id,
+      name: newBranch.name,
+      address: newBranch.address,
+      city: newBranch.city,
+      phone: newBranch.phone,
+      manager_name: newBranch.manager_name,
+      is_hq: Boolean(newBranch.is_hq),
+      status: newBranch.status || 'active',
+    };
+    setPairingBranches((prev) => [...prev, branchObj]);
+    setSelectedPairingBranchId(newBranch.id);
+    setShowAddBranchModal(false);
+  };
 
   useEffect(() => {
     if (step === 'sent') {
@@ -1420,7 +1490,13 @@ export default function NfcLandingScreen() {
 
       if (res.success) {
         await refreshSession();
-        router.push('/(merchant)/profile-onboarding' as any);
+        router.push({
+          pathname: '/(merchant)/branches' as any,
+          params: {
+            linked_stand: unclaimedStand.code,
+            branch_id: selectedPairingBranchId || undefined,
+          },
+        });
       } else {
         alert(res.message || 'Failed to activate stand code.');
       }
@@ -2233,31 +2309,53 @@ export default function NfcLandingScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Outlet Selection Pills (Only displayed if merchant has 2+ branches) */}
-                {pairingBranches.length > 1 && (
-                  <View style={styles.pairingBranchBox}>
-                    <Text style={styles.pairingBranchBoxLabel}>
-                      SELECT OUTLET FOR THIS STAND:
-                    </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                      {pairingBranches.map(b => {
-                        const isSelected = selectedPairingBranchId === b.id;
-                        return (
-                          <TouchableOpacity
-                            key={b.id}
-                            onPress={() => setSelectedPairingBranchId(b.id)}
-                            style={[styles.pairingBranchChip, isSelected && styles.pairingBranchChipSelected]}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name={b.is_hq ? "business" : "storefront"} size={12} color="#000000" />
-                            <Text style={styles.pairingBranchChipText}>
-                              {b.name}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
+                {/* Outlet Selection Pills (Always visible for logged-in merchant) */}
+                <View style={styles.pairingBranchBox}>
+                  <Text style={styles.pairingBranchBoxLabel}>
+                    {locale === 'en' ? 'SELECT OUTLET FOR THIS STAND:' : 'PILIH CAWANGAN UNTUK STAND INI:'}
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {pairingBranches.map(b => {
+                      const isSelected = selectedPairingBranchId === b.id;
+                      return (
+                        <TouchableOpacity
+                          key={b.id}
+                          onPress={() => setSelectedPairingBranchId(b.id)}
+                          style={[styles.pairingBranchChip, isSelected && styles.pairingBranchChipSelected]}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name={b.is_hq ? "business" : "storefront"} size={12} color={isSelected ? "#000000" : "#475569"} />
+                          <Text style={[styles.pairingBranchChipText, isSelected && styles.pairingBranchChipTextSelected]}>
+                            {b.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* + Add Branch Chip */}
+                    <TouchableOpacity
+                      onPress={handleOpenAddBranchModal}
+                      style={styles.pairingAddBranchChip}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="add" size={13} color="#000000" />
+                      <Text style={styles.pairingAddBranchChipText}>
+                        {locale === 'en' ? 'Add Branch' : 'Tambah Cawangan'}
+                      </Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+
+                {/* Add Branch Modal */}
+                {showAddBranchModal && user?.merchant_id && (
+                  <BranchFormModal
+                    visible={showAddBranchModal}
+                    onClose={() => setShowAddBranchModal(false)}
+                    onSuccess={handleBranchCreated}
+                    merchantId={user.merchant_id}
+                    availableStaff={pairingStaff}
+                    existingBranchesCount={pairingBranches.length}
+                  />
                 )}
 
                 {/* Primary Bind CTA */}
@@ -6643,6 +6741,27 @@ const styles = StyleSheet.create({
   pairingBranchChipText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  pairingBranchChipTextSelected: {
+    color: '#000000',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  pairingAddBranchChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pairingAddBranchChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
   pairingBtnPrimary: {
