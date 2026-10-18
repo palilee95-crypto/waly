@@ -131,6 +131,15 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     const branchName = (body.branch_name || authRecord.getString("branch_name") || "All Branches (HQ)").trim();
     const branchId = (body.branch_id || authRecord.getString("branch") || "").trim();
 
+    function resolveBranchId(mid, candidate) {
+      if (!candidate) return "";
+      try {
+        const b = $app.findRecordById("branches", candidate);
+        if (b && b.getString("merchant") === mid) return b.id;
+      } catch (e) {}
+      return "";
+    }
+
     const txnCol = $app.findCollectionByNameOrId("transactions");
     const txn = new Record(txnCol);
     txn.set("id", $security.randomString(15).toLowerCase());
@@ -141,6 +150,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("merchant", merchantId);
     txn.set("loyalty_card", card.id);
     txn.set("staff", authRecord.id);
+    txn.set("branch", resolveBranchId(merchantId, branchId));
     
     const txnMeta = {
       source: "manual_give",

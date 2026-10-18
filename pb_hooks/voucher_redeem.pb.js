@@ -165,6 +165,15 @@ routerAdd("POST", "/api/risev/merchant/vouchers/redeem", (e) => {
     }
 
     try {
+      function resolveBranchId(mid, candidate) {
+        if (!candidate) return "";
+        try {
+          const b = $app.findRecordById("branches", candidate);
+          if (b && b.getString("merchant") === mid) return b.id;
+        } catch (e) {}
+        return "";
+      }
+
       const txCol = $app.findCollectionByNameOrId("transactions");
       const tx = new Record(txCol);
       tx.set("customer", customerId);
@@ -173,6 +182,7 @@ routerAdd("POST", "/api/risev/merchant/vouchers/redeem", (e) => {
       tx.set("stamps", 0);
       tx.set("points", 0);
       tx.set("staff", authRecord.id);
+      tx.set("branch", resolveBranchId(merchantId, authRecord.getString("branch") || ""));
 
       const staffName = authRecord.getString("name") || "Staff";
       const branchName = authRecord.getString("branch_name") || "All Branches (HQ)";

@@ -178,6 +178,15 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
 
       try {
+        function resolveBranchId(mid, candidate) {
+          if (!candidate) return "";
+          try {
+            const b = $app.findRecordById("branches", candidate);
+            if (b && b.getString("merchant") === mid) return b.id;
+          } catch (e) {}
+          return "";
+        }
+
         const txnCol = $app.findCollectionByNameOrId("transactions");
         const txn = new Record(txnCol);
         txn.set("id", $security.randomString(15).toLowerCase());
@@ -188,6 +197,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         txn.set("merchant", merchantId);
         txn.set("loyalty_card", card.id);
         txn.set("staff", staffId);
+        txn.set("branch", resolveBranchId(merchantId, branchId));
         const txnMeta = {
           source: "nfc_claim",
           claim_id: claimId,
