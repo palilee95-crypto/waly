@@ -77,3 +77,15 @@ tests/
 playwright.config.ts
 playwright-report/
 test-results/
+
+# One-off / accidental artifacts (never commit)
+/root@*
+/fix.py
+/fix_modal.py
+/update.py
+/update_studio.py
+/qr.png
+/tmp-birthday-preview.html
+/implementation_plan.md
+/source/
+/evolution_db_init/
