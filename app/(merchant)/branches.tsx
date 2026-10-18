@@ -89,6 +89,11 @@ export default function BranchesScreen() {
   const [merchantName, setMerchantName] = useState('');
   const [availableStaff, setAvailableStaff] = useState<StaffOption[]>([]);
 
+  // Smart Stand → outlet assignment
+  const [standCodes, setStandCodes] = useState<any[]>([]);
+  const [standModalBranchId, setStandModalBranchId] = useState<string | null>(null);
+  const [savingStandCode, setSavingStandCode] = useState<string | null>(null);
+
   useEffect(() => {
     fetchBranches();
   }, [user]);
@@ -130,6 +135,7 @@ export default function BranchesScreen() {
       ]);
 
       setSubscription(subRec);
+      setStandCodes(codeRecords || []);
       if (merchRec?.name) {
         setMerchantName(merchRec.name);
       }
@@ -327,6 +333,33 @@ export default function BranchesScreen() {
     });
     setDeleting(false);
     setDeleteConfirmBranch(null);
+  };
+
+  const handleOpenStandManager = (branchId: string) => {
+    setStandModalBranchId(branchId);
+  };
+
+  const handleAssignStand = async (code: string, branchId: string) => {
+    if (!code || !branchId) return;
+    setSavingStandCode(code);
+    try {
+      await pb.send('/api/risev/merchant/bind-stand-branch', {
+        method: 'POST',
+        body: { code, branch_id: branchId },
+      });
+      setStandCodes((prev) => prev.map((c: any) => (c.code === code ? { ...c, branch: branchId } : c)));
+      await fetchBranches();
+      Alert.alert(
+        locale === 'en' ? 'Stand Updated' : 'Stand Dikemaskini',
+        locale === 'en'
+          ? `Stand ${code} is now assigned to the selected outlet.`
+          : `Stand ${code} kini ditetapkan kepada cawangan yang dipilih.`
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || (locale === 'en' ? 'Failed to assign stand.' : 'Gagal menetapkan stand.'));
+    } finally {
+      setSavingStandCode(null);
+    }
   };
 
   return (
@@ -623,12 +656,7 @@ export default function BranchesScreen() {
                       {branch.assigned_stands && branch.assigned_stands.length > 0 ? (
                         <TouchableOpacity
                           style={styles.standPill}
-                          onPress={() => {
-                            Alert.alert(
-                              locale === 'en' ? 'Assigned Smart Stands' : 'Smart Stand Berdaftar',
-                              (branch.assigned_stands || []).join('\n')
-                            );
-                          }}
+                          onPress={() => handleOpenStandManager(branch.id)}
                           activeOpacity={0.7}
                         >
                           <Ionicons name="hardware-chip-outline" size={13} color="#000000" />
@@ -638,12 +666,16 @@ export default function BranchesScreen() {
                           <Ionicons name="information-circle-outline" size={12} color="#64748B" />
                         </TouchableOpacity>
                       ) : (
-                        <View style={[styles.standPill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
+                        <TouchableOpacity
+                          style={[styles.standPill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}
+                          onPress={() => handleOpenStandManager(branch.id)}
+                          activeOpacity={0.7}
+                        >
                           <Ionicons name="hardware-chip-outline" size={13} color="#94A3B8" />
                           <Text style={[styles.standPillText, { color: '#94A3B8' }]}>
                             {locale === 'en' ? '0 Stands' : '0 Stand'}
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       )}
 
                       {branch.google_review_url ? (
@@ -1087,6 +1119,102 @@ export default function BranchesScreen() {
                   {locale === 'en' ? 'Maybe Later' : 'Mungkin Nanti'}
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        {/* Smart Stand → Outlet Assignment Modal */}
+        <Modal
+          visible={!!standModalBranchId}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setStandModalBranchId(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, isDesktop && { maxWidth: 560 }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {locale === 'en' ? 'Assign Smart Stands' : 'Tetapkan Smart Stand'}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
+                    {locale === 'en'
+                      ? 'Choose the outlet each physical stand belongs to'
+                      : 'Pilih cawangan bagi setiap stand fizikal'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setStandModalBranchId(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={20} color="#050505" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+                {(() => {
+                  const list = (standCodes || []).filter(
+                    (sc: any) => !sc.branch || sc.branch === standModalBranchId
+                  );
+                  if (list.length === 0) {
+                    return (
+                      <Text style={styles.loadingText}>
+                        {locale === 'en' ? 'No stands to assign here.' : 'Tiada stand untuk ditetapkan di sini.'}
+                      </Text>
+                    );
+                  }
+                  return list.map((sc: any) => {
+                    const assignedBranch = branches.find((b) => b.id === sc.branch);
+                    const busy = savingStandCode === sc.code;
+                    return (
+                      <View key={sc.id || sc.code} style={styles.standRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Ionicons name="hardware-chip" size={15} color="#0F172A" />
+                          <Text style={styles.standRowCode}>{sc.code}</Text>
+                          {sc.plan ? (
+                            <View style={styles.standRowPlanPill}>
+                              <Text style={styles.standRowPlanText}>
+                                {String(sc.plan).replace('_', ' ')}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={styles.standRowSub}>
+                          {sc.quota ? `${sc.quota} ${locale === 'en' ? 'customers' : 'pelanggan'}` : ''}
+                          {assignedBranch
+                            ? ` · ${assignedBranch.name}`
+                            : ` · ${locale === 'en' ? 'Unassigned' : 'Belum ditetapkan'}`}
+                        </Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={{ gap: 6, paddingTop: 8 }}
+                        >
+                          {branches.map((b) => {
+                            const selected = sc.branch === b.id;
+                            return (
+                              <TouchableOpacity
+                                key={b.id}
+                                disabled={busy}
+                                onPress={() => handleAssignStand(sc.code, b.id)}
+                                style={[
+                                  styles.standBranchChip,
+                                  selected && styles.standBranchChipActive,
+                                  busy && { opacity: 0.5 },
+                                ]}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.standBranchChipText, selected && styles.standBranchChipTextActive]}>
+                                  {b.name.replace(' (HQ)', '')}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    );
+                  });
+                })()}
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -1930,5 +2058,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  standRow: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+  },
+  standRowCode: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    letterSpacing: 0.3,
+  },
+  standRowPlanPill: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  standRowPlanText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#FFCC00',
+    textTransform: 'uppercase',
+  },
+  standRowSub: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
+    marginTop: 3,
+  },
+  standBranchChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  standBranchChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  standBranchChipText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#475569',
+  },
+  standBranchChipTextActive: {
+    color: '#FFCC00',
   },
 });
