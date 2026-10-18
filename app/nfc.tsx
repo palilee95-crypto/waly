@@ -1939,7 +1939,7 @@ export default function NfcLandingScreen() {
                   reward?.description ||
                   campaign?.description ||
                   meta.snapshot_description ||
-                  'Tebus di kaunter';
+                  (locale === 'en' ? 'Redeem at counter' : 'Tebus di kaunter');
 
                 return {
                   id: v.id,
@@ -3488,7 +3488,7 @@ export default function NfcLandingScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>
-                                {appliedVoucherForClaim.title || 'Tebus Baucar'}
+                                {appliedVoucherForClaim.title || (locale === 'en' ? 'Redeem Voucher' : 'Tebus Baucar')}
                               </Text>
                               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309', marginTop: 1 }}>
                                 {locale === 'en' ? 'Voucher to redeem' : 'Baucar ditebus di kaunter'}
@@ -4332,7 +4332,7 @@ export default function NfcLandingScreen() {
                           color: '#64748B',
                           marginTop: 1,
                         }} numberOfLines={1}>
-                          {v.description || 'Tebus di kaunter'}
+                          {v.description || (locale === 'en' ? 'Redeem at counter' : 'Tebus di kaunter')}
                         </Text>
                         {v.code ? (
                           <Text style={{
@@ -4854,7 +4854,7 @@ export default function NfcLandingScreen() {
                 activeOpacity={0.88}
               >
                 <Text style={styles.rewardModalPrimaryBtnText}>
-                  {user ? 'View My Voucher' : 'Simpan Baucar ke Wallet'}
+                  {user ? (locale === 'en' ? 'View My Voucher' : 'Lihat Baucar') : (locale === 'en' ? 'Save Voucher to Wallet' : 'Simpan Baucar ke Wallet')}
                 </Text>
                 <Ionicons name="arrow-forward" size={17} color="#FFFFFF" style={{ marginLeft: 6 }} />
               </TouchableOpacity>

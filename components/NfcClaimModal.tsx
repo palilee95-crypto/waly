@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
 const getCleanCustomerName = (rawName?: string): string => {
@@ -112,6 +113,7 @@ const getItemImageUrl = (item: any, availableAddons: any[] = []): string | null 
 
 export default function NfcClaimModal() {
   const { user } = useAuth();
+  const { locale } = useLanguage();
   const merchantId = user?.merchant_id;
 
   const [claim, setClaim] = useState<any>(null);
@@ -718,7 +720,7 @@ export default function NfcClaimModal() {
           payment_method: paymentMethod || 'nfc_counter',
           payment_reference: paymentReference.trim(),
           stamps_earned: stamps,
-          line_items: selectedServices.length > 0 ? selectedServices : [{ name: 'Pembayaran Servis', price: subtotalAmount || bill }]
+          line_items: selectedServices.length > 0 ? selectedServices : [{ name: locale === 'en' ? 'Service Payment' : 'Pembayaran Servis', price: subtotalAmount || bill }]
         };
         if (activeBooking?.id) receiptPayload.booking = activeBooking.id;
         
@@ -1325,7 +1327,9 @@ export default function NfcClaimModal() {
                           {appliedVoucher ? (
                             <View style={styles.customerVoucherBadge}>
                               <Ionicons name="gift" size={10} color="#92400E" />
-                              <Text style={styles.customerVoucherBadgeText}>Guna Baucar</Text>
+                              <Text style={styles.customerVoucherBadgeText}>
+                                {locale === 'en' ? 'Using Voucher' : 'Guna Baucar'}
+                              </Text>
                             </View>
                           ) : null}
                         </View>
@@ -1406,9 +1410,16 @@ export default function NfcClaimModal() {
                                   const url = `https://risev.app/b/${merchantSlug}`;
                                   if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
                                     navigator.clipboard.writeText(url);
-                                    Alert.alert('Link Copied', `Pautan booking ${url} telah disalin!`);
+                                    Alert.alert(
+                                      locale === 'en' ? 'Link Copied' : 'Pautan Disalin',
+                                      locale === 'en' ? `Booking link ${url} copied to clipboard!` : `Pautan booking ${url} telah disalin!`
+                                    );
                                   } else {
-                                    Share.share({ message: `Tempah slot temujanji online kami di: ${url}` }).catch(() => {});
+                                    Share.share({
+                                      message: locale === 'en'
+                                        ? `Book an appointment with us online at: ${url}`
+                                        : `Tempah slot temujanji online kami di: ${url}`
+                                    }).catch(() => {});
                                   }
                                 }}
                                 activeOpacity={0.7}
@@ -1530,17 +1541,17 @@ export default function NfcClaimModal() {
                           <View style={styles.chosenVoucherBadge}>
                             <Ionicons name="sparkles" size={11} color="#92400E" />
                             <Text style={styles.chosenVoucherBadgeText}>
-                              PELANGGAN INGIN GUNAKAN BAUCAR INI
+                              {locale === 'en' ? 'CUSTOMER WANTS TO USE THIS VOUCHER' : 'PELANGGAN INGIN GUNAKAN BAUCAR INI'}
                             </Text>
                           </View>
                           <TouchableOpacity
                             onPress={() => setAppliedVoucher(null)}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             style={styles.chosenVoucherRemoveBtn}
-                            accessibilityLabel="Batal guna baucar"
+                            accessibilityLabel={locale === 'en' ? 'Cancel voucher' : 'Batal guna baucar'}
                           >
                             <Ionicons name="close-circle" size={15} color="#94A3B8" />
-                            <Text style={styles.chosenVoucherRemoveText}>Batal</Text>
+                            <Text style={styles.chosenVoucherRemoveText}>{locale === 'en' ? 'Cancel' : 'Batal'}</Text>
                           </TouchableOpacity>
                         </View>
 
@@ -1555,19 +1566,19 @@ export default function NfcClaimModal() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
                               {appliedVoucher.code ? (
                                 <View style={styles.chosenVoucherCodeBadge}>
-                                  <Text style={styles.chosenVoucherCodeText}>Kod: {appliedVoucher.code}</Text>
+                                  <Text style={styles.chosenVoucherCodeText}>{locale === 'en' ? 'Code' : 'Kod'}: {appliedVoucher.code}</Text>
                                 </View>
                               ) : null}
                               <View style={styles.chosenVoucherDiscountBadge}>
                                 <Text style={styles.chosenVoucherDiscountText}>
-                                  {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)} OFF` : 'Item Percuma'}
+                                  {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)} OFF` : (locale === 'en' ? 'Free Item' : 'Item Percuma')}
                                 </Text>
                               </View>
                             </View>
                           </View>
                           <View style={styles.chosenVoucherActivePill}>
                             <Ionicons name="checkmark-circle" size={13} color="#059669" />
-                            <Text style={styles.chosenVoucherActiveText}>Dipilih</Text>
+                            <Text style={styles.chosenVoucherActiveText}>{locale === 'en' ? 'Selected' : 'Dipilih'}</Text>
                           </View>
                         </View>
                       </View>
@@ -1581,7 +1592,9 @@ export default function NfcClaimModal() {
                     >
                       <Ionicons name="gift-outline" size={20} color={appliedVoucher ? '#D97706' : '#1D1D1F'} />
                       <Text style={[styles.navRowTitle, appliedVoucher && { color: '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                        {appliedVoucher ? 'Baucar Digunakan (1 Dipilih)' : 'Available vouchers'}
+                        {appliedVoucher
+                          ? (locale === 'en' ? 'Applied Voucher (1 Selected)' : 'Baucar Digunakan (1 Dipilih)')
+                          : (locale === 'en' ? 'Available vouchers' : 'Baucar tersedia')}
                       </Text>
                       {customerVouchers.length > 0 && (
                         <View style={[styles.figmaCountBadge, appliedVoucher && { backgroundColor: '#FEF3C7' }]}>
@@ -1591,7 +1604,7 @@ export default function NfcClaimModal() {
                       {appliedVoucher ? (
                         <View style={styles.appliedVoucherBadge}>
                           <Text style={styles.appliedVoucherBadgeText} numberOfLines={1}>
-                            ✓ {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : 'Item Percuma'}
+                            ✓ {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : (locale === 'en' ? 'Free Item' : 'Item Percuma')}
                           </Text>
                         </View>
                       ) : null}
@@ -1616,7 +1629,7 @@ export default function NfcClaimModal() {
                               ? `${discVal}% OFF`
                               : discType === 'fixed_amount'
                               ? `RM ${discVal} OFF`
-                              : 'FREE ITEM';
+                              : (locale === 'en' ? 'FREE ITEM' : 'ITEM PERCUMA');
 
                             const applicableText = meta.applicable_items_text || v.expand?.reward?.applicable_items_text;
 
@@ -1631,7 +1644,7 @@ export default function NfcClaimModal() {
                                   </View>
                                   {applicableText ? (
                                     <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309', marginTop: 2 }}>
-                                      📌 {discType === 'none' || v.expand?.reward?.type === 'free_item' ? `Item: ${applicableText}` : `Sah: ${applicableText}`}
+                                      📌 {discType === 'none' || v.expand?.reward?.type === 'free_item' ? `Item: ${applicableText}` : `${locale === 'en' ? 'Valid for' : 'Sah'}: ${applicableText}`}
                                     </Text>
                                   ) : null}
                                   <Text style={styles.figmaVoucherCode}>Code: {v.code}</Text>
@@ -1772,7 +1785,7 @@ export default function NfcClaimModal() {
                         <Text style={styles.figmaTotalLabel}>Total Amount</Text>
                         {appliedVoucher ? (
                           <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669', marginTop: 1 }} numberOfLines={1}>
-                            🏷️ {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code} ({discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : 'Item Percuma'})
+                            🏷️ {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code} ({discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : (locale === 'en' ? 'Free Item' : 'Item Percuma')})
                           </Text>
                         ) : null}
                       </View>
