@@ -109,7 +109,7 @@ export default function CustomersScreen() {
   const [merchant, setMerchant] = useState<any>(null);
   const [selectedBranch, setSelectedBranch] = useState('All Branches');
   const [branchModalVisible, setBranchModalVisible] = useState(false);
-  const [branchList, setBranchList] = useState<string[]>(['All Branches']);
+  const [branchList, setBranchList] = useState<any[]>([]);
 
   const fetchBranches = async () => {
     if (!user?.merchant_id) return;
@@ -119,13 +119,9 @@ export default function CustomersScreen() {
         sort: '-is_hq,-created',
         requestKey: null
       });
-      if (records.length > 0) {
-        setBranchList(['All Branches', ...records.map((r: any) => r.name)]);
-      } else {
-        setBranchList(['All Branches']);
-      }
+      setBranchList(records || []);
     } catch (e) {
-      setBranchList(['All Branches']);
+      setBranchList([]);
     }
   };
 
@@ -262,7 +258,7 @@ export default function CustomersScreen() {
 
   useEffect(() => {
     setMainPage(0);
-  }, [activeTab, searchQuery, dateFilter, sortBy]);
+  }, [activeTab, searchQuery, dateFilter, sortBy, selectedBranch]);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -979,8 +975,29 @@ export default function CustomersScreen() {
     }, [user?.id, user?.merchant_id])
   );
 
+  // Dynamic Branch Filter
+  const branchTransactions = React.useMemo(() => {
+    if (!selectedBranch || selectedBranch === 'All Branches') {
+      return transactions;
+    }
+    const selectedBranchObj = branchList.find(b => b.name === selectedBranch || b.id === selectedBranch);
+    if (!selectedBranchObj) {
+      return transactions;
+    }
+
+    return transactions.filter(tx => {
+      const meta = parseSafeMetadata(tx.metadata);
+      const txBranchId = meta.branch_id || '';
+      const txBranchName = (meta.branch_name || '').toLowerCase();
+      const isHqMatch = selectedBranchObj.is_hq && (!txBranchId || txBranchId === selectedBranchObj.id || txBranchName.includes('hq') || txBranchName.includes('all branches'));
+      const isSpecificMatch = txBranchId === selectedBranchObj.id || (Boolean(txBranchName) && txBranchName === selectedBranchObj.name.toLowerCase());
+
+      return isSpecificMatch || isHqMatch;
+    });
+  }, [transactions, selectedBranch, branchList]);
+
   const getFilteredAndSortedTransactions = () => {
-    let result = [...transactions];
+    let result = [...branchTransactions];
 
     // 1. Filter by Search Query
     if (searchQuery.trim().length > 0) {
@@ -1027,15 +1044,15 @@ export default function CustomersScreen() {
 
   const filteredTransactions = getFilteredAndSortedTransactions();
 
-  const totalStampsDistributed = transactions
+  const totalStampsDistributed = branchTransactions
     .filter((tx) => tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT')
     .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
-  const totalPointsRedeemed = transactions
+  const totalPointsRedeemed = branchTransactions
     .filter((tx) => tx.type === 'REDEMPTION')
     .reduce((acc, tx) => acc + (tx.points || tx.stamps * 10), 0);
 
-  const activeMembersCount = new Set(transactions.map((tx) => tx.customerId).filter(Boolean)).size;
+  const activeMembersCount = new Set(branchTransactions.map((tx) => tx.customerId).filter(Boolean)).size;
 
   // Calculate top spenders (by sum of bill_amount from PURCHASE transactions)
   // and map the rest of unique customers
@@ -1043,7 +1060,7 @@ export default function CustomersScreen() {
     // 1. Group by customer and compute total purchase amount and visit count
     const customerMap: Record<string, { id: string; customerId: string; name: string; initials: string; avatar: string | null; bgCircleColor: string; totalPurchase: number; totalVisits: number; customerPhone: string; memberId: string }> = {};
     
-    transactions.forEach(t => {
+    branchTransactions.forEach(t => {
       if (!t.customerId) return;
       if (!customerMap[t.customerId]) {
         customerMap[t.customerId] = {
@@ -1095,17 +1112,17 @@ export default function CustomersScreen() {
         medal,
       };
     });
-  }, [transactions, leaderboardRankBy]);
+  }, [branchTransactions, leaderboardRankBy]);
 
   // Stamps distributed this month (last 30 days) vs previous month (30-60 days ago)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000);
 
-  const currentPeriodStamps = transactions
+  const currentPeriodStamps = branchTransactions
     .filter((tx) => (tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT') && new Date(tx.created) >= thirtyDaysAgo)
     .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
-  const previousPeriodStamps = transactions
+  const previousPeriodStamps = branchTransactions
     .filter((tx) => (tx.type === 'PURCHASE' || tx.type === 'ADJUSTMENT') && new Date(tx.created) >= sixtyDaysAgo && new Date(tx.created) < thirtyDaysAgo)
     .reduce((acc, tx) => acc + (tx.stamps || 0), 0);
 
@@ -1133,7 +1150,7 @@ export default function CustomersScreen() {
     }
 
     // Aggregate stamps
-    transactions.forEach(tx => {
+    branchTransactions.forEach(tx => {
       if (tx.type === 'PURCHASE') {
         const txDate = new Date(tx.created);
         const diffTime = Math.abs(new Date().getTime() - txDate.getTime());
@@ -1156,12 +1173,12 @@ export default function CustomersScreen() {
       percentage: (values[idx] / maxVal) * 100,
       isMax: values[idx] === maxVal && values[idx] > 0
     }));
-  }, [transactions]);
+  }, [branchTransactions]);
 
   const idleCustomers = React.useMemo(() => {
     const lastVisitedMap: Record<string, { lastVisited: Date; name: string; customerPhone: string; initials: string; bgCircleColor: string; avatar: string | null }> = {};
 
-    transactions.forEach(tx => {
+    branchTransactions.forEach(tx => {
       if (!tx.customerId) return;
       const txDate = new Date(tx.created);
       const existing = lastVisitedMap[tx.customerId];
@@ -1285,7 +1302,7 @@ export default function CustomersScreen() {
               </Text>
             </View>
             <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-              {loading ? '...' : `${(transactions.filter(t => t.type === 'REDEMPTION').length)} claims`}
+              {loading ? '...' : `${(branchTransactions.filter(t => t.type === 'REDEMPTION').length)} claims`}
             </Text>
           </View>
         </View>
@@ -3248,7 +3265,7 @@ export default function CustomersScreen() {
             </View>
 
             <View style={{ gap: 8, marginTop: 12 }}>
-              {branchList.map((bName) => {
+              {['All Branches', ...branchList.map((b: any) => b.name)].map((bName) => {
                 const isSelected = (selectedBranch || 'All Branches') === bName;
                 return (
                   <TouchableOpacity
