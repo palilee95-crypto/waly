@@ -1,5 +1,21 @@
 // pb_hooks/staff_management.pb.js
 
+function risevResolveBranchId(merchantId, candidate) {
+  const c = (candidate || "").trim();
+  if (!c) return "";
+  try {
+    const b = $app.findRecordById("branches", c);
+    if (b && b.getString("merchant") === merchantId) return b.id;
+  } catch (e) {}
+  try {
+    const list = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
+    for (let i = 0; i < list.length; i++) {
+      if ((list[i].getString("name") || "").trim().toLowerCase() === c.toLowerCase()) return list[i].id;
+    }
+  } catch (e) {}
+  return "";
+}
+
 routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
@@ -510,6 +526,7 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
       targetUser.set("role", "both");
       targetUser.set("merchant_id", merchantId);
       targetUser.set("branch_name", branch || "All Branches (HQ)");
+      targetUser.set("branch", risevResolveBranchId(merchantId, branch));
       targetUser.set("birthday", "2000-01-01 00:00:00.000Z");
       targetUser.set("verified", false);
       targetUser.setPassword($security.randomString(20));
@@ -595,6 +612,7 @@ routerAdd("POST", "/api/risev/merchant/staff", (e) => {
   targetUser.set("merchant_id", merchantId);
   if (branch) {
     targetUser.set("branch_name", branch);
+    targetUser.set("branch", risevResolveBranchId(merchantId, branch));
   }
   
   // Set role to 'both' so they can switch roles
