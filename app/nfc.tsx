@@ -834,9 +834,27 @@ export default function NfcLandingScreen() {
   // Realtime listening & WhatsApp state
   const [isWaitingConfirm, setIsWaitingConfirm] = useState(false);
   const [claimId, setClaimId] = useState<string>('');
+  const claimIdRef = useRef<string>('');
+  const stepRef = useRef<string>(step);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+  const hasTriggeredReviewRef = useRef<boolean>(false);
   const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
   const [isApproved, setIsApproved] = useState<boolean>(false);
   const [showBack, setShowBack] = useState<boolean>(false);
+
+  const handleResetToForm = () => {
+    setStep('form');
+    setIsWaitingConfirm(false);
+    setIsApproved(false);
+    setShowReviewModal(false);
+    setShowRewardModal(false);
+    setUnlockedReward(null);
+    claimIdRef.current = '';
+    setClaimId('');
+    hasTriggeredReviewRef.current = false;
+  };
   
   // 🌟 Store & Google Review Funnel State
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
@@ -919,10 +937,13 @@ export default function NfcLandingScreen() {
   const voucherProgressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isApproved) {
+    let reviewTimer: any = null;
+
+    if (isApproved && step === 'sent') {
       setShowBack(true);
 
-      if (claimId) {
+      const activeClaimId = claimIdRef.current || claimId;
+      if (activeClaimId) {
         pb.collection('digital_receipts').getList(1, 1, {
           filter: `customer_phone = "${phoneInput || user?.phone || ''}" && merchant = "${merchant?.id}"`,
           sort: '-created'
@@ -953,8 +974,10 @@ export default function NfcLandingScreen() {
       voucherProgressAnim.setValue(0);
     }
 
-      // Trigger Review Funnel if customer hasn't reviewed yet and merchant has configured reviews
-      if (merchant?.id) {
+      // Trigger Review Funnel ONLY after merchant approved the claim, and only once per session
+      if (isApproved && step === 'sent' && merchant?.id && !hasTriggeredReviewRef.current) {
+        hasTriggeredReviewRef.current = true;
+
         const checkAndTriggerReview = async () => {
           const phone = phoneInput || user?.phone || '';
           const storageKey = `risev_reviewed_${merchant.id}_${phone}`;
@@ -984,17 +1007,20 @@ export default function NfcLandingScreen() {
 
           // Delay popup ~3.5s to let customer celebrate their stamp and see the voucher progress first
           // If a reward celebration modal was unlocked, skip review modal to avoid stacking popups
-          const timer = setTimeout(() => {
+          reviewTimer = setTimeout(() => {
             if (!unlockedReward && !showRewardModal) {
               setShowReviewModal(true);
             }
           }, 3500);
-          return () => clearTimeout(timer);
         };
 
         checkAndTriggerReview();
       }
-  }, [isApproved, merchant?.id, phoneInput, user?.phone]);
+
+    return () => {
+      if (reviewTimer) clearTimeout(reviewTimer);
+    };
+  }, [isApproved, step, merchant?.id, unlockedReward, showRewardModal]);
 
   const handleSelectStar = async (star: number) => {
     setReviewRating(star);
@@ -1443,8 +1469,10 @@ export default function NfcLandingScreen() {
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (cardRecord.merchant === merchant.id && currentCustId && cardRecord.customer === currentCustId) {
           setLoyaltyCard(cardRecord);
-          setIsApproved(true);
-          setIsWaitingConfirm(false);
+          if (stepRef.current === 'sent') {
+            setIsApproved(true);
+            setIsWaitingConfirm(false);
+          }
         }
       }
     }, {
@@ -1459,8 +1487,10 @@ export default function NfcLandingScreen() {
         const currentCustId = user?.id || pb.authStore.record?.id;
         if (tx.merchant === merchant.id && currentCustId && tx.customer === currentCustId) {
           fetchUserLoyaltyCard(merchant.id, currentCustId);
-          setIsApproved(true);
-          setIsWaitingConfirm(false);
+          if (stepRef.current === 'sent') {
+            setIsApproved(true);
+            setIsWaitingConfirm(false);
+          }
         }
       }
     }, {
@@ -1471,7 +1501,10 @@ export default function NfcLandingScreen() {
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
       if (!isSubscribed) return;
       const record = e.record;
-      if (record && (record.id === claimId || record.merchant === merchant.id)) {
+      const activeClaimId = claimIdRef.current || claimId;
+      // CRITICAL: Strictly match this customer's active claim ID — never blindly match all claims for the merchant!
+      const isThisClaim = Boolean(record && activeClaimId && record.id === activeClaimId);
+      if (isThisClaim && (stepRef.current === 'sent' || step === 'sent')) {
         if (record.status === 'pending') {
           setHasSentWhatsapp(true);
         }
@@ -1489,7 +1522,7 @@ export default function NfcLandingScreen() {
           setIsWaitingConfirm(false);
 
           // Fetch claim-status to check if this completion generated a voucher
-          const cid = claimId || record.id;
+          const cid = activeClaimId;
           if (cid) {
             pb.send<any>('/api/risev/nfc/claim-status', {
               method: 'GET',
@@ -1531,7 +1564,7 @@ export default function NfcLandingScreen() {
       pb.collection('transactions').unsubscribe('*').catch(() => {});
       pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
     };
-  }, [merchant, user, claimId]);
+  }, [merchant, user, claimId, step]);
 
   // 3. Robust Polling & Tab Visibility Listener for Mobile Browsers (iOS Safari / Android Chrome)
   useEffect(() => {
@@ -1982,6 +2015,7 @@ export default function NfcLandingScreen() {
         },
       });
       if (reqRes?.claim_id) {
+        claimIdRef.current = reqRes.claim_id;
         setClaimId(reqRes.claim_id);
         createdClaimId = reqRes.claim_id;
       }
@@ -1990,6 +2024,11 @@ export default function NfcLandingScreen() {
         setApprovedStamps(reqRes.current_stamps);
       }
 
+      setIsApproved(false);
+      setShowReviewModal(false);
+      setShowRewardModal(false);
+      setUnlockedReward(null);
+      hasTriggeredReviewRef.current = false;
       setIsWaitingConfirm(true);
       setHasSentWhatsapp(true);
       setStep('sent');
@@ -2600,8 +2639,7 @@ export default function NfcLandingScreen() {
                 style={styles.iconCircleBtn} 
                 onPress={() => {
                   if (step === 'sent' && !isApproved) {
-                    setStep('form');
-                    setIsWaitingConfirm(false);
+                    handleResetToForm();
                   } else {
                     handleViewStampCard();
                   }
@@ -3261,9 +3299,6 @@ export default function NfcLandingScreen() {
           {/* ───────────────────────────────────────────────────────── */}
           {/* STEP 2: Real-Time Store Approval (Waiting Card & Live Pulse) */}
           {/* ───────────────────────────────────────────────────────── */}
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* STEP 2: Real-Time Store Approval (Waiting Card & Live Pulse) */}
-          {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={{ alignItems: 'center', width: '100%', marginTop: 0, marginBottom: 0 }}>
               {!isApproved ? (
@@ -3286,10 +3321,7 @@ export default function NfcLandingScreen() {
                 }}>
                   {/* Top-Right Dismiss / Cancel (X) Button */}
                   <TouchableOpacity
-                    onPress={() => {
-                      setStep('form');
-                      setIsWaitingConfirm(false);
-                    }}
+                    onPress={handleResetToForm}
                     activeOpacity={0.75}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     style={{
