@@ -33,6 +33,7 @@ interface Branch {
   manager_name: string;
   is_hq: boolean;
   status: 'active' | 'inactive';
+  manager?: string;
   google_review_url?: string;
   staff_count?: number;
   total_sales?: number;
@@ -234,25 +235,15 @@ export default function BranchesScreen() {
       }
 
       // Compute live performance metrics per branch
-      const hqBranch = branchList.find(b => b.is_hq) || branchList[0];
-      const hqId = hqBranch?.id;
-
       const enriched = branchList.map((branch) => {
         let totalSales = 0;
         let totalStamps = 0;
         const customerSet = new Set<string>();
 
         txRecords.forEach((tx: any) => {
-          let meta: any = {};
-          try {
-            if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
-            else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
-          } catch (e) {}
-
-          const txBranchId = meta.branch_id || '';
-          const txBranchName = (meta.branch_name || '').toLowerCase();
-          const isHqMatch = branch.is_hq && (!txBranchId || txBranchId === hqId || txBranchName.includes('hq') || txBranchName.includes('all branches'));
-          const isSpecificMatch = txBranchId === branch.id || (Boolean(txBranchName) && txBranchName === branch.name.toLowerCase());
+          // Match the outlet relation by ID; rows with no outlet count towards HQ.
+          const isHqMatch = branch.is_hq && !tx.branch;
+          const isSpecificMatch = tx.branch === branch.id;
 
           if (isSpecificMatch || isHqMatch) {
             totalSales += Number(tx.bill_amount) || 0;
@@ -360,6 +351,16 @@ export default function BranchesScreen() {
     } finally {
       setSavingStandCode(null);
     }
+  };
+
+  // Prefer the durable manager relation over the denormalised name, so renaming
+  // a staff member never leaves a stale manager on the outlet.
+  const resolveManagerName = (branch: Branch) => {
+    if (branch.manager) {
+      const match = availableStaff.find((s) => s.id === branch.manager);
+      if (match?.name) return match.name;
+    }
+    return branch.manager_name || (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai');
   };
 
   return (
@@ -633,7 +634,7 @@ export default function BranchesScreen() {
                           <Text style={styles.insetTextSecondary}>
                             {locale === 'en' ? 'Manager: ' : 'Pengurus: '}
                             <Text style={styles.insetTextBold}>
-                              {branch.manager_name || (locale === 'en' ? 'Store Owner' : 'Pemilik Kedai')}
+                              {resolveManagerName(branch)}
                             </Text>
                           </Text>
                         </View>

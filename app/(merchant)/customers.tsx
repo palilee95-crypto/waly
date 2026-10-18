@@ -48,6 +48,7 @@ type TransactionItem = {
   created: string;
   metadata: any;
   bill_amount?: number;
+  branch?: string;
 };
 
 const getInitials = (name: string) => {
@@ -189,6 +190,7 @@ export default function CustomersScreen() {
           created: rec.created,
           metadata: meta,
           bill_amount: rec.bill_amount,
+          branch: rec.branch || '',
         };
       });
       setTransactions(mapped);
@@ -986,13 +988,9 @@ export default function CustomersScreen() {
     }
 
     return transactions.filter(tx => {
-      const meta = parseSafeMetadata(tx.metadata);
-      const txBranchId = meta.branch_id || '';
-      const txBranchName = (meta.branch_name || '').toLowerCase();
-      const isHqMatch = selectedBranchObj.is_hq && (!txBranchId || txBranchId === selectedBranchObj.id || txBranchName.includes('hq') || txBranchName.includes('all branches'));
-      const isSpecificMatch = txBranchId === selectedBranchObj.id || (Boolean(txBranchName) && txBranchName === selectedBranchObj.name.toLowerCase());
-
-      return isSpecificMatch || isHqMatch;
+      // Match the outlet relation by ID; rows with no outlet count towards HQ.
+      if (tx.branch === selectedBranchObj.id) return true;
+      return selectedBranchObj.is_hq && !tx.branch;
     });
   }, [transactions, selectedBranch, branchList]);
 

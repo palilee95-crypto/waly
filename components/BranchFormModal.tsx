@@ -145,6 +145,9 @@ export default function BranchFormModal({
     }
 
     setSubmitting(true);
+    // Only link the relation when the picker holds a real user id — it may hold a
+    // placeholder (e.g. 'owner_id'), and custom names have no user behind them.
+    const resolvedManagerId = !isCustomManager && /^[a-z0-9]{15}$/.test(selectedStaffId || '') ? selectedStaffId : '';
     try {
       if (editingBranch) {
         const updated = await pb.collection('branches').update(editingBranch.id, {
@@ -152,6 +155,7 @@ export default function BranchFormModal({
           address: address.trim(),
           city: city.trim(),
           phone: phone.trim(),
+          manager: resolvedManagerId,
           manager_name: managerName.trim(),
           is_hq: isHq,
           google_review_url: googleReviewUrl.trim(),
@@ -164,6 +168,7 @@ export default function BranchFormModal({
           address: address.trim(),
           city: city.trim(),
           phone: phone.trim(),
+          manager: resolvedManagerId,
           manager_name: managerName.trim(),
           is_hq: isHq,
           google_review_url: googleReviewUrl.trim(),

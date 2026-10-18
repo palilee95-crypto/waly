@@ -436,24 +436,15 @@ export default function AnalyticsScreen() {
 
   const filteredTransactions = useMemo(() => {
     const now = new Date();
-    const hqBranch = branchList.find(b => b.is_hq);
     const selectedBranchObj = selectedBranch === 'All Branches' ? null : branchList.find(b => b.name === selectedBranch || b.id === selectedBranch);
 
     return transactions.filter(tx => {
-      // Dynamic Branch Filter
+      // Dynamic Branch Filter — match the outlet relation by ID.
+      // Rows with no outlet count only towards HQ.
       if (selectedBranchObj) {
-        let meta: any = {};
-        try {
-          if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
-          else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
-        } catch (e) {}
-
-        const txBranchId = meta.branch_id || '';
-        const txBranchName = (meta.branch_name || '').toLowerCase();
-        const isHqMatch = selectedBranchObj.is_hq && (!txBranchId || txBranchId === selectedBranchObj.id || txBranchName.includes('hq') || txBranchName.includes('all branches'));
-        const isSpecificMatch = txBranchId === selectedBranchObj.id || (Boolean(txBranchName) && txBranchName === selectedBranchObj.name.toLowerCase());
-
-        if (!isSpecificMatch && !isHqMatch) return false;
+        if (tx.branch !== selectedBranchObj.id) {
+          if (!(selectedBranchObj.is_hq && !tx.branch)) return false;
+        }
       }
 
       const txDate = new Date(tx.created);
@@ -497,8 +488,6 @@ export default function AnalyticsScreen() {
   // Dynamic Outlet Comparison Metrics
   const branchComparisonMetrics = useMemo(() => {
     if (branchList.length === 0) return [];
-    const hqBranch = branchList.find(b => b.is_hq) || branchList[0];
-    const hqId = hqBranch?.id;
 
     const stats = branchList.map(branch => {
       let sales = 0;
@@ -506,18 +495,10 @@ export default function AnalyticsScreen() {
       const customers = new Set<string>();
 
       transactions.forEach(tx => {
-        let meta: any = {};
-        try {
-          if (typeof tx.metadata === 'string' && tx.metadata.trim()) meta = JSON.parse(tx.metadata);
-          else if (typeof tx.metadata === 'object' && tx.metadata !== null) meta = tx.metadata;
-        } catch (e) {}
+        // Match the outlet relation by ID; rows with no outlet count towards HQ.
+        const match = tx.branch === branch.id || (branch.is_hq && !tx.branch);
 
-        const txBranchId = meta.branch_id || '';
-        const txBranchName = (meta.branch_name || '').toLowerCase();
-        const isHqMatch = branch.is_hq && (!txBranchId || txBranchId === hqId || txBranchName.includes('hq') || txBranchName.includes('all branches'));
-        const isSpecificMatch = txBranchId === branch.id || (Boolean(txBranchName) && txBranchName === branch.name.toLowerCase());
-
-        if (isSpecificMatch || isHqMatch) {
+        if (match) {
           sales += Number(tx.bill_amount) || 0;
           stamps += Number(tx.stamps) || (tx.type === 'earn' ? 1 : 0);
           if (tx.customer) customers.add(tx.customer);

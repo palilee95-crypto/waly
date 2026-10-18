@@ -86,6 +86,26 @@ export default function GiveStampsScreen() {
   const [stampAmount, setStampAmount] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Outlet selection — staff are bound to their outlet (users.branch); the owner
+  // is brand-wide and must pick an outlet at the point of sale.
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+
+  useEffect(() => {
+    const mid = (user as any)?.merchant_id;
+    if (!mid) return;
+    pb.collection('branches')
+      .getFullList({ filter: `merchant = "${mid}"`, sort: '-is_hq,-created', requestKey: null })
+      .then((list: any[]) => {
+        setBranches(list || []);
+        const hq = (list || []).find((b: any) => b.is_hq) || (list || [])[0];
+        if (hq) setSelectedBranchId(hq.id);
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const isBrandWide = !(user as any)?.branch;
+
   // Active Loyalty Program & Mode Configuration
   const [program, setProgram] = useState<any>(null);
 
@@ -295,6 +315,7 @@ export default function GiveStampsScreen() {
             customer_name: customerName.trim(),
             bill_amount: bill,
             stamp_amount: stamps,
+            branch_id: selectedBranchId || undefined,
           },
         }
       );
@@ -334,7 +355,7 @@ export default function GiveStampsScreen() {
       const receiptInfo: ReceiptData = {
         id: realTxnId || ('TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()),
         storeName: storeName || (user as any)?.merchant_name || 'Risev Partner Store',
-        branchName: branchName || (user as any)?.branch_name || 'Main Counter',
+        branchName: branchName || branches.find((b: any) => b.id === selectedBranchId)?.name || storeName || 'Main Counter',
         date: new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         billAmount: bill,
         stampsEarned: stamps,
@@ -787,6 +808,42 @@ export default function GiveStampsScreen() {
                       </Text>
                     </TouchableOpacity>
                   ))}
+                </View>
+              </View>
+            )}
+
+            {/* Outlet picker — brand-wide users (the owner) choose where this sale happened */}
+            {isBrandWide && branches.length > 1 && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6, letterSpacing: 0.5 }}>
+                  {locale === 'en' ? 'OUTLET' : 'CAWANGAN'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {branches.map((b: any) => {
+                    const selected = selectedBranchId === b.id;
+                    return (
+                      <TouchableOpacity
+                        key={b.id}
+                        onPress={() => setSelectedBranchId(b.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          backgroundColor: selected ? '#000000' : '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: selected ? '#000000' : '#E2E8F0',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#475569' }}>
+                          {b.name.replace(' (HQ)', '')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
