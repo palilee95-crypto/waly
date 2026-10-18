@@ -71,3 +71,21 @@ onRecordUpdate((e) => {
   }
   return e.next();
 }, "branches");
+
+onRecordDelete((e) => {
+  const merchantId = e.record.getString("merchant");
+  if (!merchantId) return e.next();
+  if (!e.record.getBool("is_hq")) return e.next();
+
+  // Deleting the HQ outlet promotes the oldest remaining outlet to HQ.
+  try {
+    const others = $app.findRecordsByFilter("branches",
+      `merchant = '${merchantId}' && id != '${e.record.id}'`, "+created", 500, 0);
+    const hasHq = others.some(b => b.getBool("is_hq"));
+    if (!hasHq && others.length > 0) {
+      others[0].set("is_hq", true);
+      $app.save(others[0]);
+    }
+  } catch (err) {}
+  return e.next();
+}, "branches");
