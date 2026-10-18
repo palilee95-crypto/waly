@@ -21,6 +21,15 @@ function risevCountBranches(merchantId) {
   } catch (e) { return 0; }
 }
 
+function risevCountHq(merchantId, excludeId) {
+  let n = 0;
+  try {
+    const all = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
+    all.forEach(b => { if (b.id !== excludeId && b.getBool("is_hq")) n++; });
+  } catch (e) {}
+  return n;
+}
+
 function risevClearOtherHq(merchantId, keepId) {
   try {
     const all = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
@@ -30,7 +39,10 @@ function risevClearOtherHq(merchantId, keepId) {
   } catch (e) {}
 }
 
-onRecordCreate((e) => {
+// ── Outlet limit + first-outlet-is-HQ (request level, so superusers bypass) ──
+onRecordCreateRequest((e) => {
+  try { if (e.hasSuperuserAuth()) return e.next(); } catch (err) {}
+
   const merchantId = e.record.getString("merchant");
   if (!merchantId) return e.next();
 
@@ -43,41 +55,45 @@ onRecordCreate((e) => {
     );
   }
 
-  if (existing === 0) {
-    e.record.set("is_hq", true);
-  } else if (e.record.getBool("is_hq")) {
-    risevClearOtherHq(merchantId, e.record.id);
-  }
+  if (existing === 0) e.record.set("is_hq", true);
   return e.next();
 }, "branches");
 
-onRecordUpdate((e) => {
+// ── Guard: never let a merchant reach zero HQ outlets (request level) ──
+onRecordUpdateRequest((e) => {
+  try { if (e.hasSuperuserAuth()) return e.next(); } catch (err) {}
+
   const merchantId = e.record.getString("merchant");
   if (!merchantId) return e.next();
 
   if (!e.record.getBool("is_hq")) {
     let wasHq = false;
     try { wasHq = e.record.original().getBool("is_hq"); } catch (err) {}
-    if (wasHq) {
-      let others = 0;
-      try {
-        const all = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
-        all.forEach(b => { if (b.id !== e.record.id && b.getBool("is_hq")) others++; });
-      } catch (err) {}
-      if (others === 0) throw new ForbiddenError("At least one outlet must remain the HQ.");
+    if (wasHq && risevCountHq(merchantId, e.record.id) === 0) {
+      throw new ForbiddenError("At least one outlet must remain the HQ.");
     }
-  } else {
-    risevClearOtherHq(merchantId, e.record.id);
   }
   return e.next();
 }, "branches");
 
+// ── Clear other HQ ONLY after the incoming record is persisted ──
+// (running this pre-save re-entered the guard above and aborted the clear.)
+onRecordAfterCreateSuccess((e) => {
+  if (e.record.getBool("is_hq")) risevClearOtherHq(e.record.getString("merchant"), e.record.id);
+  return e.next();
+}, "branches");
+
+onRecordAfterUpdateSuccess((e) => {
+  if (e.record.getBool("is_hq")) risevClearOtherHq(e.record.getString("merchant"), e.record.id);
+  return e.next();
+}, "branches");
+
+// ── Deleting the HQ outlet promotes the oldest remaining outlet ──
 onRecordDelete((e) => {
   const merchantId = e.record.getString("merchant");
   if (!merchantId) return e.next();
   if (!e.record.getBool("is_hq")) return e.next();
 
-  // Deleting the HQ outlet promotes the oldest remaining outlet to HQ.
   try {
     const others = $app.findRecordsByFilter("branches",
       `merchant = '${merchantId}' && id != '${e.record.id}'`, "+created", 500, 0);
