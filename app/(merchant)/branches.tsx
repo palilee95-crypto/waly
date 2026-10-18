@@ -216,8 +216,7 @@ export default function BranchesScreen() {
               phone: merch.phone || user.phone || '',
               manager_name: user.name || 'Store Owner',
               is_hq: true,
-              status: 'active',
-              google_review_url: merch.google_review_url || ''
+              status: 'active'
             });
             if (autoHq?.id) {
               branchList = [autoHq as any];

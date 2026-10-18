@@ -19,21 +19,6 @@ migrate((app) => {
   } catch (err) {
     console.log("[MIGRATION] branches.google_review_url:", err.message || err);
   }
-
-  // Backfill: the URL lives on the merchant; copy it to the HQ outlet.
-  try {
-    const hqs = app.findRecordsByFilter("branches", "is_hq = true", "-created", 5000, 0);
-    let n = 0;
-    hqs.forEach(b => {
-      try {
-        if (b.getString("google_review_url")) return;
-        const m = app.findRecordById("merchants", b.getString("merchant"));
-        const url = m.getString("google_review_url") || "";
-        if (url) { b.set("google_review_url", url); app.save(b); n++; }
-      } catch (e) {}
-    });
-    console.log(`[MIGRATION] Backfilled google_review_url on ${n} HQ outlets`);
-  } catch (e2) {}
   return null;
 }, (app) => {
   try {
