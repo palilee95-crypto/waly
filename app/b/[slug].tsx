@@ -968,14 +968,16 @@ export default function CustomerBookingPwaScreen() {
       }
       setIsPro(proStatus);
 
-      // Fetch branches
+      // Fetch branches (public route — the branches collection is no longer world-readable)
       try {
-        const bRes = await pb.collection('branches').getList(1, 10, {
-          filter: `merchant = "${mRecord.id}"`
+        const bRes = await pb.send<any>('/api/risev/branches/public', {
+          method: 'GET',
+          query: { merchant: mRecord.id },
         });
-        if (bRes.items.length > 0) {
-          setBranches(bRes.items as any);
-          setSelectedBranch(bRes.items[0] as any);
+        const branchItems = (bRes && bRes.branches) || [];
+        if (branchItems.length > 0) {
+          setBranches(branchItems as any);
+          setSelectedBranch(branchItems[0] as any);
         } else {
           const mainBranch = {
             id: 'main',
