@@ -671,6 +671,7 @@ export default function NfcLandingScreen() {
     branch?: string;
     preview_step?: string;
     preview_approved?: string;
+    preview_declined?: string;
   }>();
   const { user, logout, refreshSession } = useAuth();
   const { locale } = useLanguage();
@@ -842,12 +843,16 @@ export default function NfcLandingScreen() {
   const hasTriggeredReviewRef = useRef<boolean>(false);
   const [hasSentWhatsapp, setHasSentWhatsapp] = useState<boolean>(false);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+  const [isDeclined, setIsDeclined] = useState<boolean>(false);
+  const isDeclinedRef = useRef<boolean>(false);
   const [showBack, setShowBack] = useState<boolean>(false);
 
   const handleResetToForm = () => {
     setStep('form');
     setIsWaitingConfirm(false);
     setIsApproved(false);
+    setIsDeclined(false);
+    isDeclinedRef.current = false;
     setShowReviewModal(false);
     setShowRewardModal(false);
     setUnlockedReward(null);
@@ -903,6 +908,10 @@ export default function NfcLandingScreen() {
     if (params.preview_approved === 'true' || params.preview_approved === '1') {
       setIsApproved(true);
     }
+    if (params.preview_declined === 'true' || params.preview_declined === '1') {
+      isDeclinedRef.current = true;
+      setIsDeclined(true);
+    }
     if (previewReward === 'milestone') {
       if (!hasDismissedRewardRef.current) {
         setUnlockedReward({
@@ -925,7 +934,7 @@ export default function NfcLandingScreen() {
         setShowRewardModal(true);
       }
     }
-  }, [params.preview_step, params.preview_approved, (params as any)?.preview_reward]);
+  }, [params.preview_step, params.preview_approved, params.preview_declined, (params as any)?.preview_reward]);
   const [reviewSubmitted, setReviewSubmitted] = useState<boolean>(false);
 
   // Tracks which stamp slot indices are "newly earned" this session for animation
@@ -1504,9 +1513,15 @@ export default function NfcLandingScreen() {
       const activeClaimId = claimIdRef.current || claimId;
       // CRITICAL: Strictly match this customer's active claim ID — never blindly match all claims for the merchant!
       const isThisClaim = Boolean(record && activeClaimId && record.id === activeClaimId);
-      if (isThisClaim && (stepRef.current === 'sent' || step === 'sent')) {
+      if (isThisClaim && !isDeclinedRef.current && (stepRef.current === 'sent' || step === 'sent')) {
         if (record.status === 'pending') {
           setHasSentWhatsapp(true);
+        }
+        if (record.status === 'cancelled') {
+          isDeclinedRef.current = true;
+          setIsDeclined(true);
+          setIsWaitingConfirm(false);
+          return;
         }
         if (record.status === 'completed') {
           if (typeof record.total_stamps === 'number') {
@@ -1568,12 +1583,12 @@ export default function NfcLandingScreen() {
 
   // 3. Robust Polling & Tab Visibility Listener for Mobile Browsers (iOS Safari / Android Chrome)
   useEffect(() => {
-    if (step !== 'sent' || !merchant || isApproved) return;
+    if (step !== 'sent' || !merchant || isApproved || isDeclined) return;
 
     let isMounted = true;
 
     const checkApprovalStatus = async () => {
-      if (!isMounted || isApproved) return;
+      if (!isMounted || isApproved || isDeclinedRef.current) return;
       try {
         // 1. Check claim status endpoint
         if (claimId) {
@@ -1583,6 +1598,12 @@ export default function NfcLandingScreen() {
               params: { claim_id: claimId },
               requestKey: null,
             });
+            if (res && res.status === 'cancelled' && isMounted) {
+              isDeclinedRef.current = true;
+              setIsDeclined(true);
+              setIsWaitingConfirm(false);
+              return;
+            }
             if (res && res.status === 'completed' && isMounted) {
               if (typeof res.total_stamps === 'number') {
                 setApprovedStamps(res.total_stamps);
@@ -1666,7 +1687,7 @@ export default function NfcLandingScreen() {
         }
       }
     };
-  }, [step, merchant, claimId, user, loyaltyCard, isApproved]);
+  }, [step, merchant, claimId, user, loyaltyCard, isApproved, isDeclined]);
 
   // Brand Tokens & Assets
   const merchantName = merchant?.name || 'Risev Merchant';
@@ -3301,7 +3322,224 @@ export default function NfcLandingScreen() {
           {/* ───────────────────────────────────────────────────────── */}
           {step === 'sent' && (
             <View style={{ alignItems: 'center', width: '100%', marginTop: 0, marginBottom: 0 }}>
-              {!isApproved ? (
+              {isDeclined ? (
+                <View style={{
+                  width: '100%',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 28,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                  paddingHorizontal: 18,
+                  paddingTop: 16,
+                  paddingBottom: 18,
+                  marginTop: 0,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 20,
+                  elevation: 6,
+                  position: 'relative',
+                }}>
+                  {/* Top-Right Dismiss (X) Button */}
+                  <TouchableOpacity
+                    onPress={handleResetToForm}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={{
+                      position: 'absolute',
+                      top: 14,
+                      right: 14,
+                      zIndex: 10,
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color="#0F172A" />
+                  </TouchableOpacity>
+
+                  {/* Declined Centerpiece with Soft Rose Halo */}
+                  <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 10 }}>
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: 108,
+                        height: 108,
+                        borderRadius: 54,
+                        backgroundColor: '#FECACA',
+                        opacity: 0.42,
+                      }}
+                    />
+                    <View style={{
+                      width: 76,
+                      height: 76,
+                      borderRadius: 38,
+                      backgroundColor: '#FEE2E2',
+                      borderWidth: 2,
+                      borderColor: '#FCA5A5',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Ionicons name="close" size={34} color="#DC2626" />
+                    </View>
+                  </View>
+
+                  {/* Centered Typography: Title & Subtitle */}
+                  <Text style={{
+                    fontSize: 21,
+                    fontFamily: 'PlusJakartaSans_800ExtraBold',
+                    color: '#0F172A',
+                    textAlign: 'center',
+                    letterSpacing: -0.4,
+                  }}>
+                    {locale === 'en' ? 'Request declined' : 'Permintaan ditolak'}
+                  </Text>
+                  <Text style={{
+                    fontSize: 12.5,
+                    fontFamily: 'PlusJakartaSans_500Medium',
+                    color: '#64748B',
+                    textAlign: 'center',
+                    lineHeight: 17,
+                    marginTop: 4,
+                    paddingHorizontal: 8,
+                  }}>
+                    {locale === 'en'
+                      ? `${merchantName} did not approve this ${isPointsOnly ? 'point' : 'stamp'} request.`
+                      : `${merchantName} tidak meluluskan permintaan ${isPointsOnly ? 'mata ganjaran' : 'cop'} ini.`}
+                  </Text>
+
+                  {/* Inset Rows: Declined Approval (and Voucher when applied) */}
+                  <View style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    marginTop: 14,
+                    gap: 8,
+                  }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                        <View style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: '#0F172A',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 10,
+                        }}>
+                          <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                            {locale === 'en'
+                              ? (isPointsOnly ? 'Points Approval' : 'Stamp Approval')
+                              : (isPointsOnly ? 'Kelulusan Mata' : 'Kelulusan Cop')}
+                          </Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                            {locale === 'en' ? 'Declined by store' : 'Ditolak oleh kedai'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: '#FEE2E2',
+                        borderWidth: 1,
+                        borderColor: '#FCA5A5',
+                        paddingHorizontal: 9,
+                        paddingVertical: 4,
+                        borderRadius: 99,
+                      }}>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B91C1C' }}>
+                          {locale === 'en' ? 'Declined' : 'Ditolak'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {appliedVoucherForClaim && (
+                      <>
+                        <View style={{ height: 1, backgroundColor: '#EDF2F7' }} />
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 6 }}>
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: '#0F172A',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}>
+                              <Ionicons name="gift" size={17} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }} numberOfLines={1}>
+                                {appliedVoucherForClaim.title || (locale === 'en' ? 'Redeem Voucher' : 'Tebus Baucar')}
+                              </Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 }}>
+                                {locale === 'en' ? 'Voucher still available' : 'Baucar masih tersedia'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#FEE2E2',
+                            borderWidth: 1,
+                            borderColor: '#FCA5A5',
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 99,
+                          }}>
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B91C1C' }}>
+                              {locale === 'en' ? 'Declined' : 'Ditolak'}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </View>
+
+                  {/* Try Again Primary Action */}
+                  <TouchableOpacity
+                    onPress={handleResetToForm}
+                    activeOpacity={0.85}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 7,
+                      backgroundColor: '#0F172A',
+                      borderRadius: 14,
+                      paddingVertical: 13,
+                      marginTop: 14,
+                    }}
+                  >
+                    <Ionicons name="refresh" size={15} color="#FFFFFF" />
+                    <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                      {locale === 'en' ? 'Try Again' : 'Cuba Lagi'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 10 }}>
+                    <Ionicons name="information-circle-outline" size={12.5} color="#64748B" />
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
+                      {locale === 'en' ? 'Think this is a mistake? Ask the cashier.' : 'Rasa ini satu kesilapan? Tanya juruwang.'}
+                    </Text>
+                  </View>
+                </View>
+              ) : !isApproved ? (
                 <View style={{
                   width: '100%',
                   backgroundColor: '#FFFFFF',
