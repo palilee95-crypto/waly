@@ -471,6 +471,14 @@ function processCompletedBooking(rec) {
     newTx.set("merchant", merchantId);
     if (loyaltyCard) newTx.set("loyalty_card", loyaltyCard.id);
     if (staffUserId) newTx.set("staff", staffUserId);
+    var safeBranchId = "";
+    if (branchId) {
+      try {
+        var bRec = $app.findRecordById("branches", branchId);
+        if (bRec && bRec.getString("merchant") === merchantId) safeBranchId = bRec.id;
+      } catch (bRecErr) {}
+    }
+    if (safeBranchId) newTx.set("branch", safeBranchId);
     newTx.set("type", "earn");
     newTx.set("bill_amount", totalPrice);
     newTx.set("stamps", stampsToAward);

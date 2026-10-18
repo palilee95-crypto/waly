@@ -271,6 +271,16 @@ onRecordUpdate((e) => {
       tx.set('stamps', 0);
       tx.set('points', 0);
       tx.set('staff', e.auth ? e.auth.id : '');
+
+      let safeBranchId = "";
+      const candBranch = e.auth ? (e.auth.getString('branch') || '') : '';
+      if (candBranch) {
+        try {
+          const bRec = $app.findRecordById('branches', candBranch);
+          if (bRec && bRec.getString('merchant') === merchantId) safeBranchId = bRec.id;
+        } catch (bRecErr) {}
+      }
+      tx.set('branch', safeBranchId);
       
       const meta = {
         voucher_id: e.record.id,
