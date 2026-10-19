@@ -105,36 +105,6 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
   const sliderHandlerRef = useRef<(x: number) => void>(() => {});
   const wheelRef = useRef<any>(null);
   const sliderRef = useRef<any>(null);
-  const wheelOrigin = useRef({ x: 0, y: 0 });
-  const sliderOrigin = useRef({ x: 0, y: 0 });
-
-  const measureView = (
-    ref: React.MutableRefObject<any>,
-    onMeasured: (x: number, y: number, width: number, height: number) => void
-  ) => {
-    const node = ref.current;
-    if (!node) return;
-    if (typeof node.measureInWindow === 'function') {
-      node.measureInWindow(onMeasured);
-      return;
-    }
-    // React Native Web host node fallback.
-    if (typeof node.getBoundingClientRect === 'function') {
-      const rect = node.getBoundingClientRect();
-      onMeasured(rect.left, rect.top, rect.width, rect.height);
-    }
-  };
-
-  const measureWheel = () =>
-    measureView(wheelRef, (x, y) => {
-      wheelOrigin.current = { x, y };
-    });
-
-  const measureSlider = () =>
-    measureView(sliderRef, (x, y, width) => {
-      sliderOrigin.current = { x, y };
-      if (width > 0) setSliderWidth(width);
-    });
 
   useEffect(() => {
     hsvRef.current = { h: hue, s: sat, v: val };
@@ -180,18 +150,36 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
 
   sliderHandlerRef.current = handleSliderTouch;
 
-  const pointFromEvent = (evt: any, origin: { x: number; y: number }) => {
+  const pointFromEvent = (evt: any, ref: React.MutableRefObject<any>) => {
     const ne = evt?.nativeEvent || {};
-    // Web mouse events have no locationX/locationY; use page coords minus the
-    // measured view origin. Native touches still prefer locationX/locationY.
-    if (Platform.OS === 'web' && typeof ne.pageX === 'number') {
-      return { x: ne.pageX - origin.x, y: ne.pageY - origin.y };
-    }
+    // React Native Web (and native) expose locationX/locationY relative to the
+    // responder view. This is measured per event against the CURRENT rect, so
+    // it stays correct while the modal slides open.
     if (typeof ne.locationX === 'number' && typeof ne.locationY === 'number') {
       return { x: ne.locationX, y: ne.locationY };
     }
+    // Fallbacks for platforms that do not provide locationX/locationY.
+    if (Platform.OS === 'web') {
+      const node = ref.current;
+      const rect = typeof node?.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null;
+      if (rect) {
+        const touch = ne.touches && ne.touches[0] ? ne.touches[0] : null;
+        const clientX =
+          typeof ne.clientX === 'number' ? ne.clientX : touch && typeof touch.clientX === 'number' ? touch.clientX : null;
+        const clientY =
+          typeof ne.clientY === 'number' ? ne.clientY : touch && typeof touch.clientY === 'number' ? touch.clientY : null;
+        if (typeof clientX === 'number' && typeof clientY === 'number') {
+          return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+        if (typeof ne.pageX === 'number') {
+          const scrollX = typeof window !== 'undefined' ? window.scrollX : 0;
+          const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+          return { x: ne.pageX - scrollX - rect.left, y: ne.pageY - scrollY - rect.top };
+        }
+      }
+    }
     if (typeof ne.pageX === 'number') {
-      return { x: ne.pageX - origin.x, y: ne.pageY - origin.y };
+      return { x: ne.pageX, y: ne.pageY };
     }
     return { x: ne.offsetX, y: ne.offsetY };
   };
@@ -204,11 +192,11 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
-        const { x, y } = pointFromEvent(evt, wheelOrigin.current);
+        const { x, y } = pointFromEvent(evt, wheelRef);
         touchHandlerRef.current(x, y);
       },
       onPanResponderMove: (evt) => {
-        const { x, y } = pointFromEvent(evt, wheelOrigin.current);
+        const { x, y } = pointFromEvent(evt, wheelRef);
         touchHandlerRef.current(x, y);
       },
     })
@@ -220,11 +208,11 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
-        const { x } = pointFromEvent(evt, sliderOrigin.current);
+        const { x } = pointFromEvent(evt, sliderRef);
         sliderHandlerRef.current(x);
       },
       onPanResponderMove: (evt) => {
-        const { x } = pointFromEvent(evt, sliderOrigin.current);
+        const { x } = pointFromEvent(evt, sliderRef);
         sliderHandlerRef.current(x);
       },
     })
@@ -258,7 +246,6 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
     <View style={styles.root}>
       <View
         ref={wheelRef}
-        onLayout={measureWheel}
         style={{ width: size, height: size, alignSelf: 'center' }}
         {...wheelResponder.panHandlers}
         accessible
@@ -287,10 +274,7 @@ export default function ColorWheelPicker({ value, onChange, locale = 'en' }: Pro
         <View
           ref={sliderRef}
           style={styles.sliderTrack}
-          onLayout={(e) => {
-            setSliderWidth(e.nativeEvent.layout.width);
-            measureSlider();
-          }}
+          onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
           {...sliderResponder.panHandlers}
         >
           <LinearGradient
