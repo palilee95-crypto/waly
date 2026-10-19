@@ -1139,15 +1139,16 @@ export default function NfcLandingScreen() {
 
       // 4. Save feedback in database
       if (merchant?.id) {
-        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
-        pb.collection('store_feedbacks').create({
-          id: genId,
-          merchant: merchant.id,
-          customer_phone: phone,
-          customer_name: name,
-          rating: 5,
-          feedback: '',
-          redirected_to_google: true,
+        pb.send('/api/risev/feedback/submit', {
+          method: 'POST',
+          body: {
+            merchant: merchant.id,
+            customer_phone: phone,
+            customer_name: name,
+            rating: 5,
+            feedback: '',
+            redirected_to_google: true,
+          },
         }).catch((err) => {
           console.warn('[STORE FEEDBACK 5-STAR ERROR]', err?.message || err);
         });
@@ -1166,15 +1167,16 @@ export default function NfcLandingScreen() {
 
     try {
       if (merchant?.id) {
-        const genId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 9);
-        await pb.collection('store_feedbacks').create({
-          id: genId,
-          merchant: merchant.id,
-          customer_phone: phone,
-          customer_name: name,
-          rating: reviewRating,
-          feedback: reviewFeedback.trim(),
-          redirected_to_google: false,
+        await pb.send('/api/risev/feedback/submit', {
+          method: 'POST',
+          body: {
+            merchant: merchant.id,
+            customer_phone: phone,
+            customer_name: name,
+            rating: reviewRating,
+            feedback: reviewFeedback.trim(),
+            redirected_to_google: false,
+          },
         });
       }
 
