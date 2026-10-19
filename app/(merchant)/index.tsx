@@ -309,16 +309,6 @@ export default function MerchantDashboard() {
         }
       } catch (codeErr) {}
 
-      // Purchased customer-slot top-ups + server-side quota state
-      try {
-        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
-        if (quotaRes?.current) {
-          setAddonQuota(Number(quotaRes.current.addon_quota) || 0);
-        }
-      } catch (quotaErr) {
-        setAddonQuota(0);
-      }
-
       // 1. Fetch merchant details & active loyalty program
       const [mRec, prog] = await Promise.all([
         pb.collection('merchants').getOne(user.merchant_id).catch(() => null),
@@ -340,6 +330,20 @@ export default function MerchantDashboard() {
         filter: `merchant = '${user.merchant_id}'`,
       });
       setTotalCustomersCount(cardsRes.totalItems);
+
+      // Purchased customer-slot top-ups + server-side quota state. `used` comes
+      // from the server so the gauge matches enforcement (distinct customers).
+      try {
+        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        if (quotaRes?.current) {
+          setAddonQuota(Number(quotaRes.current.addon_quota) || 0);
+          if (typeof quotaRes.current.used === 'number') {
+            setTotalCustomersCount(quotaRes.current.used);
+          }
+        }
+      } catch (quotaErr) {
+        setAddonQuota(0);
+      }
 
       // 4. Fetch active/upcoming bookings count for Bookings Quick Action badge
       try {
@@ -366,7 +370,9 @@ export default function MerchantDashboard() {
       // 5. Fetch vouchers redeemed today & this month
       try {
         const now = new Date();
-        const todayIso = now.toISOString().split('T')[0];
+        // Local date parts: toISOString() is UTC and reports yesterday between
+        // midnight and 08:00 in Malaysia (UTC+8).
+        const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const currentMonthIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const [vTodayRes, vMonthRes] = await Promise.all([
           pb.collection('vouchers').getList(1, 1, {
@@ -553,7 +559,8 @@ export default function MerchantDashboard() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (activeFilter === 'Today') {
-        return diffDays <= 1;
+        // Calendar day, not a rolling 24h window (which pulled in yesterday).
+        return isToday(tx.created);
       } else if (activeFilter === 'This Week') {
         return diffDays <= 7;
       } else {
@@ -637,10 +644,8 @@ export default function MerchantDashboard() {
   // Customer Cohorts Calculation (New, Repeat, Churn)
   const customerCohorts = useMemo(() => {
     if (!transactions || transactions.length === 0) {
-      const approxRepeat = Math.round(customerCount * 0.55);
-      const approxNew = Math.max(1, Math.round(customerCount * 0.35));
-      const approxChurn = Math.max(0, customerCount - approxRepeat - approxNew);
-      return { newCustomers: approxNew, repeatCustomers: approxRepeat, churnCustomers: approxChurn };
+      // No transaction history: report zeros rather than inventing a split.
+      return { newCustomers: 0, repeatCustomers: 0, churnCustomers: 0 };
     }
 
     const now = new Date();
@@ -687,10 +692,7 @@ export default function MerchantDashboard() {
     });
 
     if (newCount === 0 && repeatCount === 0 && customerCount > 0) {
-      const approxRepeat = Math.round(customerCount * 0.55);
-      const approxNew = Math.max(1, Math.round(customerCount * 0.35));
-      const approxChurn = Math.max(0, customerCount - approxRepeat - approxNew);
-      return { newCustomers: approxNew, repeatCustomers: approxRepeat, churnCustomers: approxChurn };
+      return { newCustomers: 0, repeatCustomers: 0, churnCustomers: 0 };
     }
 
     return {
