@@ -169,16 +169,5 @@ onRecordDelete((e) => {
     console.log("[REWARD DELETE] Error unlinking campaigns:", err.message || err);
   }
 
-  // 4. Unlink from store_feedbacks
-  try {
-    const feedbacks = $app.findRecordsByFilter('store_feedbacks', `linked_reward = "${rewardId}"`, '-created', 100, 0);
-    for (const fb of feedbacks) {
-      fb.set('linked_reward', null);
-      $app.save(fb);
-    }
-  } catch (err) {
-    console.log("[REWARD DELETE] Error unlinking store_feedbacks:", err.message || err);
-  }
-
   return e.next();
 }, 'rewards');
