@@ -99,7 +99,8 @@ Configured for **Command Code** in `.mcp.json` (project root, gitignored). Two s
 2. **Unknown fields are silently dropped.** `record.set("field", …)` for a column that does not exist does not throw — the write just vanishes. This is how several "ghost field" bugs hid (`branches.google_review_url`, `nfc_claims.branch`, …). If a field seems to have no effect, check the collection schema first.
 3. **`RecordRequestEvent.record` is typed optional** but *is* populated in practice.
 4. **List rules act as a filter, not a gate** — an anonymous `getList` on a rule-protected collection returns `200` with `items: []`, not `403`. Use that when asserting privacy in tests.
-5. Migrations and hooks: see the deployment method above.
+5. **`err.name` is `undefined` for ALL thrown errors — never branch on it.** Verified on PB 0.39.4: a thrown `ForbiddenError` reports `err.name === undefined`, `err.status === 403`, `err instanceof ForbiddenError === true`. So any `err.name === 'ForbiddenError'` / `'BadRequestError'` guard **silently never matches** and the catch falls through — this is exactly how `subscription_enforce` failed **open** for months (non-subscribed merchants could transact, and the stand_bundle/starter quota limits were never enforced). **Use `err instanceof XxxError` (the constructor IS available, including in tagged hooks — only file-level `function` declarations are not, see #1) or `err.status` (`403`/`400`/`404`).** Fixed in `subscription_enforce`, `voucher_redeem`, `booking_system`; grep `err.name ===` before trusting any error handling.
+6. Migrations and hooks: see the deployment method above.
 
 ## Outlet (branch) model
 
