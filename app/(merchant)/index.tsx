@@ -899,7 +899,6 @@ export default function MerchantDashboard() {
             loading={loading}
             locale={locale}
             cohorts={customerCohorts}
-            onUpgrade={() => router.push('/(merchant)/subscription' as any)}
             onAddSlots={!isPro && activeSubscription?.plan === 'stand_bundle' ? () => setShowQuotaModal(true) : undefined}
           />
         </View>

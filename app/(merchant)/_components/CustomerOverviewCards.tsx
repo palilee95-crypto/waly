@@ -10,11 +10,10 @@ type Props = {
   loading: boolean;
   locale: string;
   cohorts: { newCustomers: number; repeatCustomers: number; churnCustomers: number };
-  onUpgrade: () => void;
   onAddSlots?: () => void;
 };
 
-export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro, loading, locale, cohorts, onUpgrade, onAddSlots }: Props) {
+export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro, loading, locale, cohorts, onAddSlots }: Props) {
   const [width, setWidth] = useState(340);
   const ms = locale === 'ms';
   const scale = Math.min(1.25, width / 760);
@@ -74,14 +73,12 @@ export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro
             </View>
           </View>
         </View>
-        <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} activeOpacity={0.75} style={[styles.upgrade, { minHeight: size(52, 44), marginTop: size(24, 12), gap: size(18, 10) }]}>
-          <Text style={[styles.bold, { fontSize: size(23, 13) }]}>{isPro ? (ms ? 'Urus pelan' : 'Manage plan') : (ms ? 'Naik taraf' : 'Upgrade')}</Text>
-          <Ionicons name="arrow-forward" size={size(28, 18)} color="#000000" />
-        </TouchableOpacity>
         {!isPro && onAddSlots ? (
-          <TouchableOpacity accessibilityRole="button" onPress={onAddSlots} activeOpacity={0.75} style={[styles.addSlots, { marginTop: size(10, 6) }]}>
-            <Ionicons name="add-circle-outline" size={size(22, 14)} color="#000000" />
-            <Text style={[styles.bold, { fontSize: size(19, 11) }]}>{ms ? 'Tambah slot pelanggan' : 'Add customer slots'}</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={onAddSlots} activeOpacity={0.75} style={[styles.addSlots, { marginTop: size(10, 6), minHeight: size(48, 44), paddingHorizontal: size(16, 10) }]}>
+            <Text style={[styles.bold, styles.addSlotsText, { fontSize: size(17, 11), lineHeight: size(22, 15) }]}>{ms ? 'Dapatkan lebih ramai pelanggan?' : 'Get more customers?'}</Text>
+            <View style={[styles.addSlotsArrow, { width: size(32, 28), height: size(32, 28), borderRadius: size(16, 14) }]}>
+              <Ionicons name="arrow-forward" size={size(19, 17)} color="#000000" />
+            </View>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -122,8 +119,9 @@ const styles = StyleSheet.create({
   gaugeCopy: { position: 'absolute', left: '8%', right: '8%', top: '34%', alignItems: 'center' },
   totals: { flex: 1.2, minWidth: 0, borderLeftWidth: 1, borderLeftColor: '#E8ECF1' },
   divider: { height: 1, backgroundColor: '#EDF0F4' },
-  upgrade: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#FFCC00' },
-  addSlots: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 },
+  addSlots: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 7, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F2D65C' },
+  addSlotsText: { flex: 1, flexShrink: 1 },
+  addSlotsArrow: { flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFCC00' },
   healthRows: { flex: 1, justifyContent: 'space-between' },
   healthRow: { flexDirection: 'row', alignItems: 'center' },
   valueRow: { flexDirection: 'row', alignItems: 'baseline' },
