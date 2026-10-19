@@ -3429,6 +3429,7 @@ export default function UnifiedRewardsScreen() {
                             placeholder="000000"
                             placeholderTextColor="#94A3B8"
                             maxLength={6}
+                            selectTextOnFocus
                             {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                           />
                           <View style={{
@@ -3441,6 +3442,38 @@ export default function UnifiedRewardsScreen() {
                           }} />
                         </View>
                       </View>
+
+                      {/* A background image is painted over the base color, so the
+                          picked hex has no visible effect until it is removed. */}
+                      {activeColorPickerModal === 'background' && !!bgImage && (
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          backgroundColor: '#FEF3C7',
+                          borderWidth: 1,
+                          borderColor: '#FDE68A',
+                          borderRadius: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                        }}>
+                          <Ionicons name="image-outline" size={16} color="#B45309" />
+                          <Text style={{ flex: 1, fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E', lineHeight: 15 }}>
+                            {locale === 'en'
+                              ? 'A background image is set and covers this colour. Remove it to see the hex colour.'
+                              : 'Imej latar sedang digunakan dan menutupi warna ini. Buang imej untuk melihat warna hex.'}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => { setRemoveBgImage(true); setBgImage(''); setBgFile(null); }}
+                            activeOpacity={0.8}
+                            style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#F59E0B' }}
+                          >
+                            <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                              {locale === 'en' ? 'Remove' : 'Buang'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
 
                       {/* Close Done Button */}
                       <TouchableOpacity
