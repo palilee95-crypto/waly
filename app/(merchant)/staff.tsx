@@ -2494,7 +2494,7 @@ export default function StaffManagementScreen() {
                   <View style={styles.statMetricIconCircle}>
                     <Ionicons name="ribbon-outline" size={16} color="#0F172A" />
                   </View>
-                  <Text style={styles.statMetricVal}>{selectedStaffForDetails.stamps_issued ?? 2}</Text>
+                  <Text style={styles.statMetricVal}>{selectedStaffForDetails.stamps_issued ?? 0}</Text>
                   <Text style={styles.statMetricLabel}>Stamps issued</Text>
                 </View>
 
@@ -2504,9 +2504,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="person-outline" size={16} color="#0F172A" />
                   </View>
                   <Text style={styles.statMetricVal}>
-                    {selectedStaffForDetails.sales_volume 
-                      ? `RM ${selectedStaffForDetails.sales_volume.toLocaleString()}` 
-                      : 'RM 3,150'}
+                    RM {(selectedStaffForDetails.sales_volume ?? 0).toLocaleString()}
                   </Text>
                   <Text style={styles.statMetricLabel}>Sales handled</Text>
                 </View>
@@ -2516,7 +2514,7 @@ export default function StaffManagementScreen() {
                   <View style={styles.statMetricIconCircle}>
                     <Ionicons name="hourglass-outline" size={16} color="#0F172A" />
                   </View>
-                  <Text style={styles.statMetricVal}>{selectedStaffForDetails.customers_served ?? 2}</Text>
+                  <Text style={styles.statMetricVal}>{selectedStaffForDetails.customers_served ?? 0}</Text>
                   <Text style={styles.statMetricLabel}>Customers served</Text>
                 </View>
               </View>
@@ -2550,7 +2548,7 @@ export default function StaffManagementScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.groupedRowTitle}>Email Address</Text>
-                    <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.email || 'shadow_staff@risev.app'}</Text>
+                    <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.email || '—'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </View>
@@ -2847,37 +2845,28 @@ export default function StaffManagementScreen() {
                       Rank #{selectedStaffForDetails.rank || 1} Top Performer
                     </Text>
                     <Text style={styles.leaderboardStandingDesc}>
-                      Leading store loyalty engagement and service speed
+                      Ranked against the rest of your team
                     </Text>
                   </View>
                 </View>
               </View>
 
-              {/* Customer Satisfaction Card */}
-              <View style={styles.customerReviewCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="star" size={20} color="#D97706" />
-                      <Text style={styles.ratingNumberBig}>{selectedStaffForDetails.rating_avg || '4.9'}</Text>
-                      <Text style={styles.ratingTotalText}>/ 5.0</Text>
-                    </View>
-                    <Text style={styles.ratingCountSub}>
-                      Based on {selectedStaffForDetails.rating_count || 34} verified customer reviews
+              {/* Customer Satisfaction Card — only shown when real review data exists */}
+              {(selectedStaffForDetails.rating_count ?? 0) > 0 ? (
+                <View style={styles.customerReviewCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="star" size={20} color="#D97706" />
+                    <Text style={styles.ratingNumberBig}>
+                      {Number(selectedStaffForDetails.rating_avg ?? 0).toFixed(1)}
                     </Text>
+                    <Text style={styles.ratingTotalText}>/ 5.0</Text>
                   </View>
-                  <View style={styles.satisfactionBadge}>
-                    <Text style={styles.satisfactionBadgeText}>98% Satisfaction</Text>
-                  </View>
-                </View>
-
-                <View style={styles.reviewSnippetBubble}>
-                  <Text style={styles.reviewSnippetText}>
-                    "Fast service, very polite, and remembered to stamp my card immediately!"
+                  <Text style={styles.ratingCountSub}>
+                    Based on {selectedStaffForDetails.rating_count} verified customer review
+                    {(selectedStaffForDetails.rating_count ?? 0) === 1 ? '' : 's'}
                   </Text>
-                  <Text style={styles.reviewSnippetAuthor}>— Verified member review</Text>
                 </View>
-              </View>
+              ) : null}
 
               {/* Key Performance Breakdown Grid */}
               <Text style={styles.groupHeaderLabel}>LOYALTY & SALES METRICS</Text>
@@ -2886,7 +2875,7 @@ export default function StaffManagementScreen() {
                   <View style={styles.statMetricIconCircle}>
                     <Ionicons name="ribbon-outline" size={16} color="#0F172A" />
                   </View>
-                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.stamps_issued || 142}</Text>
+                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.stamps_issued ?? 0}</Text>
                   <Text style={styles.perfGridLabel}>Stamps issued</Text>
                 </View>
 
@@ -2894,7 +2883,7 @@ export default function StaffManagementScreen() {
                   <View style={[styles.statMetricIconCircle, { backgroundColor: '#ECFDF5' }]}>
                     <Ionicons name="gift-outline" size={16} color="#16A34A" />
                   </View>
-                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.vouchers_redeemed || 18}</Text>
+                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.vouchers_redeemed ?? 0}</Text>
                   <Text style={styles.perfGridLabel}>Vouchers redeemed</Text>
                 </View>
 
@@ -2902,7 +2891,7 @@ export default function StaffManagementScreen() {
                   <View style={[styles.statMetricIconCircle, { backgroundColor: '#EFF6FF' }]}>
                     <Ionicons name="people-outline" size={16} color="#2563EB" />
                   </View>
-                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.customers_served || 89}</Text>
+                  <Text style={styles.perfGridVal}>{selectedStaffForDetails.customers_served ?? 0}</Text>
                   <Text style={styles.perfGridLabel}>Customers served</Text>
                 </View>
 
@@ -2911,7 +2900,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="cash-outline" size={16} color="#B45309" />
                   </View>
                   <Text style={styles.perfGridVal}>
-                    RM {(selectedStaffForDetails.sales_volume || 3150).toLocaleString()}
+                    RM {(selectedStaffForDetails.sales_volume ?? 0).toLocaleString()}
                   </Text>
                   <Text style={styles.perfGridLabel}>Total sales</Text>
                 </View>
@@ -2924,12 +2913,16 @@ export default function StaffManagementScreen() {
                 s => s.staff_id === selectedStaffForDetails.id || 
                      (s.staff_phone && selectedStaffForDetails.phone && s.staff_phone.replace(/\D/g, '') === selectedStaffForDetails.phone.replace(/\D/g, ''))
               );
-              const commRate = selectedStaffForDetails.commission_rate || staffComm?.commission_rate || 10;
+              const commRate = selectedStaffForDetails.commission_rate || staffComm?.commission_rate || 0;
               const isPercent = selectedStaffForDetails.commission_type === 'percentage' || staffComm?.commission_type === 'percentage';
               const isFixed = selectedStaffForDetails.commission_type === 'fixed_per_job' || staffComm?.commission_type === 'fixed_per_job';
-              const salesTotal = staffComm ? staffComm.total_sales : (selectedStaffForDetails.sales_volume || 3150);
-              const jobsTotal = staffComm ? staffComm.total_jobs : (selectedStaffForDetails.customers_served || 14);
-              const calculatedComm = isPercent ? (salesTotal * (commRate / 100)) : isFixed ? (jobsTotal * commRate) : 315;
+              const hasCommissionPlan = isPercent || isFixed;
+              const isPartTime = selectedStaffForDetails.employment_type === 'part_time';
+              const baseRate = Number(selectedStaffForDetails.base_salary) || 0;
+              const hourlyRate = Number(selectedStaffForDetails.hourly_rate) || 0;
+              const salesTotal = staffComm ? staffComm.total_sales : (selectedStaffForDetails.sales_volume ?? 0);
+              const jobsTotal = staffComm ? staffComm.total_jobs : (selectedStaffForDetails.customers_served ?? 0);
+              const calculatedComm = isPercent ? (salesTotal * (commRate / 100)) : isFixed ? (jobsTotal * commRate) : 0;
               const unpaidDue = staffComm ? staffComm.unpaid_commission : calculatedComm;
               const paidTotal = staffComm ? staffComm.paid_commission : 0;
               const totalComm = staffComm ? staffComm.total_commission : (unpaidDue + paidTotal);
@@ -2992,10 +2985,15 @@ export default function StaffManagementScreen() {
                           </>
                         )}
                       </TouchableOpacity>
-                    ) : (
+                    ) : hasCommissionPlan ? (
                       <View style={styles.allPaidBadgeRow}>
                         <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
                         <Text style={styles.allPaidBadgeText}>All commissions settled for this cycle</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.allPaidBadgeRow}>
+                        <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
+                        <Text style={styles.allPaidBadgeText}>No commission plan configured</Text>
                       </View>
                     )}
                   </View>
@@ -3037,9 +3035,9 @@ export default function StaffManagementScreen() {
                           {selectedStaffForDetails.employment_type === 'part_time' ? 'Hourly Wage' : 'Base Salary'}
                         </Text>
                         <Text style={styles.groupedRowSubtitle}>
-                          {selectedStaffForDetails.employment_type === 'part_time'
-                            ? `RM ${(selectedStaffForDetails.hourly_rate || 10).toFixed(2)} / hour`
-                            : `RM ${(selectedStaffForDetails.base_salary || 2500).toFixed(2)} / month`}
+                          {isPartTime
+                            ? (hourlyRate > 0 ? `RM ${hourlyRate.toFixed(2)} / hour` : 'Not set')
+                            : (baseRate > 0 ? `RM ${baseRate.toFixed(2)} / month` : 'Not set')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -3094,11 +3092,17 @@ export default function StaffManagementScreen() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.groupedRowTitle}>Previous Month Payout</Text>
-                        <Text style={styles.groupedRowSubtitle}>RM {(paidTotal || 420).toFixed(2)} • Settled via cash / transfer</Text>
+                        <Text style={styles.groupedRowSubtitle}>
+                          {paidTotal > 0
+                            ? `RM ${paidTotal.toFixed(2)} • Settled via cash / transfer`
+                            : 'No payouts recorded yet'}
+                        </Text>
                       </View>
-                      <View style={styles.paidBadgePill}>
-                        <Text style={styles.paidBadgePillText}>Paid</Text>
-                      </View>
+                      {paidTotal > 0 && (
+                        <View style={styles.paidBadgePill}>
+                          <Text style={styles.paidBadgePillText}>Paid</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -8653,41 +8657,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
     marginTop: 2,
-  },
-  satisfactionBadge: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: 100,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-  },
-  satisfactionBadgeText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#16A34A',
-  },
-  reviewSnippetBubble: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
-    marginTop: 10,
-  },
-  reviewSnippetText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#334155',
-    fontStyle: 'italic',
-    lineHeight: 18,
-  },
-  reviewSnippetAuthor: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#94A3B8',
-    marginTop: 6,
-    textAlign: 'right',
   },
   perfMetricGrid: {
     flexDirection: 'row',
