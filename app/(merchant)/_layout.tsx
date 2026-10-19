@@ -714,7 +714,6 @@ export default function MerchantLayout() {
             merchant: user.merchant_id,
             name: 'Main Outlet',
             address: storeDescription.trim(),
-            city: 'Jitra',
             country: 'Malaysia',
             phone: phoneVal,
             hours: {

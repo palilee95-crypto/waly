@@ -415,7 +415,7 @@ export default function ExploreScreen() {
           isPro: isProPlan,
           lat: storeLat || undefined,
           lng: storeLng || undefined,
-          city: loc?.city || 'Jitra',
+          city: loc?.city || 'Nearby',
           address: loc?.address || undefined,
           stampsRule: program ? `Complete ${program.stamp_goal} stamps for ${program.reward_description}` : undefined,
           collectedStamps: card ? card.stamps_collected : 0,

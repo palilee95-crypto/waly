@@ -568,7 +568,7 @@ export default function CustomerDashboard() {
 
         // 3. Distance Calculation
         let distanceKm = 999;
-        let distanceStr = loc?.city ? `In ${loc.city}` : 'Jitra';
+        let distanceStr = loc?.city ? `In ${loc.city}` : 'Nearby';
         const storeLat = loc?.lat ? parseFloat(String(loc.lat)) : null;
         const storeLng = loc?.lng ? parseFloat(String(loc.lng)) : null;
 
@@ -601,7 +601,7 @@ export default function CustomerDashboard() {
           name: m.name || 'Merchant Store',
           slug: m.pwa_slug || m.id,
           category: labelMap[m.category?.toLowerCase()] || m.category || 'General',
-          city: loc?.city || 'Jitra',
+          city: loc?.city || 'Nearby',
           location: distanceStr,
           distance: distanceStr,
           rating: ratingVal,
@@ -1300,7 +1300,7 @@ export default function CustomerDashboard() {
                 store_name: m.name,
                 slug: m.slug || m.id,
                 category: m.category || 'Services',
-                city: m.city || m.location || 'Jitra, Kedah',
+                city: m.city || m.location || 'Nearby',
                 address: '',
                 rating: parseFloat(m.rating) || 4.9,
                 reviews_count: parseInt(m.reviews, 10) || 50,
@@ -1643,7 +1643,7 @@ export default function CustomerDashboard() {
                               </View>
 
                               <Text style={styles.newCardSubTitle} numberOfLines={1}>
-                                {item.category} • {item.city || 'Jitra'}
+                                {item.category} • {item.city || 'Nearby'}
                               </Text>
 
                               <View style={styles.newRatingRow}>
@@ -1740,7 +1740,7 @@ export default function CustomerDashboard() {
                             </View>
 
                             <Text style={styles.newCardSubTitle} numberOfLines={1}>
-                              {item.category} • {item.city || 'Jitra'}
+                              {item.category} • {item.city || 'Nearby'}
                             </Text>
 
                             <View style={styles.newRatingRow}>

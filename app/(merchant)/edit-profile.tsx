@@ -365,8 +365,8 @@ export default function EditProfileScreen() {
       setInactiveThresholdDays(String(mRec.inactive_threshold_days || '30'));
       setAddress(mRec.metadata?.street_address || mRec.description || '');
       setPostcode(mRec.metadata?.postcode || '');
-      setCity(mRec.metadata?.city || 'Jitra');
-      setStateName(mRec.metadata?.state || 'Kedah');
+      setCity(mRec.metadata?.city || '');
+      setStateName(mRec.metadata?.state || '');
       const rawSubCat = mRec.metadata?.sub_category || mRec.category || 'dessert';
       const matchedCat = ALL_CATEGORIES_LIST.find((c) => c.id === rawSubCat || c.id === mRec.category);
       if (matchedCat) {
@@ -401,6 +401,9 @@ export default function EditProfileScreen() {
         setLocationRecord(loc);
         setLat(String(loc.lat || '6.2443'));
         setLng(String(loc.lng || '100.4217'));
+        // The stored location city is the source of truth — don't let the metadata
+        // default overwrite it.
+        if (loc.city) setCity(loc.city);
 
         // Parse hours
         const hours = loc.hours || {};
@@ -617,7 +620,7 @@ export default function EditProfileScreen() {
       if (locationRecord) {
         await pb.collection('store_locations').update(locationRecord.id, {
           address: fullAddress || address.trim(),
-          city: city.trim() || 'Jitra',
+          city: city.trim(),
           phone: phoneNumber.trim(),
           lat: latVal,
           lng: lngVal,
@@ -628,7 +631,7 @@ export default function EditProfileScreen() {
           merchant: merchant.id,
           name: 'Main Outlet',
           address: fullAddress || address.trim(),
-          city: city.trim() || 'Jitra',
+          city: city.trim(),
           country: 'Malaysia',
           phone: phoneNumber.trim(),
           hours: updatedHours,

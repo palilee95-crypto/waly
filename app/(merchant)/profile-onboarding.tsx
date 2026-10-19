@@ -166,7 +166,7 @@ export default function ProfileOnboardingScreen() {
 
   // Step 3: Location & Contact
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Jitra, Kedah');
+  const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
   const [googleReviewUrl, setGoogleReviewUrl] = useState('');
 

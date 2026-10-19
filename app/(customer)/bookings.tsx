@@ -180,7 +180,7 @@ export default function CustomerBookingsScreen() {
           priceStr: `RM ${priceVal}`,
           rawDate: b.booking_date,
           rawTime: b.start_time,
-          address: m.description || m.address || `${m.city || 'Jitra'}, Kedah`,
+          address: m.description || m.address || m.city || 'Malaysia',
           latitude: m.latitude ? parseFloat(String(m.latitude)) : undefined,
           longitude: m.longitude ? parseFloat(String(m.longitude)) : undefined,
           notes: b.notes || '',
