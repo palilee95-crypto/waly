@@ -129,7 +129,10 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       let bMeta = {};
       try {
         const raw = b.getString("metadata");
-        bMeta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          bMeta = parsed;
+        }
       } catch (e) {}
       const sId = bMeta.staff_id || b.getString("staff") || "";
       const rScore = parseInt(bMeta.staff_rating, 10);
@@ -140,6 +143,21 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
       }
     });
   } catch (rErr) {}
+
+  // A booking's `staff` may hold either the merchant_staff id or the linked
+  // users id (older rows used the user id). Alias both keys so the lookup below
+  // resolves no matter which one was stored.
+  try {
+    const msAliasList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}"`, "created", 200, 0);
+    msAliasList.forEach(ms => {
+      const linkedUid = ms.getString("user");
+      const entry = staffRatingStats[ms.id] || (linkedUid ? staffRatingStats[linkedUid] : null);
+      if (entry) {
+        staffRatingStats[ms.id] = entry;
+        if (linkedUid) staffRatingStats[linkedUid] = entry;
+      }
+    });
+  } catch (aliasErr) {}
 
   staffMembers.forEach(u => {
     const sPhone = (u.getString("phone") || "").replace(/[^\d]/g, '');
@@ -1511,7 +1529,10 @@ routerAdd("POST", "/api/risev/merchant/staff/commission-payout", (e) => {
     let meta = {};
     try {
       const raw = b.getString("metadata");
-      meta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        meta = parsed;
+      }
     } catch (e) {}
 
     const bStaffId = meta.staff_id || b.getString("staff") || "";
@@ -1619,5 +1640,83 @@ onRecordCreate((e) => {
 
   return e.next();
 }, "transactions");
+
+// ---------------------------------------------------------------------------
+// Public staff rating aggregate — consumed by the customer booking PWA.
+// GET /api/risev/staff/ratings?merchant=<id>
+// A staff rating is written by /api/risev/booking/rate-staff onto the booking's
+// metadata (staff_rating / staff_id). This exposes only aggregates (no PII) and
+// keys them by BOTH merchant_staff.id and the linked users.id, because bookings
+// may store either.
+// ---------------------------------------------------------------------------
+routerAdd("GET", "/api/risev/staff/ratings", (e) => {
+  let query = {};
+  try {
+    query = e.requestInfo().query || {};
+  } catch (qErr) {
+    query = {};
+  }
+
+  const merchantId = (query.merchant || "").trim();
+  if (!merchantId) {
+    return e.json(400, { message: "merchant is required" });
+  }
+
+  const stats = {};
+  try {
+    const bookings = $app.findRecordsByFilter(
+      "service_bookings",
+      `merchant = "${merchantId}" && status = "completed"`,
+      "-booking_date",
+      1500,
+      0
+    );
+    bookings.forEach((b) => {
+      let meta = {};
+      try {
+        const raw = b.getString("metadata");
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          meta = parsed;
+        }
+      } catch (mErr) {}
+      const staffId = meta.staff_id || b.getString("staff") || "";
+      const score = parseInt(meta.staff_rating, 10);
+      if (staffId && score >= 1 && score <= 5) {
+        if (!stats[staffId]) stats[staffId] = { total: 0, count: 0 };
+        stats[staffId].total += score;
+        stats[staffId].count += 1;
+      }
+    });
+  } catch (bErr) {
+    console.log("[STAFF RATINGS] booking scan failed:", bErr.message || bErr);
+  }
+
+  const ratings = {};
+  Object.keys(stats).forEach((staffId) => {
+    const s = stats[staffId];
+    if (s.count > 0) {
+      ratings[staffId] = {
+        rating_avg: Math.round((s.total / s.count) * 10) / 10,
+        rating_count: s.count,
+      };
+    }
+  });
+
+  // Alias merchant_staff.id <-> users.id so the client can look up by either.
+  try {
+    const msList = $app.findRecordsByFilter("merchant_staff", `merchant = "${merchantId}"`, "created", 200, 0);
+    msList.forEach((ms) => {
+      const uid = ms.getString("user");
+      const entry = ratings[ms.id] || (uid ? ratings[uid] : null);
+      if (entry) {
+        ratings[ms.id] = entry;
+        if (uid) ratings[uid] = entry;
+      }
+    });
+  } catch (msErr) {}
+
+  return e.json(200, { success: true, ratings });
+});
 
 

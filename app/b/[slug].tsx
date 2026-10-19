@@ -1102,7 +1102,24 @@ export default function CustomerBookingPwaScreen() {
           filter: `merchant = "${mRecord.id}" && is_active = true`
         });
         const activeStaff = (stRes.items || []).filter((s: any) => s.is_active !== false && s.attendance_status !== 'on_leave');
-        setStaffList(activeStaff as any);
+
+        // Attach real rating aggregates (derived from completed bookings).
+        let staffRatings: Record<string, { rating_avg: number; rating_count: number }> = {};
+        try {
+          const rRes = await pb.send<any>('/api/risev/staff/ratings', {
+            method: 'GET',
+            query: { merchant: mRecord.id },
+          });
+          staffRatings = (rRes && rRes.ratings) || {};
+        } catch (rErr) {
+          staffRatings = {};
+        }
+
+        setStaffList(activeStaff.map((s: any) => ({
+          ...s,
+          rating_avg: staffRatings[s.id]?.rating_avg ?? s.rating_avg,
+          rating_count: staffRatings[s.id]?.rating_count ?? s.rating_count,
+        })) as any);
       } catch (stErr) {
         setStaffList([]);
       }
@@ -2628,17 +2645,17 @@ export default function CustomerBookingPwaScreen() {
                             <Text style={[styles.staffCardName, { color: themeStyles.textPrimaryColor, flex: 1 }]} numberOfLines={1}>
                               {st.name}
                             </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2, marginLeft: 4 }}>
-                              <Ionicons name="star" size={10} color="#D97706" />
-                              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
-                                {(st as any).rating_avg ? `${(st as any).rating_avg}` : '5.0'}
-                              </Text>
-                              {(st as any).rating_count ? (
+                            {(st as any).rating_count > 0 && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2, marginLeft: 4 }}>
+                                <Ionicons name="star" size={10} color="#D97706" />
+                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                                  {(st as any).rating_avg}
+                                </Text>
                                 <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E' }}>
                                   ({(st as any).rating_count})
                                 </Text>
-                              ) : null}
-                            </View>
+                              </View>
+                            )}
                           </View>
                           <Text style={[styles.staffCardRole, { color: themeStyles.textSecondaryColor }]} numberOfLines={1}>
                             {st.role_title || (st as any).role || 'Specialist'}

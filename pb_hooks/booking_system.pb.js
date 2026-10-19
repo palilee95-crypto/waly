@@ -705,7 +705,12 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
     let meta = {};
     try {
       const raw = booking.getString("metadata");
-      meta = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+      // An unset JSON field reads back as the literal string "null" (and get()
+      // returns a byte array), so JSON.parse yields null — never assign onto it.
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        meta = parsed;
+      }
     } catch (mErr) {}
 
     const nowIso = new Date().toISOString();
