@@ -136,9 +136,6 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
     }
 
-    const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
-    const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
-
     // Trigger Web Push Notification to Merchant Owner & Branch Staff
     try {
       const pushHelper = require(`${__hooks}/push_notify.js`);
