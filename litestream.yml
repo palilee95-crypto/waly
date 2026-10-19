@@ -4,6 +4,12 @@ dbs:
       - type: s3
         bucket: risev-pb-backup
         path: backups/data.db
-        region: ap-southeast-1
-        sync-interval: 1s
+        # Cloudflare R2 is S3-compatible; region "auto" + the account endpoint.
+        # Litestream auto-detects R2 from the endpoint and applies the right
+        # signing/concurrency defaults.
+        region: auto
+        endpoint: https://8f18e39f60be975e821dca7fa5e691b1.r2.cloudflarestorage.com
+        # 5s keeps Class A operations comfortably inside R2's free tier
+        # (1M/month) while worst-case data loss stays at 5 seconds.
+        sync-interval: 5s
         retention: 7d
