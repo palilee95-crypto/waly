@@ -1234,6 +1234,7 @@ export default function CustomerBookingPwaScreen() {
             booking_id: existingBooking.id,
             rating: 5,
             feedback: '',
+            customer_phone: phone || existingBooking?.customer_phone || '',
           }
         }).catch((err) => console.warn('[RATE STAFF 5-STAR ERROR]', err));
       } else if (merchant?.id) {
@@ -1274,6 +1275,7 @@ export default function CustomerBookingPwaScreen() {
             booking_id: existingBooking.id,
             rating: reviewRating,
             feedback: reviewFeedback.trim(),
+            customer_phone: phone || existingBooking?.customer_phone || '',
           }
         }).catch((err) => console.warn('[RATE STAFF PRIVATE ERROR]', err));
       } else {

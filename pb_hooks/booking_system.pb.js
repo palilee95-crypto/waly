@@ -686,7 +686,7 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
 
     const bookingId = (data.booking_id || data.id || "").trim();
     const rating = parseInt(data.rating, 10) || 0;
-    const feedback = (data.feedback || data.review || "").trim();
+    const feedback = (data.feedback || data.review || "").trim().slice(0, 1000);
 
     if (!bookingId) {
       return e.json(400, { error: "Missing booking_id" });
@@ -702,6 +702,27 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
       return e.json(404, { error: "Booking not found" });
     }
 
+    // Hardening: the booking id alone is not proof of ownership. Require the
+    // caller to be the booking's customer — either the authenticated user who
+    // owns it, or a caller presenting the booking's phone number — and only
+    // allow rating a visit that actually happened.
+    const bookingPhoneDigits = (booking.getString("customer_phone") || "").replace(/[^\d]/g, "");
+    const callerPhoneDigits = (data.customer_phone || data.phone || "").replace(/[^\d]/g, "");
+    const authRecord = e.auth;
+
+    const isBookingCustomer =
+      (authRecord && booking.getString("customer") === authRecord.id) ||
+      (authRecord && bookingPhoneDigits && (authRecord.getString("phone") || "").replace(/[^\d]/g, "") === bookingPhoneDigits) ||
+      (bookingPhoneDigits && callerPhoneDigits === bookingPhoneDigits);
+
+    if (!isBookingCustomer) {
+      return e.json(403, { error: "You can only rate your own booking." });
+    }
+
+    if (booking.getString("status") !== "completed") {
+      return e.json(409, { error: "You can only rate a completed booking." });
+    }
+
     let meta = {};
     try {
       const raw = booking.getString("metadata");
@@ -712,6 +733,8 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
         meta = parsed;
       }
     } catch (mErr) {}
+
+    const alreadyRated = !!meta.staff_reviewed_at;
 
     const nowIso = new Date().toISOString();
     meta.staff_rating = rating;
@@ -727,19 +750,24 @@ routerAdd("POST", "/api/risev/booking/rate-staff", (e) => {
     const custPhone = booking.getString("customer_phone");
     const custName = booking.getString("customer_name");
 
-    try {
-      const fbCol = $app.findCollectionByNameOrId("store_feedbacks");
-      const fbRec = new Record(fbCol);
-      fbRec.set("id", $security.randomString(15).toLowerCase());
-      fbRec.set("merchant", merchantId);
-      fbRec.set("customer_phone", custPhone);
-      fbRec.set("customer_name", custName);
-      fbRec.set("rating", rating);
-      fbRec.set("feedback", feedback || (staffName ? "Servis oleh " + staffName : ""));
-      fbRec.set("redirected_to_google", false);
-      $app.save(fbRec);
-    } catch (fbErr) {
-      console.log("[RATE STAFF] Error writing store_feedbacks:", fbErr.message || fbErr);
+    // Only write a feedback row on the FIRST rating. A re-rate updates the
+    // booking metadata (so a mistake can be corrected) but must not inflate the
+    // merchant's review count or the staff average.
+    if (!alreadyRated) {
+      try {
+        const fbCol = $app.findCollectionByNameOrId("store_feedbacks");
+        const fbRec = new Record(fbCol);
+        fbRec.set("id", $security.randomString(15).toLowerCase());
+        fbRec.set("merchant", merchantId);
+        fbRec.set("customer_phone", custPhone);
+        fbRec.set("customer_name", custName);
+        fbRec.set("rating", rating);
+        fbRec.set("feedback", feedback || (staffName ? "Servis oleh " + staffName : ""));
+        fbRec.set("redirected_to_google", false);
+        $app.save(fbRec);
+      } catch (fbErr) {
+        console.log("[RATE STAFF] Error writing store_feedbacks:", fbErr.message || fbErr);
+      }
     }
 
     return e.json(200, {
