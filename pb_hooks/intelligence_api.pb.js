@@ -86,6 +86,49 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
     return e.json(200, { success: true, data: [], meta: { total: 0 } });
   }
 
+  // 1b. Join the real data sources. `merchants` has NO city/address/coordinates —
+  //     those live on `store_locations`; ratings live on `store_feedbacks`; and
+  //     "Pro" is derived from an active `subscriptions` record (plan = "pro").
+  var locByMerchant = {};
+  try {
+    var locations = $app.findRecordsByFilter("store_locations", "id != ''", "-created", 500, 0);
+    locations.forEach(function (l) {
+      var lMerchant = l.getString("merchant");
+      if (!lMerchant) return;
+      var existing = locByMerchant[lMerchant];
+      if (!existing || (l.getBool("is_active") && !existing.getBool("is_active"))) {
+        locByMerchant[lMerchant] = l; // prefer an active location, else first seen
+      }
+    });
+  } catch (lErr) {
+    console.log("[REC_ERR_LOCATIONS] " + lErr);
+  }
+
+  var fbByMerchant = {};
+  try {
+    var feedbacks = $app.findRecordsByFilter("store_feedbacks", "id != ''", "-created", 2000, 0);
+    feedbacks.forEach(function (f) {
+      var fMerchant = f.getString("merchant");
+      if (!fMerchant) return;
+      var agg = fbByMerchant[fMerchant] || { sum: 0, count: 0 };
+      agg.sum += f.getFloat("rating") || 0;
+      agg.count += 1;
+      fbByMerchant[fMerchant] = agg;
+    });
+  } catch (fErr) {
+    console.log("[REC_ERR_FEEDBACKS] " + fErr);
+  }
+
+  var proMerchantIds = {};
+  try {
+    var activeSubs = $app.findRecordsByFilter("subscriptions", "status = 'active'", "-created", 500, 0);
+    activeSubs.forEach(function (s) {
+      if (s.getString("plan") === "pro") proMerchantIds[s.getString("merchant")] = true;
+    });
+  } catch (sErr) {
+    console.log("[REC_ERR_SUBS] " + sErr);
+  }
+
   // 2. Fetch customer history if authenticated
   var customerCards = [];
   var customerBookings = [];
@@ -136,13 +179,18 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
   activeMerchants.forEach(function(merchant) {
     var mId = merchant.id;
     var mCat = (merchant.getString("category") || "services").toLowerCase();
-    var mRating = merchant.getFloat("rating") || 4.8;
-    var mReviews = merchant.getInt("reviews_count") || 10;
-    var isPro = merchant.getBool("is_pro");
+    var loc = locByMerchant[mId];
+    var fb = fbByMerchant[mId];
+    var mCity = (loc && loc.getString("city")) || "Kedah";
+    var mRating = (fb && fb.count > 0) ? (fb.sum / fb.count) : 4.8;
+    var mReviews = (fb && fb.count > 0) ? fb.count : 10;
+    var isPro = !!proMerchantIds[mId];
 
-    // Proximity factor (w3 = 20%)
-    var mLat = merchant.getFloat("latitude") || userLat;
-    var mLng = merchant.getFloat("longitude") || userLng;
+    // Proximity factor (w3 = 20%) — coordinates come from store_locations.
+    // If a merchant has no coordinates, calcDistanceKm returns a neutral 5 km
+    // (rather than faking 0 km, which would rank it as the closest store).
+    var mLat = loc ? loc.getFloat("lat") : 0;
+    var mLng = loc ? loc.getFloat("lng") : 0;
     var distKm = calcDistanceKm(userLat, userLng, mLat, mLng);
     var proxScore = Math.max(0, 1 - (distKm / 30.0)); // 0 to 1
 
@@ -174,7 +222,7 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
     if (isPro) finalScore += 5.0; // slight Pro boost
 
     // Explainable Recommendation Reason
-    var reason = "Top rated in " + (merchant.getString("city") || "Kedah");
+    var reason = "Top rated in " + mCity;
     var badgeType = "popular";
 
     if (currentStamps >= 7) {
@@ -185,7 +233,7 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
       reason = "Based on your " + visits + " previous visits";
       badgeType = "frequent";
     } else if (distKm <= 3.0) {
-      reason = "Nearby in " + (merchant.getString("city") || "your area") + " (" + distKm.toFixed(1) + " km)";
+      reason = "Nearby in " + mCity + " (" + distKm.toFixed(1) + " km)";
       badgeType = "nearby";
     } else if (isPro) {
       reason = "Featured verified Risev merchant";
@@ -198,7 +246,14 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
       score: finalScore,
       reason: reason,
       badgeType: badgeType,
-      currentStamps: currentStamps
+      currentStamps: currentStamps,
+      isPro: isPro,
+      city: mCity,
+      address: (loc && loc.getString("address")) || "",
+      rating: mRating,
+      reviews: mReviews,
+      mLat: mLat,
+      mLng: mLng
     });
   });
 
@@ -213,16 +268,17 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
       id: m.id,
       store_name: m.getString("name"),
       name: m.getString("name"),
-      slug: m.getString("slug") || m.getString("pwa_slug") || m.id,
+      slug: m.getString("pwa_slug") || m.id,
       category: m.getString("category") || "Services",
-      city: m.getString("city") || "Kedah",
-      address: m.getString("address") || "",
-      rating: m.getFloat("rating") || 5.0,
-      reviews_count: m.getInt("reviews_count") || 10,
+      city: item.city,
+      address: item.address,
+      latitude: item.mLat,
+      longitude: item.mLng,
+      rating: parseFloat(item.rating.toFixed(1)),
+      reviews_count: item.reviews,
       banner: m.getString("banner"),
       logo: m.getString("logo"),
-      cover_url: m.getString("cover_url"),
-      is_pro: m.getBool("is_pro"),
+      is_pro: item.isPro,
       distance_km: parseFloat(item.distKm.toFixed(1)),
       recommendation_score: parseFloat(item.score.toFixed(1)),
       recommendation_reason: item.reason,
