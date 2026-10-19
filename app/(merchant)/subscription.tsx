@@ -288,10 +288,12 @@ export default function SubscriptionScreen() {
         highlights: locale === 'en' ? [
           '300 customer quota per renewal',
           'Basic booking engine (30 bookings / mo)',
+          'POS system included',
           'Single Store Outlet (HQ) & up to 5 staff'
         ] : [
           'Kuota 300 pelanggan setiap pembaharuan',
           'Sistem tempahan asas (30 tempahan / bln)',
+          'Sistem POS disertakan',
           '1 Outlet (HQ) & hingga 5 akaun staf'
         ]
       };
@@ -315,12 +317,14 @@ export default function SubscriptionScreen() {
         highlights: locale === 'en' ? [
           'Unlimited customer database ♾️',
           'Unlimited bookings & staff commission',
+          'POS system included',
           'Up to 5 store outlets (1 HQ + 4 Branches)',
           'Milestone rewards & birthday automation',
           'Up to 10 staff accounts'
         ] : [
           'Database pelanggan tanpa had ♾️',
           'Tempahan tanpa had & komisen staf',
+          'Sistem POS disertakan',
           'Hingga 5 outlet (1 HQ + 4 Cawangan)',
           'Ganjaran kemajuan & automasi hari lahir',
           'Hingga 10 akaun staf'
@@ -387,6 +391,7 @@ export default function SubscriptionScreen() {
       return [
         '300 customer quota per renewal',
         'Single Store Outlet (HQ)',
+        'POS system included',
         'Basic Analytics Dashboard',
         'Up to 10 active vouchers',
         'Up to 5 staff accounts',
@@ -399,6 +404,7 @@ export default function SubscriptionScreen() {
     } else {
       return [
         'Everything in Starter',
+        'POS system included',
         'Unlimited customer database ♾️',
         'Up to 5 store outlets (1 HQ + 4 Branches)',
         'Pro Sales & Opportunity Analytics',
@@ -975,6 +981,7 @@ export default function SubscriptionScreen() {
               {[
                 { icon: 'people-outline' as const, label: 'Customer capacity', starter: '300', pro: 'Unlimited ♾️' },
                 { icon: 'calendar-outline' as const, label: 'Booking engine', starter: '30 / month', pro: 'Unlimited' },
+                { icon: 'calculator-outline' as const, label: 'POS system', starter: 'Included', pro: 'Included' },
                 { icon: 'storefront-outline' as const, label: 'Business outlets', starter: '1 (HQ)', pro: '5 Outlets' },
                 { icon: 'person-add-outline' as const, label: 'Staff accounts', starter: 'Up to 5', pro: '10 + Comm' },
                 { icon: 'gift-outline' as const, label: 'Milestone loyalty', starter: 'Standard', pro: 'All Engines 🎁' },
