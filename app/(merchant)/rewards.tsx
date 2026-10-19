@@ -25,6 +25,7 @@ import UpgradeModal from './_components/UpgradeModal';
 import { RewardVisualPickerModal } from '@/components/RewardVisualPickerModal';
 import { getRewardVisualById, getRewardVisualUrl } from '@/lib/rewardVisuals';
 import { getVoucherSpineTheme, PRO_CAMPAIGN_RECIPES, ProCampaignRecipe } from '@/theme';
+import ColorWheelPicker from '@/components/ColorWheelPicker';
 
 // Existing Catalogue Reward Interface
 interface Reward {
@@ -3336,7 +3337,24 @@ export default function UnifiedRewardsScreen() {
                       </View>
                     </ScrollView>
                   ) : (
-                    <View style={{ gap: 18 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 20 }}>
+                      <ColorWheelPicker
+                        value={activeColorPickerModal === 'background' ? cardColor : activeColorPickerModal === 'slots' ? stampColor : fontColor}
+                        onChange={(hex) => {
+                          if (activeColorPickerModal === 'background') {
+                            setCardColor(hex);
+                            setCustomHexInput(hex);
+                          } else if (activeColorPickerModal === 'slots') {
+                            setStampColor(hex);
+                            setCustomStampHexInput(hex);
+                          } else {
+                            setFontColor(hex);
+                            setCustomFontHexInput(hex);
+                          }
+                        }}
+                        locale={locale}
+                      />
+
                       {/* Presets Grid */}
                       <View>
                         <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 10 }}>
@@ -3490,7 +3508,7 @@ export default function UnifiedRewardsScreen() {
                           Done
                         </Text>
                       </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                   )}
                 </View>
               </View>
