@@ -27,9 +27,24 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       return e.json(404, { message: "Merchant not found" });
     }
 
-    // POS is a paid-plan feature. Enforce it server-side so the client gate
-    // cannot be bypassed.
+    // POS is a paid-plan feature and must be initiated by the merchant or its
+    // staff. The customer flow below stays public; only manual_pos is gated.
     if (isManualPos) {
+      const auth = e.auth;
+      if (!auth) {
+        return e.json(401, { code: "POS_AUTH_REQUIRED", message: "Please sign in to use the POS System." });
+      }
+      let isMerchantOwner = false;
+      try {
+        isMerchantOwner = merchant.getString("owner") === auth.id;
+      } catch (ownerErr) {}
+      const authMerchantId = auth.getString ? (auth.getString("merchant_id") || "") : "";
+      const isSuperuser = auth.isSuperuser === true ||
+        (auth.collection && auth.collection().name === "_superusers");
+      if (!isMerchantOwner && authMerchantId !== merchantId && !isSuperuser) {
+        return e.json(403, { code: "POS_FORBIDDEN", message: "You are not authorized to start a POS sale for this store." });
+      }
+
       let posPlan = "";
       try {
         const posSubs = $app.findRecordsByFilter("subscriptions", `merchant = '${merchantId}' && status = 'active'`, "-created", 1, 0);

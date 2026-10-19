@@ -530,15 +530,18 @@ export default function NfcClaimModal() {
   useEffect(() => {
     if (!merchantId) return;
 
-    // 1. Initial fetch for any unhandled pending claims
+    // 1. Initial fetch for any unhandled pending claims.
+    //    POS claims (manual_pos) are opened explicitly by ManualPosLauncher;
+    //    auto-opening them here would surface abandoned sales on reload.
     const fetchPendingClaims = async () => {
       try {
-        const records = await pb.collection('nfc_claims').getList(1, 1, {
+        const records = await pb.collection('nfc_claims').getList(1, 20, {
           filter: `merchant = '${merchantId}' && status = 'pending'`,
           sort: '-created',
         });
-        if (records.items.length > 0) {
-          setClaim(records.items[0]);
+        const customerClaim = records.items.find((r: any) => r.manual_pos !== true);
+        if (customerClaim) {
+          setClaim(customerClaim);
           setIsVisible(true);
         }
       } catch (err) {
@@ -556,6 +559,9 @@ export default function NfcClaimModal() {
       if (!record || record.merchant !== merchantId) return;
 
       if (record.status === 'pending') {
+        // POS claims are opened by the launcher (and on iOS only after its own
+        // modal dismisses). Letting SSE open them here races the two modals.
+        if (record.manual_pos === true) return;
         setClaim(record);
         setIsSuccess(false);
         setErrorMsg(null);
