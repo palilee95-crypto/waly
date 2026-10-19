@@ -14,11 +14,14 @@ import {
   Alert,
   Share,
   Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import FullPosCheckout from './FullPosCheckout';
+import { normalizeManualPosPhone } from '@/lib/manualPosPhone';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
 const getCleanCustomerName = (rawName?: string): string => {
@@ -123,6 +126,14 @@ export default function NfcClaimModal() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [isSuccess, setIsSuccess] = useState(false);
+  const [bannerNow, setBannerNow] = useState(Date.now());
+  useEffect(() => {
+    if (!claim || isVisible || isSuccess || claim.status !== 'pending') return;
+    setBannerNow(Date.now());
+    const timer = setInterval(() => setBannerNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, [claim?.id, claim?.status, isVisible, isSuccess]);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [merchantColor, setMerchantColor] = useState('#5C3BCC');
   const [merchantSlug, setMerchantSlug] = useState('');
@@ -150,12 +161,12 @@ export default function NfcClaimModal() {
       return;
     }
     try {
-      const qRes = await pb.collection('merchant_services').getList(1, 100, {
+      const qRes = await pb.collection('merchant_services').getFullList({
         filter: `merchant = "${merchantId}" && is_active = true`,
         sort: '-item_type,price',
         requestKey: null,
       });
-      setQuickAddons(qRes.items || []);
+      setQuickAddons(qRes || []);
     } catch (e) {
       setQuickAddons([]);
     }
@@ -177,6 +188,15 @@ export default function NfcClaimModal() {
 
   // Option A: Catalog Picker states
   const [isCatalogPickerOpen, setIsCatalogPickerOpen] = useState(false);
+  const [fullPosOpen, setFullPosOpen] = useState(false);
+  const [paymentFromPos, setPaymentFromPos] = useState(false);
+  const openFullPos = () => {
+    if (selectedServices.length === 0 && Number(customBillInput) > 0) {
+      setSelectedServices([{ id: 'quick_custom_amount', name: locale === 'ms' ? 'Jumlah manual' : 'Custom amount', price: Number(customBillInput), qty: 1, item_type: 'custom' }]);
+    }
+    setCustomBillInput('0');
+    setFullPosOpen(true);
+  };
   const [pickerSearchQuery, setPickerSearchQuery] = useState('');
   const [pickerCategory, setPickerCategory] = useState('all');
   const [customItemTitle, setCustomItemTitle] = useState('');
@@ -587,6 +607,14 @@ export default function NfcClaimModal() {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
       if (targetClaim && targetClaim.status === 'pending') {
         setClaim(targetClaim);
+        if (targetClaim.manual_pos) {
+          setFullPosOpen(true);
+          setCheckoutStep('review');
+          setCustomBillInput('0');
+          setSelectedServices([]);
+          setAppliedVoucher(null);
+        }
+        setIsVouchersExpanded(false);
         if (targetClaim.bill_amount) setBillAmount(String(targetClaim.bill_amount));
         else setBillAmount('10');
         if (targetClaim.stamp_amount) setStampAmount(String(targetClaim.stamp_amount));
@@ -646,6 +674,10 @@ export default function NfcClaimModal() {
 
   const handleConfirm = async () => {
     if (!claim) return;
+    if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) {
+      setErrorMsg(locale === 'ms' ? 'Nombor telefon pelanggan diperlukan untuk pembayaran.' : 'A valid customer phone number is required for payment.');
+      return;
+    }
     const bill = netTotalAmount;
     const stamps = parseInt(stampAmount) || 1;
 
@@ -746,6 +778,7 @@ export default function NfcClaimModal() {
   const handleClose = () => {
     setIsVisible(false);
     setClaim(null);
+    setFullPosOpen(false);
     setIsSuccess(false);
     setErrorMsg(null);
     setBillAmount('20');
@@ -754,6 +787,7 @@ export default function NfcClaimModal() {
     setStampAmount('1');
     setSelectedServices([]);
     setCheckoutStep('review');
+    setIsVouchersExpanded(false);
     setPaymentMethod('qr');
     setPaymentReference('');
     setIsCatalogPickerOpen(false);
@@ -788,6 +822,21 @@ export default function NfcClaimModal() {
 
   if (!claim || (!isSuccess && claim.status !== 'pending')) return null;
 
+  const bannerMinutes = Math.max(0, Math.floor((bannerNow - new Date(claim.created).getTime()) / 60000));
+  const bannerTime = !Number.isFinite(bannerMinutes) ? ''
+    : bannerMinutes < 1 ? (locale === 'ms' ? 'Baru sahaja' : 'Just now')
+    : bannerMinutes < 60 ? `${bannerMinutes}${locale === 'ms' ? ' min lalu' : 'm ago'}`
+    : bannerMinutes < 1440 ? `${Math.floor(bannerMinutes / 60)}${locale === 'ms' ? ' jam lalu' : 'h ago'}`
+    : `${Math.floor(bannerMinutes / 1440)}${locale === 'ms' ? ' hari lalu' : 'd ago'}`;
+  const bannerBill = Number.parseFloat(billAmount);
+  const bannerStamps = Number.parseInt(stampAmount, 10);
+  const bannerSummary = [
+    Number.isFinite(bannerBill) ? `RM${bannerBill.toFixed(2)}` : 'RM—',
+    Number.isFinite(bannerStamps) ? `${bannerStamps} ${locale === 'ms' ? 'cop' : bannerStamps === 1 ? 'stamp' : 'stamps'}` : '',
+    bannerTime,
+  ].filter(Boolean).join(' · ');
+
+
   return (
     <>
       {/* Floating Minimized Pending Capsule (visible when minimized so cashier can re-open anytime) */}
@@ -795,23 +844,25 @@ export default function NfcClaimModal() {
         <View style={styles.floatingContainer} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.floatingCapsule}
+            accessibilityRole="button"
+            accessibilityLabel={`${locale === 'ms' ? 'Semak permintaan' : 'Review request from'} ${getCleanCustomerName(claim.customer_name)}. ${bannerSummary}`}
             onPress={() => setIsVisible(true)}
             activeOpacity={0.88}
           >
             <View style={styles.floatingPulseRing}>
-              <Ionicons name="wifi" size={15} color="#B45309" />
+              <Ionicons name="radio-outline" size={20} color="#0F172A" />
             </View>
             <View style={{ flex: 1, paddingRight: 6 }}>
               <Text style={styles.floatingTitle} numberOfLines={1}>
-                Pending Tap: <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{getCleanCustomerName(claim.customer_name)}</Text>
+                {getCleanCustomerName(claim.customer_name)}
               </Text>
-              <Text style={styles.floatingSubtitle}>
-                {claim.customer_phone} · RM {billAmount || '10'} ({stampAmount || '1'} stamp)
+              <Text style={styles.floatingSubtitle} numberOfLines={2}>
+                {bannerSummary}
               </Text>
             </View>
-            <View style={[styles.floatingActionBadge, { backgroundColor: merchantColor }]}>
-              <Text style={styles.floatingActionText}>Open</Text>
-              <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+            <View style={styles.floatingActionBadge}>
+              <Text style={styles.floatingActionText}>{locale === 'ms' ? 'Semak' : 'Review'}</Text>
+              <Ionicons name="arrow-forward" size={14} color="#000000" />
             </View>
           </TouchableOpacity>
         </View>
@@ -825,8 +876,9 @@ export default function NfcClaimModal() {
           animationType="fade"
           onRequestClose={handleMinimize}
         >
-      <View style={styles.overlay}>
-        <View style={styles.modalCard}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
+      <View style={[styles.overlay, fullPosOpen && { padding: 0 }] }>
+        <View style={[styles.modalCard, isProPlan && checkoutStep === 'review' && !isCatalogPickerOpen && !isSuccess && { maxHeight: '96%', paddingTop: 12, paddingBottom: 12 }, fullPosOpen && { flex: 1, maxWidth: '100%', maxHeight: '100%', borderRadius: 0, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 0 }] }>
           {isSuccess ? (
             // ── In-Modal Success Confirmation Screen ──────────────
             <View style={styles.successWrap}>
@@ -874,7 +926,7 @@ export default function NfcClaimModal() {
                 <Text style={styles.doneBtnText}>Done</Text>
               </TouchableOpacity>
             </View>
-          ) : isProPlan ? (
+          ) : (isProPlan || claim.manual_pos) ? (
             // ── Main Claim Form View (PRO Flow) ──────────────────────────────
             (() => {
               const getIsLight = (color: string) => {
@@ -910,6 +962,17 @@ export default function NfcClaimModal() {
                 return matchesSearch && matchesCategory;
               });
 
+              if (fullPosOpen) {
+                return <FullPosCheckout
+                  name={getCleanCustomerName(claim.customer_name)} phone={claim.customer_phone} locale={locale}
+                  catalog={quickAddons} items={selectedServices} setItems={setSelectedServices}
+                  imageFor={item => getItemImageUrl(item, quickAddons)} onAdd={handleAddItem}
+                  onBack={() => setFullPosOpen(false)} onPay={() => { if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) { Alert.alert(locale === 'ms' ? 'Nombor telefon diperlukan' : 'Customer phone required'); return; } setPaymentFromPos(true); setFullPosOpen(false); setCheckoutStep('payment'); }}
+                  total={netTotalAmount} subtotal={subtotalAmount} discount={discountAmount}
+                  vouchers={customerVouchers} voucher={appliedVoucher} onVoucher={setAppliedVoucher}
+                  stamps={stampAmount} onStamps={setStampAmount} points={Math.floor(netTotalAmount / spendPerPoint)}
+                />;
+              }
               if (isCatalogPickerOpen) {
                 return (
                   <View style={{ flex: 1, width: '100%' }}>
@@ -987,6 +1050,10 @@ export default function NfcClaimModal() {
 
                     {/* Catalog List */}
                     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 10, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
+                      {selectedServices.length > 0 && <View style={{ gap: 8 }}>
+                        <Text style={styles.compactLabel}>{locale === 'ms' ? 'Item dipilih' : 'Selected items'}</Text>
+                        {selectedServices.map((item, index) => <TouchableOpacity key={`${item.id}-${index}`} style={styles.compactOrderSummary} onPress={() => setItemActionTarget({ item, index })}><View style={{ flex: 1 }}><Text style={styles.compactLabel}>{item.name}</Text><Text style={styles.compactMuted}>{item.qty || 1} × RM{Number(item.price).toFixed(2)}</Text></View><Ionicons name="ellipsis-horizontal" size={20} color="#0F172A" /></TouchableOpacity>)}
+                      </View>}
                       {/* Custom Line Item Accordion */}
                       <View style={styles.pickerCustomCard}>
                         <TouchableOpacity
@@ -1113,7 +1180,7 @@ export default function NfcClaimModal() {
                     <View style={styles.payHeaderRow}>
                       <TouchableOpacity
                         style={styles.payBackBtn}
-                        onPress={() => setCheckoutStep('review')}
+                        onPress={() => { setCheckoutStep('review'); if (paymentFromPos) setFullPosOpen(true); }}
                         activeOpacity={0.8}
                       >
                         <Ionicons name="chevron-back" size={20} color="#1D1D1F" />
@@ -1278,550 +1345,93 @@ export default function NfcClaimModal() {
                 );
               }
 
+              if (isVouchersExpanded) {
+                return (
+                  <View style={{ flexShrink: 1 }}>
+                    <View style={styles.compactHeader}>
+                      <Text style={styles.compactTitle}>{locale === 'ms' ? 'Pilih baucar' : 'Choose voucher'}</Text>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to checkout" style={styles.compactIconButton} onPress={() => setIsVouchersExpanded(false)}><Ionicons name="close" size={22} color="#0F172A" /></TouchableOpacity>
+                    </View>
+                    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                      {customerVouchers.length === 0 && <Text style={styles.compactMuted}>{locale === 'ms' ? 'Tiada baucar tersedia.' : 'No vouchers available.'}</Text>}
+                      {customerVouchers.map(v => {
+                        let meta: any = {};
+                        try { meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {}); } catch {}
+                        const selected = appliedVoucher?.id === v.id;
+                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }]} onPress={() => { setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.compactLabel}>{meta.snapshot_title || v.expand?.reward?.name || v.code}</Text>
+                            <Text style={styles.compactMuted}>{v.code}</Text>
+                            {(meta.applicable_items_text || v.expand?.reward?.applicable_items_text) && <Text style={styles.compactMuted}>{meta.applicable_items_text || v.expand?.reward?.applicable_items_text}</Text>}
+                            <Text style={styles.compactMuted}>{meta.discount_type === 'percentage' ? `${meta.discount_value}% OFF` : meta.discount_type === 'fixed_amount' ? `RM${meta.discount_value} OFF` : (locale === 'ms' ? 'Item percuma' : 'Free item')}</Text>
+                          </View>
+                          <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color="#0F172A" />
+                        </TouchableOpacity>;
+                      })}
+                    </ScrollView>
+                  </View>
+                );
+              }
               return (
                 <>
-                  {/* Top iOS Drag Handle Indicator */}
-                  <View style={styles.topDragHandleBar} />
-
-                  {/* Modal Header */}
-                  <View style={styles.headerRow}>
-                    <View style={styles.headerYellowIconBox}>
-                      <Ionicons name="calendar" size={20} color="#D97706" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.title}>{activeBooking ? "Complete Booking" : "Customer Checkout"}</Text>
-                      <Text style={styles.subtitle}>{activeBooking ? "Review before checkout" : "Walk-in checkout via NFC"}</Text>
-                    </View>
-                    <TouchableOpacity onPress={handleMinimize} style={styles.closeBtnCircle} accessibilityLabel="Minimize">
-                      <Ionicons name="close" size={18} color="#86868B" />
-                    </TouchableOpacity>
+                  <View style={styles.compactHeader}>
+                    <Text style={styles.compactTitle}>{activeBooking ? (locale === 'ms' ? 'Selesaikan tempahan' : 'Complete Booking') : (locale === 'ms' ? 'Checkout Pantas' : 'Quick Checkout')}</Text>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open full POS" onPress={openFullPos} style={{ minHeight: 44, paddingHorizontal: 10, backgroundColor: '#F1F5F9', borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }}><Text style={styles.compactLink}>Full POS</Text><Ionicons name="expand-outline" size={14} color="#0F172A" /></TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Minimize checkout" style={styles.compactIconButton} onPress={handleMinimize}><Ionicons name="close" size={22} color="#64748B" /></TouchableOpacity>
                   </View>
-
-                  {/* Error Banner */}
-                  {errorMsg ? (
-                    <View style={styles.errorBanner}>
-                      <Ionicons name="alert-circle" size={18} color="#EF4444" />
-                      <Text style={styles.errorText}>{errorMsg}</Text>
+                  {errorMsg && <View style={styles.errorBanner}><Text style={styles.errorText}>{errorMsg}</Text></View>}
+                  <ScrollView style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={styles.compactCustomer}>
+                      <View style={styles.compactAvatar}><Text style={styles.compactLabel}>{getInitials(claim.customer_name)}</Text></View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.compactCustomerName} numberOfLines={1}>{getCleanCustomerName(claim.customer_name)}</Text>
+                        <Text style={styles.compactMuted} numberOfLines={1}>{[claim.customer_phone, claim.session_code].filter(Boolean).join(' · ')}</Text>
+                      </View>
+                      {activeBooking ? <TouchableOpacity accessibilityRole="button" onPress={handleToggleBookingStatus} style={styles.compactStatus}><Text style={styles.compactMuted}>{activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'In-service' : 'Booked'}</Text></TouchableOpacity> : <View style={styles.compactStatus}><Text style={styles.compactMuted}>Walk-in</Text></View>}
                     </View>
-                  ) : null}
-
-                  {/* Scrollable Main Content Body */}
-                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 10, gap: 12 }} showsVerticalScrollIndicator={false}>
-                    
-                    {/* 1. CUSTOMER & BOOKING SINGLE HORIZONTAL CARD */}
-                    <View style={styles.customerRowCard}>
-                      <View style={styles.figmaAvatarCircle}>
-                        <Text style={styles.figmaAvatarText}>
-                          {getInitials(claim.customer_name) || '?'}
-                        </Text>
+                    <View>
+                      <View style={styles.compactLine}>
+                        <Text style={styles.compactLabel}>{locale === 'ms' ? 'Jumlah bil' : 'Bill amount'}</Text>
+                        <TouchableOpacity style={styles.compactTextButton} accessibilityRole="button" onPress={() => setIsCatalogPickerOpen(true)}><Text style={styles.compactLink}>{selectedServices.length ? (locale === 'ms' ? 'Edit item' : 'Edit items') : (locale === 'ms' ? 'Tambah item' : 'Add items')} ›</Text></TouchableOpacity>
                       </View>
-                      
-                      <View style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                          <Text style={styles.figmaCustomerName} numberOfLines={1}>
-                            {getCleanCustomerName(claim.customer_name) || 'Customer'}
-                          </Text>
-                          <View style={styles.sessionPillBadge}>
-                            <Text style={styles.sessionPillText}>{claim.session_code || '—'}</Text>
-                          </View>
-                          {appliedVoucher ? (
-                            <View style={styles.customerVoucherBadge}>
-                              <Ionicons name="gift" size={10} color="#92400E" />
-                              <Text style={styles.customerVoucherBadgeText}>
-                                {locale === 'en' ? 'Using Voucher' : 'Guna Baucar'}
-                              </Text>
-                            </View>
-                          ) : null}
+                      {selectedServices.length === 0 ? <>
+                        <View style={styles.compactAmountInput}>
+                          <Text style={styles.compactCurrency}>RM</Text>
+                          <TextInput accessibilityLabel={locale === 'ms' ? 'Jumlah bil' : 'Bill amount'} style={styles.compactAmountText} value={customBillInput} onChangeText={text => setCustomBillInput(text.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#94A3B8" />
                         </View>
-                        <Text style={styles.figmaCustomerPhone} numberOfLines={1}>
-                          {claim.customer_phone || '+60 00 000 0000'}
-                        </Text>
-                      </View>
-
-                      <View style={styles.customerColDivider} />
-
-                      {activeBooking ? (
-                        <TouchableOpacity
-                          style={{ flex: 1.15, minWidth: 0, paddingLeft: 2 }}
-                          onPress={handleToggleBookingStatus}
-                          activeOpacity={0.7}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <View style={[
-                              styles.statusMiniBadge,
-                              (activeBooking.status === 'in_service' || activeBooking.status === 'arrived') 
-                                ? styles.statusBadgeInService 
-                                : styles.statusBadgeScheduled
-                            ]}>
-                              <Ionicons
-                                name={activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'time' : 'calendar'}
-                                size={10}
-                                color={activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? '#059669' : '#475569'}
-                              />
-                              <Text style={[
-                                styles.statusMiniBadgeText,
-                                (activeBooking.status === 'in_service' || activeBooking.status === 'arrived') 
-                                  ? styles.statusTextInService 
-                                  : styles.statusTextScheduled
-                              ]}>
-                                {activeBooking.status === 'in_service' || activeBooking.status === 'arrived' 
-                                  ? 'In-Service' 
-                                  : `Today, ${activeBooking.start_time || '03:00 PM'}`}
-                              </Text>
-                            </View>
-                            <View style={[
-                              styles.statusIndicatorPill,
-                              (activeBooking.status === 'in_service' || activeBooking.status === 'arrived') 
-                                ? styles.statusIndicatorOngoing 
-                                : styles.statusIndicatorScheduled
-                            ]}>
-                              <Text style={[
-                                styles.statusIndicatorText,
-                                (activeBooking.status === 'in_service' || activeBooking.status === 'arrived') 
-                                  ? styles.statusTextInService 
-                                  : styles.statusTextScheduled
-                              ]}>
-                                {activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'Ongoing' : 'Scheduled'}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={styles.bookingServiceSubText} numberOfLines={1}>
-                            {activeBooking.items_summary?.[0]?.name || selectedServices[0]?.name || 'Catering Aiskrim 300pax'}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={{ flex: 1.15, minWidth: 0, paddingLeft: 2 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                            <View style={styles.figmaWalkinPill}>
-                              <View style={styles.walkinDot} />
-                              <Text style={styles.figmaWalkinText}>Walk-in</Text>
-                            </View>
-                            {upcomingFutureBooking ? (
-                              <View style={styles.futureBookingChip}>
-                                <Ionicons name="calendar-outline" size={10} color="#2563EB" />
-                                <Text style={styles.futureBookingChipText} numberOfLines={1}>
-                                  Booked: {formatUpcomingDate(upcomingFutureBooking.booking_date)}
-                                </Text>
-                              </View>
-                            ) : merchantSlug ? (
-                              <TouchableOpacity
-                                style={styles.shareBookingBtnMini}
-                                onPress={() => {
-                                  const url = `https://risev.app/b/${merchantSlug}`;
-                                  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                                    navigator.clipboard.writeText(url);
-                                    Alert.alert(
-                                      locale === 'en' ? 'Link Copied' : 'Pautan Disalin',
-                                      locale === 'en' ? `Booking link ${url} copied to clipboard!` : `Pautan booking ${url} telah disalin!`
-                                    );
-                                  } else {
-                                    Share.share({
-                                      message: locale === 'en'
-                                        ? `Book an appointment with us online at: ${url}`
-                                        : `Tempah slot temujanji online kami di: ${url}`
-                                    }).catch(() => {});
-                                  }
-                                }}
-                                activeOpacity={0.7}
-                              >
-                                <Ionicons name="link-outline" size={10} color="#2563EB" />
-                                <Text style={styles.shareBookingTextMini}>Share Link</Text>
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                          <Text style={styles.bookingServiceSubText} numberOfLines={1}>
-                            {upcomingFutureBooking ? `Next: ${upcomingFutureBooking.items_summary?.[0]?.name || 'Service'}` : 'Counter checkout'}
-                          </Text>
-                        </View>
-                      )}
+                        <View style={styles.compactPresets}>{['10', '20', '30', '50'].map(amount => <TouchableOpacity key={amount} accessibilityRole="button" accessibilityState={{ selected: customBillInput === amount }} style={[styles.compactPreset, customBillInput === amount && { backgroundColor: '#0F172A', borderColor: '#0F172A' }]} onPress={() => setCustomBillInput(amount)}><Text style={[styles.compactLabel, customBillInput === amount && { color: '#FFFFFF' }]}>RM{amount}</Text></TouchableOpacity>)}</View>
+                      </> : <TouchableOpacity accessibilityRole="button" style={styles.compactOrderSummary} onPress={() => setIsCatalogPickerOpen(true)}>
+                        <View style={{ flex: 1 }}><Text style={styles.compactLabel}>{selectedServices.reduce((sum, item) => sum + (item.qty || 1), 0)} {locale === 'ms' ? 'item' : 'items'}</Text><Text style={styles.compactMuted} numberOfLines={1}>{selectedServices.map(item => item.name).join(', ')}</Text></View>
+                        <Text style={styles.compactCurrency}>RM{subtotalAmount.toFixed(2)}</Text>
+                      </TouchableOpacity>}
                     </View>
-
-                    {/* 2. BOOKING SUMMARY SECTION */}
-                    <View style={{ gap: 8 }}>
-                      <Text style={styles.bookingSummaryTitle}>Booking Summary</Text>
-                      
-                      {selectedServices.length === 0 ? (
-                        <View style={styles.quickBillCard}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <Text style={styles.quickBillLabel}>ORDER / BILL AMOUNT</Text>
-                            <TouchableOpacity onPress={() => setIsCatalogPickerOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="list-outline" size={13} color="#2563EB" />
-                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#2563EB' }}>Choose Items ›</Text>
-                            </TouchableOpacity>
-                          </View>
-                          <View style={styles.quickBillInputRow}>
-                            <Text style={styles.quickBillCurrency}>RM</Text>
-                            <TextInput
-                              style={styles.quickBillInputField}
-                              value={customBillInput}
-                              onChangeText={(text) => {
-                                const clean = text.replace(/[^0-9.]/g, '');
-                                setCustomBillInput(clean);
-                              }}
-                              keyboardType="decimal-pad"
-                              placeholder="0.00"
-                              placeholderTextColor="#94A3B8"
-                            />
-                          </View>
-                          {/* Quick amount shortcut chips */}
-                          <View style={styles.quickBillChipsRow}>
-                            {['10', '20', '30', '50'].map((amt) => (
-                              <TouchableOpacity
-                                key={amt}
-                                style={[styles.quickBillChip, customBillInput === amt && styles.quickBillChipActive]}
-                                onPress={() => setCustomBillInput(amt)}
-                                activeOpacity={0.75}
-                              >
-                                <Text style={[styles.quickBillChipText, customBillInput === amt && styles.quickBillChipTextActive]}>
-                                  RM {amt}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
+                    <View style={styles.compactVoucherLine}>
+                      <TouchableOpacity accessibilityRole="button" style={[styles.compactLine, { flex: 1, gap: 8, minHeight: 48 }]} onPress={() => setIsVouchersExpanded(true)}>
+                        <Text style={styles.compactLabel}>Voucher</Text>
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                          <Text style={styles.compactMuted} numberOfLines={1}>{appliedVoucher ? (appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.code) : `${customerVouchers.length} ${locale === 'ms' ? 'tersedia' : 'available'}`}</Text>
+                          {appliedVoucher && <Text style={styles.compactLink}>{discountAmount > 0 ? `−RM${discountAmount.toFixed(2)}` : (locale === 'ms' ? 'Item percuma' : 'Free item')}</Text>}
                         </View>
-                      ) : (
-                        <View style={{ gap: 6 }}>
-                          {selectedServices.map((item, idx) => {
-                            const imgUrl = getItemImageUrl(item, quickAddons);
-                            return (
-                              <View key={idx} style={styles.figmaServiceItemRow}>
-                                {imgUrl ? (
-                                  <Image source={{ uri: imgUrl }} style={styles.productThumbnailImg} resizeMode="cover" />
-                                ) : (
-                                  <View style={styles.figmaServiceIconBox}>
-                                    <Ionicons name="ice-cream-outline" size={18} color="#D97706" />
-                                  </View>
-                                )}
-                                
-                                <View style={{ flex: 1, paddingRight: 6 }}>
-                                  <Text style={styles.figmaServiceName} numberOfLines={1}>{item.name}</Text>
-                                  <Text style={styles.figmaServiceSub}>
-                                    {item.qty && item.qty > 1 ? `${item.qty} × ` : ''}{item.isBooking ? 'Booking service' : 'Add-on service'}
-                                  </Text>
-                                </View>
-                                
-                                <Text style={styles.figmaServicePrice}>
-                                  RM {((parseFloat(item.price || 0)) * (item.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </Text>
-
-                                <TouchableOpacity 
-                                  style={styles.figmaServiceMoreBtn}
-                                  onPress={() => setItemActionTarget({ item, index: idx })}
-                                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                                  activeOpacity={0.7}
-                                  accessibilityLabel="Manage item"
-                                >
-                                  <Ionicons name="ellipsis-vertical" size={17} color="#64748B" />
-                                </TouchableOpacity>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      )}
-
-                      {/* Voucher Discount Breakdown Line */}
-                      {appliedVoucher && (
-                        <View style={{ marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 2 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 11, color: '#86868B', fontFamily: 'PlusJakartaSans_500Medium' }}>Subtotal</Text>
-                            <Text style={{ fontSize: 11, color: '#1D1D1F', fontFamily: 'PlusJakartaSans_700Bold' }}>RM {subtotalAmount.toFixed(2)}</Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 11, color: '#059669', fontFamily: 'PlusJakartaSans_700Bold' }}>Voucher Discount</Text>
-                            <Text style={{ fontSize: 11, color: '#059669', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>-RM {discountAmount.toFixed(2)}</Text>
-                          </View>
-                        </View>
-                      )}
+                        <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                      </TouchableOpacity>
+                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => setAppliedVoucher(null)}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
                     </View>
-
-                    {/* Customer Applied Voucher Highlight Banner */}
-                    {appliedVoucher ? (
-                      <View style={styles.chosenVoucherCard}>
-                        <View style={styles.chosenVoucherHeaderRow}>
-                          <View style={styles.chosenVoucherBadge}>
-                            <Ionicons name="sparkles" size={11} color="#92400E" />
-                            <Text style={styles.chosenVoucherBadgeText}>
-                              {locale === 'en' ? 'CUSTOMER WANTS TO USE THIS VOUCHER' : 'PELANGGAN INGIN GUNAKAN BAUCAR INI'}
-                            </Text>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => setAppliedVoucher(null)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            style={styles.chosenVoucherRemoveBtn}
-                            accessibilityLabel={locale === 'en' ? 'Cancel voucher' : 'Batal guna baucar'}
-                          >
-                            <Ionicons name="close-circle" size={15} color="#94A3B8" />
-                            <Text style={styles.chosenVoucherRemoveText}>{locale === 'en' ? 'Cancel' : 'Batal'}</Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.chosenVoucherContentRow}>
-                          <View style={styles.chosenVoucherIconBox}>
-                            <Ionicons name="gift" size={20} color="#D97706" />
-                          </View>
-                          <View style={{ flex: 1, minWidth: 0 }}>
-                            <Text style={styles.chosenVoucherTitle} numberOfLines={1}>
-                              {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code}
-                            </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                              {appliedVoucher.code ? (
-                                <View style={styles.chosenVoucherCodeBadge}>
-                                  <Text style={styles.chosenVoucherCodeText}>{locale === 'en' ? 'Code' : 'Kod'}: {appliedVoucher.code}</Text>
-                                </View>
-                              ) : null}
-                              <View style={styles.chosenVoucherDiscountBadge}>
-                                <Text style={styles.chosenVoucherDiscountText}>
-                                  {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)} OFF` : (locale === 'en' ? 'Free Item' : 'Item Percuma')}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                          <View style={styles.chosenVoucherActivePill}>
-                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
-                            <Text style={styles.chosenVoucherActiveText}>{locale === 'en' ? 'Selected' : 'Dipilih'}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ) : null}
-
-                    {/* 3. AVAILABLE VOUCHERS NAVIGATION ROW */}
-                    <TouchableOpacity
-                      style={[styles.navRowCard, appliedVoucher && styles.navRowCardWithVoucher]}
-                      onPress={() => setIsVouchersExpanded(!isVouchersExpanded)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="gift-outline" size={20} color={appliedVoucher ? '#D97706' : '#1D1D1F'} />
-                      <Text style={[styles.navRowTitle, appliedVoucher && { color: '#0F172A', fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-                        {appliedVoucher
-                          ? (locale === 'en' ? 'Applied Voucher (1 Selected)' : 'Baucar Digunakan (1 Dipilih)')
-                          : (locale === 'en' ? 'Available vouchers' : 'Baucar tersedia')}
-                      </Text>
-                      {customerVouchers.length > 0 && (
-                        <View style={[styles.figmaCountBadge, appliedVoucher && { backgroundColor: '#FEF3C7' }]}>
-                          <Text style={[styles.figmaCountText, appliedVoucher && { color: '#B45309' }]}>{customerVouchers.length}</Text>
-                        </View>
-                      )}
-                      {appliedVoucher ? (
-                        <View style={styles.appliedVoucherBadge}>
-                          <Text style={styles.appliedVoucherBadgeText} numberOfLines={1}>
-                            ✓ {discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : (locale === 'en' ? 'Free Item' : 'Item Percuma')}
-                          </Text>
-                        </View>
-                      ) : null}
-                      <Ionicons name={isVouchersExpanded ? "chevron-up" : "chevron-forward"} size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
-                    </TouchableOpacity>
-
-                    {/* Collapsible Vouchers Drawer when expanded */}
-                    {isVouchersExpanded && (
-                      <View style={styles.figmaVoucherSectionCard}>
-                        <View style={{ gap: 6 }}>
-                          {customerVouchers.map((v) => {
-                            let meta: any = {};
-                            try {
-                              meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
-                            } catch (e) {}
-
-                            const title = meta.snapshot_title || v.expand?.reward?.name || v.code;
-                            const isApplied = appliedVoucher?.id === v.id;
-                            const discType = meta.discount_type || 'none';
-                            const discVal = parseFloat(meta.discount_value) || 0;
-                            const badgeText = discType === 'percentage'
-                              ? `${discVal}% OFF`
-                              : discType === 'fixed_amount'
-                              ? `RM ${discVal} OFF`
-                              : (locale === 'en' ? 'FREE ITEM' : 'ITEM PERCUMA');
-
-                            const applicableText = meta.applicable_items_text || v.expand?.reward?.applicable_items_text;
-
-                            return (
-                              <View key={v.id} style={[styles.figmaVoucherItemRow, isApplied && styles.figmaVoucherItemApplied]}>
-                                <View style={{ flex: 1, paddingRight: 6 }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <Text style={styles.figmaVoucherTitle} numberOfLines={1}>{title}</Text>
-                                    <View style={styles.figmaTagBadge}>
-                                      <Text style={styles.figmaTagText}>{badgeText}</Text>
-                                    </View>
-                                  </View>
-                                  {applicableText ? (
-                                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309', marginTop: 2 }}>
-                                      📌 {discType === 'none' || v.expand?.reward?.type === 'free_item' ? `Item: ${applicableText}` : `${locale === 'en' ? 'Valid for' : 'Sah'}: ${applicableText}`}
-                                    </Text>
-                                  ) : null}
-                                  <Text style={styles.figmaVoucherCode}>{locale === 'en' ? 'Code' : 'Kod'}: {v.code}</Text>
-                                </View>
-
-                                <TouchableOpacity
-                                  style={[styles.figmaRedeemBtn, isApplied && styles.figmaRedeemBtnApplied]}
-                                  onPress={() => {
-                                    setAppliedVoucher(isApplied ? null : v);
-                                    if (!isApplied) setIsVouchersExpanded(false);
-                                  }}
-                                  activeOpacity={0.85}
-                                >
-                                  <Text style={styles.figmaRedeemBtnText}>{isApplied ? 'Applied ✓' : 'Redeem'}</Text>
-                                </TouchableOpacity>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* 4. EDIT ORDER / ADD ITEMS NAVIGATION ROW */}
-                    <TouchableOpacity
-                      style={styles.navRowCard}
-                      onPress={() => setIsCatalogPickerOpen(true)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="add-circle-outline" size={20} color="#1D1D1F" />
-                      <Text style={styles.navRowTitle}>Edit Order / Add Items</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
-                    </TouchableOpacity>
-
-                    {/* 5. STAMPS TO ISSUE / GIVE */}
-                    <View style={styles.stampIssueCard}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-                          <Ionicons name="ribbon-outline" size={15} color="#D97706" />
-                          <Text style={styles.stampIssueLabel}>STAMPS TO GIVE</Text>
-                        </View>
-                        <View style={styles.stampStepperRow}>
-                          <TouchableOpacity
-                            style={styles.stampStepperBtn}
-                            onPress={() => {
-                              const curr = parseInt(stampAmount, 10) || 1;
-                              setStampAmount(String(Math.max(1, curr - 1)));
-                            }}
-                            activeOpacity={0.7}
-                            accessibilityLabel="Decrease stamps"
-                          >
-                            <Ionicons name="remove" size={13} color="#0F172A" />
-                          </TouchableOpacity>
-                          <TextInput
-                            style={[
-                              styles.stampStepperInput,
-                              Platform.OS === 'web' ? ({ outlineWidth: 0, width: 32, textAlign: 'center' } as any) : null,
-                            ]}
-                            value={stampAmount}
-                            onChangeText={(t) => {
-                              const clean = t.replace(/[^0-9]/g, '');
-                              setStampAmount(clean);
-                            }}
-                            keyboardType="number-pad"
-                            maxLength={3}
-                          />
-                          <TouchableOpacity
-                            style={styles.stampStepperBtn}
-                            onPress={() => {
-                              const curr = parseInt(stampAmount, 10) || 1;
-                              setStampAmount(String(Math.min(99, curr + 1)));
-                            }}
-                            activeOpacity={0.7}
-                            accessibilityLabel="Increase stamps"
-                          >
-                            <Ionicons name="add" size={13} color="#0F172A" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-
-                      {/* Quick preset chips */}
-                      <View style={styles.quickBillChipsRow}>
-                        {['1', '2', '3', '5'].map((amt) => (
-                          <TouchableOpacity
-                            key={amt}
-                            style={[styles.quickBillChip, stampAmount === amt && styles.quickBillChipActive]}
-                            onPress={() => setStampAmount(amt)}
-                            activeOpacity={0.75}
-                          >
-                            <Text style={[styles.quickBillChipText, stampAmount === amt && styles.quickBillChipTextActive]}>
-                              {amt} {amt === '1' ? 'Stamp' : 'Stamps'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                    <View style={styles.compactLine}>
+                      <Text style={styles.compactLabel}>{locale === 'ms' ? 'Cop diberikan' : 'Stamps to give'}</Text>
+                      <View style={styles.compactStepper}>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.max(1, (parseInt(stampAmount, 10) || 1) - 1)))}><Ionicons name="remove" size={18} color="#0F172A" /></TouchableOpacity>
+                        <TextInput accessibilityLabel="Stamps to give" value={stampAmount} onChangeText={text => setStampAmount(text.replace(/[^0-9]/g, ''))} keyboardType="number-pad" maxLength={3} style={styles.compactStampInput} />
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.min(99, (parseInt(stampAmount, 10) || 1) + 1)))}><Ionicons name="add" size={18} color="#0F172A" /></TouchableOpacity>
                       </View>
                     </View>
-
-                    {/* 6. LOYALTY REWARDS PREVIEW CARD */}
-                    <View style={styles.loyaltyCardApple}>
-                      {/* Column 1: Rewards Info */}
-                      <View style={styles.loyaltyColMain}>
-                        <View style={styles.loyaltyStarBox}>
-                          <Ionicons name="star" size={15} color="#D97706" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.loyaltyTitleApple} numberOfLines={1}>Rewards after payment</Text>
-                          <Text style={styles.loyaltySubApple} numberOfLines={1}>You'll earn the following rewards</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.loyaltyDividerLight} />
-
-                      {/* Column 2: Stamp */}
-                      <View style={styles.loyaltyColPill}>
-                        <Ionicons name="ribbon-outline" size={14} color="#D97706" />
-                        <Text style={styles.loyaltyValApple}>
-                          +{parseInt(stampAmount, 10) || 1} {(parseInt(stampAmount, 10) || 1) === 1 ? 'Stamp' : 'Stamps'}
-                        </Text>
-                      </View>
-
-                      <View style={styles.loyaltyDividerLight} />
-
-                      {/* Column 3: Points */}
-                      <View style={styles.loyaltyColPill}>
-                        <Ionicons name="cash-outline" size={14} color="#B45309" />
-                        <Text style={styles.loyaltyValApple}>
-                          +{Math.floor(netTotalAmount / spendPerPoint).toLocaleString()} pts
-                        </Text>
-                      </View>
-                    </View>
-
+                    <View style={styles.compactLine}><Text style={styles.compactMuted}>{locale === 'ms' ? 'Mata diperoleh' : 'Points earned'}</Text><Text style={styles.compactLabel}>+{Math.floor(netTotalAmount / spendPerPoint).toLocaleString()}</Text></View>
                   </ScrollView>
-
-                  {/* 7. STICKY CHECKOUT FOOTER */}
-                  <View style={styles.figmaStickyCheckoutFooter}>
-                    {/* Total Amount Row */}
-                    <View style={styles.figmaTotalRow}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={styles.figmaTotalLabel}>Total Amount</Text>
-                        {appliedVoucher ? (
-                          <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669', marginTop: 1 }} numberOfLines={1}>
-                            🏷️ {appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.metadata?.snapshot_title || appliedVoucher.code} ({discountAmount > 0 ? `-RM ${discountAmount.toFixed(2)}` : (locale === 'en' ? 'Free Item' : 'Item Percuma')})
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text style={styles.figmaTotalValue}>
-                        RM {netTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Text>
-                    </View>
-
-                    {/* Main Dark Action Button */}
-                    <TouchableOpacity 
-                      style={styles.figmaPrimaryActionBtn} 
-                      onPress={() => setCheckoutStep('payment')} 
-                      disabled={isLoading} 
-                      activeOpacity={0.88}
-                    >
-                      {isLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                          <Ionicons name="card" size={18} color="#FFCA05" />
-                          <Text style={styles.figmaPrimaryActionBtnText}>Proceed to Payment →</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-
-                    {/* Secondary Actions */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 4 }}>
-                      <TouchableOpacity onPress={handleMinimize} disabled={isLoading} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name="time-outline" size={13} color="#64748B" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Save for Later</Text>
-                      </TouchableOpacity>
-                      <Text style={{ color: '#CBD5E1' }}>|</Text>
-                      <TouchableOpacity onPress={handleDecline} disabled={isLoading} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name="remove-circle-outline" size={13} color="#EF4444" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#EF4444' }}>Decline</Text>
-                      </TouchableOpacity>
+                  <View style={styles.compactFooter}>
+                    <View style={styles.compactLine}><Text style={styles.compactLabel}>{locale === 'ms' ? 'Jumlah' : 'Total'}</Text><Text style={styles.compactTotal}>RM{netTotalAmount.toFixed(2)}</Text></View>
+                    <TouchableOpacity accessibilityRole="button" style={styles.compactPayButton} onPress={() => { setPaymentFromPos(false); setCheckoutStep('payment'); }} disabled={isLoading} activeOpacity={0.8}><Text style={styles.compactPayText}>{locale === 'ms' ? 'Teruskan pembayaran' : 'Continue to payment'} →</Text></TouchableOpacity>
+                    <View style={styles.compactLine}>
+                      <TouchableOpacity style={styles.compactTextButton} onPress={handleMinimize} disabled={isLoading}><Text style={styles.compactMuted}>{locale === 'ms' ? 'Simpan dahulu' : 'Save for later'}</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.compactTextButton} onPress={handleDecline} disabled={isLoading}><Text style={[styles.compactMuted, { color: '#DC2626' }]}>{locale === 'ms' ? 'Tolak' : 'Decline'}</Text></TouchableOpacity>
                     </View>
                   </View>
                 </>
@@ -2062,6 +1672,7 @@ export default function NfcClaimModal() {
           </Pressable>
         )}
       </View>
+      </KeyboardAvoidingView>
     </Modal>
     )}
   </>
@@ -3520,6 +3131,32 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     color: '#475569',
   },
+  compactHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
+  compactTitle: { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', flexShrink: 1 },
+  compactIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  compactCustomer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#EEF0F3' },
+  compactAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  compactCustomerName: { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  compactLabel: { fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#0F172A' },
+  compactMuted: { fontSize: 12, lineHeight: 18, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' },
+  compactStatus: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#F5F6F8', borderRadius: 8 },
+  compactLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  compactTextButton: { minHeight: 44, justifyContent: 'center' },
+  compactLink: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  compactAmountInput: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 14 },
+  compactCurrency: { fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  compactAmountText: { flex: 1, fontSize: 26, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', height: '100%' },
+  compactPresets: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  compactPreset: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  compactOrderSummary: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12 },
+  compactVoucherLine: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEF0F3' },
+  compactStepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F6F8', borderRadius: 10 },
+  compactStampInput: { width: 32, fontSize: 16, textAlign: 'center', fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  compactFooter: { paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderTopColor: '#EEF0F3', gap: 4 },
+  compactTotal: { fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' },
+  compactPayButton: { minHeight: 50, backgroundColor: '#FFCC00', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  compactPayText: { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' },
+  compactVoucherOption: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
   floatingContainer: {
     position: 'absolute',
     top: Platform.OS === 'web' ? 16 : 48,
@@ -3534,50 +3171,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 10,
+    borderRadius: 22,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     gap: 10,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1.5,
-    borderColor: '#FEF3C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E8ECF1',
   },
   floatingPulseRing: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#FEF3C7',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F5F6F8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   floatingTitle: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#64748B',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
   },
   floatingSubtitle: {
     fontSize: 11,
+    lineHeight: 16,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
-    marginTop: 1,
+    color: '#64748B',
+    marginTop: 3,
   },
   floatingActionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#050505',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 12,
+    minHeight: 40,
+    borderRadius: 999,
+    flexShrink: 0,
   },
   floatingActionText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#000000',
   },
   activeBookingBanner: {
     backgroundColor: '#FFFBEA',
