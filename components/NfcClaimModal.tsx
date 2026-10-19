@@ -449,12 +449,28 @@ export default function NfcClaimModal() {
 
         let loadedVouchers: any[] = [];
         if (custId) {
-          const vRes = await pb.collection('vouchers').getList(1, 20, {
-            filter: `customer = "${custId}" && status = "active"`,
-            expand: 'reward',
-          });
-          loadedVouchers = vRes.items;
-          setCustomerVouchers(vRes.items);
+          const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+          const merchantFilter = merchantId
+            ? ` && (reward.merchant = "${merchantId}" || campaign.merchant = "${merchantId}")`
+            : '';
+          try {
+            // Active, unexpired, and issued by THIS merchant.
+            const vRes = await pb.collection('vouchers').getList(1, 50, {
+              filter: `customer = "${custId}" && status = "active" && (expires_at = "" || expires_at > "${nowIso}")${merchantFilter}`,
+              expand: 'reward,reward.merchant,campaign,campaign.merchant',
+              sort: 'expires_at',
+            });
+            loadedVouchers = vRes.items;
+            setCustomerVouchers(vRes.items);
+          } catch (vErr) {
+            // Older backend / restrictive rules: fall back to the legacy query.
+            const vRes = await pb.collection('vouchers').getList(1, 20, {
+              filter: `customer = "${custId}" && status = "active"`,
+              expand: 'reward',
+            });
+            loadedVouchers = vRes.items;
+            setCustomerVouchers(vRes.items);
+          }
         } else {
           setCustomerVouchers([]);
         }
@@ -478,16 +494,25 @@ export default function NfcClaimModal() {
             );
           }
 
+          // The claim's voucher may be used/expired, so it isn't in the active
+          // list. Fetch it by id so the cashier sees its real title/metadata.
+          if (!matched && targetVoucherId) {
+            try {
+              matched = await pb.collection('vouchers').getOne(targetVoucherId, { expand: 'reward' });
+            } catch (oneErr) {}
+          }
+
           if (matched) {
             setAppliedVoucher(matched);
           } else {
-            // Virtual voucher fallback so merchant always sees the customer's selected voucher
+            // Synthetic fallback so the cashier at least sees the customer's choice.
             setAppliedVoucher({
               id: targetVoucherId || 'v_selected',
               title: voucherTitleHint || 'Selected Customer Voucher',
-              code: targetVoucherId || '',
+              code: '',
               status: 'active',
               metadata: { snapshot_title: voucherTitleHint || 'Selected Customer Voucher', discount_type: 'none' },
+              _synthetic: true,
             });
           }
         }
@@ -672,6 +697,26 @@ export default function NfcClaimModal() {
     }
   };
 
+  // Why a voucher cannot be applied right now (empty string = usable).
+  const getVoucherIssue = (v: any): string => {
+    if (!v) return '';
+    if (v._synthetic) return locale === 'ms' ? 'Baucar tidak dijumpai' : 'Voucher not found';
+    if (v.status && v.status !== 'active') {
+      if (v.status === 'used') return locale === 'ms' ? 'Sudah ditebus' : 'Already used';
+      if (v.status === 'expired') return locale === 'ms' ? 'Tamat tempoh' : 'Expired';
+      return locale === 'ms' ? 'Tidak sah' : 'Not valid';
+    }
+    const expMs = v.expires_at ? new Date(String(v.expires_at).replace(' ', 'T')).getTime() : NaN;
+    if (Number.isFinite(expMs) && expMs <= Date.now()) {
+      return locale === 'ms' ? 'Tamat tempoh' : 'Expired';
+    }
+    const voucherMerchant = v.expand?.reward?.merchant || v.expand?.campaign?.merchant || '';
+    if (voucherMerchant && merchantId && voucherMerchant !== merchantId) {
+      return locale === 'ms' ? 'Bukan untuk kedai ini' : 'Not valid for this store';
+    }
+    return '';
+  };
+
   const handleConfirm = async () => {
     if (!claim) return;
     if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) {
@@ -684,32 +729,16 @@ export default function NfcClaimModal() {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      // 1. If voucher was applied, redeem it via the dedicated endpoint AND update status
-      if (appliedVoucher) {
-        if (appliedVoucher.code) {
-          try {
-            await pb.send('/api/risev/merchant/vouchers/redeem', {
-              method: 'POST',
-              body: { code: appliedVoucher.code },
-            });
-          } catch (vErr) {
-            console.warn('[VOUCHER REDEEM] Dedicated endpoint note:', vErr);
-          }
-        }
-        try {
-          await pb.collection('vouchers').update(appliedVoucher.id, {
-            status: 'used',
-            used_at: new Date().toISOString(),
-          });
-        } catch (vDirectErr) {
-          console.warn('[VOUCHER REDEEM] Direct update note:', vDirectErr);
-        }
-        // Remove from local list so it instantly vanishes from UI
-        setCustomerVouchers(prev => prev.filter(v => v.id !== appliedVoucher.id));
-      }
+      // Voucher validation + consumption is handled atomically by /nfc/complete.
+      // (The old flow burned it here and again in the endpoint, and swallowed
+      // every rejection.)
 
       // 2. Complete NFC transaction
-      await pb.send('/api/risev/nfc/complete', {
+      const completeRes = await pb.send<{
+        success: boolean;
+        voucher_error?: string;
+        voucher_code?: string;
+      }>('/api/risev/nfc/complete', {
         method: 'POST',
         body: {
           claim_id: claim.id,
@@ -724,6 +753,15 @@ export default function NfcClaimModal() {
           branch_id: user?.branch || '',
         },
       });
+
+      if (appliedVoucher) {
+        if (completeRes?.voucher_error) {
+          console.warn('[VOUCHER] Not applied:', completeRes.voucher_error);
+        } else {
+          // The server consumed it; drop it from the local list.
+          setCustomerVouchers(prev => prev.filter(v => v.id !== appliedVoucher.id));
+        }
+      }
 
       // 3. Notify merchant dashboard to refresh sales immediately
       DeviceEventEmitter.emit('merchant_transaction_completed', {
@@ -1358,12 +1396,14 @@ export default function NfcClaimModal() {
                         let meta: any = {};
                         try { meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {}); } catch {}
                         const selected = appliedVoucher?.id === v.id;
-                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }]} onPress={() => { setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
+                        const issue = getVoucherIssue(v);
+                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }, issue && { opacity: 0.6 }]} onPress={() => { if (issue) { Alert.alert(locale === 'ms' ? 'Baucar tidak sah' : 'Voucher unavailable', issue); return; } setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.compactLabel}>{meta.snapshot_title || v.expand?.reward?.name || v.code}</Text>
                             <Text style={styles.compactMuted}>{v.code}</Text>
                             {(meta.applicable_items_text || v.expand?.reward?.applicable_items_text) && <Text style={styles.compactMuted}>{meta.applicable_items_text || v.expand?.reward?.applicable_items_text}</Text>}
                             <Text style={styles.compactMuted}>{meta.discount_type === 'percentage' ? `${meta.discount_value}% OFF` : meta.discount_type === 'fixed_amount' ? `RM${meta.discount_value} OFF` : (locale === 'ms' ? 'Item percuma' : 'Free item')}</Text>
+                            {issue ? <Text style={[styles.compactMuted, { color: '#DC2626' }]}>{issue}</Text> : null}
                           </View>
                           <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color="#0F172A" />
                         </TouchableOpacity>;
@@ -1410,7 +1450,9 @@ export default function NfcClaimModal() {
                         <Text style={styles.compactLabel}>Voucher</Text>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
                           <Text style={styles.compactMuted} numberOfLines={1}>{appliedVoucher ? (appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.code) : `${customerVouchers.length} ${locale === 'ms' ? 'tersedia' : 'available'}`}</Text>
-                          {appliedVoucher && <Text style={styles.compactLink}>{discountAmount > 0 ? `−RM${discountAmount.toFixed(2)}` : (locale === 'ms' ? 'Item percuma' : 'Free item')}</Text>}
+                          {appliedVoucher && (getVoucherIssue(appliedVoucher)
+                            ? <Text style={[styles.compactLink, { color: '#DC2626' }]}>{getVoucherIssue(appliedVoucher)}</Text>
+                            : <Text style={styles.compactLink}>{discountAmount > 0 ? `−RM${discountAmount.toFixed(2)}` : (locale === 'ms' ? 'Item percuma' : 'Free item')}</Text>)}
                         </View>
                         <Ionicons name="chevron-forward" size={16} color="#64748B" />
                       </TouchableOpacity>

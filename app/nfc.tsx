@@ -674,6 +674,7 @@ export default function NfcLandingScreen() {
     preview_step?: string;
     preview_approved?: string;
     preview_declined?: string;
+    preview_voucher?: string;
   }>();
   const { user, logout, refreshSession } = useAuth();
   const { locale } = useLanguage();
@@ -759,6 +760,9 @@ export default function NfcLandingScreen() {
   const [availableCustomerVouchers, setAvailableCustomerVouchers] = useState<any[]>([]);
   const [selectedVoucherToUse, setSelectedVoucherToUse] = useState<any>(null);
   const [appliedVoucherForClaim, setAppliedVoucherForClaim] = useState<any>(null);
+  // Phone + resolved name captured when the voucher sheet opens, so the
+  // proceed handlers don't lose the name returned by /check-phone.
+  const voucherFlowRef = useRef<{ phone: string; name: string }>({ phone: '', name: '' });
   
   const pulseAnim = useRef(new Animated.Value(0.2)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -923,6 +927,10 @@ export default function NfcLandingScreen() {
     setIsApproved(false);
     setIsDeclined(false);
     isDeclinedRef.current = false;
+    setShowVoucherPrompt(false);
+    setAvailableCustomerVouchers([]);
+    setSelectedVoucherToUse(null);
+    setAppliedVoucherForClaim(null);
     setShowReviewModal(false);
     setShowRewardModal(false);
     setUnlockedReward(null);
@@ -1004,7 +1012,29 @@ export default function NfcLandingScreen() {
         setShowRewardModal(true);
       }
     }
-  }, [params.preview_step, params.preview_approved, params.preview_declined, (params as any)?.preview_reward]);
+
+    if (params.preview_voucher === '1' || params.preview_voucher === 'true') {
+      const sampleVouchers = [
+        {
+          id: 'preview_v1',
+          code: 'WV-XH8D-9RZ3',
+          title: 'FREE AISKRIM Premium 3 scoop',
+          description: 'Reward for completing the Reward Card',
+          expires_at: '',
+        },
+        {
+          id: 'preview_v2',
+          code: 'WV-N639-9NXM',
+          title: 'Free Drink / Snack',
+          description: 'Milestone Reward',
+          expires_at: '',
+        },
+      ];
+      setAvailableCustomerVouchers(sampleVouchers);
+      setSelectedVoucherToUse(sampleVouchers[0]);
+      setShowVoucherPrompt(true);
+    }
+  }, [params.preview_step, params.preview_approved, params.preview_declined, params.preview_voucher, (params as any)?.preview_reward]);
   const [reviewSubmitted, setReviewSubmitted] = useState<boolean>(false);
 
   // Tracks which stamp slot indices are "newly earned" this session for animation
@@ -1997,85 +2027,66 @@ export default function NfcLandingScreen() {
       if (!finalName) finalName = 'Customer ' + digits.slice(-4);
       const displayName = finalName;
 
-      // 2. Check if customer has existing active vouchers for this store
+      // 2. Check if the customer has usable vouchers for this store.
+      //    One authoritative server call: it resolves the customer (auth id or
+      //    phone), enforces active + unexpired + this merchant, and returns the
+      //    fields the sheet renders.
       if (!appliedVoucherForClaim) {
         let foundVouchers: any[] = [];
-
-        // Method A: Check client-authenticated user if logged in in this browser session
-        const activeUserId = user?.id || pb.authStore.record?.id;
-        if (activeUserId) {
+        try {
+          const vCheck = await pb.send<{ success: boolean; vouchers: any[] }>('/api/risev/nfc/customer-vouchers', {
+            method: 'POST',
+            body: {
+              merchant_id: merchant.id,
+              phone: cleanPhone,
+            },
+            requestKey: null,
+          });
+          foundVouchers = Array.isArray(vCheck?.vouchers) ? vCheck.vouchers : [];
+        } catch (vErr) {
+          // Route missing (older backend) — fall back to a direct read, but keep
+          // the same strict rules so other stores' vouchers never leak in.
+          console.warn('[NFC] customer-vouchers route failed, using direct fallback:', vErr);
           try {
-            const vList = await pb.collection('vouchers').getFullList({
-              filter: `customer = "${activeUserId}" && status = "active"`,
-              expand: 'reward,reward.merchant,campaign,campaign.merchant',
-              sort: '-created',
-              requestKey: null,
-            });
-
-            foundVouchers = vList
-              .map((v: any) => {
-                const reward = v.expand?.reward;
-                const campaign = v.expand?.campaign;
-                const mId =
-                  reward?.merchant ||
-                  reward?.expand?.merchant?.id ||
-                  campaign?.merchant ||
-                  campaign?.expand?.merchant?.id;
-
-                let meta: any = {};
-                try {
-                  meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
-                } catch (e) {}
-
-                const title =
-                  reward?.name ||
-                  reward?.title ||
-                  campaign?.name ||
-                  campaign?.title ||
-                  meta.snapshot_title ||
-                  'Reward Voucher';
-                const description =
-                  reward?.description ||
-                  campaign?.description ||
-                  meta.snapshot_description ||
-                  (locale === 'en' ? 'Redeem at counter' : 'Tebus di kaunter');
-
-                return {
-                  id: v.id,
-                  code: v.code || '',
-                  title,
-                  description,
-                  merchantId: mId,
-                  expires_at: v.expires_at || v.valid_until || '',
-                };
-              })
-              .filter((v: any) => !v.merchantId || v.merchantId === merchant?.id);
-          } catch (dirErr) {
-            console.warn('[NFC] Direct voucher check notice:', dirErr);
-          }
-        }
-
-        // Method B: Call server endpoint /api/risev/nfc/customer-vouchers (for guest / phone lookup)
-        if (foundVouchers.length === 0) {
-          try {
-            const vCheck = await pb.send<{ success: boolean; vouchers: any[] }>('/api/risev/nfc/customer-vouchers', {
-              method: 'POST',
-              body: {
-                merchant_id: merchant.id,
-                phone: cleanPhone,
-              },
-              requestKey: null,
-            });
-
-            if (vCheck?.vouchers && vCheck.vouchers.length > 0) {
-              foundVouchers = vCheck.vouchers;
+            const activeUserId = user?.id || pb.authStore.record?.id;
+            if (activeUserId) {
+              const nowMs = Date.now();
+              const vList = await pb.collection('vouchers').getFullList({
+                filter: `customer = "${activeUserId}" && status = "active"`,
+                expand: 'reward,reward.merchant,campaign,campaign.merchant',
+                sort: '-created',
+                requestKey: null,
+              });
+              foundVouchers = vList
+                .map((v: any) => {
+                  let meta: any = {};
+                  try {
+                    meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
+                  } catch (e) {}
+                  const reward = v.expand?.reward;
+                  const campaign = v.expand?.campaign;
+                  return {
+                    id: v.id,
+                    code: v.code || '',
+                    title: reward?.name || campaign?.name || meta.snapshot_title || 'Reward Voucher',
+                    description: reward?.description || campaign?.description || meta.snapshot_description || '',
+                    expires_at: v.expires_at || '',
+                    merchantId: reward?.merchant || campaign?.merchant || meta.merchant_id || '',
+                  };
+                })
+                .filter((v: any) => {
+                  if (v.merchantId !== merchant.id) return false;
+                  if (!v.expires_at) return true;
+                  return new Date(v.expires_at.replace(' ', 'T')).getTime() > nowMs;
+                });
             }
-          } catch (vErr) {
-            console.warn('[NFC] customer-vouchers server endpoint note:', vErr);
+          } catch (dirErr) {
+            console.warn('[NFC] Direct voucher fallback failed:', dirErr);
           }
         }
 
         if (foundVouchers.length > 0) {
+          voucherFlowRef.current = { phone: cleanPhone, name: displayName };
           setAvailableCustomerVouchers(foundVouchers);
           setSelectedVoucherToUse(foundVouchers[0]);
           setShowVoucherPrompt(true);
@@ -2110,7 +2121,6 @@ export default function NfcLandingScreen() {
           branch_name: branch?.branch_name || undefined,
           voucher_id: voucherToApply?.id || undefined,
           voucher_name: voucherToApply?.title || undefined,
-          voucher_code: voucherToApply?.code || undefined,
         },
       });
       if (reqRes?.claim_id) {
@@ -2144,13 +2154,18 @@ export default function NfcLandingScreen() {
     setShowVoucherPrompt(false);
     setAppliedVoucherForClaim(selectedVoucherToUse);
 
-    let digits = phoneInput.trim().replace(/\D/g, '');
-    if (digits.startsWith('0')) digits = '6' + digits;
-    if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-    const cleanPhone = '+' + digits;
-    const displayName = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+    // Prefer the phone/name captured by handleNfcSubmit (keeps the name
+    // resolved by /check-phone); fall back to the form for preview/test paths.
+    let { phone, name } = voucherFlowRef.current;
+    if (!phone) {
+      let digits = phoneInput.trim().replace(/\D/g, '');
+      if (digits.startsWith('0')) digits = '6' + digits;
+      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+      phone = '+' + digits;
+      name = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+    }
 
-    await executeNfcClaim(cleanPhone, displayName, selectedVoucherToUse);
+    await executeNfcClaim(phone, name || 'Customer', selectedVoucherToUse);
   };
 
   // Customer chooses to skip voucher and collect stamps only
@@ -2158,13 +2173,16 @@ export default function NfcLandingScreen() {
     setShowVoucherPrompt(false);
     setAppliedVoucherForClaim(null);
 
-    let digits = phoneInput.trim().replace(/\D/g, '');
-    if (digits.startsWith('0')) digits = '6' + digits;
-    if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-    const cleanPhone = '+' + digits;
-    const displayName = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+    let { phone, name } = voucherFlowRef.current;
+    if (!phone) {
+      let digits = phoneInput.trim().replace(/\D/g, '');
+      if (digits.startsWith('0')) digits = '6' + digits;
+      if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+      phone = '+' + digits;
+      name = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+    }
 
-    await executeNfcClaim(cleanPhone, displayName, null);
+    await executeNfcClaim(phone, name || 'Customer', null);
   };
 
   // ══════════════════════════════════════════════════════════════════

@@ -72,9 +72,93 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     }
 
     const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
-    const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
-    if (reqVoucherId && !name.includes("[VOUCHER:")) {
-      name = `${name} [VOUCHER:${reqVoucherId}#${reqVoucherName}]`;
+    let voucherTitle = (body.voucher_name || body.voucher_title || "").trim();
+    let voucher = null;
+    let voucherError = "";
+
+    // Validate the customer's pre-selected voucher BEFORE attaching it.
+    // A bad voucher must never block the stamp claim itself.
+    if (reqVoucherId) {
+      try {
+        voucher = $app.findRecordById("vouchers", reqVoucherId);
+      } catch (idErr) {
+        try {
+          const byCode = $app.findRecordsByFilter("vouchers", `code = '${reqVoucherId}'`, "-created", 1, 0);
+          if (byCode.length > 0) voucher = byCode[0];
+        } catch (codeErr) {}
+      }
+
+      if (!voucher) {
+        voucherError = "not_found";
+      } else {
+        const vStatus = voucher.getString("status");
+        const vExpires = voucher.getString("expires_at");
+        if (vStatus !== "active") {
+          voucherError = (vStatus === "used" || vStatus === "expired" || vStatus === "voided") ? vStatus : "invalid";
+        } else if (vExpires && new Date(vExpires.replace(" ", "T")).getTime() <= Date.now()) {
+          voucherError = "expired";
+        } else if (!customerUser || voucher.getString("customer") !== customerUser.id) {
+          voucherError = "wrong_customer";
+        } else {
+          // Resolve the voucher's merchant: reward, then campaign, then metadata.
+          let vMerchant = "";
+          const rewardId = voucher.getString("reward");
+          const campaignId = voucher.getString("campaign");
+          try {
+            if (rewardId) vMerchant = $app.findRecordById("rewards", rewardId).getString("merchant") || "";
+          } catch (rwErr) {}
+          if (!vMerchant && campaignId) {
+            try {
+              vMerchant = $app.findRecordById("campaigns", campaignId).getString("merchant") || "";
+            } catch (cpErr) {}
+          }
+          if (!vMerchant) {
+            try {
+              const rawMeta = voucher.getString("metadata");
+              if (rawMeta && rawMeta !== "null") {
+                const meta = JSON.parse(rawMeta);
+                if (meta && typeof meta === "object") vMerchant = meta.merchant_id || "";
+              }
+            } catch (metaErr) {}
+          }
+
+          if (!vMerchant || vMerchant !== merchantId) {
+            voucherError = "wrong_merchant";
+          } else {
+            if (!voucherTitle) {
+              try {
+                if (rewardId) voucherTitle = $app.findRecordById("rewards", rewardId).getString("name") || "";
+              } catch (t1Err) {}
+            }
+            if (!voucherTitle && campaignId) {
+              try {
+                voucherTitle = $app.findRecordById("campaigns", campaignId).getString("name") || "";
+              } catch (t2Err) {}
+            }
+            if (!voucherTitle) {
+              try {
+                const rawMeta = voucher.getString("metadata");
+                if (rawMeta && rawMeta !== "null") {
+                  const meta = JSON.parse(rawMeta);
+                  if (meta && typeof meta === "object") voucherTitle = meta.snapshot_title || "";
+                }
+              } catch (t3Err) {}
+            }
+            if (!voucherTitle) voucherTitle = "Reward Voucher";
+          }
+        }
+      }
+
+      if (voucherError) {
+        console.log(`[NFC REQUEST] Rejected voucher ${reqVoucherId}: ${voucherError}`);
+        voucher = null;
+        voucherTitle = "";
+      }
+    }
+
+    const appliedVoucherId = voucher ? voucher.id : "";
+    if (appliedVoucherId && !name.includes("[VOUCHER:")) {
+      name = `${name} [VOUCHER:${appliedVoucherId}#${voucherTitle}]`;
     }
 
     // Generate random 6-character uppercase session code
@@ -99,14 +183,11 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         if (branchId) claim.set("branch", branchId);
         if (branchName) claim.set("branch_name", branchName);
         if (customerUser) claim.set("customer", customerUser.id);
-        const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
-        const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
-        if (reqVoucherId) {
-          try { claim.set("voucher", reqVoucherId); } catch (vErr) {}
-        }
-        if (reqVoucherName) {
-          try { claim.set("voucher_title", reqVoucherName); } catch (vErr) {}
-        }
+        // Always set or clear the voucher on reuse so a stale request can't persist.
+        try {
+          claim.set("voucher", appliedVoucherId || "");
+          claim.set("voucher_title", appliedVoucherId ? voucherTitle : "");
+        } catch (vErr) {}
         $app.save(claim);
         console.log(`[NFC REQUEST] Updated existing claim ${claim.id} to pending for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
       }
@@ -124,13 +205,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       if (branchId) claim.set("branch", branchId);
       if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
-      const reqVoucherId = (body.voucher_id || body.voucher || "").trim();
-      const reqVoucherName = (body.voucher_name || body.voucher_title || "").trim();
-      if (reqVoucherId) {
-        try { claim.set("voucher", reqVoucherId); } catch (vErr) {}
-      }
-      if (reqVoucherName) {
-        try { claim.set("voucher_title", reqVoucherName); } catch (vErr) {}
+      if (appliedVoucherId) {
+        try { claim.set("voucher", appliedVoucherId); } catch (vErr) {}
+        try { claim.set("voucher_title", voucherTitle); } catch (vErr) {}
       }
       $app.save(claim);
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
@@ -140,9 +217,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     try {
       const pushHelper = require(`${__hooks}/push_notify.js`);
       pushHelper.sendPushToMerchant(merchantId, branchId, {
-        title: reqVoucherName ? "NFC Claim + Baucar! 🏷️🎁" : "NFC Stamp Claim! 🏷️",
-        body: reqVoucherName
-          ? `${name} ingin kumpul cop & tebus: ${reqVoucherName}`
+        title: appliedVoucherId ? "NFC Claim + Baucar! 🏷️🎁" : "NFC Stamp Claim! 🏷️",
+        body: appliedVoucherId
+          ? `${name} ingin kumpul cop & tebus: ${voucherTitle}`
           : `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
         url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cleanPhone)}`,
         tag: `claim-${claim.id}`,
@@ -151,8 +228,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
           customer_name: name,
           phone: cleanPhone,
           session_code: sessionCode,
-          voucher_id: reqVoucherId,
-          voucher_name: reqVoucherName
+          voucher_id: appliedVoucherId,
+          voucher_name: voucherTitle
         }
       });
     } catch (pushErr) {
@@ -179,8 +256,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       current_stamps: currentStamps,
       stamp_goal: stampGoal,
       merchant_name: merchant.getString("name") || "Merchant",
-      voucher_id: reqVoucherId,
-      voucher_name: reqVoucherName
+      voucher_id: appliedVoucherId,
+      voucher_name: voucherTitle,
+      voucher_error: voucherError
     });
   } catch (err) {
     console.log("[NFC REQUEST ERROR]", err.message || err);
@@ -334,97 +412,140 @@ routerAdd("POST", "/api/risev/nfc/customer-vouchers", (e) => {
     const merchantId = (body.merchant_id || body.merchant || "").trim();
     const rawPhone = (body.phone || body.customer_phone || "").trim();
 
-    if (!merchantId || !rawPhone) {
+    if (!merchantId) {
       return e.json(200, { success: true, vouchers: [] });
     }
 
     let digits = rawPhone.replace(/[^\d]/g, '');
     if (digits.indexOf("0") === 0) digits = "6" + digits;
     if (digits.indexOf("60") !== 0 && digits.length >= 9) digits = "60" + digits;
-    const cleanPhone = "+" + digits;
+    const cleanPhone = digits ? "+" + digits : "";
     const localDigits = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
 
-    // Find customer by phone
+    // 1. Prefer the authenticated customer; fall back to phone (guest flow).
     let customerId = "";
     try {
-      const users = $app.findRecordsByFilter(
-        "users",
-        `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`,
-        "-created",
-        1,
-        0
-      );
-      if (users.length > 0) {
-        customerId = users[0].id;
+      const auth = e.auth;
+      if (auth && (auth.collectionId === "_pb_users_auth_" || (auth.collection && auth.collection().name === "users"))) {
+        customerId = auth.id;
       }
-    } catch (uErr) {}
+    } catch (authErr) {}
+
+    if (!customerId && digits) {
+      try {
+        const users = $app.findRecordsByFilter(
+          "users",
+          `phone = '${cleanPhone}' || phone = '${digits}' || phone = '${localDigits}'`,
+          "-created",
+          1,
+          0
+        );
+        if (users.length > 0) customerId = users[0].id;
+      } catch (uErr) {}
+    }
 
     if (!customerId) {
       return e.json(200, { success: true, vouchers: [] });
     }
 
-    // Find all active vouchers for this customer
-    const rawVouchers = $app.findRecordsByFilter(
-      "vouchers",
-      `customer = '${customerId}' && status = 'active'`,
-      "-created",
-      20,
-      0
-    );
+    // 2. Active vouchers only. Expiry is checked in JS so an unset date and a
+    //    past date are handled the same way everywhere.
+    const nowMs = Date.now();
+    let rawVouchers = [];
+    try {
+      rawVouchers = $app.findRecordsByFilter(
+        "vouchers",
+        `customer = '${customerId}' && status = 'active'`,
+        "-created",
+        100,
+        0
+      );
+    } catch (vErr) {
+      return e.json(200, { success: true, vouchers: [] });
+    }
 
     const result = [];
     for (let i = 0; i < rawVouchers.length; i++) {
       const v = rawVouchers[i];
+
       let meta = {};
       try {
-        const rawMeta = v.getString("metadata") || v.get("metadata");
-        meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+        const rawMeta = v.getString("metadata");
+        if (rawMeta && rawMeta !== "null") {
+          const parsed = JSON.parse(rawMeta);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) meta = parsed;
+        }
       } catch (mErr) {}
 
-      let rewardId = v.getString("reward");
-      let rewardMerchantId = "";
-      let rewardTitle = meta.snapshot_title || "";
-      let rewardDesc = meta.snapshot_description || "";
-      let rewardType = meta.snapshot_type || "free_item";
+      const expiresAt = v.getString("expires_at") || "";
+      if (expiresAt) {
+        const expMs = new Date(expiresAt.replace(" ", "T")).getTime();
+        if (Number.isFinite(expMs) && expMs <= nowMs) continue;
+      }
+
+      const rewardId = v.getString("reward");
+      const campaignId = v.getString("campaign");
+      let voucherMerchantId = "";
+      let title = meta.snapshot_title || "";
+      let description = meta.snapshot_description || "";
+      let type = meta.snapshot_type || "free_item";
 
       if (rewardId) {
         try {
           const rw = $app.findRecordById("rewards", rewardId);
           if (rw) {
-            rewardMerchantId = rw.getString("merchant");
-            if (!rewardTitle) rewardTitle = rw.getString("name") || rw.getString("title") || "";
-            if (!rewardDesc) rewardDesc = rw.getString("description") || "";
-            if (rw.getString("type")) rewardType = rw.getString("type");
+            voucherMerchantId = rw.getString("merchant") || "";
+            if (!title) title = rw.getString("name") || "";
+            if (!description) description = rw.getString("description") || "";
+            if (rw.getString("type")) type = rw.getString("type");
           }
         } catch (rErr) {}
       }
 
-      if (!rewardMerchantId && v.getString("campaign")) {
+      if (!voucherMerchantId && campaignId) {
         try {
-          const cp = $app.findRecordById("campaigns", v.getString("campaign"));
+          const cp = $app.findRecordById("campaigns", campaignId);
           if (cp) {
-            rewardMerchantId = cp.getString("merchant");
-            if (!rewardTitle) rewardTitle = cp.getString("name") || cp.getString("title") || "";
+            voucherMerchantId = cp.getString("merchant") || "";
+            if (!title) title = cp.getString("name") || "";
+            if (!description) description = cp.getString("description") || "";
           }
         } catch (cErr) {}
       }
 
-      // Check if voucher belongs to this merchant
-      if (!rewardMerchantId || rewardMerchantId === merchantId) {
-        result.push({
-          id: v.id,
-          code: v.getString("code") || "",
-          title: rewardTitle || "Reward Voucher",
-          description: rewardDesc || "Redeem at counter",
-          type: rewardType,
-          discount_value: meta.discount_value || 0,
-          expires_at: v.getString("expires_at") || v.getString("valid_until") || "",
-          created: v.getString("created")
-        });
+      if (!voucherMerchantId && meta.merchant_id) {
+        voucherMerchantId = meta.merchant_id;
       }
+
+      // Strict: only vouchers clearly issued by this merchant.
+      if (voucherMerchantId !== merchantId) continue;
+
+      result.push({
+        id: v.id,
+        code: v.getString("code") || "",
+        title: title || "Reward Voucher",
+        description: description || "",
+        type: type,
+        discount_type: meta.discount_type || "",
+        discount_value: Number(meta.discount_value) || 0,
+        min_spend: Number(meta.min_spend) || 0,
+        max_discount: Number(meta.max_discount) || 0,
+        applicable_items_text: meta.applicable_items_text || "",
+        snapshot_type: meta.snapshot_type || "",
+        reward_id: rewardId,
+        expires_at: expiresAt,
+        created: v.getString("created")
+      });
     }
 
-    return e.json(200, { success: true, vouchers: result });
+    // Soonest-expiring first; vouchers without an expiry go last.
+    result.sort((a, b) => {
+      const aT = a.expires_at ? new Date(a.expires_at.replace(" ", "T")).getTime() : Infinity;
+      const bT = b.expires_at ? new Date(b.expires_at.replace(" ", "T")).getTime() : Infinity;
+      return aT - bT;
+    });
+
+    return e.json(200, { success: true, customer_id: customerId, vouchers: result });
   } catch (err) {
     console.log("[NFC CUSTOMER VOUCHERS ERROR]", err.message || err);
     return e.json(200, { success: true, vouchers: [] });

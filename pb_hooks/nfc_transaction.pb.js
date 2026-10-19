@@ -152,8 +152,15 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
       const branchName = (body.branch_name || authRecord.getString("branch_name") || claim.getString("branch_name") || "All Branches (HQ)").trim();
       const branchId = (body.branch_id || authRecord.getString("branch") || claim.getString("branch") || "").trim();
-      const voucherId = (body.voucher_id || "").trim();
+      // `voucher_id` present (even empty) is authoritative: the cashier can
+      // deliberately remove the customer's pre-selected voucher. Older clients
+      // omit the key, so fall back to the voucher stored on the claim.
+      const hasVoucherField = Object.prototype.hasOwnProperty.call(body, "voucher_id");
+      const voucherId = hasVoucherField
+        ? String(body.voucher_id || "").trim()
+        : (claim.getString("voucher") || "").trim();
       let redeemedVoucherCode = "";
+      let voucherError = "";
 
       if (voucherId) {
         try {
@@ -164,15 +171,59 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
             const byCode = $app.findRecordsByFilter("vouchers", `code = '${voucherId}'`, "-created", 1, 0);
             if (byCode.length > 0) vRec = byCode[0];
           }
-          if (vRec) {
-            const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
-            vRec.set("status", "used");
-            vRec.set("used_at", nowIso);
-            $app.save(vRec);
-            redeemedVoucherCode = vRec.getString("code");
-            console.log("[NFC COMPLETE] Voucher marked as used:", redeemedVoucherCode || voucherId);
+
+          if (!vRec) {
+            voucherError = "not_found";
+          } else {
+            const vStatus = vRec.getString("status");
+            const vExpires = vRec.getString("expires_at");
+
+            if (vStatus !== "active") {
+              voucherError = vStatus || "invalid";
+            } else if (vExpires && new Date(vExpires.replace(" ", "T")).getTime() <= Date.now()) {
+              voucherError = "expired";
+            } else if (customer && vRec.getString("customer") !== customer.id) {
+              voucherError = "wrong_customer";
+            } else {
+              // Resolve the voucher's merchant before burning it here.
+              let vMerchant = "";
+              const rewardId = vRec.getString("reward");
+              const campaignId = vRec.getString("campaign");
+              try {
+                if (rewardId) vMerchant = $app.findRecordById("rewards", rewardId).getString("merchant") || "";
+              } catch (rwErr) {}
+              if (!vMerchant && campaignId) {
+                try {
+                  vMerchant = $app.findRecordById("campaigns", campaignId).getString("merchant") || "";
+                } catch (cpErr) {}
+              }
+              if (!vMerchant) {
+                try {
+                  const rawMeta = vRec.getString("metadata");
+                  if (rawMeta && rawMeta !== "null") {
+                    const meta = JSON.parse(rawMeta);
+                    if (meta && typeof meta === "object") vMerchant = meta.merchant_id || "";
+                  }
+                } catch (metaErr) {}
+              }
+              if (!vMerchant || vMerchant !== merchantId) {
+                voucherError = "wrong_merchant";
+              }
+            }
+
+            if (voucherError) {
+              console.log(`[NFC COMPLETE] Voucher ${voucherId} not applied: ${voucherError}`);
+            } else {
+              const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+              vRec.set("status", "used");
+              vRec.set("used_at", nowIso);
+              $app.save(vRec);
+              redeemedVoucherCode = vRec.getString("code");
+              console.log("[NFC COMPLETE] Voucher marked as used:", redeemedVoucherCode || voucherId);
+            }
           }
         } catch (vErr) {
+          voucherError = "error";
           console.log("[NFC COMPLETE] Voucher redemption note:", vErr.message || vErr);
         }
       }
@@ -207,6 +258,7 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
           branch_id: branchId,
           voucher_id: voucherId || "",
           voucher_code: redeemedVoucherCode || "",
+          voucher_error: voucherError || "",
           subtotal: body.subtotal ? parseFloat(body.subtotal) : billAmount,
           discount_amount: body.discount_amount ? parseFloat(body.discount_amount) : 0,
         };
@@ -233,7 +285,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         success: true,
         message: "Stamps issued successfully",
         totalStamps: totalStamps,
-        goal: goal
+        goal: goal,
+        voucher_error: voucherError || "",
+        voucher_code: redeemedVoucherCode || ""
       });
     }
 
