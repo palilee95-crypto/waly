@@ -1239,9 +1239,23 @@ export default function ProfileScreen() {
         <View style={styles.storeCard}>
           {/* Top Profile Header Row (Tappable with Chevron) */}
           {(() => {
-            const isProPlan = subscription?.plan 
-              ? (subscription.plan.toLowerCase().includes('pro') || subscription.plan.toLowerCase().includes('stand')) 
-              : (merchant?.status === 'active' || !subscription);
+            const planKey = (subscription?.plan || '').toLowerCase();
+            const planIsActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+            const isStandBundle = planIsActive && planKey === 'stand_bundle';
+            const isStarterPlan = planIsActive && planKey === 'starter';
+            // "Pro tier" only — Stand Bundle and Starter are paid, but not PRO.
+            const isProPlan = planIsActive && (planKey === 'pro' || planKey === 'business' || planKey === 'enterprise');
+            const planBadge = isStandBundle
+              ? { title: 'NFC BUNDLE', icon: 'nfc' as const, bg: '#000000', color: '#FFCC00', border: 'rgba(255, 204, 0, 0.4)' }
+              : isStarterPlan
+                ? { title: 'STARTER', icon: 'cube-outline' as const, bg: '#F8FAFC', color: '#0F172A', border: '#E2E8F0' }
+                : isProPlan
+                  ? {
+                      title: planKey === 'pro' ? 'PRO' : 'BUSINESS',
+                      icon: planKey === 'pro' ? 'crown-outline' as const : 'briefcase-outline' as const,
+                      bg: '#000000', color: '#FFCC00', border: 'rgba(255, 204, 0, 0.4)',
+                    }
+                  : { title: 'FREE', icon: 'account-outline' as const, bg: '#F1F5F9', color: '#475569', border: '#E2E8F0' };
             
             // Clean location string (e.g. "Kampung Padang, Jitra")
             const cleanAddress = (() => {
@@ -1281,20 +1295,12 @@ export default function ProfileScreen() {
                   </View>
 
                   <View style={styles.storeTierRow}>
-                    {isProPlan ? (
-                      <View style={styles.storeVipBadge}>
-                        <MaterialCommunityIcons name="crown-outline" size={13} color="#FFCC00" />
-                        <Text style={styles.storeVipBadgeText}>
-                          PRO
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.storeFreeBadge}>
-                        <Text style={styles.storeFreeBadgeText}>
-                          FREE
-                        </Text>
-                      </View>
-                    )}
+                    <View style={[styles.storeVipBadge, { backgroundColor: planBadge.bg, borderWidth: 1, borderColor: planBadge.border }]}>
+                      <MaterialCommunityIcons name={planBadge.icon} size={13} color={planBadge.color} />
+                      <Text style={[styles.storeVipBadgeText, { color: planBadge.color }]}>
+                        {planBadge.title}
+                      </Text>
+                    </View>
 
                     <View style={styles.storeTierDivider} />
 
@@ -2285,17 +2291,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#FFCC00',
     letterSpacing: 0.5,
-  },
-  storeFreeBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 99,
-  },
-  storeFreeBadgeText: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
   },
   storeTierDivider: {
     width: 1,
