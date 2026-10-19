@@ -207,11 +207,14 @@ export default function MerchantDashboard() {
         sort: '-created',
         requestKey: null,
       });
-      setPendingClaims(records);
+      // POS sales are merchant-initiated; they must not show up as customer
+      // stamp requests on the dashboard.
+      const visibleRecords = records.filter((c: any) => c.manual_pos !== true);
+      setPendingClaims(visibleRecords);
 
       setClaimInputs((prev) => {
         const next = { ...prev };
-        records.forEach((c) => {
+        visibleRecords.forEach((c) => {
           if (!next[c.id]) {
             next[c.id] = {
               billAmount: c.bill_amount ? String(c.bill_amount) : '10',
@@ -636,6 +639,8 @@ export default function MerchantDashboard() {
   const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
   const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
   const isStarter = activeSubscription?.plan === 'starter';
+  // POS is a paid-plan feature: Starter, PRO (and the higher legacy tiers).
+  const posEnabled = ['starter', 'pro', 'business', 'enterprise'].includes((activeSubscription?.plan || '').toLowerCase());
   const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota + addonQuota : 300);
   const quotaPercentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
   const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
@@ -953,13 +958,25 @@ export default function MerchantDashboard() {
           <TouchableOpacity
             style={styles.quickActionItem}
             accessibilityRole="button"
-            onPress={() => DeviceEventEmitter.emit('OPEN_MANUAL_POS')}
+            accessibilityLabel={posEnabled ? 'Open POS System' : 'POS System requires Starter or PRO'}
+            onPress={() => {
+              if (posEnabled) {
+                DeviceEventEmitter.emit('OPEN_MANUAL_POS');
+              } else {
+                router.push('/(merchant)/subscription' as any);
+              }
+            }}
             activeOpacity={0.75}
           >
             <View style={styles.quickActionSquircle}>
-              <Ionicons name="calculator-outline" size={20} color="#0F172A" />
+              <Ionicons name="calculator-outline" size={20} color={posEnabled ? '#0F172A' : '#94A3B8'} />
+              {!posEnabled && (
+                <View style={{ position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="lock-closed" size={9} color="#FFCC00" />
+                </View>
+              )}
             </View>
-            <Text style={styles.quickActionLabel}>POS System</Text>
+            <Text style={[styles.quickActionLabel, !posEnabled && { color: '#94A3B8' }]}>POS System</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

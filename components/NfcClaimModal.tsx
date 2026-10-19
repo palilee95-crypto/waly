@@ -642,8 +642,9 @@ export default function NfcClaimModal() {
         setIsVouchersExpanded(false);
         if (targetClaim.bill_amount) setBillAmount(String(targetClaim.bill_amount));
         else setBillAmount('10');
+        // A POS sale starts at 0 stamps; the cashier can raise it deliberately.
         if (targetClaim.stamp_amount) setStampAmount(String(targetClaim.stamp_amount));
-        else setStampAmount('1');
+        else setStampAmount(targetClaim.manual_pos ? '0' : '1');
         setIsSuccess(false);
         setErrorMsg(null);
         setIsVisible(true);
@@ -724,7 +725,9 @@ export default function NfcClaimModal() {
       return;
     }
     const bill = netTotalAmount;
-    const stamps = parseInt(stampAmount) || 1;
+    // 0 is valid: a POS sale can be completed without issuing a stamp.
+    const hasStampInput = String(stampAmount).trim() !== '';
+    const stamps = hasStampInput ? Math.max(0, parseInt(stampAmount, 10) || 0) : 1;
 
     setIsLoading(true);
     setErrorMsg(null);
@@ -1461,7 +1464,7 @@ export default function NfcClaimModal() {
                     <View style={styles.compactLine}>
                       <Text style={styles.compactLabel}>{locale === 'ms' ? 'Cop diberikan' : 'Stamps to give'}</Text>
                       <View style={styles.compactStepper}>
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.max(1, (parseInt(stampAmount, 10) || 1) - 1)))}><Ionicons name="remove" size={18} color="#0F172A" /></TouchableOpacity>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.max(0, (parseInt(stampAmount, 10) || 0) - 1)))}><Ionicons name="remove" size={18} color="#0F172A" /></TouchableOpacity>
                         <TextInput accessibilityLabel="Stamps to give" value={stampAmount} onChangeText={text => setStampAmount(text.replace(/[^0-9]/g, ''))} keyboardType="number-pad" maxLength={3} style={styles.compactStampInput} />
                         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.min(99, (parseInt(stampAmount, 10) || 1) + 1)))}><Ionicons name="add" size={18} color="#0F172A" /></TouchableOpacity>
                       </View>

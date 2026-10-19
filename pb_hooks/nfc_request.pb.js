@@ -9,6 +9,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     let name = (body.name || body.customer_name || "").trim();
     let branchId = (body.branch_id || body.branch || "").trim();
     let branchName = (body.branch_name || "").trim();
+    const isManualPos = body.manual_pos === true || body.manual_pos === "true" ||
+      body.manual_pos === 1 || body.manual_pos === "1";
 
     if (!merchantId) {
       return e.json(400, { message: "merchant_id is required" });
@@ -23,6 +25,27 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       merchant = $app.findRecordById("merchants", merchantId);
     } catch (err) {
       return e.json(404, { message: "Merchant not found" });
+    }
+
+    // POS is a paid-plan feature. Enforce it server-side so the client gate
+    // cannot be bypassed.
+    if (isManualPos) {
+      let posPlan = "";
+      try {
+        const posSubs = $app.findRecordsByFilter("subscriptions", `merchant = '${merchantId}' && status = 'active'`, "-created", 1, 0);
+        if (posSubs.length > 0) {
+          const periodEnd = posSubs[0].getString("current_period_end");
+          if (!periodEnd || new Date(periodEnd).getTime() > Date.now()) {
+            posPlan = (posSubs[0].getString("plan") || "").toLowerCase();
+          }
+        }
+      } catch (posSubErr) {}
+      if (["starter", "pro", "business", "enterprise"].indexOf(posPlan) < 0) {
+        return e.json(403, {
+          code: "POS_PLAN_REQUIRED",
+          message: "The POS System is available on Starter and PRO plans."
+        });
+      }
     }
 
     // Resolve branch name if branchId is provided
@@ -183,6 +206,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
         if (branchId) claim.set("branch", branchId);
         if (branchName) claim.set("branch_name", branchName);
         if (customerUser) claim.set("customer", customerUser.id);
+        // A POS sale is not a customer stamp request; flag it so the dashboard
+        // does not list it and the merchant is not pushed about their own sale.
+        try { claim.set("manual_pos", isManualPos); } catch (vErr) {}
         // Always set or clear the voucher on reuse so a stale request can't persist.
         try {
           claim.set("voucher", appliedVoucherId || "");
@@ -205,6 +231,7 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       if (branchId) claim.set("branch", branchId);
       if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
+      try { claim.set("manual_pos", isManualPos); } catch (vErr) {}
       if (appliedVoucherId) {
         try { claim.set("voucher", appliedVoucherId); } catch (vErr) {}
         try { claim.set("voucher_title", voucherTitle); } catch (vErr) {}
@@ -213,27 +240,30 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       console.log(`[NFC REQUEST] Created new pending claim ${claim.id} for merchant ${merchantId}, branch ${branchName}, phone ${cleanPhone}`);
     }
 
-    // Trigger Web Push Notification to Merchant Owner & Branch Staff
-    try {
-      const pushHelper = require(`${__hooks}/push_notify.js`);
-      pushHelper.sendPushToMerchant(merchantId, branchId, {
-        title: appliedVoucherId ? "NFC Claim + Baucar! 🏷️🎁" : "NFC Stamp Claim! 🏷️",
-        body: appliedVoucherId
-          ? `${name} ingin kumpul cop & tebus: ${voucherTitle}`
-          : `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
-        url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cleanPhone)}`,
-        tag: `claim-${claim.id}`,
-        data: {
-          claim_id: claim.id,
-          customer_name: name,
-          phone: cleanPhone,
-          session_code: sessionCode,
-          voucher_id: appliedVoucherId,
-          voucher_name: voucherTitle
-        }
-      });
-    } catch (pushErr) {
-      console.log("[NFC CLAIM PUSH DISPATCH ERROR]", pushErr.message || pushErr);
+    // Trigger Web Push Notification to Merchant Owner & Branch Staff.
+    // Skip it for a POS sale — the merchant just started the claim themselves.
+    if (!isManualPos) {
+      try {
+        const pushHelper = require(`${__hooks}/push_notify.js`);
+        pushHelper.sendPushToMerchant(merchantId, branchId, {
+          title: appliedVoucherId ? "NFC Claim + Baucar! 🏷️🎁" : "NFC Stamp Claim! 🏷️",
+          body: appliedVoucherId
+            ? `${name} ingin kumpul cop & tebus: ${voucherTitle}`
+            : `${name} wants to claim stamps${branchName ? ' (' + branchName + ')' : ''}`,
+          url: `/(merchant)/give?claim_id=${claim.id}&phone=${encodeURIComponent(cleanPhone)}`,
+          tag: `claim-${claim.id}`,
+          data: {
+            claim_id: claim.id,
+            customer_name: name,
+            phone: cleanPhone,
+            session_code: sessionCode,
+            voucher_id: appliedVoucherId,
+            voucher_name: voucherTitle
+          }
+        });
+      } catch (pushErr) {
+        console.log("[NFC CLAIM PUSH DISPATCH ERROR]", pushErr.message || pushErr);
+      }
     }
 
     // Find current stamps for this customer & merchant if already registered
@@ -258,7 +288,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       merchant_name: merchant.getString("name") || "Merchant",
       voucher_id: appliedVoucherId,
       voucher_name: voucherTitle,
-      voucher_error: voucherError
+      voucher_error: voucherError,
+      manual_pos: isManualPos
     });
   } catch (err) {
     console.log("[NFC REQUEST ERROR]", err.message || err);

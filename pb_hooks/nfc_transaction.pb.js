@@ -11,7 +11,10 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
     const body = e.requestInfo().body || {};
     const claimId = (body.claim_id || "").trim();
     const billAmount = parseFloat(body.bill_amount) || 0;
-    const stampAmount = parseInt(body.stamp_amount) || 1;
+    // 0 is a valid amount (a POS sale with no stamps). Only default to 1 when
+    // the caller omitted the field entirely.
+    const hasStampField = body.stamp_amount !== undefined && body.stamp_amount !== null && String(body.stamp_amount).trim() !== "";
+    const stampAmount = hasStampField ? Math.max(0, parseInt(String(body.stamp_amount), 10) || 0) : 1;
 
     if (!claimId) {
       return e.json(400, { message: "claim_id is required" });
@@ -78,8 +81,8 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       });
     }
 
-    if (isStampsEnabled && (stampAmount < 1 || stampAmount > 100)) {
-      return e.json(400, { message: "Invalid stamp amount. Must be between 1 and 100." });
+    if (isStampsEnabled && (stampAmount < 0 || stampAmount > 100)) {
+      return e.json(400, { message: "Invalid stamp amount. Must be between 0 and 100." });
     }
 
     const cleanPhone = claim.getString("customer_phone");

@@ -83,7 +83,7 @@ export default function FullPosCheckout({
   const [customAmount, setCustomAmount] = useState('');
 
   const columns = width >= 900 ? 4 : width >= 620 ? 3 : 2;
-  const stampCount = Math.max(1, parseInt(stamps, 10) || 1);
+  const stampCount = Math.max(0, parseInt(stamps, 10) || 0);
 
   const filteredCatalog = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -354,7 +354,7 @@ export default function FullPosCheckout({
               <Text style={styles.optionValue}>{points} {ms ? 'mata akan diperoleh' : 'points will be earned'}</Text>
             </View>
             <View style={styles.stepper}>
-              <TouchableOpacity style={styles.stepperBtn} onPress={() => onStamps(String(Math.max(1, stampCount - 1)))} accessibilityRole="button" accessibilityLabel="Decrease stamps">
+              <TouchableOpacity style={styles.stepperBtn} onPress={() => onStamps(String(Math.max(0, stampCount - 1)))} accessibilityRole="button" accessibilityLabel="Decrease stamps">
                 <Ionicons name="remove" size={16} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.stepperValue}>{stampCount}</Text>

@@ -18,10 +18,10 @@ export default function ManualPosLauncher() {
     if (!normalized || !user?.merchant_id) { setError(ms ? 'Masukkan nombor telefon Malaysia yang sah.' : 'Enter a valid Malaysian mobile number.'); return; }
     busyRef.current = true; setBusy(true); setError('');
     try {
-      const response = await pb.send('/api/risev/nfc/request', { method: 'POST', body: { merchant_id: user.merchant_id, phone: normalized, branch_id: user.branch || '', branch_name: user.branch_name || '' } });
+      const response = await pb.send('/api/risev/nfc/request', { method: 'POST', body: { merchant_id: user.merchant_id, phone: normalized, branch_id: user.branch || '', branch_name: user.branch_name || '', manual_pos: true } });
       if (!response.success || !response.claim_id) throw new Error('Unable to start sale');
       const claim = await pb.collection('nfc_claims').getOne(response.claim_id);
-      if (normalizeManualPosPhone(claim.customer_phone) !== normalized || claim.merchant !== user.merchant_id || claim.status !== 'pending') throw new Error('Customer request could not be verified');
+      if (normalizeManualPosPhone(claim.customer_phone) !== normalized || claim.merchant !== user.merchant_id || claim.status !== 'pending' || claim.manual_pos !== true) throw new Error('Customer request could not be verified');
       queued.current = claim; setOpen(false);
       if (Platform.OS !== 'ios') launch();
     } catch (err: any) { setError(err?.message || (ms ? 'Tidak dapat membuka POS. Cuba lagi.' : 'Unable to open POS. Please try again.')); }
