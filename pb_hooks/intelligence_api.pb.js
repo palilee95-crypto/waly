@@ -8,21 +8,6 @@
 // 5. Merchant Customer Intelligence (GET /api/risev/merchant/insights)
 
 // -------------------------------------------------------------
-// HELPER: Haversine distance in km
-// -------------------------------------------------------------
-function calcDistanceKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 5.0; // fallback reasonable radius
-  var R = 6371; // Earth radius in km
-  var dLat = (lat2 - lat1) * Math.PI / 180;
-  var dLon = (lon2 - lon1) * Math.PI / 180;
-  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-// -------------------------------------------------------------
 // 1. EVENT TRACKING INGESTION
 // -------------------------------------------------------------
 routerAdd("POST", "/api/risev/events", (e) => {
@@ -67,6 +52,20 @@ routerAdd("POST", "/api/risev/events", (e) => {
 // 2. PERSONALIZED "FOR YOU" RECOMMENDATION FEED
 // -------------------------------------------------------------
 routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
+  // JSVM: hook handlers are re-evaluated without file scope, so file-level helpers
+  // are NOT visible here — define the Haversine helper inside the handler.
+  function calcDistanceKm(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 5.0; // fallback reasonable radius
+    var R = 6371; // Earth radius in km
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
   var authRecord = e.auth;
   var customerId = authRecord ? authRecord.id : null;
   var queryParams = e.requestInfo().query || {};
@@ -78,7 +77,7 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
   // 1. Fetch active merchants
   var activeMerchants = [];
   try {
-    activeMerchants = $app.findRecordsByFilter("merchants", "id != ''", "-is_pro,-rating", 50, 0);
+    activeMerchants = $app.findRecordsByFilter("merchants", "id != ''", "-created", 50, 0);
   } catch (mErr) {
     console.log("[REC_ERR_MERCHANTS] " + mErr);
   }
@@ -212,8 +211,8 @@ routerAdd("GET", "/api/risev/recommendations/for-you", (e) => {
     var m = item.merchant;
     return {
       id: m.id,
-      store_name: m.getString("store_name"),
-      name: m.getString("store_name"),
+      store_name: m.getString("name"),
+      name: m.getString("name"),
       slug: m.getString("slug") || m.getString("pwa_slug") || m.id,
       category: m.getString("category") || "Services",
       city: m.getString("city") || "Kedah",
