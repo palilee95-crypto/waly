@@ -127,6 +127,7 @@ export default function CustomersScreen() {
   };
 
   const [activePlan, setActivePlan] = useState<string>('stand_bundle');
+  const [maxDeletions, setMaxDeletions] = useState<number>(10);
 
   const fetchMerchant = async () => {
     if (!user?.merchant_id) return;
@@ -145,6 +146,14 @@ export default function CustomersScreen() {
           setActivePlan('stand_bundle');
         }
       } catch (sErr) {}
+
+      // Deletion allowance grows with purchased customer slots
+      try {
+        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        if (quotaRes?.current && typeof quotaRes.current.deletions_allowed === 'number') {
+          setMaxDeletions(quotaRes.current.deletions_allowed);
+        }
+      } catch (quotaErr) {}
     } catch (e) {
       console.warn("Failed to fetch merchant for customers screen:", e);
     }
@@ -527,8 +536,8 @@ export default function CustomersScreen() {
   const parsedMerchantMeta = parseSafeMetadata(rawMerchantMeta);
   const standDeletionsUsed = parseInt(parsedMerchantMeta.stand_customer_deletions) || 0;
   const isStandBundle = activePlan === 'stand_bundle' || activePlan === 'none';
-  const standRemainingDeletions = Math.max(0, 10 - standDeletionsUsed);
-  const isStandDeletionLimitReached = isStandBundle && standDeletionsUsed >= 10;
+  const standRemainingDeletions = Math.max(0, maxDeletions - standDeletionsUsed);
+  const isStandDeletionLimitReached = isStandBundle && standDeletionsUsed >= maxDeletions;
 
   const handleConfirmDeleteCustomer = async () => {
     if (!selectedCustomer?.customerId || !user?.merchant_id) return;
@@ -548,10 +557,15 @@ export default function CustomersScreen() {
         is_stand_bundle?: boolean;
         remaining_deletions?: number;
         deletions_used?: number;
+        max_deletions?: number;
       }>('/api/risev/merchant/customer/delete', {
         method: 'POST',
         body: { customer_id: targetCustomerId },
       });
+
+      if (res.is_stand_bundle && typeof res.max_deletions === 'number') {
+        setMaxDeletions(res.max_deletions);
+      }
 
       if (res.is_stand_bundle && res.deletions_used !== undefined) {
         setMerchant((prev: any) => {
@@ -3436,7 +3450,7 @@ export default function CustomersScreen() {
               </Text>
               <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 4 }}>
                 {isStandDeletionLimitReached
-                  ? 'You have used all 10 free customer removals on the NFC Stand package.'
+                  ? `You have used all ${maxDeletions} customer removals included with your NFC Stand package.`
                   : "This will remove the customer's stamp card, transactions, and unused vouchers from your store."}
               </Text>
             </View>
@@ -3482,8 +3496,8 @@ export default function CustomersScreen() {
                     color: isStandDeletionLimitReached ? "#DC2626" : "#B45309"
                   }}>
                     {isStandDeletionLimitReached
-                      ? 'NFC Stand Cap: 10/10 Used'
-                      : `Stand Bundle: ${standRemainingDeletions} of 10 Removals Left`}
+                      ? `NFC Stand Cap: ${standDeletionsUsed}/${maxDeletions} Used`
+                      : `Stand Bundle: ${standRemainingDeletions} of ${maxDeletions} Removals Left`}
                   </Text>
                 </View>
                 <Text style={{
@@ -3493,8 +3507,8 @@ export default function CustomersScreen() {
                   lineHeight: 16
                 }}>
                   {isStandDeletionLimitReached
-                    ? 'To remove more customers and free up slots, upgrade to Starter (RM47/mo) or PRO (RM97/mo) for unlimited customer removals.'
-                    : 'Each customer removed frees up 1 slot in your 500-customer quota. Upgrading to Starter or PRO gives unlimited removals.'}
+                    ? 'To remove more customers and free up slots, add customer slots (each +100 slots grants 10 more removals) or upgrade to Starter (RM47/mo) or PRO (RM97/mo) for unlimited removals.'
+                    : 'Each customer removed frees up 1 slot in your customer quota. Upgrading to Starter or PRO gives unlimited removals.'}
                 </Text>
               </View>
             ) : (
@@ -3538,7 +3552,7 @@ export default function CustomersScreen() {
                   activeOpacity={0.85}
                 >
                   <Ionicons name="flash" size={14} color="#FFC700" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Upgrade Plan</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Add Slots / Upgrade</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity

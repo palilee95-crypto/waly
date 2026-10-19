@@ -11,9 +11,10 @@ type Props = {
   locale: string;
   cohorts: { newCustomers: number; repeatCustomers: number; churnCustomers: number };
   onUpgrade: () => void;
+  onAddSlots?: () => void;
 };
 
-export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro, loading, locale, cohorts, onUpgrade }: Props) {
+export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro, loading, locale, cohorts, onUpgrade, onAddSlots }: Props) {
   const [width, setWidth] = useState(340);
   const ms = locale === 'ms';
   const scale = Math.min(1.25, width / 760);
@@ -77,6 +78,12 @@ export default function CustomerOverviewCards({ customerCount, quotaLimit, isPro
           <Text style={[styles.bold, { fontSize: size(23, 13) }]}>{isPro ? (ms ? 'Urus pelan' : 'Manage plan') : (ms ? 'Naik taraf' : 'Upgrade')}</Text>
           <Ionicons name="arrow-forward" size={size(28, 18)} color="#000000" />
         </TouchableOpacity>
+        {!isPro && onAddSlots ? (
+          <TouchableOpacity accessibilityRole="button" onPress={onAddSlots} activeOpacity={0.75} style={[styles.addSlots, { marginTop: size(10, 6) }]}>
+            <Ionicons name="add-circle-outline" size={size(22, 14)} color="#000000" />
+            <Text style={[styles.bold, { fontSize: size(19, 11) }]}>{ms ? 'Tambah slot pelanggan' : 'Add customer slots'}</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={[styles.card, cardStyle]}>
         {header('pie-chart', ms ? 'STATUS PELANGGAN' : 'CUSTOMER HEALTH', ms ? 'Aktiviti pelanggan' : 'Customer activity')}
@@ -116,6 +123,7 @@ const styles = StyleSheet.create({
   totals: { flex: 1.2, minWidth: 0, borderLeftWidth: 1, borderLeftColor: '#E8ECF1' },
   divider: { height: 1, backgroundColor: '#EDF0F4' },
   upgrade: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#FFCC00' },
+  addSlots: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 },
   healthRows: { flex: 1, justifyContent: 'space-between' },
   healthRow: { flexDirection: 'row', alignItems: 'center' },
   valueRow: { flexDirection: 'row', alignItems: 'baseline' },

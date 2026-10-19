@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import QuotaTopUpModal from './_components/QuotaTopUpModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -31,7 +32,7 @@ const BENEFITS = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ status?: string; order_id?: string; plan?: string; cycle?: string; checkout?: string }>();
+  const params = useLocalSearchParams<{ status?: string; topup?: string; order_id?: string; plan?: string; cycle?: string; checkout?: string }>();
   const { user, refreshSession, switchRole } = useAuth();
   const { locale } = useLanguage();
   const [activeSlide, setActiveSlide] = useState(0);
@@ -45,6 +46,8 @@ export default function SubscriptionScreen() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeSub, setActiveSub] = useState<any>(null);
   const [standTotalQuota, setStandTotalQuota] = useState(500);
+  const [addonQuota, setAddonQuota] = useState(0);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [monthlyCustomerCount, setMonthlyCustomerCount] = useState(0);
 
@@ -60,6 +63,7 @@ export default function SubscriptionScreen() {
   const [staffCount, setStaffCount] = useState(1);
   const [activeVoucherCount, setActiveVoucherCount] = useState(0);
   const [showUsageModal, setShowUsageModal] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Auto-open checkout modal if requested via route params
   useEffect(() => {
@@ -76,7 +80,16 @@ export default function SubscriptionScreen() {
 
   // Handle gateway callback status
   useEffect(() => {
-    if (params.status === 'success') {
+    if (params.topup === 'success') {
+      refreshSession();
+      setReloadKey((k) => k + 1);
+      Alert.alert(
+        locale === 'en' ? 'Slots Added' : 'Slot Ditambah',
+        locale === 'en'
+          ? 'Your payment was successful. Your new customer slots are now active.'
+          : 'Pembayaran anda berjaya. Slot pelanggan baharu anda kini aktif.'
+      );
+    } else if (params.status === 'success') {
       refreshSession();
       setShowSuccessModal(true);
     } else if (params.status === 'cancelled') {
@@ -86,7 +99,7 @@ export default function SubscriptionScreen() {
       setFailureType('failed');
       setShowFailureModal(true);
     }
-  }, [params.status]);
+  }, [params.status, params.topup]);
 
   // Load real subscription & customer database count (Total & Monthly)
   useEffect(() => {
@@ -118,6 +131,19 @@ export default function SubscriptionScreen() {
           filter: `merchant = "${user.merchant_id}"`,
         });
         setCustomerCount(allCards.totalItems);
+
+        // Purchased customer-slot top-ups + server-side quota state
+        try {
+          const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+          if (quotaRes?.current) {
+            setAddonQuota(Number(quotaRes.current.addon_quota) || 0);
+            if (typeof quotaRes.current.used === 'number') {
+              setCustomerCount(quotaRes.current.used);
+            }
+          }
+        } catch (quotaErr) {
+          setAddonQuota(0);
+        }
 
         // Monthly customers registered in current month
         const now = new Date();
@@ -180,7 +206,9 @@ export default function SubscriptionScreen() {
       } catch (e) {}
     };
     fetchSubData();
-  }, [user?.merchant_id]);
+  }, [user?.merchant_id, reloadKey]);
+
+  const customerLimit = activeSub?.plan === 'stand_bundle' ? standTotalQuota + addonQuota : 300;
 
   const handleRedeemCode = async () => {
     if (!standCodeInput.trim()) {
@@ -515,7 +543,7 @@ export default function SubscriptionScreen() {
                         </View>
                       ) : (
                         <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                          / {(activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300).toLocaleString()}
+                           / {customerLimit.toLocaleString()}
                         </Text>
                       )}
                     </View>
@@ -525,7 +553,7 @@ export default function SubscriptionScreen() {
                       height: '100%', 
                       width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                         ? '100%'
-                        : `${Math.min(100, Math.round((customerCount / (activeSub?.plan === 'stand_bundle' ? standTotalQuota : 300)) * 100))}%`, 
+                        : `${Math.min(100, Math.round((customerCount / customerLimit) * 100))}%`, 
                       backgroundColor: '#FFCC00', 
                       borderRadius: 2.5 
                     }} />
@@ -597,6 +625,60 @@ export default function SubscriptionScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+          ) : null}
+
+          {/* Customer Slot Top-Up (Stand Bundle only) */}
+          {activeSub?.plan === 'stand_bundle' ? (
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#0F172A',
+                borderRadius: 18,
+                padding: 14,
+                marginBottom: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+              activeOpacity={0.85}
+              onPress={() => setShowQuotaModal(true)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(255, 204, 0, 0.16)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="people" size={19} color="#FFCC00" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
+                    {locale === 'en' ? 'Need more customer slots?' : 'Perlukan lebih banyak slot pelanggan?'}
+                  </Text>
+                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 2 }}>
+                    {locale === 'en'
+                      ? `Using ${customerCount.toLocaleString()} of ${customerLimit.toLocaleString()}. Add a lifetime block from RM19.`
+                      : `Menggunakan ${customerCount.toLocaleString()} daripada ${customerLimit.toLocaleString()}. Tambah blok seumur hidup dari RM19.`}
+                  </Text>
+                </View>
+              </View>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                backgroundColor: '#FFCC00',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 20,
+              }}>
+                <Ionicons name="add" size={13} color="#050505" />
+                <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
+                  {locale === 'en' ? 'Add' : 'Tambah'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           ) : null}
 
           {/* Option B: Buy NFC Stand in-app (Daylight White Squircle with Gold Accent) */}
@@ -1060,12 +1142,12 @@ export default function SubscriptionScreen() {
                       <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
                         {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                           ? 'Unlimited customer registration'
-                          : `${Math.max(0, 300 - customerCount)} quota balance remaining`}
+                          : `${Math.max(0, customerLimit - customerCount)} quota balance remaining`}
                       </Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                    {customerCount} {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '♾️' : '/ 300'}
+                    {customerCount} {activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise' ? '♾️' : `/ ${customerLimit.toLocaleString()}`}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
@@ -1073,7 +1155,7 @@ export default function SubscriptionScreen() {
                     height: '100%',
                     width: activeSub?.plan === 'pro' || activeSub?.plan === 'business' || activeSub?.plan === 'enterprise'
                       ? '100%'
-                      : `${Math.min(100, Math.round((customerCount / 300) * 100))}%`,
+                      : `${Math.min(100, Math.round((customerCount / customerLimit) * 100))}%`,
                     backgroundColor: '#FFCC00',
                   }} />
                 </View>
@@ -1725,6 +1807,14 @@ export default function SubscriptionScreen() {
           </View>
         </View>
       </Modal>
+
+      <QuotaTopUpModal
+        visible={showQuotaModal}
+        onClose={() => setShowQuotaModal(false)}
+        onPurchased={() => setReloadKey((k) => k + 1)}
+        used={customerCount}
+        limit={customerLimit}
+      />
     </SafeAreaView>
   </View>
   );

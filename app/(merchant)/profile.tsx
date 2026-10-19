@@ -135,6 +135,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [merchant, setMerchant] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
+  const [customerSlotLimit, setCustomerSlotLimit] = useState<number>(500);
   const [loading, setLoading] = useState(true);
   const [customersCount, setCustomersCount] = useState<number>(0);
   const [standsCount, setStandsCount] = useState<number>(1);
@@ -765,7 +766,7 @@ export default function ProfileScreen() {
         bg: '#000000',
         color: '#FFCC00',
         borderColor: 'rgba(255, 204, 0, 0.4)',
-        subtitle: locale === 'en' ? 'Lifetime • 500 Cap' : 'Seumur Hidup • 500 Had',
+        subtitle: locale === 'en' ? `Lifetime • ${customerSlotLimit.toLocaleString()} Cap` : `Seumur Hidup • ${customerSlotLimit.toLocaleString()} Had`,
       };
     }
 
@@ -828,6 +829,14 @@ export default function ProfileScreen() {
       } catch (e: any) {
         console.log("No active subscription row found for profile view:", e.message);
       }
+
+      // Customer-slot capacity (redeemed stands + purchased top-ups)
+      try {
+        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        if (quotaRes?.current && typeof quotaRes.current.limit === 'number') {
+          setCustomerSlotLimit(quotaRes.current.limit);
+        }
+      } catch (quotaErr) {}
 
       // Fetch program record for live preview
       try {

@@ -34,6 +34,53 @@ routerAdd("POST", "/api/risev/chipin-webhook", (c) => {
       return c.json(200, { success: true, message: "Ignored non-paid event" });
     }
 
+    // --- Customer-slot top-ups (merchant_addons) -------------------------
+    // MUST run before any subscription lookup: the email/phone fallback below
+    // would otherwise attach a quota payment to a subscription record.
+    const topupProducts = (body.purchase && body.purchase.products) || [];
+    const topupProdName = topupProducts.length > 0 ? (topupProducts[0].name || "").toLowerCase() : "";
+    const isQuotaTopup = orderReference.indexOf("QUOTA-") === 0 || topupProdName.indexOf("customer slots") !== -1;
+
+    if (isQuotaTopup) {
+      try {
+        let addon = null;
+        if (orderReference) {
+          const byRef = $app.findRecordsByFilter("merchant_addons", `order_ref = "${orderReference}"`, "-created", 1, 0);
+          if (byRef.length > 0) addon = byRef[0];
+        }
+        if (!addon && purchaseId) {
+          const byPay = $app.findRecordsByFilter("merchant_addons", `payment_ref = "${purchaseId}"`, "-created", 1, 0);
+          if (byPay.length > 0) addon = byPay[0];
+        }
+
+        if (!addon) {
+          console.log(`[CHIPIN WEBHOOK] Quota top-up not found for ${purchaseId} / ${orderReference}`);
+          return c.json(200, { success: false, message: "Quota add-on record not found" });
+        }
+
+        if (addon.getString("status") === "active") {
+          console.log(`[CHIPIN WEBHOOK] Quota top-up ${addon.id} already active — ignoring replay.`);
+          return c.json(200, { success: true, type: "customer_quota", duplicate: true });
+        }
+
+        addon.set("status", "active");
+        addon.set("purchased_at", new Date().toISOString());
+        if (purchaseId) addon.set("payment_ref", purchaseId);
+        $app.save(addon);
+        console.log(`[CHIPIN WEBHOOK] Activated ${addon.getInt("quantity")} customer slot(s) for merchant ${addon.getString("merchant")} (${addon.id})`);
+
+        return c.json(200, {
+          success: true,
+          type: "customer_quota",
+          addon_id: addon.id,
+          quantity: addon.getInt("quantity")
+        });
+      } catch (topupErr) {
+        console.log("[CHIPIN WEBHOOK] Quota top-up error:", topupErr.message || topupErr);
+        return c.json(500, { success: false, message: "Failed to apply quota top-up" });
+      }
+    }
+
     // Locate subscription record
     let subRecord = null;
     if (purchaseId) {

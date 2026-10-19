@@ -714,13 +714,19 @@ export default function NfcPaywallScreen() {
             );
           })}
 
-          <View style={styles.disclaimerBox}>
+          <TouchableOpacity
+            style={styles.disclaimerBox}
+            activeOpacity={0.75}
+            onPress={() => router.push('/(merchant)/subscription' as any)}
+          >
             <Ionicons name="information-circle" size={18} color="#64748B" style={{ marginTop: 2 }} />
             <Text style={styles.disclaimerText}>
               <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>Optional Add-ons: </Text>
               WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via your dashboard if needed.
+              {' '}
+              <Text style={{ color: '#FFCC00', fontFamily: 'PlusJakartaSans_700Bold' }}>Add customer slots →</Text>
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
         )}
 

@@ -29,6 +29,7 @@ import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import BookingAccessModal from './_components/BookingAccessModal';
 import CustomerOverviewCards from './_components/CustomerOverviewCards';
+import QuotaTopUpModal from './_components/QuotaTopUpModal';
 
 
 const { width } = Dimensions.get('window');
@@ -78,6 +79,8 @@ export default function MerchantDashboard() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [standTotalQuota, setStandTotalQuota] = useState<number>(500);
+  const [addonQuota, setAddonQuota] = useState<number>(0);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
   const [loyaltyProgram, setLoyaltyProgram] = useState<any>(null);
   const [activeBookingsCount, setActiveBookingsCount] = useState<number>(0);
@@ -305,6 +308,16 @@ export default function MerchantDashboard() {
           if (sumQuota > 0) setStandTotalQuota(sumQuota);
         }
       } catch (codeErr) {}
+
+      // Purchased customer-slot top-ups + server-side quota state
+      try {
+        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        if (quotaRes?.current) {
+          setAddonQuota(Number(quotaRes.current.addon_quota) || 0);
+        }
+      } catch (quotaErr) {
+        setAddonQuota(0);
+      }
 
       // 1. Fetch merchant details & active loyalty program
       const [mRec, prog] = await Promise.all([
@@ -616,7 +629,7 @@ export default function MerchantDashboard() {
   const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
   const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
   const isStarter = activeSubscription?.plan === 'starter';
-  const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 300);
+  const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota + addonQuota : 300);
   const quotaPercentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
   const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
   const isCritical = !isPro && customerCount >= Math.round(quotaLimit * 0.95);
@@ -880,6 +893,7 @@ export default function MerchantDashboard() {
             locale={locale}
             cohorts={customerCohorts}
             onUpgrade={() => router.push('/(merchant)/subscription' as any)}
+            onAddSlots={!isPro && activeSubscription?.plan === 'stand_bundle' ? () => setShowQuotaModal(true) : undefined}
           />
         </View>
 
@@ -1281,6 +1295,14 @@ export default function MerchantDashboard() {
           setMerchant((prev: any) => (prev ? { ...prev, booking_vip_opt_in: true } : prev));
           fetchMerchantData();
         }}
+      />
+
+      <QuotaTopUpModal
+        visible={showQuotaModal}
+        onClose={() => setShowQuotaModal(false)}
+        onPurchased={fetchMerchantData}
+        used={totalCustomersCount ?? 0}
+        limit={activeSubscription?.plan === 'stand_bundle' ? standTotalQuota + addonQuota : null}
       />
     </SafeAreaView>
   );

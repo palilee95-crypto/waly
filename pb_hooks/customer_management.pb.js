@@ -145,24 +145,33 @@ routerAdd("POST", "/api/risev/merchant/customer/delete", (e) => {
       }
     } catch (sErr) {}
 
-    // Check deletion quota for stand_bundle
+    // Check deletion quota for stand_bundle: 10 free removals, plus 10 for
+    // every 100 purchased customer slots.
     const isStandBundle = (activePlan === "stand_bundle" || activePlan === "none");
+    const quotaAddons = require(`${__hooks}/quota_addons.js`);
+    const addonQuota = quotaAddons.getActiveAddonQuota(merchantId);
+    const maxDeletions = quotaAddons.getDeletionAllowance(addonQuota);
+
+    // JSON fields read back as a byte array via get(); getString() returns the
+    // literal "null" when unset. Parse defensively (JSVM JSON gotcha).
     let meta = {};
     try {
-      const rawMeta = merchant.get("metadata");
-      meta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+      const rawMeta = merchant.getString("metadata");
+      meta = (rawMeta && rawMeta !== "null") ? JSON.parse(rawMeta) : {};
     } catch (mErr) {
       meta = {};
     }
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) meta = {};
 
     const deletionsUsed = parseInt(meta.stand_customer_deletions) || 0;
 
-    if (isStandBundle && deletionsUsed >= 10) {
+    if (isStandBundle && deletionsUsed >= maxDeletions) {
       return e.json(403, {
         code: "DELETION_LIMIT_REACHED",
-        message: "You have reached the maximum of 10 customer removals allowed on the NFC Stand package. Please subscribe to Starter (RM47/mo) or PRO (RM97/mo) to remove more members.",
+        message: `You have reached the maximum of ${maxDeletions} customer removals for your package. Add more customer slots, or upgrade to Starter (RM47/mo) or PRO (RM97/mo), to remove more members.`,
         deletions_used: deletionsUsed,
-        max_deletions: 10,
+        max_deletions: maxDeletions,
+        addon_quota: addonQuota,
         plan: activePlan
       });
     }
@@ -224,7 +233,7 @@ routerAdd("POST", "/api/risev/merchant/customer/delete", (e) => {
       meta.stand_customer_deletions = newCount;
       merchant.set("metadata", meta);
       $app.save(merchant);
-      remainingDeletions = Math.max(0, 10 - newCount);
+      remainingDeletions = Math.max(0, maxDeletions - newCount);
     }
 
     console.log(`[CUSTOMER MANAGEMENT] Merchant ${merchantId} removed customer ${customerId}. Plan: ${activePlan}, Deletions used: ${isStandBundle ? meta.stand_customer_deletions : 'unlimited'}`);
@@ -235,6 +244,8 @@ routerAdd("POST", "/api/risev/merchant/customer/delete", (e) => {
       deleted_cards: deletedCards,
       is_stand_bundle: isStandBundle,
       deletions_used: isStandBundle ? meta.stand_customer_deletions : null,
+      max_deletions: isStandBundle ? maxDeletions : null,
+      addon_quota: addonQuota,
       remaining_deletions: remainingDeletions,
       plan: activePlan
     });
