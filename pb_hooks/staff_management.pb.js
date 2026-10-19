@@ -1,21 +1,5 @@
 // pb_hooks/staff_management.pb.js
 
-function risevResolveBranchId(merchantId, candidate) {
-  const c = (candidate || "").trim();
-  if (!c) return "";
-  try {
-    const b = $app.findRecordById("branches", c);
-    if (b && b.getString("merchant") === merchantId) return b.id;
-  } catch (e) {}
-  try {
-    const list = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
-    for (let i = 0; i < list.length; i++) {
-      if ((list[i].getString("name") || "").trim().toLowerCase() === c.toLowerCase()) return list[i].id;
-    }
-  } catch (e) {}
-  return "";
-}
-
 routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   const authRecord = e.auth;
   if (!authRecord) {
@@ -402,6 +386,24 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
 }, $apis.requireAuth("users"));
 
 routerAdd("POST", "/api/risev/merchant/staff", (e) => {
+  // JSVM: hook handlers are re-evaluated without file scope, so a file-level helper
+  // throws ReferenceError here — this must live inside the handler.
+  function risevResolveBranchId(merchantId, candidate) {
+    const c = (candidate || "").trim();
+    if (!c) return "";
+    try {
+      const b = $app.findRecordById("branches", c);
+      if (b && b.getString("merchant") === merchantId) return b.id;
+    } catch (e) {}
+    try {
+      const list = $app.findRecordsByFilter("branches", `merchant = '${merchantId}'`, "-created", 500, 0);
+      for (let i = 0; i < list.length; i++) {
+        if ((list[i].getString("name") || "").trim().toLowerCase() === c.toLowerCase()) return list[i].id;
+      }
+    } catch (e) {}
+    return "";
+  }
+
   const authRecord = e.auth;
   if (!authRecord) {
     return e.json(401, { message: "Unauthorized." });
