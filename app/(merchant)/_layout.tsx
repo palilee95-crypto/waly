@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
+import ManualPosLauncher from '@/components/ManualPosLauncher';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -988,6 +989,7 @@ export default function MerchantLayout() {
         <Tabs.Screen name="bookings" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
+      <ManualPosLauncher />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
       {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && (

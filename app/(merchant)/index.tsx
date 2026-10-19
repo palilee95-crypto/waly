@@ -953,13 +953,13 @@ export default function MerchantDashboard() {
           <TouchableOpacity
             style={styles.quickActionItem}
             accessibilityRole="button"
-            onPress={() => router.push('/(merchant)/marketing' as any)}
+            onPress={() => DeviceEventEmitter.emit('OPEN_MANUAL_POS')}
             activeOpacity={0.75}
           >
             <View style={styles.quickActionSquircle}>
-              <Ionicons name="megaphone-outline" size={20} color="#0F172A" />
+              <Ionicons name="calculator-outline" size={20} color="#0F172A" />
             </View>
-            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Pemasaran' : 'Marketing'}</Text>
+            <Text style={styles.quickActionLabel}>POS System</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

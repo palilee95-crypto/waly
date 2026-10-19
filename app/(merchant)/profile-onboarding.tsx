@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import { ALL_CATEGORIES_LIST, CategoryItemType } from '../(customer)/_components/AllCategoriesModal';
+import { normalizeMerchantCategory } from '@/lib/catalogConfig';
 import * as ImagePicker from 'expo-image-picker';
 
 const BRAND_COLOR_OPTIONS = [
@@ -54,7 +55,7 @@ const CATEGORY_GROUPS = [
   { id: 'all', label: 'All (20)' },
   { id: 'fnb', label: 'F&B & Cafe', ids: ['cafe', 'restaurant', 'dessert', 'beverage'] },
   { id: 'beauty', label: 'Beauty & Spa', ids: ['barber', 'beauty', 'spa', 'muslimah_spa'] },
-  { id: 'auto_tech', label: 'Auto & Tech', ids: ['carwash', 'workshop', 'gadget'] },
+  { id: 'auto_tech', label: 'Auto & Tech', ids: ['carwash', 'workshop', 'repair'] },
   { id: 'retail_services', label: 'Services & Retail', ids: ['groceries', 'boutique', 'laundry', 'optician', 'florist', 'pet', 'gym', 'sports', 'studio', 'other'] },
 ];
 
@@ -184,7 +185,7 @@ export default function ProfileOnboardingScreen() {
         if (m.logo) setLogoUri(`${pb.baseUrl}/api/files/merchants/${m.id}/${m.logo}`);
         if (m.banner) setBannerUri(`${pb.baseUrl}/api/files/merchants/${m.id}/${m.banner}`);
         if (m.metadata?.sub_category) {
-          setSelectedCategoryId(m.metadata.sub_category);
+          setSelectedCategoryId(normalizeMerchantCategory(m.metadata.sub_category));
         } else if (m.category) {
           const match = ALL_CATEGORIES_LIST.find((c) => mapSubCategoryToBase(c.id) === m.category);
           if (match) setSelectedCategoryId(match.id);
