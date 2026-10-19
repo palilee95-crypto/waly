@@ -248,8 +248,29 @@ function sendPushToCustomer(customerId, customerPhone, payload) {
   }
 }
 
+// Convenience wrapper used by the stamp/campaign/automation hooks:
+// builds a payload from (title, body, options) and dispatches it to the customer's devices.
+function sendPushNotification(customerId, title, body, options) {
+  if (!customerId) return null;
+  var opts = options || {};
+  var data = opts.data || {};
+  if (opts.type) data.type = opts.type;
+  if (opts.merchantId) data.merchantId = opts.merchantId;
+
+  var payload = {
+    title: title,
+    body: body,
+    url: opts.url || "/(customer)",
+    tag: opts.tag || "",
+    data: data
+  };
+
+  return sendPushToCustomer(customerId, opts.phone || null, payload);
+}
+
 module.exports = {
   sendPushToUser,
   sendPushToMerchant,
-  sendPushToCustomer
+  sendPushToCustomer,
+  sendPushNotification
 };
