@@ -45,6 +45,7 @@ yarn-error.*
 # local data storage, databases & binaries
 pb_data/
 pb_data_test/
+pb_data_local/
 evolution_db_data/
 evolution_redis_data/
 pocketbase.exe
