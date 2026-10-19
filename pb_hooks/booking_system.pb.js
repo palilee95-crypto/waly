@@ -572,7 +572,7 @@ routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
 
     const records = $app.findRecordsByFilter("service_bookings", filterStr, "booking_date,start_time", 10, 0);
     if (!records || records.length === 0) {
-      return c.json(200, { booking: null });
+      return e.json(200, { booking: null });
     }
 
     // Prioritize upcoming active bookings (booked/arrived) over no_show
