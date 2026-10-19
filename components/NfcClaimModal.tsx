@@ -1134,12 +1134,12 @@ export default function NfcClaimModal() {
                       {/* Customer Badge Row */}
                       <View style={styles.payCustomerCard}>
                         <View style={styles.payAvatarCircle}>
-                          <Text style={styles.payAvatarText}>{getInitials(claim.customer_name || 'Fazli')}</Text>
+                          <Text style={styles.payAvatarText}>{getInitials(claim.customer_name) || '?'}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.payCustomerName}>{getCleanCustomerName(claim.customer_name || 'Fazli')}</Text>
+                          <Text style={styles.payCustomerName}>{getCleanCustomerName(claim.customer_name) || 'Customer'}</Text>
                           <Text style={styles.payCustomerSub}>
-                            {claim.customer_phone || '+601110209669'} · {claim.session_code || 'ZGKPS6'}
+                            {claim.customer_phone || '+60 00 000 0000'} · {claim.session_code || '—'}
                           </Text>
                         </View>
                       </View>
@@ -1312,17 +1312,17 @@ export default function NfcClaimModal() {
                     <View style={styles.customerRowCard}>
                       <View style={styles.figmaAvatarCircle}>
                         <Text style={styles.figmaAvatarText}>
-                          {getInitials(claim.customer_name || 'Fazli')}
+                          {getInitials(claim.customer_name) || '?'}
                         </Text>
                       </View>
                       
                       <View style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                           <Text style={styles.figmaCustomerName} numberOfLines={1}>
-                            {getCleanCustomerName(claim.customer_name || 'Fazli')}
+                            {getCleanCustomerName(claim.customer_name) || 'Customer'}
                           </Text>
                           <View style={styles.sessionPillBadge}>
-                            <Text style={styles.sessionPillText}>{claim.session_code || 'ZX2Z8R'}</Text>
+                            <Text style={styles.sessionPillText}>{claim.session_code || '—'}</Text>
                           </View>
                           {appliedVoucher ? (
                             <View style={styles.customerVoucherBadge}>
@@ -1334,7 +1334,7 @@ export default function NfcClaimModal() {
                           ) : null}
                         </View>
                         <Text style={styles.figmaCustomerPhone} numberOfLines={1}>
-                          {claim.customer_phone || '+601110209669'}
+                          {claim.customer_phone || '+60 00 000 0000'}
                         </Text>
                       </View>
 

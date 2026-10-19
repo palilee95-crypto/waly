@@ -809,7 +809,7 @@ export default function MerchantDashboard() {
                       )}
                     </View>
                     <Text style={styles.pendingCustomerSubApple}>
-                      {claim.customer_phone || '+601110209669'} · {timeAgoStr}
+                      {claim.customer_phone || '+60 00 000 0000'} · {timeAgoStr}
                     </Text>
                   </View>
 
