@@ -293,7 +293,8 @@ onRecordUpdate((e) => {
       
       $app.save(tx);
     } catch (err) {
-      if (err.name === 'ForbiddenError') throw err;
+      // JSVM error `name` is undefined -> instanceof (or status 403) is the reliable check.
+      if ((err instanceof ForbiddenError) || (err && err.status === 403)) throw err;
       console.log("Error logging voucher redemption transaction:", err.message || err);
     }
   }

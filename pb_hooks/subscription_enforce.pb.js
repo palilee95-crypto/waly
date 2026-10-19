@@ -1,6 +1,11 @@
 // pb_hooks/subscription_enforce.pb.js
 
 onRecordCreate((e) => {
+  // JSVM exposes error `name` as undefined/null, so `err.name === 'ForbiddenError'` never
+  // matches (fail-open). Detect via instanceof (const ctor is available in tagged scope) with
+  // a status===403 fallback.
+  const isForbidden = (err) => (err instanceof ForbiddenError) || (err && err.status === 403);
+
   const merchantId = e.record.get('merchant');
   if (merchantId) {
     try {
@@ -67,7 +72,7 @@ onRecordCreate((e) => {
               );
             }
           } catch (qErr) {
-            if (qErr.name === 'ForbiddenError') throw qErr;
+            if (isForbidden(qErr)) throw qErr;
           }
         }
 
@@ -91,12 +96,12 @@ onRecordCreate((e) => {
               throw new ForbiddenError('You have reached your 300 customer quota for this renewal cycle. Renew your subscription or upgrade to PRO for unlimited customers.');
             }
           } catch (qErr) {
-            if (qErr.name === 'ForbiddenError') throw qErr;
+            if (isForbidden(qErr)) throw qErr;
           }
         }
       }
     } catch (err) {
-      if (err.name === 'ForbiddenError') {
+      if (isForbidden(err)) {
         throw err;
       }
       // Fail-open or log on general SQLite lookups to prevent server bricking

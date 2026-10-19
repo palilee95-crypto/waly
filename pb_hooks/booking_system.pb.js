@@ -166,7 +166,8 @@ onRecordCreate((e) => {
         throw new BadRequestError(`Kakitangan (${staffName}) sedang bercuti${staffReason ? ' (' + staffReason + ')' : ''}. Sila pilih kakitangan atau waktu lain.`);
       }
     } catch (valErr) {
-      if (valErr.name === "BadRequestError" || (valErr.message && valErr.message.indexOf("bercuti") !== -1)) {
+      // JSVM error `name` is undefined -> use instanceof / status (400) instead.
+      if ((valErr instanceof BadRequestError) || (valErr && valErr.status === 400) || (valErr.message && valErr.message.indexOf("bercuti") !== -1)) {
         throw valErr;
       }
     }
