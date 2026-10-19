@@ -73,7 +73,7 @@ export default function SmartBookingBanner({
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.container, style]}>
       <LinearGradient
-        colors={['#7E22CE', '#EC4899', '#FF6B00']}
+        colors={['#0F172A', '#1E293B']}
         start={{ x: 0, y: 0.2 }}
         end={{ x: 1, y: 0.8 }}
         style={styles.gradientCard}
@@ -87,17 +87,17 @@ export default function SmartBookingBanner({
           <View style={styles.iconWrapper}>
             <View style={styles.iconGlowHalo} />
             <View style={styles.iconSparkle}>
-              <Ionicons name="sparkles" size={13} color="#FFD700" />
+              <Ionicons name="sparkles" size={12} color="#FFCC00" />
             </View>
 
             <View style={styles.glassIconBox}>
               <LinearGradient
-                colors={['#E11D48', '#C084FC']}
+                colors={['#1E293B', '#0F172A']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.iconGradient}
               >
-                <Ionicons name="calendar" size={22} color="#FFFFFF" />
+                <Ionicons name="calendar" size={20} color="#FFCC00" />
               </LinearGradient>
             </View>
           </View>
@@ -192,15 +192,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: -4,
     marginBottom: 2,
-    shadowColor: '#EC4899',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.32,
-    shadowRadius: 12,
-    elevation: 7,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   gradientCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     borderRadius: 20,
     position: 'relative',
     overflow: 'hidden',
@@ -382,22 +384,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   ctaButton: {
-    backgroundColor: '#090A0F',
-    paddingHorizontal: 10,
-    paddingVertical: 6.5,
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   ctaButtonText: {
     fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#050505',
+    letterSpacing: 0.2,
   },
   liveNowPill: {
     flexDirection: 'row',

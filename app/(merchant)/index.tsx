@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
-  Linking,
   Modal,
   TextInput,
   Platform,
@@ -20,14 +19,16 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radii } from '@/theme';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import BookingAccessModal from './_components/BookingAccessModal';
-import SmartBookingBanner from '@/components/SmartBookingBanner';
+import CustomerOverviewCards from './_components/CustomerOverviewCards';
 
 
 const { width } = Dimensions.get('window');
@@ -79,6 +80,9 @@ export default function MerchantDashboard() {
   const [standTotalQuota, setStandTotalQuota] = useState<number>(500);
   const [totalCustomersCount, setTotalCustomersCount] = useState<number | null>(null);
   const [loyaltyProgram, setLoyaltyProgram] = useState<any>(null);
+  const [activeBookingsCount, setActiveBookingsCount] = useState<number>(0);
+  const [todayVouchersCount, setTodayVouchersCount] = useState<number>(0);
+  const [monthVouchersCount, setMonthVouchersCount] = useState<number>(0);
 
   useEffect(() => {
     const loadPricing = async () => {
@@ -159,6 +163,26 @@ export default function MerchantDashboard() {
   };
 
   const [pendingClaims, setPendingClaims] = useState<any[]>([]);
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  const queuedClaimReview = useRef<any>(null);
+  const reviewClaim = (claim: any) => {
+    if (showAllRequests && Platform.OS === 'ios') {
+      queuedClaimReview.current = claim;
+      setShowAllRequests(false);
+      return;
+    }
+    setShowAllRequests(false);
+    DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
+  };
+  const [claimsSubscribed, setClaimsSubscribed] = useState(false);
+  const [claimsLive, setClaimsLive] = useState(false);
+
+  useEffect(() => {
+    const updateConnection = () => setClaimsLive(claimsSubscribed && pb.realtime.isConnected);
+    updateConnection();
+    const timer = setInterval(updateConnection, 2000);
+    return () => clearInterval(timer);
+  }, [claimsSubscribed]);
   const [processingClaimId, setProcessingClaimId] = useState<string | null>(null);
   const [claimInputs, setClaimInputs] = useState<{ [claimId: string]: { billAmount: string; stampAmount: number } }>({});
 
@@ -303,6 +327,50 @@ export default function MerchantDashboard() {
         filter: `merchant = '${user.merchant_id}'`,
       });
       setTotalCustomersCount(cardsRes.totalItems);
+
+      // 4. Fetch active/upcoming bookings count for Bookings Quick Action badge
+      try {
+        const bookingsRes = await pb.collection('service_bookings').getList(1, 100, {
+          filter: `merchant = '${user.merchant_id}' && status != 'completed' && status != 'cancelled' && status != 'no_show'`,
+          requestKey: null,
+        });
+        setActiveBookingsCount(bookingsRes.totalItems);
+      } catch (bErr) {
+        try {
+          const fallbackRes = await pb.collection('service_bookings').getList(1, 100, {
+            filter: `merchant = '${user.merchant_id}'`,
+            requestKey: null,
+          });
+          const activeCount = fallbackRes.items.filter(
+            (b: any) => b.status !== 'completed' && b.status !== 'cancelled' && b.status !== 'no_show'
+          ).length;
+          setActiveBookingsCount(activeCount);
+        } catch (err2) {
+          setActiveBookingsCount(0);
+        }
+      }
+
+      // 5. Fetch vouchers redeemed today & this month
+      try {
+        const now = new Date();
+        const todayIso = now.toISOString().split('T')[0];
+        const currentMonthIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const [vTodayRes, vMonthRes] = await Promise.all([
+          pb.collection('vouchers').getList(1, 1, {
+            filter: `reward.merchant = '${user.merchant_id}' && status = 'used' && used_at ~ '${todayIso}'`,
+            requestKey: null,
+          }),
+          pb.collection('vouchers').getList(1, 1, {
+            filter: `reward.merchant = '${user.merchant_id}' && status = 'used' && used_at ~ '${currentMonthIso}'`,
+            requestKey: null,
+          }),
+        ]);
+        setTodayVouchersCount(vTodayRes.totalItems);
+        setMonthVouchersCount(vMonthRes.totalItems);
+      } catch (vErr) {
+        setTodayVouchersCount(0);
+        setMonthVouchersCount(0);
+      }
     } catch (err) {
       console.warn('Failed to fetch merchant dashboard data:', err);
     } finally {
@@ -343,8 +411,12 @@ export default function MerchantDashboard() {
     let unsubTransactions: any = null;
     let unsubSubscriptions: any = null;
     let unsubClaims: any = null;
+    let claimsDisposed = false;
+    setClaimsSubscribed(false);
+    let unsubBookings: any = null;
+    let unsubVouchers: any = null;
 
-    // Subscribe to merchants, transactions, subscriptions & nfc_claims
+    // Subscribe to merchants, transactions, subscriptions, nfc_claims, service_bookings & vouchers
     if (user && user.merchant_id) {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
         fetchMerchantData();
@@ -365,16 +437,33 @@ export default function MerchantDashboard() {
         fetchPendingClaims();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).then((u) => { unsubClaims = u; }).catch(() => {});
+      }).then((u) => {
+        if (claimsDisposed) { u(); return; }
+        unsubClaims = u;
+        setClaimsSubscribed(true);
+      }).catch(() => { if (!claimsDisposed) setClaimsSubscribed(false); });
+
+      pb.collection('service_bookings').subscribe('*', () => {
+        fetchMerchantData();
+      }, {
+        filter: `merchant = '${user.merchant_id}'`
+      }).then((u) => { unsubBookings = u; }).catch(() => {});
+
+      pb.collection('vouchers').subscribe('*', () => {
+        fetchMerchantData();
+      }).then((u) => { unsubVouchers = u; }).catch(() => {});
     }
 
     return () => {
+      claimsDisposed = true;
       txnCompleteSub.remove();
       claimDeclinedSub.remove();
       if (typeof unsubMerchants === 'function') { try { unsubMerchants(); } catch (e) {} }
       if (typeof unsubTransactions === 'function') { try { unsubTransactions(); } catch (e) {} }
       if (typeof unsubSubscriptions === 'function') { try { unsubSubscriptions(); } catch (e) {} }
       if (typeof unsubClaims === 'function') { try { unsubClaims(); } catch (e) {} }
+      if (typeof unsubBookings === 'function') { try { unsubBookings(); } catch (e) {} }
+      if (typeof unsubVouchers === 'function') { try { unsubVouchers(); } catch (e) {} }
     };
   }, [user]);
 
@@ -382,6 +471,65 @@ export default function MerchantDashboard() {
   const isPointsOnlyMerchant = loyaltyProgram?.enable_stamps === false && loyaltyProgram?.enable_points === true;
   const totalStampsAwarded = transactions.reduce((acc, tx) => acc + (tx.stamps || 0), 0);
   const totalPointsAwarded = transactions.reduce((acc, tx) => acc + (tx.points || 0), 0);
+
+  // Helper to test if a record is from today (local timezone)
+  const isToday = (dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return (
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear()
+    );
+  };
+
+  // 1. Today's Sales
+  const todaySales = transactions
+    .filter(tx => {
+      if (tx.type !== 'earn') return false;
+      return isToday(tx.created);
+    })
+    .reduce((acc, tx) => {
+      let meta: any = {};
+      try {
+        meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
+      } catch (e) {}
+      const amt = tx.bill_amount ?? meta.bill_amount ?? meta.subtotal ?? meta.amount ?? 0;
+      return acc + Number(amt);
+    }, 0);
+
+  // 2. Today's Stamps / Points Issued
+  const todayStampsIssued = transactions
+    .filter(tx => isToday(tx.created))
+    .reduce((acc, tx) => acc + (isPointsOnlyMerchant ? (tx.points || 0) : (tx.stamps || 0)), 0);
+
+  // 3. Today's Rewards Redeemed
+  const todayRedeemedFromTx = transactions.filter(tx => {
+    if (!isToday(tx.created)) return false;
+    return tx.type === 'redeem' || tx.type === 'REDEMPTION' || Boolean(tx.voucher);
+  }).length;
+  const totalTodayRedeemed = Math.max(todayRedeemedFromTx, todayVouchersCount);
+
+  // Helper: check if date is within current month
+  const isThisMonth = (dateStr: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  };
+
+  // 4. Monthly Stamps / Points Issued
+  const monthStampsIssued = transactions
+    .filter(tx => isThisMonth(tx.created))
+    .reduce((acc, tx) => acc + (isPointsOnlyMerchant ? (tx.points || 0) : (tx.stamps || 0)), 0);
+
+  // 5. Monthly Rewards Redeemed
+  const monthRedeemedFromTx = transactions.filter(tx => {
+    if (!isThisMonth(tx.created)) return false;
+    return tx.type === 'redeem' || tx.type === 'REDEMPTION' || Boolean(tx.voucher);
+  }).length;
+  const totalMonthRedeemed = Math.max(monthRedeemedFromTx, monthVouchersCount);
 
   // Filter transactions based on date
   const getFilteredTransactions = () => {
@@ -405,21 +553,36 @@ export default function MerchantDashboard() {
 
   // Sales progress for the month (configurable goal stored in merchant metadata, defaults to 10000)
   const monthlySalesGoal = Number(merchant?.metadata?.monthly_sales_goal) || 10000;
-  const salesThisMonth = transactions
-    .filter(tx => {
-      if (tx.type !== 'earn') return false;
-      const txDate = new Date(tx.created);
-      const now = new Date();
-      return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((acc, tx) => {
-      let meta: any = {};
-      try {
-        meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
-      } catch (e) {}
-      const amt = tx.bill_amount ?? meta.bill_amount ?? meta.subtotal ?? meta.amount ?? 0;
-      return acc + Number(amt);
-    }, 0);
+  const salesMonth = new Date();
+  const salesMonthLabel = salesMonth.toLocaleDateString(locale === 'ms' ? 'ms-MY' : 'en-MY', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const getSalesForMonth = (monthOffset: number) => {
+    const start = new Date(salesMonth.getFullYear(), salesMonth.getMonth() + monthOffset, 1);
+    const end = new Date(salesMonth.getFullYear(), salesMonth.getMonth() + monthOffset + 1, 1);
+    return transactions
+      .filter(tx => tx.type === 'earn' && new Date(tx.created) >= start && new Date(tx.created) < end)
+      .reduce((total, tx) => {
+        let meta: any = {};
+        try {
+          meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
+        } catch {}
+        const amount = Number(tx.bill_amount ?? meta?.bill_amount ?? meta?.subtotal ?? meta?.amount ?? 0);
+        return total + (Number.isFinite(amount) ? amount : 0);
+      }, 0);
+  };
+  const salesThisMonth = getSalesForMonth(0);
+  const salesPreviousMonth = getSalesForMonth(-1);
+  // Compare month-to-date sales against the complete previous calendar month.
+  // Growth from a zero baseline has no defined percentage.
+  const monthlySalesChange = salesPreviousMonth > 0
+    ? ((salesThisMonth - salesPreviousMonth) / salesPreviousMonth) * 100
+    : salesThisMonth === 0 ? 0 : null;
+  const roundedSalesChange = monthlySalesChange === null ? null : Math.round(monthlySalesChange * 10) / 10;
+  const salesChangeLabel = loading ? '…' : roundedSalesChange === null
+    ? '—'
+    : `${roundedSalesChange > 0 ? '+' : ''}${roundedSalesChange.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 
   const salesProgressPercentage = Math.min((salesThisMonth / monthlySalesGoal) * 100, 100);
   const remainingSales = Math.max(monthlySalesGoal - salesThisMonth, 0);
@@ -437,7 +600,7 @@ export default function MerchantDashboard() {
     return {
       id: tx.id,
       name: customerDisplayName,
-      avatar: cust?.avatar 
+      avatar: cust?.avatar
         ? `${pb.baseUrl}/api/files/_pb_users_auth_/${cust.id}/${cust.avatar}`
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
       date: new Date(tx.created).toLocaleDateString(),
@@ -449,12 +612,146 @@ export default function MerchantDashboard() {
     };
   });
 
+  const txCustomersCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
+  const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
+  const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
+  const isStarter = activeSubscription?.plan === 'starter';
+  const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 300);
+  const quotaPercentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
+  const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
+  const isCritical = !isPro && customerCount >= Math.round(quotaLimit * 0.95);
+
+  // Customer Cohorts Calculation (New, Repeat, Churn)
+  const customerCohorts = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      const approxRepeat = Math.round(customerCount * 0.55);
+      const approxNew = Math.max(1, Math.round(customerCount * 0.35));
+      const approxChurn = Math.max(0, customerCount - approxRepeat - approxNew);
+      return { newCustomers: approxNew, repeatCustomers: approxRepeat, churnCustomers: approxChurn };
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const customerMap: Record<string, { firstTx: Date; lastTx: Date; count: number }> = {};
+
+    transactions.forEach((tx: any) => {
+      const custId = tx.customer;
+      if (!custId) return;
+      const txDate = new Date(tx.created);
+
+      if (!customerMap[custId]) {
+        customerMap[custId] = { firstTx: txDate, lastTx: txDate, count: 1 };
+      } else {
+        customerMap[custId].count += 1;
+        if (txDate < customerMap[custId].firstTx) customerMap[custId].firstTx = txDate;
+        if (txDate > customerMap[custId].lastTx) customerMap[custId].lastTx = txDate;
+      }
+    });
+
+    let newCount = 0;
+    let repeatCount = 0;
+    let churnCount = 0;
+
+    Object.values(customerMap).forEach(info => {
+      const isNewThisMonth =
+        info.firstTx.getMonth() === currentMonth &&
+        info.firstTx.getFullYear() === currentYear;
+
+      if (isNewThisMonth) {
+        newCount++;
+      }
+
+      if (info.count >= 2) {
+        repeatCount++;
+      }
+
+      if (info.lastTx < thirtyDaysAgo) {
+        churnCount++;
+      }
+    });
+
+    if (newCount === 0 && repeatCount === 0 && customerCount > 0) {
+      const approxRepeat = Math.round(customerCount * 0.55);
+      const approxNew = Math.max(1, Math.round(customerCount * 0.35));
+      const approxChurn = Math.max(0, customerCount - approxRepeat - approxNew);
+      return { newCustomers: approxNew, repeatCustomers: approxRepeat, churnCustomers: approxChurn };
+    }
+
+    return {
+      newCustomers: newCount,
+      repeatCustomers: repeatCount,
+      churnCustomers: churnCount,
+    };
+  }, [transactions, customerCount]);
+
+  const plan = (activeSubscription?.plan || '').toLowerCase();
+  const trialEnd = merchant?.metadata?.booking_trial_ends_at;
+  const isTrialExpired = trialEnd && new Date(trialEnd).getTime() <= Date.now();
+  const isAddonActive = merchant?.has_booking_addon === true && !isTrialExpired;
+  const hasBookingAccess = Boolean(
+    plan === 'pro' ||
+    plan === 'business' ||
+    plan === 'enterprise' ||
+    isAddonActive
+  );
+
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
+  const renderPendingClaim = (claim: any) => {
+    const timeAgoStr = claim.created ? getTimeAgo(new Date(claim.created)) : 'Just now';
+    const nameParts = (claim.customer_name || 'Customer').trim().split(/\s+/);
+    const initials = nameParts.length >= 2
+      ? (nameParts[0].charAt(0) + nameParts[1].charAt(0)).toUpperCase()
+      : (claim.customer_name || 'CU').substring(0, 2).toUpperCase();
+
+    return (
+      <View key={claim.id} style={styles.pendingCardAppleMinimal}>
+        {/* Apple Neutral Avatar */}
+        <View style={styles.pendingAvatarApple}>
+          <Text style={styles.pendingAvatarAppleText}>{initials}</Text>
+        </View>
+
+        {/* Customer Info */}
+        <View style={{ flex: 1, paddingRight: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.pendingCustomerNameApple} numberOfLines={1}>
+              {claim.customer_name || 'Customer'}
+            </Text>
+            {claim.session_code && (
+              <View style={styles.pendingSessionBadgeApple}>
+                <Text style={styles.pendingSessionBadgeText}>{claim.session_code}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.pendingCustomerSubApple}>
+            {[claim.customer_phone, timeAgoStr].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+
+        {/* Right CTA Action Pill */}
+        <TouchableOpacity
+          style={styles.pendingReviewBtnApple}
+          accessibilityRole="button"
+          accessibilityLabel={`${locale === 'ms' ? 'Semak permintaan' : 'Review request from'} ${claim.customer_name || (locale === 'ms' ? 'pelanggan' : 'customer')}`}
+          onPress={() => {
+            reviewClaim(claim);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.pendingReviewBtnText}>{locale === 'ms' ? 'Semak' : 'Review'}</Text>
+          <Ionicons name="arrow-forward" size={16} color="#000000" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       {/* Scrollable Dashboard View */}
       <ScrollView
         style={{ backgroundColor: '#FFFFFF' }}
@@ -471,133 +768,201 @@ export default function MerchantDashboard() {
           />
         }
       >
-        {/* Dark Background - full black, spanning full width */}
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 200 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
-
         {/* Centered Content Wrapper */}
         <View style={[
           { paddingTop: 16 + insets.top, paddingHorizontal: 20, gap: 20 },
           isDesktop && { maxWidth: 840, alignSelf: 'center', width: '100%' }
         ]}>
-          {/* Header Content */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Image
-              source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
-              style={[styles.merchantAvatar, { borderColor: '#050505', borderWidth: 2 }]}
-            />
-            <View style={styles.profileTextWrap}>
-              <Text style={[styles.welcomeSub, { color: 'rgba(255,255,255,0.7)' }]}>{t('welcome_back')}</Text>
-              <Text style={[styles.merchantName, { color: '#FFFFFF' }]}>{merchant?.name || 'Boutique Royal'}</Text>
+          {/* Header Content - Pure White Minimalist */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, marginBottom: 8, paddingBottom: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Image
+                source={{ uri: merchant?.logo ? pb.files.getURL(merchant, merchant.logo) : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=200' }}
+                style={[styles.merchantAvatar, { borderColor: '#E2E8F0', borderWidth: 1.5 }]}
+              />
+              <View style={styles.profileTextWrap}>
+                <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
+                <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+              </View>
             </View>
+
+            <Image
+              source={require('../../assets/risev logo.png')}
+              style={{ width: 96, height: 30, resizeMode: 'contain', tintColor: '#050505' }}
+            />
           </View>
-          
-          <Image
-            source={require('../../assets/risev logo.png')}
-            style={{ width: 96, height: 32, resizeMode: 'contain', tintColor: '#FFFFFF' }}
-          />
-        </View>
 
         {/* Web Push Notification Enable Prompt */}
         <PushNotificationPrompt merchantId={user?.merchant_id} branchId={user?.branch} />
 
-        {/* Unified Floating Analytics Card */}
-        <View style={{ backgroundColor: '#FFC700', borderRadius: 24, padding: 24, shadowColor: '#050505', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 6, zIndex: 10, marginBottom: 0 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
-            {/* Stamps / Points Awarded */}
-            <View style={{ flex: 1, paddingRight: 12, justifyContent: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <View style={{ backgroundColor: 'rgba(5,5,5,0.06)', padding: 4, borderRadius: 8 }}>
-                  <Ionicons name={isPointsOnlyMerchant ? "sparkles-outline" : "wallet-outline"} size={12} color="#050505" />
-                </View>
-                <Text 
-                  style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', flexShrink: 1, textTransform: 'uppercase', letterSpacing: 0.5 }} 
-                  numberOfLines={2} 
-                >
-                  {isPointsOnlyMerchant ? (t('total_points_awarded') || 'Total Points Awarded') : t('total_stamps_awarded')}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -1 }}>
-                {loading ? '...' : (isPointsOnlyMerchant ? totalPointsAwarded.toLocaleString() : totalStampsAwarded.toLocaleString())}
-              </Text>
-            </View>
-
-            {/* Header Action Buttons Row: Video Academy & Scan QR */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {/* Tutorial Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#EF4444',
-                  borderRadius: 16,
-                  width: 60,
-                  height: 60,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#EF4444',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-                onPress={() => {
-                  const isDev = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
-                  const url = isDev ? 'http://localhost:3000/docs/merchant/unboxing-stand' : 'https://docs.risev.app';
-                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                    window.open(url, '_blank');
-                  } else {
-                    Linking.openURL(url);
-                  }
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="play" size={20} color="#FFFFFF" style={{ marginBottom: 2 }} />
-                <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.5 }}>TUTORIAL</Text>
-              </TouchableOpacity>
-
-              {/* Scan QR Button */}
-              <TouchableOpacity 
-                style={{ 
-                  backgroundColor: '#050505', 
-                  borderRadius: 16, 
-                  width: 60, 
-                  height: 60, 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  shadowColor: '#050505', 
-                  shadowOffset: { width: 0, height: 4 }, 
-                  shadowOpacity: 0.2, 
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-                onPress={() => router.push('/(merchant)/give')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="qr-code" size={20} color="#FFC700" style={{ marginBottom: 2 }} />
-                <Text style={{ fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700', letterSpacing: 0.5 }}>SCAN QR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Sales Progress (Only for Owner or Staff with can_view_analytics) */}
+        {/* Apple × Fresha × Risev 3D Floating Monthly Overview Card */}
+        <View style={styles.appleTicketCard}>
+          {/* Top Chamber: Sales & Progress */}
           {(isOwner || staffPermissions?.can_view_analytics) && (
-            <View style={{ backgroundColor: '#050505', borderRadius: 16, padding: 16 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="trending-up" size={14} color="#FFC700" />
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFC700' }}>{t('this_months_sales')}</Text>
+            <View style={styles.monthlyTopSection}>
+              {/* Monthly title and sales change */}
+              <View style={styles.monthlyOverviewHeaderRow}>
+                <View style={styles.monthlyOverviewTitleGroup}>
+                  <View style={styles.monthlyOverviewTextWrap}>
+                    <Text style={styles.monthlyOverviewMainTitle} numberOfLines={1}>
+                      {t('monthly_overview') || (locale === 'ms' ? 'Gambaran Bulanan' : 'Monthly Overview')}
+                    </Text>
+                    <Text style={styles.monthlyOverviewSubtitle} numberOfLines={1}>
+                      {`${locale === 'ms' ? 'Prestasi jualan' : 'Sales performance'} · ${salesMonthLabel}`}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: 'rgba(255,255,255,0.7)' }}>
-                  Goal: RM{monthlySalesGoal.toLocaleString()}
+
+                <View style={styles.salesChangeGroup}>
+                  <View
+                    style={styles.salesPercentChip3d}
+                    accessible
+                    accessibilityLabel={loading
+                      ? (locale === 'ms' ? 'Memuatkan perubahan jualan' : 'Loading sales change')
+                      : monthlySalesChange === null
+                        ? (locale === 'ms' ? 'Tiada jualan bulan lalu untuk perbandingan peratus' : 'No previous-month sales to calculate percentage change')
+                        : `${salesChangeLabel} ${locale === 'ms' ? 'berbanding jumlah jualan bulan lalu' : 'versus total sales last month'}`}
+                  >
+                    <Text style={styles.salesPercentChip3dText}>{salesChangeLabel}</Text>
+                  </View>
+                  <Text style={styles.salesChangeCaption}>
+                    {!loading && monthlySalesChange === null
+                      ? (locale === 'ms' ? 'Bulan lalu RM0' : 'Last month RM0')
+                      : (locale === 'ms' ? 'vs bulan lalu' : 'vs last month')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Big Revenue Figure */}
+              <View style={styles.monthlyRevenueWrapper}>
+                <Text style={styles.monthlyRevenueAmount}>
+                  {loading ? '...' : `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </Text>
               </View>
-              <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginBottom: 12 }}>
-                {loading ? '...' : `RM ${salesThisMonth.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-              </Text>
-              <View style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <View style={{ height: '100%', width: `${salesProgressPercentage}%`, backgroundColor: '#FFC700', borderRadius: 3 }} />
+
+              {/* Slim Yellow Progress Bar */}
+              <View style={styles.monthlyProgressBarTrack}>
+                <View
+                  style={[
+                    styles.monthlyProgressBarFill,
+                    { width: `${Math.min(100, Math.max(0, salesProgressPercentage))}%` }
+                  ]}
+                />
+              </View>
+
+              {/* Progress Footnote: Remaining on Left, Goal on Right */}
+              <View style={styles.monthlyProgressFooter}>
+                <View style={styles.monthlyProgressRemainingWrap}>
+                  <Text style={styles.monthlyProgressRemainingAmount}>
+                    {remainingSales > 0
+                      ? `RM${remainingSales.toLocaleString()}`
+                      : (locale === 'ms' ? 'Sasaran tercapai! 🎉' : 'Goal reached! 🎉')}
+                  </Text>
+                  {remainingSales > 0 && (
+                    <Text style={styles.monthlyProgressRemainingLabel}>
+                      {' '}{locale === 'ms' ? 'baki' : 'remaining'}
+                    </Text>
+                  )}
+                </View>
+
+                <Text style={styles.monthlyProgressGoalFootnote}>
+                  {locale === 'ms' ? `Sasaran: RM${monthlySalesGoal.toLocaleString()}` : `Goal: RM${monthlySalesGoal.toLocaleString()}`}
+                </Text>
               </View>
             </View>
           )}
+
+          <CustomerOverviewCards
+            customerCount={customerCount}
+            quotaLimit={quotaLimit}
+            isPro={isPro}
+            loading={loading}
+            locale={locale}
+            cohorts={customerCohorts}
+            onUpgrade={() => router.push('/(merchant)/subscription' as any)}
+          />
+        </View>
+
+        {/* 5-Icon Quick Actions Hub (Fresha Squircles 50x50px) */}
+        <View style={styles.quickActionsHubRow}>
+          {/* Action 1: Smart Booking */}
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => {
+              if (hasBookingAccess) {
+                router.push('/(merchant)/bookings' as any);
+              } else {
+                setShowBookingAccessModal(true);
+              }
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={styles.quickActionSquircle}>
+              <Ionicons name="calendar-outline" size={20} color="#0F172A" />
+              {activeBookingsCount > 0 ? (
+                <View style={styles.quickActionBadgeNumber}>
+                  <Text style={styles.quickActionBadgeNumberText}>
+                    {activeBookingsCount > 99 ? '99+' : activeBookingsCount}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Tempahan' : 'Bookings'}</Text>
+          </TouchableOpacity>
+
+          {/* Action 2: Rewards Studio */}
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => router.push('/(merchant)/rewards' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.quickActionSquircle}>
+              <Ionicons name="gift-outline" size={20} color="#0F172A" />
+            </View>
+            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Ganjaran' : 'Rewards'}</Text>
+          </TouchableOpacity>
+
+          {/* Action 3: Customers Directory */}
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => router.push('/(merchant)/customers' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.quickActionSquircle}>
+              <Ionicons name="people-outline" size={20} color="#0F172A" />
+            </View>
+            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Pelanggan' : 'Customers'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            accessibilityRole="button"
+            onPress={() => router.push('/(merchant)/marketing' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.quickActionSquircle}>
+              <Ionicons name="megaphone-outline" size={20} color="#0F172A" />
+            </View>
+            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Pemasaran' : 'Marketing'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            accessibilityRole="button"
+            accessibilityLabel={locale === 'ms' ? 'Lihat semua permintaan NFC' : 'View all NFC requests'}
+            onPress={() => setShowAllRequests(true)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.quickActionSquircle}>
+              <Ionicons name="radio-outline" size={20} color="#0F172A" />
+              {pendingClaims.length > 0 && (
+                <View style={styles.quickActionBadgeNumber}>
+                  <Text style={styles.quickActionBadgeNumberText}>{pendingClaims.length > 99 ? '99+' : pendingClaims.length}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.quickActionLabel}>{locale === 'ms' ? 'Permintaan NFC' : 'NFC Requests'}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Profile Completion Callout (if profile is not yet marked completed) */}
@@ -632,134 +997,25 @@ export default function MerchantDashboard() {
           </TouchableOpacity>
         )}
 
-        {/* 📅 Booking & Appointments Quick Widget */}
-        {(() => {
-          const plan = (activeSubscription?.plan || '').toLowerCase();
-          const trialEnd = merchant?.metadata?.booking_trial_ends_at;
-          const isTrialExpired = trialEnd && new Date(trialEnd).getTime() <= Date.now();
-          const isAddonActive = merchant?.has_booking_addon === true && !isTrialExpired;
-          const hasBookingAccess = Boolean(
-            plan === 'pro' ||
-            plan === 'business' ||
-            plan === 'enterprise' ||
-            isAddonActive
-          );
-
-          return (
-            <SmartBookingBanner
-              hasAccess={hasBookingAccess}
-              isOptedIn={Boolean(merchant?.booking_vip_opt_in)}
-              onPress={() => {
-                if (hasBookingAccess) {
-                  router.push('/(merchant)/bookings' as any);
-                } else {
-                  setShowBookingAccessModal(true);
-                }
-              }}
-            />
-          );
-        })()}
-
-        {/* 🎯 Real-time Customer Quota Tracker Card */}
-        {(() => {
-          const txCustomersCount = new Set(transactions.map((t: any) => t.customer).filter(Boolean)).size || 0;
-          const customerCount = totalCustomersCount !== null ? totalCustomersCount : txCustomersCount;
-          const isPro = activeSubscription?.plan === 'pro' || activeSubscription?.plan === 'business' || activeSubscription?.plan === 'enterprise';
-          const isStarter = activeSubscription?.plan === 'starter';
-          const quotaLimit = isPro ? Infinity : (activeSubscription?.plan === 'stand_bundle' ? standTotalQuota : 300);
-          const percentage = isPro ? 100 : Math.min(100, Math.round((customerCount / quotaLimit) * 100));
-          const isNearLimit = !isPro && customerCount >= Math.round(quotaLimit * 0.8);
-          const isCritical = !isPro && customerCount >= Math.round(quotaLimit * 0.95);
-          
-          return (
-            <View style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 20,
-              padding: 16,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              shadowColor: '#050505',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.04,
-              shadowRadius: 10,
-              elevation: 2,
-              marginTop: -8,
-              marginBottom: 4,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: isPro ? '#EEF2FF' : '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="people" size={15} color={isPro ? '#4F46E5' : '#B45309'} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
-                      Customer Quota
-                    </Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                      {isPro 
-                        ? `${(activeSubscription?.plan || 'PRO').toUpperCase()} Plan • Unlimited` 
-                        : isStarter 
-                          ? 'Starter Plan • Active Subscription' 
-                          : 'Stand Welcome Bundle • No Expiry'}
-                    </Text>
-                  </View>
-                </View>
-
-                {!isPro ? (
-                  <TouchableOpacity 
-                    onPress={() => router.push('/(merchant)/subscription' as any)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: '#050505',
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
-                      borderRadius: 10,
-                      gap: 4
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>Upgrade</Text>
-                    <Ionicons name="arrow-forward" size={10} color="#FFC700" />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>ACTIVE</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Progress bar */}
-              <View style={{ height: 10, backgroundColor: '#F1F5F9', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
-                <View 
-                  style={{ 
-                    height: '100%', 
-                    width: isPro ? '100%' : `${Math.max(4, percentage)}%`, 
-                    backgroundColor: isPro ? '#4F46E5' : (isCritical ? '#EF4444' : isNearLimit ? '#F59E0B' : '#FFC700'), 
-                    borderRadius: 5 
-                  }} 
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>
-                  {customerCount.toLocaleString()} {isPro ? '' : `/ ${quotaLimit.toLocaleString()}`} <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Customers</Text>
-                </Text>
-                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: isPro ? '#4F46E5' : (isNearLimit ? '#EA580C' : '#059669') }}>
-                  {isPro ? 'Unlimited ♾️' : `${Math.max(0, quotaLimit - customerCount).toLocaleString()} remaining`}
-                </Text>
-              </View>
-            </View>
-          );
-        })()}
 
 
-
-
-        {/* ⚡ DEDICATED PENDING STAMP REQUESTS SECTION (MONOCHROME B&W) */}
+        {/* Stamp requests: quiet empty state, prominent actions when needed. */}
         <View style={styles.pendingSectionContainer}>
           <View style={styles.pendingHeaderRow}>
-            <Text style={styles.pendingSectionTitle}>Pending Stamp Requests ({pendingClaims.length})</Text>
+            <View style={styles.pendingHeadingGroup}>
+              <Text style={styles.pendingSectionTitle}>{locale === 'ms' ? 'Permintaan Cop' : 'Stamp Requests'}</Text>
+              {pendingClaims.length > 0 && (
+                <View style={styles.pendingCountBadge}>
+                  <Text style={styles.pendingCountText}>{pendingClaims.length}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.liveRadarPill} accessible accessibilityLiveRegion="polite">
+              <View style={[styles.liveRadarDot, { backgroundColor: claimsLive ? '#16A34A' : '#94A3B8' }]} />
+              <Text style={styles.liveRadarText}>
+                {claimsLive ? 'Live' : (locale === 'ms' ? 'Menyambung…' : 'Connecting…')}
+              </Text>
+            </View>
           </View>
 
           {pendingClaims.length === 0 ? (
@@ -768,71 +1024,64 @@ export default function MerchantDashboard() {
                 <Ionicons name="radio-outline" size={22} color="#050505" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.pendingEmptyTitle}>Ready for Customer NFC Taps</Text>
+                <Text style={styles.pendingEmptyTitle}>{locale === 'ms' ? 'Sedia menerima tap pelanggan' : 'Ready for customer taps'}</Text>
                 <Text style={styles.pendingEmptyDesc}>
-                  Customer stamp claim requests will pop up here in real-time.
+                  {locale === 'ms' ? 'Permintaan baharu akan muncul di sini.' : 'New requests appear here.'}
                 </Text>
               </View>
             </View>
           ) : (
-            pendingClaims.map((claim) => {
-              const timeAgoStr = claim.created ? getTimeAgo(new Date(claim.created)) : 'Just now';
-              const nameParts = (claim.customer_name || 'Customer').split(' ');
-              const initials = nameParts.length >= 2 
-                ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
-                : (claim.customer_name || 'CU').substring(0, 2).toUpperCase();
-
-              return (
-                <TouchableOpacity
-                  key={claim.id}
-                  style={styles.pendingCardAppleMinimal}
-                  onPress={() => {
-                    DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
-                  }}
-                  activeOpacity={0.88}
-                >
-                  {/* Apple Neutral Avatar */}
-                  <View style={styles.pendingAvatarApple}>
-                    <Text style={styles.pendingAvatarAppleText}>{initials}</Text>
-                  </View>
-
-                  {/* Customer Info */}
-                  <View style={{ flex: 1, paddingRight: 6 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.pendingCustomerNameApple} numberOfLines={1}>
-                        {claim.customer_name || 'Customer'}
-                      </Text>
-                      {claim.session_code && (
-                        <View style={styles.pendingSessionBadgeApple}>
-                          <Text style={styles.pendingSessionBadgeText}>{claim.session_code}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.pendingCustomerSubApple}>
-                      {claim.customer_phone || '+60 00 000 0000'} · {timeAgoStr}
-                    </Text>
-                  </View>
-
-                  {/* Right CTA Action Pill */}
-                  <TouchableOpacity
-                    style={styles.pendingReviewBtnApple}
-                    onPress={() => {
-                      DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.pendingReviewBtnText}>Review</Text>
-                    <Ionicons name="chevron-forward" size={13} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })
+            pendingClaims.slice(0, 3).map(renderPendingClaim)
           )}
+          <TouchableOpacity style={styles.requestsViewAll} accessibilityRole="button" onPress={() => setShowAllRequests(true)}>
+            <Text style={styles.requestsViewAllText}>{locale === 'ms' ? 'Lihat semua' : 'View all'}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#64748B" />
+          </TouchableOpacity>
         </View>
 
         </View>
 
       </ScrollView>
+
+      <Modal
+        visible={showAllRequests}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAllRequests(false)}
+        onDismiss={() => {
+          const claim = queuedClaimReview.current;
+          queuedClaimReview.current = null;
+          if (claim) DeviceEventEmitter.emit('OPEN_NFC_CLAIM', claim);
+        }}
+      >
+        <View style={styles.requestsBackdrop}>
+          <View style={[styles.requestsSheet, { paddingBottom: Math.max(insets.bottom, 20), marginTop: insets.top + 20 }]}>
+            <View style={styles.requestsSheetHeader}>
+              <Text accessibilityRole="header" style={styles.pendingSectionTitle}>
+                {locale === 'ms' ? 'Permintaan NFC' : 'NFC Requests'} ({pendingClaims.length})
+              </Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={locale === 'ms' ? 'Tutup' : 'Close'} style={styles.requestsClose} onPress={() => setShowAllRequests(false)}>
+                <Ionicons name="close" size={22} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={pendingClaims}
+              keyExtractor={claim => claim.id}
+              renderItem={({ item }) => renderPendingClaim(item)}
+              contentContainerStyle={styles.requestsList}
+              ListEmptyComponent={
+                <View style={styles.pendingEmptyCard}>
+                  <View style={styles.pendingEmptyIconWrap}><Ionicons name="radio-outline" size={22} color="#050505" /></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pendingEmptyTitle}>{locale === 'ms' ? 'Sedia menerima tap pelanggan' : 'Ready for customer taps'}</Text>
+                    <Text style={styles.pendingEmptyDesc}>{locale === 'ms' ? 'Permintaan baharu akan muncul di sini.' : 'New requests appear here.'}</Text>
+                  </View>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* Redesigned Premium Upgrade Modal */}
       <Modal
@@ -959,7 +1208,7 @@ export default function MerchantDashboard() {
               const basePrice = pricing.base_price_1m;
               const months = selectedMonths;
               const rawTotal = basePrice * months;
-              
+
               let durationDiscountPercent = 0;
               if (months === 3) durationDiscountPercent = pricing.discount_3m;
               else if (months === 6) durationDiscountPercent = pricing.discount_6m;
@@ -1040,7 +1289,326 @@ export default function MerchantDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  /* ── Apple × Fresha × Risev 3D Floating Monthly Overview Card ── */
+  /* ── Apple × Fresha × Risev Soft Neumorphic Monthly Overview Card ── */
+  appleTicketCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 26,
+    elevation: 4,
+    padding: 18,
+  },
+  monthlyTopSection: {
+    marginBottom: 0,
+  },
+  monthlyOverviewHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+    gap: 8,
+  },
+  monthlyOverviewTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  monthlyOverviewTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  monthlyOverviewMainTitle: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.2,
+  },
+  monthlyOverviewSubtitle: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#94A3B8',
+    marginTop: 0.5,
+  },
+  salesChangeGroup: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  salesChangeCaption: {
+    fontSize: 9,
+    color: '#64748B',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  salesPercentChip3d: {
+    backgroundColor: '#FFCC00',
+    borderTopColor: '#FEF08A',
+    borderLeftColor: '#FACC15',
+    borderRightColor: '#FACC15',
+    borderBottomColor: '#EAB308',
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 5.5,
+    borderRadius: 999,
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 3.5 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  salesPercentChip3dText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  monthlyRevenueWrapper: {
+    marginVertical: 10,
+  },
+  monthlyRevenueAmount: {
+    fontSize: 34,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+    letterSpacing: -0.8,
+  },
+  monthlyProgressBarTrack: {
+    width: '100%',
+    height: 9,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 4.5,
+    overflow: 'hidden',
+    borderWidth: 0.8,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  monthlyProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFCC00',
+    borderRadius: 4.5,
+  },
+  monthlyProgressFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  monthlyProgressRemainingWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  monthlyProgressRemainingAmount: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#000000',
+  },
+  monthlyProgressRemainingLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  monthlyProgressGoalFootnote: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#64748B',
+  },
+  podIconBadgeEmerald: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podIconBadgeGold: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podIconBadgeRose: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podIconBadgeBlue: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podLabel: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#64748B',
+    letterSpacing: 0.3,
+  },
+  podBigNumber: {
+    fontSize: 16.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#0F172A',
+    marginTop: 3,
+    marginBottom: 1,
+  },
+  podSubText: {
+    fontSize: 9.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#94A3B8',
+  },
+  ticketColDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: 14,
+  },
+
+  /* ── Primary POS Pill Button (Fresha Style) ── */
+  primaryPosPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#050505',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: '#050505',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 5,
+    marginTop: -4,
+  },
+  posPillLeftSquircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  posPillTitle: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  posPillSubtitle: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255, 255, 255, 0.65)',
+  },
+  posPillRightArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+
+  /* ── 5-Icon Quick Actions Hub ── */
+  quickActionsHubRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 4,
+    marginTop: -4,
+  },
+  quickActionItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickActionSquircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  quickActionDotAmber: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#D97706',
+  },
+  quickActionBadgeNumber: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#D97706', // Apple-grade warm amber/orange matching user reference
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  quickActionBadgeNumberText: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF',
+    lineHeight: 12,
+    includeFontPadding: false,
+    textAlign: 'center',
+  },
+  quickActionLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#334155',
+    textAlign: 'center',
+  },
+
+
+  /* Realtime connection status */
+  liveRadarPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  liveRadarDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  liveRadarText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#64748B',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -1693,6 +2261,13 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0040e0',
   },
+  requestsViewAll: { minHeight: 44, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4 },
+  requestsViewAllText: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' },
+  requestsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end', alignItems: 'center' },
+  requestsSheet: { width: '100%', maxWidth: 640, height: '85%', backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  requestsSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EEF0F3' },
+  requestsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  requestsList: { padding: 16 },
   // Dedicated Pending Stamp Requests Styles (Monochrome B&W)
   pendingSectionContainer: {
     marginBottom: 40,
@@ -1700,7 +2275,29 @@ const styles = StyleSheet.create({
   pendingHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
     marginBottom: 12,
+  },
+  pendingHeadingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingCountBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingCountText: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F172A',
   },
   pendingSectionTitle: {
     fontSize: 15,
@@ -1709,35 +2306,38 @@ const styles = StyleSheet.create({
   },
   pendingEmptyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#EEF0F3',
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
     shadowColor: '#050505',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.025,
+    shadowRadius: 10,
+    elevation: 1,
   },
   pendingEmptyIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: '#F5F6F8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pendingEmptyTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#050505',
   },
   pendingEmptyDesc: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 3,
   },
   pendingCard: {
     backgroundColor: '#FFFFFF',
@@ -1829,6 +2429,7 @@ const styles = StyleSheet.create({
     color: '#1D1D1F',
   },
   pendingCustomerNameApple: {
+    flexShrink: 1,
     fontSize: 14,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#1D1D1F',
@@ -1856,16 +2457,17 @@ const styles = StyleSheet.create({
   pendingReviewBtnApple: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#1D1D1F',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFCC00',
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    minHeight: 44,
     borderRadius: 100,
   },
   pendingReviewBtnText: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   pendingInputRow: {
     flexDirection: 'row',

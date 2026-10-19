@@ -1249,3 +1249,97 @@ The Manage Staff experience (`app/(merchant)/staff.tsx`) follows a strict 3-scre
      - Fixed React Native Web `<TextInput>` auto-expansion overflow by constraining `stampStepperInput` with explicit `width: 32`, `maxWidth: 36`, `height: 26`, and `stampStepperRow` / buttons with `flexShrink: 0`.
      - Preserved clean gap separation and alignment between `STAMPS TO GIVE` title and the counter stepper.
 
+
+
+### 72. Merchant Dashboard Home Redesign: Apple Wallet Pass x Fresha POS (Concept A+B)
+- **File**: [`app/(merchant)/index.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/app/%28merchant%29/index.tsx), [`components/SmartBookingBanner.tsx`](file:///Users/fazlihadir/Desktop/risev%20app/waly/components/SmartBookingBanner.tsx)
+- **Design Philosophy**: Fused **Concept A (Apple Wallet Executive Pass)** with **Concept B (Fresha POS Minimalist Quick Actions)** while strictly adhering to the **Rule of Three** (`#FFFFFF`, `#000000`, `#FFCC00`).
+- **Key Visual & Architectural Upgrades**:
+  1. **Apple Wallet Executive Ticket Pass Card (`appleTicketCard`)**:
+     - Replaced the dated solid yellow box with an authentic Apple Wallet ticket pass featuring crisp side notch cutouts (`ticketNotchLeft` & `ticketNotchRight`, 14×14px with matching borders) and a dashed perforation divider line (`ticketPerforatedLine`).
+     - **Top Chamber (`ticketTopChamber`)**:
+       - Eyebrow row with store name (`store_name`), live status pill (`● AKTIF`), and instant store profile shortcut.
+       - Sales Performance Progress Gauge: Visual monthly turnover track with animated progress bar (`#FFCC00`), current month's sales (`RM XX.XX`), and dynamic growth metric percentage vs previous month.
+     - **Bottom Chamber (`ticketBottomChamber`)**:
+       - Clean twin counters separated by a vertical hairline divider:
+         - **Stamps Awarded**: Total stamps issued this month with sparkline trend indicator.
+         - **Active Customers**: Distinct loyalty customers recorded with tier breakdown.
+  2. **Streamlined Direct Layout (Primary POS Button Retired)**:
+     - The floating black "Scan QR & Issue Stamps" banner was retired to declutter the dashboard, creating a seamless, uninterrupted transition directly from the Executive Pass Card into the 4-Icon Quick Actions Hub and relying on the dedicated center bottom tab POS button for scanner actions.
+  3. **Apple-Grade 4-Icon Quick Actions Hub (`quickActionsHubRow`)**:
+     - Fresha-inspired 52×52px squircles (`borderRadius: 18`, subtle `#F1F5F9` border, soft Apple drop shadow) with cohesive monochrome black icons (`#0F172A`):
+       1. **Bookings** (Calendar icon in `#0F172A`, links directly to bookings).
+       2. **Rewards** (Gift icon in `#0F172A`, opens loyalty rules/rewards).
+       3. **Customers** (People icon in `#0F172A`, opens customer CRM list).
+       4. **Guide** (Play circle outline icon in `#0F172A`, triggers quick onboarding tour).
+  4. **SmartBookingBanner Retired from Dashboard**:
+     - The standalone booking banner was removed from the home dashboard to eliminate visual redundancy, since booking operations are already instantly accessible via the **Bookings** squircle in the 4-Icon Quick Actions Hub.
+  5. **Standalone Customer Quota Card Retired**:
+     - The standalone linear Customer Quota card (`quotaCardClean`) below the Quick Actions Hub has been retired to eliminate screen clutter and redundancy.
+     - Customer Quota is now seamlessly and comprehensively displayed inside the Executive Pass Card's Bottom Chamber (Left Pod Half-Meter Speedometer Gauge + interactive `[ baki • Upgrade ↗ ]` capsule).
+  6. **Live Radar Pending Stamp Claims (`liveRadarPill`)**:
+     - Dedicated pending claims section elevated with a pulsing emerald status pill (`● LIVE RADAR`), maintaining real-time awareness for cashiers without visual clutter.
+  7. **Pure White Minimalist Executive Header**:
+     - Replaced the dark background block (`#050505`) with a seamless pure white (`#FFFFFF`) header canvas.
+     - Dark system status bar (`<StatusBar style="dark" />`), deep obsidian store title (`#0F172A`), muted subtitle (`#64748B`), and pure black Risev logo lockup (`tintColor: '#050505'`).
+  8. **Minimalist White Executive Card (Image No 2 Exact Reference Match)**:
+     - **Card Base**: Pure White (`#FFFFFF`, `borderRadius: 24`, `borderWidth: 1.5`, `borderColor: '#F1F5F9'`) with soft ambient drop shadow. Seamless, unified single-canvas card architecture without nested inner cards.
+     - **Top Chamber**:
+       - Eyebrow: Light neutral pill (`#F8FAFC`, border `#F1F5F9`) with black trending icon and bold `Monthly Overview` / `Gambaran Bulanan`.
+       - Goal Pill: Light slate capsule (`#F1F5F9`) with `Goal: RM10,000` and high-contrast Risev Yellow chip (`#FFCC00`, `86%`).
+       - Revenue: 32px commanding `RM 8,620.00` in deep obsidian (`#0F172A`).
+       - Progress Bar: Light slate track (`#F1F5F9`) with vibrant Risev Yellow fill (`#FFCC00`).
+       - Footnote: Muted reached text (`#64748B`) and bold black remaining text (`#050505`).
+     - **Divider**: Single crisp solid hairline divider line (`ticketSolidDivider`, `height: 1`, `backgroundColor: '#F1F5F9'`) across the card.
+     - **Bottom Chamber (Unified 2-Column Grid Architecture)**:
+       - Single seamless canvas (`ticketBottomChamberGrid`, `paddingHorizontal: 18`, `paddingTop: 14`, `paddingBottom: 16`) without nested bordered cards.
+       - **Left Column: Customer Quota (`ticketQuotaCol`)**:
+         - Header: Clean `[👥] QUOTA` lockup with micro squircle badge (24×24px, `#F8FAFC`) and 11px ExtraBold title. Redundant 3% pill retired for a minimalist look.
+         - Gauge: Tightened 180° Speedometer Arc (100×50px) with 19px ExtraBold customer count (`customerCount`) and 10px limit subtext (`/ quotaLimit`).
+         - Footer: Clean borderless inline link `1,266 left  •  Upgrade →` in amber gold `#D97706` (or `Unlimited ♾️` for Pro).
+       - **Vertical Center Divider (`ticketVerticalDivider`)**: Subtle 1px solid `#F1F5F9` vertical dividing line spanning between Quota and Metrics columns.
+       - **Right Column: Vouchers & Stamps Metrics (`ticketMetricsCol`)**:
+         - **Upper Row (REDEEMED)**: 34×34px gift squircle badge (`gift-outline` in `#0F172A`), 11.5px bold title `REDEEMED` / `BAUCAR`, and prominent 22px ExtraBold figure with 13px inline unit `redeemed` / `ditebus`.
+         - **Hairline Divider**: 1px horizontal `#F1F5F9` separator (`marginVertical: 8`).
+         - **Lower Row (STAMPS)**: 34×34px medal squircle badge (`medal-outline` in `#0F172A`), 11.5px bold title `STAMPS` / `SETEM`, and prominent 22px ExtraBold figure with 13px inline unit `stamps` / `cop`.
+   9. **Dynamic Booking Badge on Quick Action Hub (`quickActionBadgeNumber`)**:
+      - Replaced static amber dot with an active bookings counter badge (`activeBookingsCount`).
+      - Queries `service_bookings` for records where `merchant = merchant_id` and status is active/uncompleted (`status != 'completed' && status != 'cancelled' && status != 'no_show'`).
+      - Realtime reactive subscription on `service_bookings` collection updates the badge automatically when appointments are made, rescheduled, or completed.
+      - Styled as an Apple-grade warm amber pill badge (`#D97706`, `minWidth: 18`, `height: 18`, `borderRadius: 9`, `borderWidth: 1.5`, `borderColor: '#FFFFFF'`) with bold white typography, perched on the top-right corner of the Bookings squircle (`top: -4`, `right: -4`). Automatically hides when count is 0.
+   10. **Risev Merchant Dashboard — Monthly Overview Card (Apple × Fresha × Risev 3D Floating Aesthetic)**:
+      - **Visual Reference Alignment**: 1:1 match with user reference render (`media_1792393273397.png`).
+      - **Main Card Canvas (`appleTicketCard`)**:
+        - Pure White (`#FFFFFF`, `borderRadius: 28`, `borderWidth: 1`, `borderColor: '#F1F5F9'`) with soft layered drop shadows (`shadowColor: '#000000'`, `shadowOffset: { width: 0, height: 10 }`, `shadowOpacity: 0.05`, `shadowRadius: 22`, `elevation: 3`) and `padding: 20`.
+      - **Top Sales Chamber**:
+        - **Header Row (`monthlyOverviewHeaderRow`)**:
+          - Left: Tactile silicone squircle (40×40px, `borderRadius: 13`, `#FEF9C3` with dual-tone bevel: top highlight `#FFFBEB` and bottom depth `#FDE047`, soft honey drop shadow `shadowColor: '#D97706'`, `shadowOpacity: 0.22`) with black `trending-up` icon beside bold title `Monthly Overview` / `Gambaran Bulanan` (15px, `#000000`) and subtitle `Sales performance this month` (11px, `#94A3B8`).
+          - Right: Standalone elevated 3D Risev Yellow pill chip (`#FFCC00`, with top/bottom bevels `#FEF08A` / `#EAB308`, `#000000` bold text, yellow shadow) displaying `{salesProgressPercentage}%`. Retires `Goal: RM10,000` from the header, giving the title group 100% full horizontal space with zero truncation (`...` eliminated).
+        - **Revenue Amount (`monthlyRevenueAmount`)**: Commanding 34px bold `#000000` text with tight letter spacing (`letterSpacing: -0.8`).
+        - **Progress Bar (`monthlyProgressBarTrack`)**: Debossed/recessed trench (9px height, `backgroundColor: '#F1F5F9'`, `borderWidth: 0.8`, `borderColor: '#E2E8F0'`) with high-gloss Risev Yellow physical filler (`#FFCC00`, `borderRadius: 4.5`).
+        - **Progress Footnote (`monthlyProgressFooter`)**:
+          - Left: `RM{remainingSales} remaining` (or `Baki RM{remainingSales}`) in bold black amount + muted slate label, eliminating the redundant sales reached repetition.
+          - Right: `Goal: RM{monthlySalesGoal}` in clean slate (`#64748B`, 12px semiBold).
+      - **Bottom Chamber: Soft Neumorphic Extruded Floating Pods (`floatingCardsRow`)**:
+        - Arranged side-by-side with an 11px gap (`flexDirection: 'row'`, `gap: 11`, `marginTop: 16`).
+        - Both internal pods feature soft dual-tone bevel lighting: pure white reflection highlight (`borderTopColor: '#FFFFFF'`) and subtle ambient depth bevel (`borderBottomColor: '#E2E8F0'`) paired with diffuse soft drop shadows (`shadowColor: '#64748B'`, `shadowOffset: { width: 0, height: 6 }`, `shadowOpacity: 0.08`, `shadowRadius: 14`), creating an authentic physical extrusion from the white main canvas.
+        - **Card 1: Customer Quota (`customerQuota3dCard`, `flex: 1`) — Option B Centered Apple Gauge**:
+          - Elevated white pod (`borderRadius: 26`, `borderWidth: 1`, `borderColor: '#EEF0F3'`, `paddingHorizontal: 11`, `paddingVertical: 13`, `justifyContent: 'space-between'`).
+          - Header: Tactile micro squircle badge (25×25px, `#FEF9C3`, border `#FEF08A`) with black `people` icon and 9.5px ExtraBold title `CUSTOMER QUOTA` (`#000000`).
+          - **Centered Semicircular Meter (`quotaCenteredGaugeWrap`)**:
+            - Spacious Semicircular Gauge ($R = 38$, width 96px, height 54px, track `#EEF2F6`, strokeWidth 6, active yellow arc `#FFCC00` with native `strokeLinecap="round"`).
+            - Inside Arc: Hero figure `34` (24px ExtraBold `#000000`, `lineHeight: 26`) and subtext `customers` / `pelanggan` (9.5px semiBold `#64748B`, letterSpacing 0.2) centered with ~13.5px clearance on both sides (zero text collision).
+          - **Bottom Chamber (`quotaBottomContainer`)**:
+            - **Single-Line Clean Footnote (`quotaFootnoteText`)**: `1,266 left of 1,300` / `1,266 baki drpd 1,300` with bold black numbers (`#000000`, 9.5px) and muted slate connector (`#64748B`). Shows `Unlimited Quota Access` for Pro merchants.
+            - **Centered Upgrade Pill Button (`quotaUpgradeCenteredPill`)**: Tactile silicone pill button (`#FEF9C3`, silky border `#FEF08A`, honey shadow `#D97706`, `paddingHorizontal: 13`, `paddingVertical: 5`, `marginTop: 6`, `borderRadius: 999`) with bold black text `Upgrade →` (or `Pro ✨`). Perfectly centered horizontally with zero risk of truncation or overflowing between cards.
+        - **Card 2: Customer Health (`customerCohorts3dCard`, `flex: 1`)**:
+          - Elevated white pod matching Card 1's curvature (`borderRadius: 26`), border (`#EEF0F3`), soft shadow, and identical height (`paddingHorizontal: 11`, `paddingVertical: 13`, `justifyContent: 'space-between'`).
+          - Header: Tactile micro squircle badge (25×25px, `#FEF9C3`, border `#FEF08A`) with black `pie-chart` icon and 9.5px ExtraBold title `CUSTOMER HEALTH` (`#000000`).
+          - **Tier 1 (New Customer)**: Pale-yellow squircle (`21×21px`, `#FEF9C3`, border `#FEF08A`) with black `person-add` icon + 8px label `NEW CUSTOMER` / `PELANGGAN BARU` + 14.5px bold figure (`customerCohorts.newCustomers`) with 9px inline unit `users` / `orang`.
+          - **Hairline Divider**: 1px `#F1F5F9` separator (`marginVertical: 4`).
+          - **Tier 2 (Repeat Customer)**: Pale-yellow squircle (`21×21px`, `#FEF9C3`, border `#FEF08A`) with black `repeat` icon + 8px label `REPEAT CUSTOMER` / `PELANGGAN BERULANG` + 14.5px bold figure (`customerCohorts.repeatCustomers`) with 9px inline unit `users` / `orang`.
+          - **Hairline Divider**: 1px `#F1F5F9` separator (`marginVertical: 4`).
+          - **Tier 3 (Churn Customer)**: Pale-yellow squircle (`21×21px`, `#FEF9C3`, border `#FEF08A`) with black `time-outline` icon + 8px label `CHURN CUSTOMER` / `PELANGGAN BERISIKO` + 14.5px bold figure (`customerCohorts.churnCustomers`) with 9px inline unit `users` / `orang`.
+      - **Strict Brand Palette**: Pure White (`#FFFFFF`), Pure Black (`#000000`), Risev Yellow (`#FFCC00`), warm pale-yellow icon squircle surfaces (`#FEF9C3`, border `#FEF08A`), and neutral grays (`#EEF0F3`, `#F1F5F9`, `#94A3B8`, `#64748B`). Zero foreign accent colors.
+      - **Equal Widths & Heights**: Both cards use `flex: 1` with 10px gap, achieving a balanced 1:1 iOS-grade layout with zero truncation or button overflow.
+      - **Preserved Logic**: 100% data integrity with dynamic bindings for `salesThisMonth`, `monthlySalesGoal`, `salesProgressPercentage`, `remainingSales`, `customerCount`, `quotaLimit`, `totalMonthRedeemed`, `monthStampsIssued`, and multilingual support (`locale === 'ms'`).
