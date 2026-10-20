@@ -463,7 +463,14 @@ function buildAudience($app, ctx, card, page, perPage) {
   if (card === "all") {
     // The customer directory that used to live on the separate activity screen.
     // Merchant-wide (the directory is not period-scoped), most recent first.
+    const counted = rows(
+      $app,
+      "SELECT COUNT(DISTINCT u.id) as n FROM loyalty_cards c JOIN users u ON u.id = c.customer WHERE c.merchant = {:mid}",
+      { mid: ctx.merchantId },
+      { n: 0 }
+    )[0];
     return {
+      total: Number(counted && counted.n) || 0,
       items: rows(
         $app,
         "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen, COUNT(t.id) as visits " +

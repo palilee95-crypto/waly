@@ -145,7 +145,13 @@ export type AudienceRow = {
   visits?: number;
 };
 
-export type AudiencePage = { card: AudienceCard; page: number; items: AudienceRow[] };
+export type AudiencePage = {
+  card: AudienceCard;
+  page: number;
+  items: AudienceRow[];
+  /** Only the directory reports a total; the other cards take theirs from the snapshot. */
+  total?: number;
+};
 
 /** Paginated rows for an Actions card. Counts live in the snapshot, rows are on demand. */
 export async function fetchAudience(params: {
@@ -167,6 +173,126 @@ export async function fetchAudience(params: {
     requestKey: null,
     signal,
   });
+}
+
+export type CustomerActivity = {
+  id: string;
+  type: string;
+  bill: number;
+  stamps: number;
+  points: number;
+  created: string;
+  method: string;
+};
+
+export type CustomerDetail = {
+  id: string;
+  name: string;
+  phone: string;
+  stamps: number;
+  goal: number;
+  points: number;
+  tier: string;
+  completions: number;
+  vouchers: number;
+  lastActivity: string;
+  activity: CustomerActivity[];
+};
+
+/**
+ * One customer's standing at this merchant. `users` is not merchant-readable, so
+ * name and phone come from the caller (the audience row, which reads the user
+ * through the transaction relation) and everything else from the records the
+ * merchant is allowed to see.
+ */
+export async function fetchCustomerDetail(
+  customerId: string,
+  fallback: { name?: string; phone?: string } = {}
+): Promise<CustomerDetail> {
+  const merchantId = String(pb.authStore.record?.merchant_id || '');
+  const [cards, txns, vouchers] = await Promise.all([
+    pb
+      .collection('loyalty_cards')
+      .getList(1, 1, {
+        filter: `merchant="${merchantId}" && customer="${customerId}"`,
+        expand: 'program',
+        requestKey: null,
+      })
+      .catch(() => null),
+    pb
+      .collection('transactions')
+      .getList(1, 12, {
+        filter: `merchant="${merchantId}" && customer="${customerId}"`,
+        sort: '-created',
+        requestKey: null,
+      })
+      .catch(() => null),
+    pb
+      .collection('vouchers')
+      .getList(1, 1, {
+        filter: `customer="${customerId}" && reward.merchant="${merchantId}" && status="active"`,
+        requestKey: null,
+      })
+      .catch(() => null),
+  ]);
+
+  const card: any = cards?.items?.[0] || null;
+  const rows: any[] = txns?.items || [];
+  const expanded: any = rows.find((r) => r.expand?.customer)?.expand?.customer || null;
+
+  return {
+    id: customerId,
+    name: fallback.name || expanded?.name || 'Customer',
+    phone: fallback.phone || expanded?.phone || '',
+    stamps: Number(card?.stamps_collected) || 0,
+    goal: Number(card?.expand?.program?.stamp_goal) || 10,
+    points: Number(card?.points_balance) || 0,
+    tier: String(card?.tier || 'bronze'),
+    completions: Number(card?.completions) || 0,
+    vouchers: vouchers?.totalItems ?? 0,
+    lastActivity: rows[0]?.created || card?.last_activity || '',
+    activity: rows.map((r) => ({
+      id: r.id,
+      type: String(r.type || ''),
+      bill: Number(r.bill_amount) || 0,
+      stamps: Number(r.stamps) || 0,
+      points: Number(r.points) || 0,
+      created: r.created,
+      method: String(r.method || ''),
+    })),
+  };
+}
+
+/** null means the plan has no removal cap. */
+export type DeletionAllowance = { used: number; max: number } | null;
+
+export async function fetchDeletionAllowance(): Promise<DeletionAllowance> {
+  const res = await pb.send<any>('/api/risev/merchant/quota/packages', {
+    method: 'GET',
+    requestKey: null,
+  });
+  const current = res?.current;
+  if (!current || current.unlimited || typeof current.deletions_allowed !== 'number') return null;
+  const merchantId = String(pb.authStore.record?.merchant_id || '');
+  const merchant = await pb.collection('merchants').getOne(merchantId, { requestKey: null }).catch(() => null);
+  let used = 0;
+  try {
+    const raw = merchant?.metadata;
+    const meta = typeof raw === 'string' ? JSON.parse(raw) : raw || {};
+    used = parseInt(meta.stand_customer_deletions, 10) || 0;
+  } catch {
+    used = 0;
+  }
+  return { used, max: current.deletions_allowed };
+}
+
+/** Removes the customer from THIS merchant: cards, transactions and their vouchers. */
+export async function deleteCustomer(customerId: string): Promise<{ remaining: number | null }> {
+  const res = await pb.send<{ remaining_deletions?: number | null }>(
+    '/api/risev/merchant/customer/delete',
+    { method: 'POST', body: { customer_id: customerId }, requestKey: null }
+  );
+  return { remaining: typeof res?.remaining_deletions === 'number' ? res.remaining_deletions : null };
 }
 
 export function formatMoney(cents: number | null): string {

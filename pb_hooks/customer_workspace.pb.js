@@ -201,6 +201,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
       card: card,
       page: Math.max(1, Number(query.page) || 1),
       items: result.items,
+      total: typeof result.total === "number" ? result.total : undefined,
     });
   } catch (err) {
     console.log("[CUSTOMER WORKSPACE] Audience failed:", err && err.message ? err.message : err);

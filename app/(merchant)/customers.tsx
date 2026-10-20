@@ -209,6 +209,7 @@ export default function CustomerWorkspaceScreen() {
                 : snapshot.attention.find((a) => a.id === audienceCard)?.count ?? 0
           }
           onClose={() => setAudienceCard(null)}
+          onChanged={retry}
         />
       ) : null}
     </SafeAreaView>

@@ -15,7 +15,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radii } from '@/theme';
-import { AudienceCard, AudienceRow, fetchAudience } from '@/lib/customer-workspace';
+import {
+  AudienceCard,
+  AudienceRow,
+  fetchAudience,
+  fetchDeletionAllowance,
+  DeletionAllowance,
+} from '@/lib/customer-workspace';
+import { collectAudience, buildAudienceCsv, shareCsv } from '@/lib/customer-csv';
+import CustomerDetailSheet from './CustomerDetailSheet';
 import {
   buildWhatsAppLink,
   renderTemplate,
@@ -41,6 +49,8 @@ type Props = {
   branchId: string;
   total: number;
   onClose: () => void;
+  /** Fired after a customer is removed so the workspace can refresh its counts. */
+  onChanged?: () => void;
 };
 
 export default function AudienceSheet({
@@ -51,6 +61,7 @@ export default function AudienceSheet({
   branchId,
   total,
   onClose,
+  onChanged,
 }: Props) {
   const [items, setItems] = useState<AudienceRow[]>([]);
   const [page, setPage] = useState(1);
@@ -61,6 +72,11 @@ export default function AudienceSheet({
   );
   const [messaged, setMessaged] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [detailRow, setDetailRow] = useState<AudienceRow | null>(null);
+  const [allowance, setAllowance] = useState<DeletionAllowance>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
   const requestId = useRef(0);
 
   // The directory reuses the "come back" wording as a generic greeting.
@@ -78,6 +94,7 @@ export default function AudienceSheet({
         if (id !== requestId.current) return;
         setItems((prev) => (nextPage === 1 ? res.items : [...prev, ...res.items]));
         setPage(nextPage);
+        if (typeof res.total === 'number') setServerTotal(res.total);
       } catch {
         if (id !== requestId.current) return;
         setError('Could not load this audience.');
@@ -93,7 +110,12 @@ export default function AudienceSheet({
     setItems([]);
     setPage(1);
     setCopied(false);
+    setExportError(null);
+    setServerTotal(null);
     loadPage(1);
+    fetchDeletionAllowance()
+      .then(setAllowance)
+      .catch(() => setAllowance(null));
     AsyncStorage.getItem(templateKey).then((saved) => {
       setTemplate(
         saved && saved.trim()
@@ -153,7 +175,36 @@ export default function AudienceSheet({
     setCopied(true);
   };
 
-  const canLoadMore = items.length > 0 && items.length < total;
+  const exportCsv = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const rows = await collectAudience(card, branchId);
+      if (!rows.length) {
+        setExportError('Nothing to export yet.');
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      await shareCsv(`risev-${card}-customers-${stamp}.csv`, buildAudienceCsv(rows, card));
+    } catch (err: any) {
+      setExportError(err?.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleted = () => {
+    setDetailRow(null);
+    setItems([]);
+    loadPage(1);
+    fetchDeletionAllowance()
+      .then(setAllowance)
+      .catch(() => {});
+    onChanged?.();
+  };
+
+  const effectiveTotal = serverTotal ?? total;
+  const canLoadMore = items.length > 0 && items.length < effectiveTotal;
   const messagedToday = useMemo(
     () => items.filter((r) => messaged.includes(r.id)).length,
     [items, messaged]
@@ -170,9 +221,22 @@ export default function AudienceSheet({
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>{CARD_TITLES[card]}</Text>
               <Text style={styles.subtitle}>
-                {total.toLocaleString('en-MY')} customer{total === 1 ? '' : 's'} · {messagedToday} opened here
+                {effectiveTotal.toLocaleString('en-MY')} customer{effectiveTotal === 1 ? '' : 's'} ·{' '}
+                {messagedToday} opened here
               </Text>
             </View>
+            <TouchableOpacity
+              onPress={exportCsv}
+              style={styles.closeBtn}
+              activeOpacity={0.7}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color={colors.black} />
+              ) : (
+                <Ionicons name="download-outline" size={17} color={colors.black} />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={18} color={colors.black} />
             </TouchableOpacity>
@@ -207,7 +271,11 @@ export default function AudienceSheet({
               const opened = messaged.includes(row.id);
               return (
                 <View key={row.id} style={styles.row}>
-                  <View style={{ flex: 1 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    activeOpacity={0.7}
+                    onPress={() => setDetailRow(row)}
+                  >
                     <Text style={styles.rowName} numberOfLines={1}>
                       {row.name || 'Customer'}
                     </Text>
@@ -230,7 +298,7 @@ export default function AudienceSheet({
                               ? `Birthday ${row.birthday}`
                               : 'Birthday this week'}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                   {opened ? <Ionicons name="checkmark" size={14} color="#686868" style={{ marginRight: 6 }} /> : null}
                   <TouchableOpacity
                     style={[styles.waBtn, !hasPhone && styles.waBtnDisabled]}
@@ -287,9 +355,26 @@ export default function AudienceSheet({
             ) : null}
           </View>
 
+          {allowance ? (
+            <Text style={styles.allowance}>
+              {`Stand Bundle: ${Math.max(0, allowance.max - allowance.used)} of ${allowance.max} removals left`}
+            </Text>
+          ) : null}
+
+          {exportError ? <Text style={styles.exportError}>{exportError}</Text> : null}
+
           <Text style={styles.disclaimer}>
             Opens WhatsApp on this device with the message prefilled. Risev cannot confirm it was sent.
           </Text>
+
+          <CustomerDetailSheet
+            visible={!!detailRow}
+            customerId={detailRow?.id ?? null}
+            name={detailRow?.name}
+            phone={detailRow?.phone}
+            onClose={() => setDetailRow(null)}
+            onDeleted={handleDeleted}
+          />
         </View>
       </View>
     </Modal>
@@ -416,6 +501,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   secondaryText: { fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
+  allowance: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#92400E',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  exportError: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#B91C1C',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   disclaimer: {
     fontSize: 10,
     lineHeight: 14,
