@@ -24,6 +24,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import { cacheKeys, TTL } from '@/lib/cache-keys';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
 import UpgradeModal from './_components/UpgradeModal';
 import BookingAccessModal from './_components/BookingAccessModal';
@@ -803,20 +805,30 @@ export default function ProfileScreen() {
   const fetchMerchant = React.useCallback(async () => {
     if (!user || !user.merchant_id) return;
     try {
-      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
-      console.log('[DEBUG] Fetched merchant:', mRec);
-      console.log('[DEBUG] user.id:', user.id);
-      console.log('[DEBUG] merchant.owner:', mRec.owner);
+      const mRec = await cachedFetch(
+        cacheKeys.merchant(user.merchant_id!),
+        () => pb.collection('merchants').getOne(user.merchant_id!),
+        { ttl: TTL.catalog }
+      );
       setMerchant(mRec);
 
       // Fetch subscription record (prioritize active record, then latest)
       try {
-        const subList = await pb.collection('subscriptions').getList(1, 1, {
-          filter: `merchant = "${user.merchant_id}" && status = "active"`,
-          sort: '-created',
-        });
-        if (subList.items.length > 0) {
-          setSubscription(subList.items[0]);
+        const activeSub = await cachedFetch(
+          cacheKeys.merchantSub(user.merchant_id),
+          () =>
+            pb
+              .collection('subscriptions')
+              .getList(1, 1, {
+                filter: `merchant = "${user.merchant_id}" && (status = "active" || status = "trialing")`,
+                sort: '-created',
+                requestKey: null,
+              })
+              .then((r) => r.items[0] || null),
+          { ttl: TTL.catalog }
+        );
+        if (activeSub) {
+          setSubscription(activeSub);
         } else {
           const fallbackList = await pb.collection('subscriptions').getList(1, 1, {
             filter: `merchant = "${user.merchant_id}"`,
@@ -832,7 +844,11 @@ export default function ProfileScreen() {
 
       // Customer-slot capacity (redeemed stands + purchased top-ups)
       try {
-        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        const quotaRes = await cachedFetch<any>(
+          cacheKeys.merchantQuota(user.merchant_id),
+          () => pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' }),
+          { ttl: TTL.own }
+        );
         if (quotaRes?.current && typeof quotaRes.current.limit === 'number') {
           setCustomerSlotLimit(quotaRes.current.limit);
         }
@@ -855,18 +871,30 @@ export default function ProfileScreen() {
       }
 
       try {
-        const cardsRes = await pb.collection('loyalty_cards').getList(1, 1, {
-          filter: `merchant = "${user.merchant_id}"`,
-        });
-        setCustomersCount(cardsRes.totalItems || 0);
+        const cards = await cachedFetch(
+          cacheKeys.merchantCards(user.merchant_id),
+          () =>
+            pb.collection('loyalty_cards').getFullList({
+              filter: `merchant = "${user.merchant_id}"`,
+              expand: 'customer',
+              requestKey: null,
+            }),
+          { ttl: TTL.own }
+        );
+        setCustomersCount(cards.length || 0);
       } catch (e) {}
 
       try {
-        const standsRes = await pb.collection('activation_codes').getList(1, 1, {
-          filter: `redeemed_by = "${user.merchant_id}"`,
-          requestKey: null,
-        });
-        setStandsCount(standsRes.totalItems || 0);
+        const codes = await cachedFetch(
+          cacheKeys.merchantCodes(user.merchant_id),
+          () =>
+            pb.collection('activation_codes').getFullList({
+              filter: `redeemed_by = "${user.merchant_id}" && is_redeemed = true`,
+              requestKey: null,
+            }),
+          { ttl: TTL.catalog }
+        );
+        setStandsCount(codes.length || 0);
       } catch (e) {
         setStandsCount(0);
       }
@@ -877,10 +905,8 @@ export default function ProfileScreen() {
     }
   }, [user?.merchant_id]);
 
-  useEffect(() => {
-    fetchMerchant();
-  }, [fetchMerchant]);
-
+  // useFocusEffect also fires on first mount, so a separate mount effect would
+  // double every request in this screen.
   useFocusEffect(
     React.useCallback(() => {
       fetchMerchant();

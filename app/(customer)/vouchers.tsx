@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch, invalidate } from '@/lib/data-cache';
+import { cacheKeys, CACHE_PREFIX, TTL } from '@/lib/cache-keys';
 import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 import { getVoucherSpineTheme } from '@/theme';
 
@@ -66,15 +68,20 @@ export default function VouchersScreen() {
   const [birthdayRewards, setBirthdayRewards] = useState<VoucherItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = async (force = false) => {
     if (!user) return;
     try {
       const [records, birthdayLogs] = await Promise.all([
-        pb.collection('vouchers').getFullList({
-          filter: `customer = '${user.id}'`,
-          expand: 'reward,reward.merchant,campaign,campaign.merchant',
-          sort: '-created'
-        }),
+        cachedFetch(
+          cacheKeys.vouchersMe(user.id),
+          () => pb.collection('vouchers').getFullList({
+            filter: `customer = '${user.id}'`,
+            expand: 'reward,reward.merchant,campaign,campaign.merchant',
+            sort: '-created',
+            requestKey: null,
+          }),
+          { ttl: TTL.own, force }
+        ),
         pb.collection('birthday_logs').getFullList({
           filter: `customer = '${user.id}' && status = 'sent'`,
           expand: 'voucher,merchant,reward',
@@ -230,7 +237,8 @@ export default function VouchersScreen() {
     fetchVouchers();
     if (user) {
       pb.collection('vouchers').subscribe('*', (e) => {
-        fetchVouchers();
+        invalidate(CACHE_PREFIX.vouchersMe);
+        fetchVouchers(true);
         if (e.record) {
           setSelectedVoucher((prev) => {
             if (prev && prev.id === e.record.id) {

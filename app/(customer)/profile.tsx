@@ -5,6 +5,8 @@ import { useAuth, storage } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { colors } from '@/theme';
 import { parseAndNormalizeBirthday } from '@/lib/emailValidator';
 
@@ -37,21 +39,34 @@ export default function CustomerProfile() {
   const fetchProfileStats = React.useCallback(() => {
     if (!user) return;
     refreshSession().catch(() => {});
-    pb.collection('loyalty_cards')
-      .getFullList({ filter: `customer = '${user.id}'` })
-      .then((cards) => {
+    cachedFetch(
+      cacheKeys.cardsAllMe(user.id),
+      () => pb.collection('loyalty_cards').getFullList({
+        filter: `customer = '${user.id}'`,
+        fields: 'id,opt_in_marketing,status',
+        requestKey: null,
+      }),
+      { ttl: TTL.own }
+    )
+      .then((cards: any[]) => {
         setCardsCount(cards.length);
         const hasOptedOut = cards.some((c: any) => c.opt_in_marketing === false);
         setOptInMarketing(!hasOptedOut);
       })
       .catch(() => {});
 
-    pb.collection('vouchers')
-      .getFullList({
-        filter: `customer = '${user.id}' && status = 'active'`,
-        expand: 'reward,campaign',
-      })
-      .then((vouchers) => {
+    cachedFetch(
+      cacheKeys.vouchersMe(user.id),
+      () => pb.collection('vouchers').getFullList({
+        filter: `customer = '${user.id}'`,
+        expand: 'reward,reward.merchant,campaign,campaign.merchant',
+        sort: '-created',
+        requestKey: null,
+      }),
+      { ttl: TTL.own }
+    )
+      .then((all: any[]) => {
+        const vouchers = all.filter((v: any) => v.status === 'active');
         setVouchersCount(vouchers.length);
         let totalVal = 0;
         vouchers.forEach((v: any) => {

@@ -24,6 +24,8 @@ import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -115,11 +117,15 @@ export default function CustomersScreen() {
   const fetchBranches = async () => {
     if (!user?.merchant_id) return;
     try {
-      const records = await pb.collection('branches').getFullList({
-        filter: `merchant = "${user.merchant_id}"`,
-        sort: '-is_hq,-created',
-        requestKey: null
-      });
+      const records = await cachedFetch(
+        cacheKeys.merchantBranches(user.merchant_id),
+        () => pb.collection('branches').getFullList({
+          filter: `merchant = "${user.merchant_id}"`,
+          sort: '-is_hq,-created',
+          requestKey: null
+        }),
+        { ttl: TTL.catalog }
+      );
       setBranchList(records || []);
     } catch (e) {
       setBranchList([]);
@@ -132,24 +138,37 @@ export default function CustomersScreen() {
   const fetchMerchant = async () => {
     if (!user?.merchant_id) return;
     try {
-      const rec = await pb.collection('merchants').getOne(user.merchant_id);
+      const rec = await cachedFetch(
+        cacheKeys.merchant(user.merchant_id),
+        () => pb.collection('merchants').getOne(user.merchant_id!),
+        { ttl: TTL.catalog }
+      );
       setMerchant(rec);
 
       try {
-        const subs = await pb.collection('subscriptions').getList(1, 1, {
-          filter: `merchant = "${user.merchant_id}" && (status = "active" || status = "trialing")`,
-          requestKey: null
-        });
-        if (subs.items.length > 0) {
-          setActivePlan(subs.items[0].plan || 'stand_bundle');
-        } else {
-          setActivePlan('stand_bundle');
-        }
+        const sub = await cachedFetch(
+          cacheKeys.merchantSub(user.merchant_id!),
+          () =>
+            pb
+              .collection('subscriptions')
+              .getList(1, 1, {
+                filter: `merchant = "${user.merchant_id}" && (status = "active" || status = "trialing")`,
+                sort: '-created',
+                requestKey: null
+              })
+              .then((r) => r.items[0] || null),
+          { ttl: TTL.catalog }
+        );
+        setActivePlan(sub?.plan || 'stand_bundle');
       } catch (sErr) {}
 
       // Deletion allowance grows with purchased customer slots
       try {
-        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        const quotaRes = await cachedFetch<any>(
+          cacheKeys.merchantQuota(user.merchant_id),
+          () => pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' }),
+          { ttl: TTL.own }
+        );
         if (quotaRes?.current && typeof quotaRes.current.deletions_allowed === 'number') {
           setMaxDeletions(quotaRes.current.deletions_allowed);
         }
@@ -166,11 +185,20 @@ export default function CustomersScreen() {
     }
     try {
       if (showLoader) setLoading(true);
-      const records = await pb.collection('transactions').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
-        expand: 'customer',
-        sort: '-created'
-      });
+      const records = await cachedFetch(
+        cacheKeys.merchantTxns(user.merchant_id),
+        () =>
+          pb
+            .collection('transactions')
+            .getList(1, 1000, {
+              filter: `merchant = '${user.merchant_id}'`,
+              expand: 'customer',
+              sort: '-created',
+              requestKey: null,
+            })
+            .then((r) => r.items),
+        { ttl: TTL.own }
+      );
       const mapped = records.map((rec: any) => {
         const cust = rec.expand?.customer;
         const meta = parseSafeMetadata(rec.metadata);
@@ -1252,7 +1280,11 @@ export default function CustomersScreen() {
               />
               <View style={{ justifyContent: 'center' }}>
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255, 255, 255, 0.7)' }}>Customer Analytics</Text>
-                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant?.name || 'Boutique Royal'}</Text>
+                {merchant?.name ? (
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{merchant.name}</Text>
+                ) : (
+                  <View style={{ width: 128, height: 16, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.18)', marginTop: 4 }} />
+                )}
               </View>
             </View>
             

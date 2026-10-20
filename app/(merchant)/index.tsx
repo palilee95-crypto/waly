@@ -26,6 +26,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { markAppReady } from '@/lib/boot-splash';
+import { cachedFetch, invalidate } from '@/lib/data-cache';
+import { cacheKeys, CACHE_PREFIX, TTL } from '@/lib/cache-keys';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import BookingAccessModal from './_components/BookingAccessModal';
 import CustomerOverviewCards from './_components/CustomerOverviewCards';
@@ -199,14 +202,22 @@ export default function MerchantDashboard() {
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  const fetchPendingClaims = async () => {
+  const merchantDataInFlightRef = useRef<Promise<void> | null>(null);
+  const pendingClaimsInFlightRef = useRef<Promise<void> | null>(null);
+
+  const loadPendingClaims = async (force = false) => {
     if (!user || !user.merchant_id) return;
     try {
-      const records = await pb.collection('nfc_claims').getFullList({
-        filter: `merchant = '${user.merchant_id}' && status = 'pending'`,
-        sort: '-created',
-        requestKey: null,
-      });
+      const records = await cachedFetch(
+        cacheKeys.pendingClaims(user.merchant_id),
+        () =>
+          pb.collection('nfc_claims').getFullList({
+            filter: `merchant = '${user.merchant_id}' && status = 'pending'`,
+            sort: '-created',
+            requestKey: null,
+          }),
+        { ttl: TTL.live, force }
+      );
       // POS sales are merchant-initiated; they must not show up as customer
       // stamp requests on the dashboard.
       const visibleRecords = records.filter((c: any) => c.manual_pos !== true);
@@ -226,6 +237,20 @@ export default function MerchantDashboard() {
       });
     } catch (err) {
       console.warn('Failed to fetch pending NFC claims:', err);
+    }
+  };
+
+  const fetchPendingClaims = async (force = false) => {
+    if (pendingClaimsInFlightRef.current) {
+      await pendingClaimsInFlightRef.current;
+      return;
+    }
+    const run = loadPendingClaims(force);
+    pendingClaimsInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      pendingClaimsInFlightRef.current = null;
     }
   };
 
@@ -277,35 +302,46 @@ export default function MerchantDashboard() {
     }
   };
 
-  const fetchMerchantData = async () => {
+  const loadMerchantData = async (force = false) => {
     if (!user || !user.merchant_id) {
       setLoading(false);
       return;
     }
+    const mid = user.merchant_id;
     try {
       fetchPendingClaims();
 
-      // 0. Fetch active/trialing subscription
+      // 0. Fetch active subscription
       try {
-        const subList = await pb.collection('subscriptions').getList(1, 1, {
-          filter: `merchant = '${user.merchant_id}' && status = 'active'`,
-          sort: '-created',
-        });
-        if (subList.items.length > 0) {
-          setActiveSubscription(subList.items[0]);
-        } else {
-          setActiveSubscription(null);
-        }
+        const sub = await cachedFetch(
+          cacheKeys.merchantSub(user.merchant_id),
+          () =>
+            pb
+              .collection('subscriptions')
+              .getList(1, 1, {
+                filter: `merchant = '${user.merchant_id}' && (status = 'active' || status = 'trialing')`,
+                sort: '-created',
+                requestKey: null,
+              })
+              .then((r) => r.items[0] || null),
+          { ttl: TTL.catalog, force }
+        );
+        setActiveSubscription(sub);
       } catch (subErr) {
         setActiveSubscription(null);
       }
 
       // Stand Bundle Quota calculation from redeemed activation codes
       try {
-        const codes = await pb.collection('activation_codes').getFullList({
-          filter: `redeemed_by = '${user.merchant_id}' && is_redeemed = true`,
-          requestKey: null,
-        });
+        const codes = await cachedFetch(
+          cacheKeys.merchantCodes(user.merchant_id),
+          () =>
+            pb.collection('activation_codes').getFullList({
+              filter: `redeemed_by = '${user.merchant_id}' && is_redeemed = true`,
+              requestKey: null,
+            }),
+          { ttl: TTL.catalog, force }
+        );
         if (codes.length > 0) {
           const sumQuota = codes.reduce((acc: number, c: any) => acc + (Number(c.quota) > 0 ? Number(c.quota) : 500), 0);
           if (sumQuota > 0) setStandTotalQuota(sumQuota);
@@ -314,30 +350,53 @@ export default function MerchantDashboard() {
 
       // 1. Fetch merchant details & active loyalty program
       const [mRec, prog] = await Promise.all([
-        pb.collection('merchants').getOne(user.merchant_id).catch(() => null),
-        pb.collection('loyalty_programs').getFirstListItem(`merchant = '${user.merchant_id}' && is_active = true`).catch(() => null),
+        cachedFetch(
+          cacheKeys.merchant(mid),
+          () => pb.collection('merchants').getOne(mid),
+          { ttl: TTL.catalog, force }
+        ).catch(() => null),
+        cachedFetch(
+          cacheKeys.merchantProgram(mid),
+          () => pb.collection('loyalty_programs').getFirstListItem(`merchant = '${user.merchant_id}' && is_active = true`),
+          { ttl: TTL.catalog, force }
+        ).catch(() => null),
       ]);
       if (mRec) setMerchant(mRec);
       if (prog) setLoyaltyProgram(prog);
 
       // 2. Fetch recent transactions
-      const txs = await pb.collection('transactions').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
-        expand: 'customer',
-        sort: '-created'
-      });
+      const txs = await cachedFetch(
+        cacheKeys.merchantTxns(user.merchant_id),
+        () =>
+          pb
+            .collection('transactions')
+            .getList(1, 1000, {
+              filter: `merchant = '${user.merchant_id}'`,
+              expand: 'customer',
+              sort: '-created',
+              requestKey: null,
+            })
+            .then((r) => r.items),
+        { ttl: TTL.own, force }
+      );
       setTransactions(txs);
 
-      // 3. Fetch total registered customer cards
-      const cardsRes = await pb.collection('loyalty_cards').getList(1, 1, {
-        filter: `merchant = '${user.merchant_id}'`,
-      });
-      setTotalCustomersCount(cardsRes.totalItems);
+      // 3. Total registered customer cards (rows are already cached for Marketing/Analytics)
+      const cards = await cachedFetch(
+        cacheKeys.merchantCards(user.merchant_id),
+        () => pb.collection('loyalty_cards').getFullList({ filter: `merchant = '${user.merchant_id}'`, requestKey: null }),
+        { ttl: TTL.own, force }
+      ).catch(() => []);
+      setTotalCustomersCount(cards.length);
 
       // Purchased customer-slot top-ups + server-side quota state. `used` comes
       // from the server so the gauge matches enforcement (distinct customers).
       try {
-        const quotaRes = await pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' });
+        const quotaRes = await cachedFetch<any>(
+          cacheKeys.merchantQuota(user.merchant_id),
+          () => pb.send<any>('/api/risev/merchant/quota/packages', { method: 'GET' }),
+          { ttl: TTL.own, force }
+        );
         if (quotaRes?.current) {
           setAddonQuota(Number(quotaRes.current.addon_quota) || 0);
           if (typeof quotaRes.current.used === 'number') {
@@ -400,6 +459,36 @@ export default function MerchantDashboard() {
     }
   };
 
+  const fetchMerchantData = async (force = false) => {
+    if (merchantDataInFlightRef.current) {
+      await merchantDataInFlightRef.current;
+      return;
+    }
+    const run = loadMerchantData(force);
+    merchantDataInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      merchantDataInFlightRef.current = null;
+    }
+  };
+
+  // Boot gate: hold the splash until the dashboard's first-paint data has settled.
+  // Both calls join any run already started by the mount/focus effects.
+  useEffect(() => {
+    if (!user?.merchant_id) {
+      markAppReady();
+      return;
+    }
+    let cancelled = false;
+    Promise.allSettled([fetchMerchantData(), fetchPendingClaims()]).finally(() => {
+      if (!cancelled) markAppReady();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.merchant_id]);
+
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -418,15 +507,18 @@ export default function MerchantDashboard() {
 
     // Listen to local completion & decline events from NfcClaimModal
     const txnCompleteSub = DeviceEventEmitter.addListener('merchant_transaction_completed', () => {
-      fetchMerchantData();
-      fetchPendingClaims();
+      invalidate(CACHE_PREFIX.merchantTxns);
+      invalidate(CACHE_PREFIX.merchantCards);
+      fetchMerchantData(true);
+      fetchPendingClaims(true);
     });
 
     const claimDeclinedSub = DeviceEventEmitter.addListener('nfc_claim_declined', (data: any) => {
       if (data?.claim_id) {
         setPendingClaims((prev) => prev.filter((c) => c.id !== data.claim_id));
       }
-      fetchPendingClaims();
+      invalidate(CACHE_PREFIX.pendingClaims);
+      fetchPendingClaims(true);
     });
 
     let unsubMerchants: any = null;
@@ -441,22 +533,29 @@ export default function MerchantDashboard() {
     // Subscribe to merchants, transactions, subscriptions, nfc_claims, service_bookings & vouchers
     if (user && user.merchant_id) {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
-        fetchMerchantData();
+        invalidate('merchant:');
+        fetchMerchantData(true);
       }).then((u) => { unsubMerchants = u; }).catch(() => {});
 
-      // Realtime transactions - refresh on new records
+      // Realtime transactions - refresh on new records (scoped: was every tenant's)
       pb.collection('transactions').subscribe('*', () => {
-        fetchMerchantData();
+        invalidate(CACHE_PREFIX.merchantTxns);
+        invalidate(CACHE_PREFIX.merchantCards);
+        fetchMerchantData(true);
+      }, {
+        filter: `merchant = '${user.merchant_id}'`
       }).then((u) => { unsubTransactions = u; }).catch(() => {});
 
       pb.collection('subscriptions').subscribe('*', () => {
-        fetchMerchantData();
+        invalidate('sub:merchant');
+        fetchMerchantData(true);
       }, {
         filter: `merchant = '${user.merchant_id}'`
       }).then((u) => { unsubSubscriptions = u; }).catch(() => {});
 
       pb.collection('nfc_claims').subscribe('*', () => {
-        fetchPendingClaims();
+        invalidate(CACHE_PREFIX.pendingClaims);
+        fetchPendingClaims(true);
       }, {
         filter: `merchant = '${user.merchant_id}'`
       }).then((u) => {
@@ -802,7 +901,11 @@ export default function MerchantDashboard() {
               />
               <View style={styles.profileTextWrap}>
                 <Text style={styles.welcomeSub}>{t('welcome_back')}</Text>
-                <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+                {merchant?.name ? (
+                  <Text style={styles.merchantName}>{merchant.name}</Text>
+                ) : (
+                  <View style={{ width: 132, height: 18, borderRadius: 6, backgroundColor: '#F1F5F9', marginTop: 4 }} />
+                )}
               </View>
             </View>
 

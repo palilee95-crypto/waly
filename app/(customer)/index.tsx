@@ -22,6 +22,17 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pb } from '@/lib/pocketbase';
+import { markAppReady } from '@/lib/boot-splash';
+import { cachedFetch, invalidate } from '@/lib/data-cache';
+import {
+  cacheKeys,
+  CACHE_PREFIX,
+  TTL,
+  MERCHANT_FIELDS,
+  PROGRAM_FIELDS,
+  LOCATION_FIELDS,
+  SUBSCRIPTION_FIELDS,
+} from '@/lib/cache-keys';
 import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 import FilterModal, { FilterState } from './_components/FilterModal';
 import AllCategoriesModal from './_components/AllCategoriesModal';
@@ -215,7 +226,15 @@ export default function CustomerDashboard() {
   const [nextVisitPrediction, setNextVisitPrediction] = useState<NextVisitPrediction | null>(null);
   const [loadingForYou, setLoadingForYou] = useState(false);
 
-  const fetchIntelligenceData = async () => {
+  // Startup fan-out guards: mount + two focus effects + SSE all request the same data.
+  const lastPopularFetchRef = useRef(0);
+  const popularInFlightRef = useRef<Promise<void> | null>(null);
+  const lastIntelligenceFetchRef = useRef(0);
+  const intelligenceInFlightRef = useRef<Promise<void> | null>(null);
+  const loyaltyInFlightRef = useRef<Promise<void> | null>(null);
+  const appointmentsInFlightRef = useRef<Promise<void> | null>(null);
+
+  const loadIntelligenceData = async () => {
     try {
       setLoadingForYou(true);
       const recs = await getForYouRecommendations(userCoords?.lat || 6.268, userCoords?.lng || 100.411, 8);
@@ -226,6 +245,22 @@ export default function CustomerDashboard() {
       console.debug('Failed to load intelligence data', err);
     } finally {
       setLoadingForYou(false);
+    }
+  };
+
+  const fetchIntelligenceData = async (force = false) => {
+    if (intelligenceInFlightRef.current) {
+      await intelligenceInFlightRef.current;
+      return;
+    }
+    if (!force && Date.now() - lastIntelligenceFetchRef.current < 30_000) return;
+    const run = loadIntelligenceData();
+    intelligenceInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      intelligenceInFlightRef.current = null;
+      lastIntelligenceFetchRef.current = Date.now();
     }
   };
 
@@ -245,7 +280,7 @@ export default function CustomerDashboard() {
       }, 700);
 
       return () => clearTimeout(pushTimer);
-    }, [userCoords, user?.phone, user?.id])
+    }, [user?.phone, user?.id])
   );
 
   const loadFavorites = async () => {
@@ -327,7 +362,7 @@ export default function CustomerDashboard() {
           });
         },
         () => {},
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
       );
     }
   }, []);
@@ -364,14 +399,19 @@ export default function CustomerDashboard() {
     }
   }, [showNotificationsModal]);
 
-  const fetchLoyaltyCards = async () => {
+  const loadLoyaltyCards = async (force = false) => {
     if (!user) return;
     try {
-      const records = await pb.collection('loyalty_cards').getFullList({
-        filter: `customer = '${user.id}' && status = 'active'`,
-        expand: 'program,merchant',
-        sort: '-updated'
-      });
+      const records = await cachedFetch(
+        cacheKeys.cardsMe(user.id),
+        () => pb.collection('loyalty_cards').getFullList({
+          filter: `customer = '${user.id}' && status = 'active'`,
+          expand: 'program,merchant',
+          sort: '-updated',
+          requestKey: null,
+        }),
+        { ttl: TTL.own, force }
+      );
       const mapped = records.map((rec: any) => {
         const program = rec.expand?.program;
         const merchant = rec.expand?.merchant;
@@ -437,16 +477,34 @@ export default function CustomerDashboard() {
     }
   };
 
-  const fetchUpcomingAppointments = async () => {
+  const fetchLoyaltyCards = async (force = false) => {
+    if (loyaltyInFlightRef.current) {
+      await loyaltyInFlightRef.current;
+      return;
+    }
+    const run = loadLoyaltyCards(force);
+    loyaltyInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      loyaltyInFlightRef.current = null;
+    }
+  };
+
+  const loadUpcomingAppointments = async (force = false) => {
     if (!user) return;
     try {
       // 1. Try dedicated endpoint first (runs server-side with full access)
       try {
         const phoneParam = encodeURIComponent(user.phone || '');
-        const res: any = await pb.send(`/api/risev/customer/active-booking?phone=${phoneParam}`, {
-          method: 'GET',
-          requestKey: null
-        });
+        const res: any = await cachedFetch(
+          cacheKeys.activeBooking(user.phone || ''),
+          () => pb.send(`/api/risev/customer/active-booking?phone=${phoneParam}`, {
+            method: 'GET',
+            requestKey: null
+          }),
+          { ttl: TTL.live, force }
+        );
         if (res && res.booking) {
           try {
             const isDismissed = await AsyncStorage.getItem(`risev_dismissed_booking_${res.booking.id}`);
@@ -485,13 +543,14 @@ export default function CustomerDashboard() {
       const uniqueFilters = Array.from(new Set(filterConditions));
       const userFilter = uniqueFilters.length > 0 ? `(${uniqueFilters.join(' || ')})` : `customer = '${user.id}'`;
       const res = await pb.collection('service_bookings').getList(1, 1, {
-        filter: `status != 'completed' && status != 'cancelled' && booking_date >= '${todayIso}'`,
+        filter: `${userFilter} && status != 'completed' && status != 'cancelled' && booking_date >= '${todayIso}'`,
         sort: 'booking_date,start_time',
         expand: 'merchant,branch,staff',
         requestKey: null
       }).catch(async () => {
         return await pb.collection('service_bookings').getList(1, 1, {
           sort: '-booking_date,-start_time',
+          filter: userFilter,
           expand: 'merchant,branch,staff',
           requestKey: null
         }).catch(() => null);
@@ -516,23 +575,69 @@ export default function CustomerDashboard() {
     }
   };
 
-  const fetchPopularMerchants = async () => {
+  const fetchUpcomingAppointments = async (force = false) => {
+    if (appointmentsInFlightRef.current) {
+      await appointmentsInFlightRef.current;
+      return;
+    }
+    const run = loadUpcomingAppointments(force);
+    appointmentsInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      appointmentsInFlightRef.current = null;
+    }
+  };
+
+  const loadPopularMerchants = async (force = false) => {
     try {
       setLoadingPopular(true);
-      const merchantList = await pb.collection('merchants').getFullList({
-        requestKey: null,
-      }).catch(() => []);
-      const programList = await pb.collection('loyalty_programs').getFullList({
-        filter: 'is_active = true',
-        requestKey: null,
-      }).catch(() => []);
-      const storeLocations = await pb.collection('store_locations').getFullList({ requestKey: null }).catch(() => []);
-      const subscriptions = await pb.collection('subscriptions').getFullList({
-        filter: 'status = "active"',
-        requestKey: null,
-      }).catch(() => []);
-      const loyaltyCards = await pb.collection('loyalty_cards').getFullList({ requestKey: null }).catch(() => []);
-      const serviceBookings = await pb.collection('service_bookings').getFullList({ requestKey: null }).catch(() => []);
+      const merchantList = await cachedFetch(
+        cacheKeys.merchantsActive(),
+        () => pb.collection('merchants').getFullList({
+          filter: `status = 'active'`,
+          fields: MERCHANT_FIELDS,
+          requestKey: null,
+        }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
+      const programList = await cachedFetch(
+        cacheKeys.programsActive(),
+        () => pb.collection('loyalty_programs').getFullList({
+          filter: 'is_active = true',
+          fields: PROGRAM_FIELDS,
+          requestKey: null,
+        }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
+      const storeLocations = await cachedFetch(
+        cacheKeys.locationsAll(),
+        () => pb.collection('store_locations').getFullList({
+          fields: LOCATION_FIELDS,
+          requestKey: null,
+        }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
+      const subscriptions = await cachedFetch(
+        cacheKeys.subsActive(),
+        () => pb.collection('subscriptions').getFullList({
+          filter: 'status = "active"',
+          fields: SUBSCRIPTION_FIELDS,
+          requestKey: null,
+        }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
+      // Only the merchant id is needed to count activity — don't download whole records.
+      const loyaltyCards = await cachedFetch(
+        cacheKeys.activityCards(),
+        () => pb.collection('loyalty_cards').getFullList({ fields: 'merchant', requestKey: null }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
+      const serviceBookings = await cachedFetch(
+        cacheKeys.activityBookings(),
+        () => pb.collection('service_bookings').getFullList({ fields: 'merchant', requestKey: null }),
+        { ttl: TTL.catalog, force }
+      ).catch(() => []);
 
       const labelMap: Record<string, string> = {
         food: 'Food & Drink',
@@ -635,6 +740,27 @@ export default function CustomerDashboard() {
       console.warn('Failed to fetch popular merchants:', err);
     } finally {
       setLoadingPopular(false);
+    }
+  };
+
+  /**
+   * Mount, both focus effects and the SSE callbacks all request the same merchant
+   * feed. Collapse them into one in-flight run with a 30s stale window instead of
+   * firing ~6 full-list queries per caller.
+   */
+  const fetchPopularMerchants = async (force = false) => {
+    if (!force && Date.now() - lastPopularFetchRef.current < 30_000) return;
+    if (popularInFlightRef.current) {
+      await popularInFlightRef.current;
+      return;
+    }
+    const run = loadPopularMerchants(force);
+    popularInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      popularInFlightRef.current = null;
+      lastPopularFetchRef.current = Date.now();
     }
   };
 
@@ -760,14 +886,16 @@ export default function CustomerDashboard() {
 
     // Listen to real-time updates on loyalty_cards and service_bookings
     pb.collection('loyalty_cards').subscribe('*', () => {
-      fetchLoyaltyCards();
+      invalidate(CACHE_PREFIX.cardsMe);
+      fetchLoyaltyCards(true);
     }, {
       filter: `customer = '${user.id}'`
     });
 
     try {
       pb.collection('service_bookings').subscribe('*', () => {
-        fetchUpcomingAppointments();
+        invalidate(CACHE_PREFIX.booking);
+        fetchUpcomingAppointments(true);
       });
     } catch (e) {}
 
@@ -776,6 +904,27 @@ export default function CustomerDashboard() {
       try { pb.collection('service_bookings').unsubscribe('*'); } catch (e) {}
     };
   }, [user]);
+
+  // Boot gate: hold the splash until every first-paint feed has settled. These calls
+  // join the in-flight runs started above, so nothing is fetched twice.
+  useEffect(() => {
+    if (!user) {
+      markAppReady();
+      return;
+    }
+    let cancelled = false;
+    Promise.allSettled([
+      fetchPopularMerchants(),
+      fetchLoyaltyCards(),
+      fetchUpcomingAppointments(),
+      fetchIntelligenceData(),
+    ]).finally(() => {
+      if (!cancelled) markAppReady();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // Refresh pinned cards, upcoming bookings & popular merchants whenever the screen comes into focus
   useFocusEffect(

@@ -20,6 +20,8 @@ import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icon
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { useRouter, usePathname } from 'expo-router';
 // @ts-ignore
 import * as ImagePicker from 'expo-image-picker';
@@ -346,10 +348,15 @@ export default function MarketingScreen() {
     if (!user || !user.merchant_id) return;
     try {
       setLoadingCampaigns(true);
-      const records = await pb.collection('campaigns').getFullList({
-        filter: `merchant = "${user.merchant_id}"`,
-        sort: '-created'
-      });
+      const records = await cachedFetch(
+        cacheKeys.campaigns(user.merchant_id),
+        () => pb.collection('campaigns').getFullList({
+          filter: `merchant = "${user.merchant_id}"`,
+          sort: '-created',
+          requestKey: null,
+        }),
+        { ttl: TTL.own }
+      );
       setCampaignsList(records);
     } catch (err) {
       console.warn('Failed to fetch campaigns list:', err);
@@ -646,11 +653,16 @@ export default function MarketingScreen() {
     if (!user || !user.merchant_id) return;
     try {
       setLoadingBroadcasts(true);
-      const records = await pb.collection('broadcasts').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
-        sort: '-created',
-        expand: 'campaign'
-      });
+      const records = await cachedFetch(
+        cacheKeys.broadcasts(user.merchant_id),
+        () => pb.collection('broadcasts').getFullList({
+          filter: `merchant = '${user.merchant_id}'`,
+          sort: '-created',
+          expand: 'campaign',
+          requestKey: null,
+        }),
+        { ttl: TTL.own }
+      );
       setBroadcastsList(records);
     } catch (err) {
       console.warn('Failed to fetch broadcasts list:', err);
@@ -663,10 +675,15 @@ export default function MarketingScreen() {
     if (!user || !user.merchant_id) return;
     try {
       setLoadingRules(true);
-      const records = await pb.collection('automation_rules').getFullList({
-        filter: `merchant = '${user.merchant_id}'`,
-        sort: '-created'
-      });
+      const records = await cachedFetch(
+        cacheKeys.automationRules(user.merchant_id),
+        () => pb.collection('automation_rules').getFullList({
+          filter: `merchant = '${user.merchant_id}'`,
+          sort: '-created',
+          requestKey: null,
+        }),
+        { ttl: TTL.own }
+      );
       setAutomationRules(records);
     } catch (err) {
       console.warn('Failed to fetch automation rules:', err);
@@ -796,13 +813,31 @@ export default function MarketingScreen() {
     if (!user || !user.merchant_id) return;
     try {
       const [cards, txs, allCusts] = await Promise.all([
-        pb.collection('loyalty_cards').getFullList({
-          filter: `merchant = '${user.merchant_id}'`,
-          expand: 'customer'
-        }),
-        pb.collection('transactions').getFullList({
-          filter: `merchant = '${user.merchant_id}'`
-        }),
+        cachedFetch(
+          cacheKeys.merchantCards(user.merchant_id),
+          () =>
+            pb.collection('loyalty_cards').getFullList({
+              filter: `merchant = '${user.merchant_id}'`,
+              expand: 'customer',
+              requestKey: null,
+            }),
+          { ttl: TTL.own }
+        ).catch(() => [] as any[]),
+        cachedFetch(
+          cacheKeys.merchantTxns(user.merchant_id),
+          () =>
+            pb
+              .collection('transactions')
+              .getList(1, 1000, {
+                filter: `merchant = '${user.merchant_id}'`,
+                expand: 'customer',
+                sort: '-created',
+                requestKey: null,
+              })
+              .then((r) => r.items),
+          { ttl: TTL.own }
+        ).catch(() => [] as any[]),
+        // Platform-wide user table — deliberately NOT cached, it is unbounded.
         pb.collection('users').getFullList({
           filter: "role = 'customer'"
         }).catch(() => [])
@@ -911,7 +946,11 @@ export default function MarketingScreen() {
     try {
       setIsLoading(true);
       // Fetch merchant details
-      const mRec = await pb.collection('merchants').getOne(user.merchant_id);
+      const mRec = await cachedFetch(
+        cacheKeys.merchant(user.merchant_id!),
+        () => pb.collection('merchants').getOne(user.merchant_id!),
+        { ttl: TTL.catalog }
+      );
       setMerchant(mRec);
 
       // Fetch active program (if any)
@@ -1154,7 +1193,11 @@ export default function MarketingScreen() {
               />
               <View style={styles.profileTextWrap}>
                 <Text style={styles.welcomeSub}>Marketing Console</Text>
-                <Text style={styles.merchantName}>{merchant?.name || 'Boutique Royal'}</Text>
+                {merchant?.name ? (
+                  <Text style={styles.merchantName}>{merchant.name}</Text>
+                ) : (
+                  <View style={{ width: 132, height: 18, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.18)', marginTop: 4 }} />
+                )}
               </View>
             </View>
             <Image

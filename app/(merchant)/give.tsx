@@ -21,6 +21,8 @@ import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
 import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
 
@@ -94,8 +96,11 @@ export default function GiveStampsScreen() {
   useEffect(() => {
     const mid = (user as any)?.merchant_id;
     if (!mid) return;
-    pb.collection('branches')
-      .getFullList({ filter: `merchant = "${mid}"`, sort: '-is_hq,-created', requestKey: null })
+    cachedFetch(
+      cacheKeys.merchantBranches(mid),
+      () => pb.collection('branches').getFullList({ filter: `merchant = "${mid}"`, sort: '-is_hq,-created', requestKey: null }),
+      { ttl: TTL.catalog }
+    )
       .then((list: any[]) => {
         setBranches(list || []);
         const hq = (list || []).find((b: any) => b.is_hq) || (list || [])[0];
@@ -128,15 +133,28 @@ export default function GiveStampsScreen() {
     if (!merchantId) return;
     try {
       setLoadingTxns(true);
-      const [txRes, progRes] = await Promise.all([
-        pb.collection('transactions').getList(1, 10, {
-          filter: `merchant = '${merchantId}'`,
-          sort: '-created',
-          expand: 'customer',
-        }),
-        pb.collection('loyalty_programs').getFirstListItem(`merchant = '${merchantId}' && is_active = true`).catch(() => null),
+      const [txRows, progRes] = await Promise.all([
+        cachedFetch(
+          cacheKeys.merchantTxns(merchantId),
+          () =>
+            pb
+              .collection('transactions')
+              .getList(1, 1000, {
+                filter: `merchant = '${merchantId}'`,
+                sort: '-created',
+                expand: 'customer',
+                requestKey: null,
+              })
+              .then((r) => r.items),
+          { ttl: TTL.own }
+        ).catch(() => [] as any[]),
+        cachedFetch(
+          cacheKeys.merchantProgram(merchantId),
+          () => pb.collection('loyalty_programs').getFirstListItem(`merchant = '${merchantId}' && is_active = true`),
+          { ttl: TTL.catalog }
+        ).catch(() => null),
       ]);
-      setTransactions(txRes.items || []);
+      setTransactions((txRows || []).slice(0, 10));
       if (progRes) setProgram(progRes);
     } catch (err) {
       console.warn('Failed to fetch transactions/program:', err);

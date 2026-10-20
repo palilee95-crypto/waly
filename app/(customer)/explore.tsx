@@ -21,6 +21,14 @@ import { colors, radii } from '@/theme';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
+import { cachedFetch } from '@/lib/data-cache';
+import {
+  cacheKeys,
+  TTL,
+  MERCHANT_FIELDS,
+  PROGRAM_FIELDS,
+  LOCATION_FIELDS,
+} from '@/lib/cache-keys';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FilterModal, { FilterState } from './_components/FilterModal';
 import AllCategoriesModal, { ALL_CATEGORIES_LIST } from './_components/AllCategoriesModal';
@@ -313,14 +321,47 @@ export default function ExploreScreen() {
     try {
       setLoading(true);
       const [merchantList, programList, storeLocations, servicesList] = await Promise.all([
-        pb.collection('merchants').getFullList({ requestKey: null }).catch(() => []),
-        pb.collection('loyalty_programs').getFullList({ filter: 'is_active = true' }).catch(() => []),
-        pb.collection('store_locations').getFullList({ requestKey: null }).catch(() => []),
-        pb.collection('merchant_services').getFullList({ requestKey: null }).catch(() => []),
+        cachedFetch(
+          cacheKeys.merchantsActive(),
+          () => pb.collection('merchants').getFullList({
+            filter: `status = 'active'`,
+            fields: MERCHANT_FIELDS,
+            requestKey: null,
+          }),
+          { ttl: TTL.catalog }
+        ).catch(() => []),
+        cachedFetch(
+          cacheKeys.programsActive(),
+          () => pb.collection('loyalty_programs').getFullList({
+            filter: 'is_active = true',
+            fields: PROGRAM_FIELDS,
+            requestKey: null,
+          }),
+          { ttl: TTL.catalog }
+        ).catch(() => []),
+        cachedFetch(
+          cacheKeys.locationsAll(),
+          () => pb.collection('store_locations').getFullList({ fields: LOCATION_FIELDS, requestKey: null }),
+          { ttl: TTL.catalog }
+        ).catch(() => []),
+        cachedFetch(
+          cacheKeys.servicesAll(),
+          () => pb.collection('merchant_services').getFullList({ requestKey: null }),
+          { ttl: TTL.catalog }
+        ).catch(() => []),
       ]);
 
       const cardList = user
-        ? await pb.collection('loyalty_cards').getFullList({ filter: `customer = '${user.id}'` }).catch(() => [])
+        ? await cachedFetch(
+            cacheKeys.cardsMe(user.id),
+            () => pb.collection('loyalty_cards').getFullList({
+              filter: `customer = '${user.id}' && status = 'active'`,
+              expand: 'program,merchant',
+              sort: '-updated',
+              requestKey: null,
+            }),
+            { ttl: TTL.own }
+          ).catch(() => [])
         : [];
 
       const mapped: MerchantExploreItem[] = merchantList.map((m: any, index: number) => {

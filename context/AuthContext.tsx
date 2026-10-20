@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { pb } from '@/lib/pocketbase';
+import { clearCache } from '@/lib/data-cache';
+import { resetPrefetch } from '@/lib/boot-prefetch';
 import { useLocalSearchParams } from 'expo-router';
 
 // Lightweight IndexedDB storage wrapper for Web/PWA persistence
@@ -111,7 +113,7 @@ export const defaultStaffPermissions: StaffPermissions = {
   can_manage_branches: false,
 };
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   phone: string;
   name: string;
@@ -348,26 +350,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const freshRecord = refreshResult?.record || pb.authStore.record;
           const merchantData = await ensureMerchantProfile(freshRecord);
           
-          setUser({
-            id: freshRecord.id,
-            phone: freshRecord.phone || '',
-            name: freshRecord.name || '',
-            email: freshRecord.email || '',
-            avatar: freshRecord.avatar || undefined,
-            birthday: freshRecord.birthday ? String(freshRecord.birthday).slice(0, 10) : undefined,
-            verified: !!freshRecord.verified,
-            role: freshRecord.role,
-            activeRole: role,
-            merchant_id: merchantData.id,
-            merchant_status: merchantData.status,
-            merchant_created: merchantData.created,
-            is_owner: merchantData.is_owner,
-            is_staff: merchantData.is_staff,
-            staff_permissions: merchantData.staff_permissions,
-            tier: freshRecord.tier || undefined,
-            total_points: freshRecord.total_points || 0,
-            branch: freshRecord.branch || undefined,
-            branch_name: freshRecord.branch_name || undefined,
+          // Only publish a new object when something actually changed. Every screen
+          // effect keys on the `user` identity, so an unconditional set here re-fired
+          // all startup fetches and re-handshaked the realtime subscriptions.
+          setUser((prev) => {
+            const next: AuthUser = {
+              ...(prev as AuthUser),
+              id: freshRecord.id,
+              phone: freshRecord.phone || '',
+              name: freshRecord.name || '',
+              email: freshRecord.email || '',
+              avatar: freshRecord.avatar || undefined,
+              birthday: freshRecord.birthday ? String(freshRecord.birthday).slice(0, 10) : undefined,
+              verified: !!freshRecord.verified,
+              role: freshRecord.role,
+              activeRole: role,
+              merchant_id: merchantData.id,
+              merchant_status: merchantData.status,
+              merchant_created: merchantData.created,
+              is_owner: merchantData.is_owner,
+              is_staff: merchantData.is_staff,
+              staff_permissions: merchantData.staff_permissions,
+              tier: freshRecord.tier || undefined,
+              total_points: freshRecord.total_points || 0,
+              branch: freshRecord.branch || undefined,
+              branch_name: freshRecord.branch_name || undefined,
+            };
+            if (!prev) return next;
+            const keys = Object.keys(next) as (keyof AuthUser)[];
+            const changed = keys.some(
+              (k) => JSON.stringify(prev[k] ?? null) !== JSON.stringify(next[k] ?? null)
+            );
+            return changed ? next : prev;
           });
         } catch (bgErr) {
           console.warn('[AuthContext] Background session refresh failed:', bgErr);
@@ -578,6 +592,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (_) {}
     pb.authStore.clear();
     await storage.deleteItem('risev_active_role');
+    clearCache();
+    resetPrefetch();
     setUser(null);
     setActiveRole(null);
   };
