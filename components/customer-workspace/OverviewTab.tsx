@@ -1,24 +1,69 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polyline, Circle, Line } from 'react-native-svg';
 import { colors, radii } from '@/theme';
-import { WorkspaceSnapshot, pctChange, formatDayLabel } from '@/lib/customer-workspace';
+import {
+  WorkspaceSnapshot,
+  LedgerRow,
+  fetchTransactions,
+  pctChange,
+  formatDayLabel,
+  formatShortDateFromIso,
+} from '@/lib/customer-workspace';
 
 type Props = {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
+  branchId: string;
+  from: string;
+  to: string;
   onOpenReport: (report: 'customers' | 'bookings') => void;
   onOpenDirectory: () => void;
+  onOpenLedger: () => void;
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  earn: 'Earned',
+  redeem: 'Redeemed',
+  expire: 'Expired',
+  adjust: 'Adjusted',
 };
 
 export default function OverviewTab({
   snapshot,
   periodLabel,
+  branchId,
+  from,
+  to,
   onOpenReport,
   onOpenDirectory,
+  onOpenLedger,
 }: Props) {
   const { overview, trend, bookings, loyalty } = snapshot;
+  const [recent, setRecent] = useState<LedgerRow[]>([]);
+  const [recentTotal, setRecentTotal] = useState(0);
+
+  // The ledger endpoint is the single source of truth for what happened, so the
+  // Overview list is the same rows the Transactions sheet shows, just shorter.
+  useEffect(() => {
+    let cancelled = false;
+    fetchTransactions({ branchId, from, to, page: 1, perPage: 6 })
+      .then((res) => {
+        if (cancelled) return;
+        setRecent(res.items);
+        setRecentTotal(res.total);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecent([]);
+          setRecentTotal(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId, from, to]);
   const change = pctChange(overview.visited, overview.previous.visited);
   const busiest = trend.reduce(
     (best, d) => (d.visits > best.visits ? d : best),
@@ -139,6 +184,69 @@ export default function OverviewTab({
           near a reward
         </Text>
       </TouchableOpacity>
+
+      {/* ── All transactions ── */}
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
+        </View>
+        <TouchableOpacity onPress={onOpenLedger} activeOpacity={0.7}>
+          <Text style={styles.sectionMetaLink}>
+            {recentTotal > 0 ? `All ${recentTotal.toLocaleString('en-MY')}` : 'All'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
+        {recent.length === 0 ? (
+          <Text style={styles.emptyText}>No transactions recorded in {periodLabel.toLowerCase()}.</Text>
+        ) : (
+          recent.map((row, i) => {
+            const isRedeem = row.type === 'redeem';
+            const isAdjust = row.type === 'adjust';
+            return (
+              <TouchableOpacity
+                key={row.id}
+                style={[styles.txnRow, i === recent.length - 1 && styles.txnRowLast]}
+                activeOpacity={0.7}
+                onPress={onOpenLedger}
+              >
+                <View style={styles.txnMain}>
+                  <Text style={styles.txnName} numberOfLines={1}>
+                    {row.customerName}
+                  </Text>
+                  <View style={styles.txnMetaRow}>
+                    <View
+                      style={[
+                        styles.txnTag,
+                        isRedeem && styles.txnTagRedeem,
+                        isAdjust && styles.txnTagAdjust,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.txnTagText,
+                          isRedeem && styles.txnTagTextRedeem,
+                          isAdjust && styles.txnTagTextAdjust,
+                        ]}
+                      >
+                        {TYPE_LABEL[row.type] || row.type}
+                      </Text>
+                    </View>
+                    <Text style={styles.txnMeta} numberOfLines={1}>
+                      {formatShortDateFromIso(row.created)} · {row.created.slice(11, 16)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.txnAmount}>
+                  {row.billCents > 0 ? `RM ${(row.billCents / 100).toFixed(2)}` : '—'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </View>
     </View>
   );
 }
@@ -373,5 +481,54 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F6F6F6',
     paddingTop: 8,
+  },
+  sectionMetaLink: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#686868',
+  },
+  emptyText: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#9CA3AF',
+    paddingVertical: 6,
+  },
+  txnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F6F6F6',
+  },
+  txnRowLast: { borderBottomWidth: 0 },
+  txnMain: { flex: 1, minWidth: 0 },
+  txnName: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.black,
+  },
+  txnMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  txnTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+    backgroundColor: '#F1F5F9',
+  },
+  txnTagRedeem: { backgroundColor: '#FFFBEA' },
+  txnTagAdjust: { backgroundColor: '#FEF2F2' },
+  txnTagText: { fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#334155' },
+  txnTagTextRedeem: { color: '#B45309' },
+  txnTagTextAdjust: { color: '#B91C1C' },
+  txnMeta: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#9CA3AF',
+    flexShrink: 1,
+  },
+  txnAmount: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.black,
   },
 });

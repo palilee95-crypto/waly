@@ -110,7 +110,7 @@ function CustomersReport({
   const peak = Math.max(1, ...series.map((s) => s.newCount + s.returningCount));
 
   return (
-    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={styles.body}>
       <View style={styles.kpiGrid}>
         <Kpi label="Customers" value={formatCount(overview.visited)} sub={change === null ? periodLabel : `${change >= 0 ? '+' : ''}${change}% vs prev`} />
         <Kpi label="New" value={formatCount(overview.newCount)} sub={`${newShare}% of visitors`} />
@@ -223,7 +223,7 @@ function CustomersReport({
           ))
         )}
       </Section>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -251,7 +251,7 @@ function OtherReport({
 
   if (report === 'bookings') {
     return (
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={styles.body}>
         <View style={styles.kpiGrid}>
           <Kpi label="Completed" value={formatCount(bookings.completed)} sub={periodLabel} />
           <Kpi label="Upcoming" value={formatCount(bookings.upcoming)} sub="Not yet served" />
@@ -306,7 +306,7 @@ function OtherReport({
             ))
           )}
         </Section>
-      </ScrollView>
+      </View>
     );
   }
 
@@ -319,7 +319,7 @@ function OtherReport({
     const maxHour = Math.max(1, ...sales.hours);
 
     return (
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={styles.body}>
         <View style={styles.kpiGrid}>
           <Kpi label="Recorded sales" value={formatMoney(overview.salesCents)} sub={periodLabel} />
           <Kpi label="Orders" value={formatCount(overview.orders)} sub="Bills above zero" />
@@ -450,14 +450,14 @@ function OtherReport({
             onPress={onOpenAnalytics}
           />
         </View>
-      </ScrollView>
+      </View>
     );
   }
 
   if (report === 'loyalty') {
     const stampPeak = Math.max(1, ...loyalty.daily.map((d) => d.stamps));
     return (
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={styles.body}>
         <View style={styles.kpiGrid}>
           <Kpi label="Near reward" value={formatCount(loyalty.nearReward)} sub="1–2 stamps away" />
           <Kpi label="Vouchers live" value={formatCount(loyalty.availableVouchers)} sub="Unused and valid" />
@@ -509,14 +509,14 @@ function OtherReport({
             onPress={() => onOpenAudience('rewards')}
           />
         </View>
-      </ScrollView>
+      </View>
     );
   }
 
   // reviews
   const maxStars = Math.max(1, ...reviews.distribution.map((d) => d.count));
   return (
-    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={styles.body}>
       <View style={styles.kpiGrid}>
         <Kpi label="Responses" value={formatCount(feedback.responses)} sub={periodLabel} />
         <Kpi
@@ -561,7 +561,7 @@ function OtherReport({
           ))
         )}
       </Section>
-    </ScrollView>
+    </View>
   );
 }
 

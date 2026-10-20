@@ -153,8 +153,12 @@ export default function CustomerWorkspaceScreen() {
               <OverviewTab
                 snapshot={snapshot}
                 periodLabel={period.label}
+                branchId={branchId}
+                from={period.from}
+                to={period.to}
                 onOpenReport={() => setMainTab('reports')}
                 onOpenDirectory={openDirectory}
+                onOpenLedger={() => setShowLedger(true)}
               />
             )}
             {mainTab === 'actions' && (
@@ -179,7 +183,9 @@ export default function CustomerWorkspaceScreen() {
           </>
         ) : null}
 
-        <View style={{ height: 28 }} />
+        {/* The floating tab bar sits over the list, so the content needs room to
+            clear it — without this the last card can never be scrolled into view. */}
+        <View style={{ height: Platform.OS === 'web' ? 118 : 130 }} />
       </ScrollView>
 
       {/* ── Scope pickers ── */}
