@@ -1403,8 +1403,10 @@ export default function UnifiedRewardsScreen() {
         stamp_color: stampColor,
         font_color: fontColor,
         card_icon: selectedIcon,
-        icon_color: iconColor,
-        points_per_stamp: 10,
+        // `icon_color` used to be sent here but the column does not exist, so the
+        // choice was silently dropped on every save (PocketBase ignores unknown fields).
+        // `points_per_stamp` is no longer written: earning is defined by
+        // spend_per_point on the Point Rule tab, and nothing ever read this field.
         expiry_days: days,
         min_spend_amount: enableMinSpend ? (parseFloat(minSpendAmount) || 0) : 0,
       };
@@ -5974,12 +5976,23 @@ export default function UnifiedRewardsScreen() {
                     paddingVertical: 5,
                     borderRadius: 20,
                   }}
-                  onPress={() => {
+                  onPress={async () => {
                     if (enablePoints && !enableStamps) {
                       Alert.alert('Action Restricted', 'At least one loyalty module (Stamps or Points) must remain active.');
                       return;
                     }
-                    setEnablePoints(!enablePoints);
+                    // This pill used to only change local state, so the toggle silently
+                    // reverted on the next load. Persist it like the capsule switch does.
+                    const next = !enablePoints;
+                    setEnablePoints(next);
+                    if (programId) {
+                      try {
+                        await pb.collection('loyalty_programs').update(programId, { enable_points: next });
+                      } catch (err) {
+                        setEnablePoints(!next);
+                        Alert.alert('Error', 'Could not update points. Please try again.');
+                      }
+                    }
                   }}
                   activeOpacity={0.8}
                 >

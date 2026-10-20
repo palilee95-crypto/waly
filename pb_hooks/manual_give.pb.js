@@ -195,6 +195,9 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       transactionId: txn.id,
       billAmount: billAmount,
       stampsEarned: actualStampsToAward,
+      // Points written by points_multiplier.pb.js during the create. The receipt used
+      // to guess floor(bill), which ignored spend_per_point, campaigns and streaks.
+      pointsEarned: txn.getInt("points") || 0,
       storeName: merchantStoreName,
       branchName: branchName,
       nextRewardName: nextRewardName,

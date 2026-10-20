@@ -245,7 +245,9 @@ export default function GiveStampsScreen() {
         };
       }>('/api/risev/merchant/vouchers/redeem', {
         method: 'POST',
-        body: { code: cleanCode },
+        // The bill lets the server enforce the store's max_redeem_percent limit;
+        // without it the voucher is redeemed with no cap check.
+        body: { code: cleanCode, bill_amount: Number(billAmount) || 0 },
       });
 
       if (res.success && res.voucher) {
@@ -368,7 +370,11 @@ export default function GiveStampsScreen() {
         } catch (fetchErr) {}
       }
 
-      const pointsEarnedCalc = (res as any).pointsEarned || Math.floor(bill);
+      // Trust the server: it applies spend_per_point, campaigns, streaks and the
+      // minimum-spend floor. `|| floor(bill)` printed wrong numbers, and turned a
+      // legitimate 0 into the bill amount.
+      const pointsEarnedCalc =
+        typeof (res as any).pointsEarned === 'number' ? (res as any).pointsEarned : 0;
 
       const receiptInfo: ReceiptData = {
         id: realTxnId || ('TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()),

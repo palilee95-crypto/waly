@@ -102,8 +102,12 @@ routerAdd("POST", "/api/risev/merchant/vouchers/redeem", (e) => {
 
     // Parse metadata if available
     try {
-      const rawMeta = voucher.get("metadata");
-      const parsedMeta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+      // JSVM: record.get() on a JSON field returns a byte array, so read the raw
+      // string instead (an unset field reads back as the literal "null").
+      const rawMeta = voucher.getString ? voucher.getString("metadata") : voucher.get("metadata");
+      const parsedMeta = typeof rawMeta === "string" && rawMeta.trim().charAt(0) === "{"
+        ? JSON.parse(rawMeta)
+        : {};
       if (!voucherMerchantId && parsedMeta.merchant_id) {
         voucherMerchantId = parsedMeta.merchant_id;
       }
@@ -141,6 +145,38 @@ routerAdd("POST", "/api/risev/merchant/vouchers/redeem", (e) => {
         success: false,
         message: "This voucher belongs to another merchant store and cannot be redeemed here."
       });
+    }
+
+    // 4b. Redemption limit — "points may cover at most N% of a bill".
+    //     Only checks when the merchant sends bill_amount. On rejection the voucher
+    //     stays ACTIVE: never silently consume a customer's value.
+    const billAmount = Number(body.bill_amount) || 0;
+    if (billAmount > 0 && voucherMerchantId) {
+      let maxPercent = 0;
+      try {
+        const programs = $app.findRecordsByFilter(
+          "loyalty_programs",
+          "merchant = '" + voucherMerchantId + "' && is_active = true",
+          "-created",
+          1,
+          0
+        );
+        if (programs.length > 0) maxPercent = Number(programs[0].get("max_redeem_percent")) || 0;
+      } catch (pErr) {}
+
+      if (maxPercent > 0 && String(discountType) === "fixed_amount") {
+        const discount = Number(discountValue) || 0;
+        const allowed = (billAmount * maxPercent) / 100;
+        if (discount > allowed + 0.0001) {
+          return e.json(400, {
+            success: false,
+            code: "EXCEEDS_MAX_REDEEM",
+            message:
+              "This voucher is worth RM " + discount.toFixed(2) + ", but this store allows at most " +
+              maxPercent + "% of a bill (RM " + allowed.toFixed(2) + "). The voucher is still valid.",
+          });
+        }
+      }
     }
 
     // 5. Update voucher to used status

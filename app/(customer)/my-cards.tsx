@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
+import PointsCashModal from '@/components/PointsCashModal';
 
 const { width } = Dimensions.get('window');
 
@@ -387,6 +388,9 @@ export default function MyCardsScreen() {
 
   const [merchantRewards, setMerchantRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(false);
+  // Points-to-cash settings for the selected card's store (rate + minimum).
+  const [cardProgram, setCardProgram] = useState<any>(null);
+  const [pointsCashOpen, setPointsCashOpen] = useState(false);
 
   useEffect(() => {
     if (selectedCard && selectedCard.merchantId) {
@@ -399,7 +403,9 @@ export default function MyCardsScreen() {
   const loadMerchantRewards = async (merchantId: string, linkedRewardId?: string) => {
     try {
       setLoadingRewards(true);
-      let filterQuery = `merchant = "${merchantId}" && is_active = true`;
+      // `is_archived` keeps the internal "Points Cash Voucher" reward (used as the
+      // backing record for converted points) out of the customer catalogue.
+      let filterQuery = `merchant = "${merchantId}" && is_active = true && is_archived != true`;
       if (linkedRewardId) {
         filterQuery += ` && id != "${linkedRewardId}"`;
       }
@@ -413,6 +419,16 @@ export default function MyCardsScreen() {
       console.warn("Failed to load rewards:", err);
     } finally {
       setLoadingRewards(false);
+    }
+
+    try {
+      const progs = await pb.collection('loyalty_programs').getFullList({
+        filter: `merchant = "${merchantId}" && is_active = true`,
+        requestKey: null,
+      });
+      setCardProgram(progs[0] || null);
+    } catch (err) {
+      setCardProgram(null);
     }
   };
 
@@ -1004,6 +1020,16 @@ export default function MyCardsScreen() {
                         <Text style={styles.statsValue}>{selectedCard.points}</Text>
                         <Text style={styles.statsUnit}>PTS</Text>
                       </View>
+                      {(selectedCard.enable_points as boolean | undefined) !== false ? (
+                        <TouchableOpacity
+                          style={styles.usePointsBtn}
+                          activeOpacity={0.85}
+                          onPress={() => setPointsCashOpen(true)}
+                        >
+                          <Text style={styles.usePointsBtnText}>Use points</Text>
+                          <Ionicons name="chevron-forward" size={11} color="#B45309" />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
 
                     {/* Membership Tier Column */}
@@ -1249,11 +1275,46 @@ export default function MyCardsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Points → cash voucher (rate and minimum come from the store's program) */}
+      {selectedCard ? (
+        <PointsCashModal
+          visible={pointsCashOpen}
+          onClose={() => setPointsCashOpen(false)}
+          merchantId={selectedCard.merchantId || ''}
+          merchantName={selectedCard.merchantName || 'Store'}
+          balance={Number(selectedCard.points) || 0}
+          rate={Number(cardProgram?.points_per_rm) || 100}
+          minRedeem={Number(cardProgram?.min_redeem_points) || 0}
+          onConverted={(newBalance) => {
+            setSelectedCard((prev) =>
+              prev ? { ...prev, points: newBalance } : prev
+            );
+            fetchLoyaltyCards();
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  usePointsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 99,
+    backgroundColor: '#FFFBEA',
+  },
+  usePointsBtnText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#B45309',
+  },
   root: {
     flex: 1,
     backgroundColor: '#FFFFFF',

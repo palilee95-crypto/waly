@@ -1,6 +1,20 @@
+// Catalogue redemption: spend points on a reward and receive a voucher.
+//
+// Guards added during the points audit:
+//   * only the owning customer may redeem (the collection rule enforces it; this is
+//     defence in depth in case the rule is ever loosened);
+//   * `min_redeem_points` from the program is honoured — it was previously stored
+//     but read by nothing;
+//   * `users.total_points` is recomputed so the profile total matches the cards.
 onRecordCreate((e) => {
   const customerId = e.record.get('customer');
   const rewardId = e.record.get('reward');
+
+  let authRecord = null;
+  try { authRecord = e.auth; } catch (err) {}
+  if (authRecord && authRecord.id && customerId !== authRecord.id) {
+    throw new ForbiddenError('You can only redeem your own points.');
+  }
 
   // Fetch reward details
   const reward = $app.findRecordById('rewards', rewardId);
@@ -17,11 +31,28 @@ onRecordCreate((e) => {
     throw new ForbiddenError('You do not have an active loyalty card for this store to redeem points.');
   }
 
-  const cost = reward.get('points_cost') || 0;
-  const balance = card.get('points_balance') || 0;
+  const cost = Number(reward.get('points_cost')) || 0;
+  const balance = Number(card.get('points_balance')) || 0;
+
+  // Minimum redemption threshold, configured per program.
+  let minRedeem = 0;
+  let pointsPerRm = 100;
+  try {
+    const programId = card.get('program');
+    if (programId) {
+      const prog = $app.findRecordById('loyalty_programs', programId);
+      minRedeem = Number(prog.get('min_redeem_points')) || 0;
+      const rate = Number(prog.get('points_per_rm'));
+      if (rate > 0) pointsPerRm = rate;
+    }
+  } catch (err) {}
 
   if (reward.get('is_active') === false || (reward.get('stock') !== null && reward.get('stock') !== undefined && reward.get('stock') <= 0)) {
     throw new ForbiddenError('This reward is currently unavailable or out of stock.');
+  }
+
+  if (minRedeem > 0 && cost < minRedeem) {
+    throw new ForbiddenError('This reward is below the minimum of ' + minRedeem + ' points for this store.');
   }
 
   if (balance < cost) {
@@ -44,7 +75,8 @@ onRecordCreate((e) => {
     reward_redemption: e.record.id || '',
     reward_id: rewardId,
     reward_title: reward.get('name') || reward.get('title') || '',
-    points_cost: cost
+    points_cost: cost,
+    points_per_rm: pointsPerRm
   }));
   $app.save(tx);
 
@@ -71,6 +103,14 @@ onRecordCreate((e) => {
     source: 'points_redemption'
   }));
   $app.save(voucher);
+
+  // Keep the derived profile total in step with the card balance.
+  try {
+    const engine = require(`${__hooks}/points_engine.js`);
+    engine.recomputeTotalPoints(customerId);
+  } catch (err) {
+    console.log('[REDEMPTION] total_points recompute failed:', err && err.message ? err.message : err);
+  }
 
   return e.next();
 }, 'redemptions');

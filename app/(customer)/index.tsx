@@ -951,7 +951,9 @@ export default function CustomerDashboard() {
   const loadMerchantRewards = async (merchantId: string, linkedRewardId?: string) => {
     try {
       setLoadingRewards(true);
-      let filterQuery = `merchant = "${merchantId}" && is_active = true`;
+      // `is_archived` keeps the internal "Points Cash Voucher" reward (the backing
+      // record for converted points) out of the customer catalogue.
+      let filterQuery = `merchant = "${merchantId}" && is_active = true && is_archived != true`;
       if (linkedRewardId) {
         filterQuery += ` && id != "${linkedRewardId}"`;
       }

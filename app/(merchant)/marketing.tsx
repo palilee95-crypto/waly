@@ -1006,7 +1006,6 @@ export default function MarketingScreen() {
         stamp_color: stampColor,
         font_color: fontColor,
         card_icon: selectedIcon,
-        points_per_stamp: 10,
         expiry_days: days,
       };
 
