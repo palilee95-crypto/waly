@@ -972,6 +972,7 @@ export default function MerchantLayout() {
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="customers" />
+        <Tabs.Screen name="customer-activity" options={{ href: null }} />
         <Tabs.Screen name="give" />
         <Tabs.Screen name="marketing" />
         <Tabs.Screen name="profile" />
