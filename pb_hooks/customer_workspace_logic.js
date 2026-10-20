@@ -215,6 +215,24 @@ function buildSnapshot($app, ctx) {
     )
   ) || 0;
 
+  // The Rewards audience is the deduplicated union of both groups — a customer with a
+  // voucher AND a nearly-complete card must be counted once, matching the audience rows.
+  const rewardAudience = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM (" +
+        "SELECT v.customer as id FROM vouchers v JOIN rewards r ON r.id = v.reward " +
+        "WHERE r.merchant = {:mid} AND v.status = 'active' AND (v.expires_at IS NULL OR v.expires_at > {:now}) " +
+        "UNION " +
+        "SELECT c.customer as id FROM loyalty_cards c JOIN loyalty_programs p ON p.id = c.program " +
+        "WHERE p.merchant = {:mid2} AND c.status = 'active' AND p.stamp_goal > 0 " +
+        "AND (p.stamp_goal - c.stamps_collected) BETWEEN 1 AND 2" +
+        ")",
+      { mid: ctx.merchantId, mid2: ctx.merchantId, now: nowUtc },
+      "v"
+    )
+  ) || 0;
+
   const vouchersRedeemed = Number(
     scalar(
       $app,
@@ -294,7 +312,7 @@ function buildSnapshot($app, ctx) {
     },
     attention: [
       { id: "return", title: "Bring customers back", detail: "Past their usual return window.", count: overdueCount },
-      { id: "rewards", title: "Rewards ready", detail: "Valid voucher or 1-2 stamps from a reward.", count: availableVouchers + nearReward },
+      { id: "rewards", title: "Rewards ready", detail: "Valid voucher or 1-2 stamps from a reward.", count: rewardAudience },
     ],
     loyalty: { nearReward: nearReward, availableVouchers: availableVouchers, daily: daily },
     bookings: {
@@ -326,8 +344,19 @@ function buildAudience($app, ctx, card, page, perPage) {
       $app,
       "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen " +
         "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+        // Already booked in? Then they are not someone to win back — matches the
+        // overview count, which also excludes customers with a future booking.
+        " AND t.customer NOT IN (SELECT b2.customer FROM service_bookings b2 " +
+        "WHERE b2.merchant = {:mid2} AND b2.customer != '' AND b2.status IN ('booked','arrived','in_service') " +
+        "AND b2.booking_date >= {:today}) " +
         " GROUP BY u.id HAVING MAX(t.created) < {:cutoff} ORDER BY MAX(t.created) ASC LIMIT {:limit} OFFSET {:offset}",
-      Object.assign({}, base, { cutoff: cutoff, limit: limit, offset: offset }),
+      Object.assign({}, base, {
+        cutoff: cutoff,
+        limit: limit,
+        offset: offset,
+        mid2: ctx.merchantId,
+        today: localDate(0),
+      }),
       { id: "", name: "", phone: "", last_seen: "" }
     );
     return {

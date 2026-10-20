@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,8 +20,18 @@ import { workspacePeriods } from '@/lib/customer-workspace';
 import { useCustomerWorkspace } from '@/components/customer-workspace/useCustomerWorkspace';
 import OverviewTab from '@/components/customer-workspace/OverviewTab';
 import ReportsTab from '@/components/customer-workspace/ReportsTab';
+import ActionsTab from '@/components/customer-workspace/ActionsTab';
+import AudienceSheet from '@/components/customer-workspace/AudienceSheet';
+import { AudienceCard } from '@/lib/customer-workspace';
+import * as Clipboard from 'expo-clipboard';
 
-type MainTab = 'overview' | 'reports';
+type MainTab = 'overview' | 'actions' | 'reports';
+
+const MAIN_TABS: { id: MainTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'actions', label: 'Actions' },
+  { id: 'reports', label: 'Reports' },
+];
 
 export default function CustomerWorkspaceScreen() {
   const router = useRouter();
@@ -29,6 +40,7 @@ export default function CustomerWorkspaceScreen() {
   const [periodIndex, setPeriodIndex] = useState(0);
   const [branchId, setBranchId] = useState('');
   const [mainTab, setMainTab] = useState<MainTab>('overview');
+  const [audienceCard, setAudienceCard] = useState<AudienceCard | null>(null);
 
   const period = periods[periodIndex];
   const { snapshot, loading, error, retry } = useCustomerWorkspace(branchId, period);
@@ -42,6 +54,18 @@ export default function CustomerWorkspaceScreen() {
   const goActivity = () => router.push('/(merchant)/customer-activity' as any);
   const goAnalytics = () => router.push('/(merchant)/analytics' as any);
   const goUpgrade = () => router.push('/(merchant)/subscription' as any);
+
+  // Share your store: the existing join link, no messaging involved.
+  const shareStore = async () => {
+    if (!snapshot) return;
+    const link = `https://risev.app/join?m=${snapshot.merchant.id}${branchId ? `&b=${branchId}` : ''}`;
+    try {
+      await Clipboard.setStringAsync(link);
+      Alert.alert('Join link copied', link);
+    } catch {
+      Alert.alert('Join link', link);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -122,18 +146,16 @@ export default function CustomerWorkspaceScreen() {
 
         {/* Main tabs */}
         <View style={styles.tabBar}>
-          {(['overview', 'reports'] as MainTab[]).map((tab) => {
-            const active = mainTab === tab;
+          {MAIN_TABS.map((tab) => {
+            const active = mainTab === tab.id;
             return (
               <TouchableOpacity
-                key={tab}
+                key={tab.id}
                 style={[styles.tabBtn, active && styles.tabBtnActive]}
-                onPress={() => setMainTab(tab)}
+                onPress={() => setMainTab(tab.id)}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                  {tab === 'overview' ? 'Overview' : 'Reports'}
-                </Text>
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -153,33 +175,59 @@ export default function CustomerWorkspaceScreen() {
             </TouchableOpacity>
           </View>
         ) : snapshot ? (
-          mainTab === 'overview' ? (
-            <OverviewTab
-              snapshot={snapshot}
-              periodLabel={period.label}
-              scopeLabel={scopeLabel}
-              onOpenCustomers={goActivity}
-              onOpenReport={(report) => {
-                if (report === 'bookings') {
-                  setMainTab('reports');
-                } else {
-                  goActivity();
-                }
-              }}
-            />
-          ) : (
-            <ReportsTab
-              snapshot={snapshot}
-              entitled={snapshot.entitlements.reports}
-              onUpgrade={goUpgrade}
-              onOpenActivity={goActivity}
-              onOpenAnalytics={goAnalytics}
-            />
-          )
+          <>
+            {mainTab === 'overview' && (
+              <OverviewTab
+                snapshot={snapshot}
+                periodLabel={period.label}
+                scopeLabel={scopeLabel}
+                onOpenCustomers={goActivity}
+                onOpenReport={(report) => {
+                  if (report === 'bookings') {
+                    setMainTab('reports');
+                  } else {
+                    goActivity();
+                  }
+                }}
+              />
+            )}
+            {mainTab === 'actions' && (
+              <ActionsTab
+                snapshot={snapshot}
+                onOpenAudience={setAudienceCard}
+                onShareStore={shareStore}
+              />
+            )}
+            {mainTab === 'reports' && (
+              <ReportsTab
+                snapshot={snapshot}
+                entitled={snapshot.entitlements.reports}
+                onUpgrade={goUpgrade}
+                onOpenActivity={goActivity}
+                onOpenAnalytics={goAnalytics}
+              />
+            )}
+          </>
         ) : null}
 
         <View style={{ height: 28 }} />
       </ScrollView>
+
+      {snapshot && audienceCard ? (
+        <AudienceSheet
+          visible
+          card={audienceCard}
+          merchantId={snapshot.merchant.id}
+          merchantName={snapshot.merchant.name}
+          branchId={branchId}
+          total={
+            audienceCard === 'birthday'
+              ? snapshot.birthdays
+              : snapshot.attention.find((a) => a.id === audienceCard)?.count ?? 0
+          }
+          onClose={() => setAudienceCard(null)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

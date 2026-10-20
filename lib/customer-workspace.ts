@@ -112,6 +112,45 @@ export async function fetchWorkspace({
   });
 }
 
+export type AudienceCard = 'return' | 'rewards' | 'birthday';
+
+export type AudienceRow = {
+  id: string;
+  name: string;
+  phone: string;
+  /** return card */
+  lastVisit?: string;
+  daysOverdue?: number | null;
+  /** rewards card */
+  reason?: 'voucher' | 'near_reward';
+  /** birthday card */
+  birthday?: string | null;
+};
+
+export type AudiencePage = { card: AudienceCard; page: number; items: AudienceRow[] };
+
+/** Paginated rows for an Actions card. Counts live in the snapshot, rows are on demand. */
+export async function fetchAudience(params: {
+  card: AudienceCard;
+  branchId?: string;
+  page?: number;
+  perPage?: number;
+  signal?: AbortSignal;
+}): Promise<AudiencePage> {
+  const { card, branchId = 'all', page = 1, perPage = 20, signal } = params;
+  const qs = new URLSearchParams({
+    card,
+    branch: branchId || 'all',
+    page: String(page),
+    perPage: String(perPage),
+  }).toString();
+  return pb.send<AudiencePage>(`/api/risev/merchant/customer-workspace/audience?${qs}`, {
+    method: 'GET',
+    requestKey: null,
+    signal,
+  });
+}
+
 export function formatMoney(cents: number | null): string {
   if (cents === null || cents === undefined) return 'No data';
   return `RM ${(cents / 100).toLocaleString('en-MY', {
