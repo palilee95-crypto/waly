@@ -9,9 +9,15 @@ type Props = {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
   onOpenReport: (report: 'customers' | 'bookings') => void;
+  onOpenDirectory: () => void;
 };
 
-export default function OverviewTab({ snapshot, periodLabel, onOpenReport }: Props) {
+export default function OverviewTab({
+  snapshot,
+  periodLabel,
+  onOpenReport,
+  onOpenDirectory,
+}: Props) {
   const { overview, trend, bookings, loyalty } = snapshot;
   const change = pctChange(overview.visited, overview.previous.visited);
   const busiest = trend.reduce(
@@ -88,7 +94,7 @@ export default function OverviewTab({ snapshot, periodLabel, onOpenReport }: Pro
         <TouchableOpacity
           style={styles.insight}
           activeOpacity={0.85}
-          onPress={() => onOpenReport('customers')}
+          onPress={onOpenDirectory}
         >
           <View style={styles.insightIcon}>
             <Ionicons name="bulb-outline" size={16} color="#B45309" />

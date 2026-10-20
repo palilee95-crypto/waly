@@ -159,7 +159,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
 
   const query = (e.requestInfo() && e.requestInfo().query) || {};
   const card = String(query.card || "");
-  if (["return", "rewards", "rebook", "birthday"].indexOf(card) === -1) {
+  if (["return", "rewards", "rebook", "birthday", "all"].indexOf(card) === -1) {
     return e.json(400, { code: "INVALID_CARD", message: "Unknown audience card." });
   }
 

@@ -16,7 +16,12 @@ import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radii } from '@/theme';
 import { AudienceCard, AudienceRow, fetchAudience } from '@/lib/customer-workspace';
-import { buildWhatsAppLink, renderTemplate, DEFAULT_ACTION_TEMPLATES } from '@/lib/whatsapp';
+import {
+  buildWhatsAppLink,
+  renderTemplate,
+  DEFAULT_ACTION_TEMPLATES,
+  ActionCardId,
+} from '@/lib/whatsapp';
 
 const PAGE_SIZE = 20;
 
@@ -25,6 +30,7 @@ const CARD_TITLES: Record<AudienceCard, string> = {
   rewards: 'Customers near reward',
   rebook: 'Not rebooked yet',
   birthday: 'Upcoming birthdays',
+  all: 'All customers',
 };
 
 type Props = {
@@ -50,12 +56,16 @@ export default function AudienceSheet({
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [template, setTemplate] = useState(DEFAULT_ACTION_TEMPLATES[card]);
+  const [template, setTemplate] = useState(
+    DEFAULT_ACTION_TEMPLATES[card === 'all' ? 'return' : card] ?? DEFAULT_ACTION_TEMPLATES.return
+  );
   const [messaged, setMessaged] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const requestId = useRef(0);
 
-  const templateKey = `@ws_action_template:${merchantId}:${card}`;
+  // The directory reuses the "come back" wording as a generic greeting.
+  const templateCard: ActionCardId = card === 'all' ? 'return' : card;
+  const templateKey = `@ws_action_template:${merchantId}:${templateCard}`;
   const messagedKey = `@ws_action_messaged:${merchantId}:${card}`;
 
   const loadPage = useCallback(
@@ -85,7 +95,11 @@ export default function AudienceSheet({
     setCopied(false);
     loadPage(1);
     AsyncStorage.getItem(templateKey).then((saved) => {
-      setTemplate(saved && saved.trim() ? saved : DEFAULT_ACTION_TEMPLATES[card]);
+      setTemplate(
+        saved && saved.trim()
+          ? saved
+          : DEFAULT_ACTION_TEMPLATES[templateCard] ?? DEFAULT_ACTION_TEMPLATES.return
+      );
     });
     AsyncStorage.getItem(messagedKey).then((saved) => {
       try {
@@ -200,13 +214,21 @@ export default function AudienceSheet({
                     <Text style={styles.rowMeta} numberOfLines={1}>
                       {card === 'return' || card === 'rebook'
                         ? `Last visit ${row.daysOverdue ?? '?'} days ago`
-                        : card === 'rewards'
-                          ? row.reason === 'voucher'
-                            ? 'Has a valid voucher'
-                            : '1–2 stamps from a reward'
-                          : row.birthday
-                            ? `Birthday ${row.birthday}`
-                            : 'Birthday this week'}
+                        : card === 'all'
+                          ? `${row.visits ?? 0} visit${row.visits === 1 ? '' : 's'} · ${
+                              row.daysOverdue === null || row.daysOverdue === undefined
+                                ? 'never visited'
+                                : row.daysOverdue <= 0
+                                  ? 'visited today'
+                                  : `last visit ${row.daysOverdue} days ago`
+                            }`
+                          : card === 'rewards'
+                            ? row.reason === 'voucher'
+                              ? 'Has a valid voucher'
+                              : '1–2 stamps from a reward'
+                            : row.birthday
+                              ? `Birthday ${row.birthday}`
+                              : 'Birthday this week'}
                     </Text>
                   </View>
                   {opened ? <Ionicons name="checkmark" size={14} color="#686868" style={{ marginRight: 6 }} /> : null}

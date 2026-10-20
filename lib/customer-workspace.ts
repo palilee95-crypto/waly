@@ -128,7 +128,7 @@ export async function fetchWorkspace({
   });
 }
 
-export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday';
+export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday' | 'all';
 
 export type AudienceRow = {
   id: string;
@@ -141,6 +141,8 @@ export type AudienceRow = {
   reason?: 'voucher' | 'near_reward';
   /** birthday card */
   birthday?: string | null;
+  /** all-customers directory */
+  visits?: number;
 };
 
 export type AudiencePage = { card: AudienceCard; page: number; items: AudienceRow[] };

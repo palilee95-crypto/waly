@@ -460,6 +460,33 @@ function buildAudience($app, ctx, card, page, perPage) {
   const returnDays = Number(ctx.returnDays) > 0 ? Number(ctx.returnDays) : DEFAULT_RETURN_DAYS;
   const cutoff = new Date(Date.now() - returnDays * DAY_MS).toISOString().replace("T", " ").slice(0, 19);
 
+  if (card === "all") {
+    // The customer directory that used to live on the separate activity screen.
+    // Merchant-wide (the directory is not period-scoped), most recent first.
+    return {
+      items: rows(
+        $app,
+        "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen, COUNT(t.id) as visits " +
+          "FROM loyalty_cards c JOIN users u ON u.id = c.customer " +
+          "LEFT JOIN transactions t ON t.customer = c.customer AND t.merchant = c.merchant AND t.type <> 'adjust' " +
+          "WHERE c.merchant = {:mid} GROUP BY u.id " +
+          "ORDER BY last_seen DESC LIMIT {:limit} OFFSET {:offset}",
+        { mid: ctx.merchantId, limit: limit, offset: offset },
+        { id: "", name: "", phone: "", last_seen: "", visits: 0 }
+      ).map(function (r) {
+        const seen = parsePbDate(r.last_seen);
+        return {
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          lastVisit: r.last_seen,
+          visits: Number(r.visits) || 0,
+          daysOverdue: seen === null ? null : Math.floor((Date.now() - seen) / DAY_MS),
+        };
+      }),
+    };
+  }
+
   if (card === "return" || card === "rebook") {
     const scope = "t.merchant = {:mid}" + branchClause(ctx, "t.branch") + " AND t.type <> 'adjust'";
     const base = bindBase(ctx);

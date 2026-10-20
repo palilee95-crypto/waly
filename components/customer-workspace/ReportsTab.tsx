@@ -26,14 +26,16 @@ const REPORTS: { id: ReportId; label: string; icon: any }[] = [
 type Props = {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
-  onOpenActivity: () => void;
+  onOpenDirectory: () => void;
+  onOpenAudience: (id: 'return' | 'rewards' | 'rebook') => void;
   onOpenAnalytics: () => void;
 };
 
 export default function ReportsTab({
   snapshot,
   periodLabel,
-  onOpenActivity,
+  onOpenDirectory,
+  onOpenAudience,
   onOpenAnalytics,
 }: Props) {
   const [report, setReport] = useState<ReportId>('customers');
@@ -62,13 +64,14 @@ export default function ReportsTab({
         <CustomersReport
           snapshot={snapshot}
           periodLabel={periodLabel}
-          onOpenActivity={onOpenActivity}
+          onOpenDirectory={onOpenDirectory}
         />
       ) : (
         <OtherReport
           report={report}
           snapshot={snapshot}
-          onOpenActivity={onOpenActivity}
+          onOpenDirectory={onOpenDirectory}
+          onOpenAudience={onOpenAudience}
           onOpenAnalytics={onOpenAnalytics}
         />
       )}
@@ -79,11 +82,11 @@ export default function ReportsTab({
 function CustomersReport({
   snapshot,
   periodLabel,
-  onOpenActivity,
+  onOpenDirectory,
 }: {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
-  onOpenActivity: () => void;
+  onOpenDirectory: () => void;
 }) {
   const { overview, topCustomers, inactive } = snapshot;
   const total = overview.visited;
@@ -193,7 +196,7 @@ function CustomersReport({
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Inactive Customers (&gt; {snapshot.bookings ? 30 : 30} days)</Text>
-        <TouchableOpacity onPress={onOpenActivity} activeOpacity={0.7}>
+        <TouchableOpacity onPress={onOpenDirectory} activeOpacity={0.7}>
           <Text style={styles.viewAll}>View All</Text>
         </TouchableOpacity>
       </View>
@@ -220,12 +223,14 @@ function CustomersReport({
 function OtherReport({
   report,
   snapshot,
-  onOpenActivity,
+  onOpenDirectory,
+  onOpenAudience,
   onOpenAnalytics,
 }: {
   report: ReportId;
   snapshot: WorkspaceSnapshot;
-  onOpenActivity: () => void;
+  onOpenDirectory: () => void;
+  onOpenAudience: (id: 'return' | 'rewards' | 'rebook') => void;
   onOpenAnalytics: () => void;
 }) {
   const { overview, bookings, loyalty, feedback, unavailable } = snapshot;
@@ -277,10 +282,10 @@ function OtherReport({
           by customers.
         </Text>
         <Row
-          title="Transaction activity"
-          detail="Inspect the records behind these numbers."
-          icon="receipt-outline"
-          onPress={onOpenActivity}
+          title="Customer directory"
+          detail="Every customer at this store, newest visit first."
+          icon="people-outline"
+          onPress={onOpenDirectory}
         />
         <Row
           title="Open full analytics"
@@ -318,7 +323,7 @@ function OtherReport({
           detail="One or two stamps left on an active card."
           value={formatCount(loyalty.nearReward)}
           icon="gift-outline"
-          onPress={onOpenActivity}
+          onPress={() => onOpenAudience('rewards')}
         />
       </View>
     );

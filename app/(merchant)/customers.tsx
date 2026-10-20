@@ -50,7 +50,9 @@ export default function CustomerWorkspaceScreen() {
     ? snapshot?.branches.find((b) => b.id === branchId)?.name || 'Outlet'
     : 'All Branches';
 
-  const goActivity = () => router.push('/(merchant)/customer-activity' as any);
+  // The old standalone activity screen is gone — the directory and audiences live
+  // in the workspace's own sheet.
+  const openDirectory = () => setAudienceCard('all');
   const goAnalytics = () => router.push('/(merchant)/analytics' as any);
 
   // Share your store: the existing join link, no messaging involved.
@@ -145,6 +147,7 @@ export default function CustomerWorkspaceScreen() {
                 snapshot={snapshot}
                 periodLabel={period.label}
                 onOpenReport={() => setMainTab('reports')}
+                onOpenDirectory={openDirectory}
               />
             )}
             {mainTab === 'actions' && (
@@ -159,7 +162,8 @@ export default function CustomerWorkspaceScreen() {
               <ReportsTab
                 snapshot={snapshot}
                 periodLabel={period.label}
-                onOpenActivity={goActivity}
+                onOpenDirectory={openDirectory}
+                onOpenAudience={(id) => setAudienceCard(id)}
                 onOpenAnalytics={goAnalytics}
               />
             )}
