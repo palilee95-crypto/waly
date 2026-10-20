@@ -6,19 +6,16 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii } from '@/theme';
+import { colors, radii, shadows } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
 import NfcClaimModal from '@/components/NfcClaimModal';
 import ManualPosLauncher from '@/components/ManualPosLauncher';
-import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { BlurView } from 'expo-blur';
 import SubscriptionScreen from './subscription';
 import { playClaimChime } from '@/lib/audioChime';
-
-const MOBILE_TAB_BAR_HEIGHT = 70;
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
@@ -180,11 +177,16 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   }
 
   // Mobile Bottom Tab Bar view
-  const tabBarHeight = MOBILE_TAB_BAR_HEIGHT + Math.max(insets.bottom, 12);
+  const tabBarHeight = 28 + 64 + Math.max(insets.bottom, 8);
 
   return (
-    <View style={[styles.mobileTabBarWrap, { height: tabBarHeight }]}>
-      <GooeyTabBarBackground width={width} height={tabBarHeight} />
+    <View
+      style={[
+        styles.mobileTabBarWrap,
+        { height: tabBarHeight, paddingBottom: Math.max(insets.bottom, 8) },
+      ]}
+      pointerEvents="box-none"
+    >
       <View style={styles.mobileTabBar}>
         {state.routes.filter((route: any) => allowedTabs.includes(route.name)).map((route: any) => {
           const isFocused = state.routes[state.index]?.name === route.name;
@@ -213,11 +215,11 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
                 style={styles.floatingBtnWrap}
                 activeOpacity={0.9}
                 accessibilityRole="button"
-                accessibilityLabel="Issue stamps"
+                accessibilityLabel="Scan or issue stamps"
                 accessibilityState={{ selected: isFocused }}
               >
                 <View style={styles.centerGlowBtnContainer}>
-                  <Ionicons name="qr-code" size={25} color="#08090B" />
+                  <Ionicons name="qr-code" size={24} color={colors.black} />
                 </View>
               </TouchableOpacity>
             );
@@ -251,18 +253,15 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
               <View style={styles.iconContainer}>
                 <Ionicons
                   name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
-                  size={21}
-                  color={isFocused ? '#FFFFFF' : '#A3AAB5'}
+                  size={22}
+                  color={colors.black}
                 />
-                {isLockedMarketing && (
-                  <View style={{ position: 'absolute', top: -2, right: -4, backgroundColor: '#050505', borderRadius: 6, padding: 1 }}>
-                    <Ionicons name="lock-closed" size={9} color="#FFC700" />
+                {isLockedMarketing ? (
+                  <View style={styles.lockBadge}>
+                    <Ionicons name="lock-closed" size={9} color={colors.primary[400]} />
                   </View>
-                )}
+                ) : null}
               </View>
-              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>
-                {label}
-              </Text>
               <View style={[styles.activeTabDot, !isFocused && styles.inactiveTabDot]} />
             </TouchableOpacity>
           );
@@ -1006,7 +1005,7 @@ export default function MerchantLayout() {
           }}
           style={{
             position: 'absolute',
-            bottom: isDesktop ? 36 : MOBILE_TAB_BAR_HEIGHT + Math.max(insets.bottom, 12) + 8,
+            bottom: isDesktop ? 36 : Math.max(insets.bottom, 8) + 80,
             right: 16,
             shadowColor: '#050505',
             shadowOffset: { width: 0, height: 4 },
@@ -1055,72 +1054,73 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
+    paddingHorizontal: 14,
+    paddingTop: 28,
+    backgroundColor: 'transparent',
   },
   mobileTabBar: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    height: 58,
-    alignItems: 'flex-start',
+    height: 64,
+    alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    borderRadius: 32,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    overflow: 'visible',
+    ...shadows.md,
   },
   tabButton: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
     flex: 1,
-    height: 58,
-    paddingTop: 4,
-  },
-  iconContainer: {
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 27,
-    height: 25,
-    marginBottom: 2,
+    gap: 3,
   },
-  tabLabel: {
-    fontSize: 9,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#A3AAB5',
+  iconContainer: {
+    width: 28,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabLabelActive: {
-    color: '#FFFFFF',
+  lockBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: colors.black,
+    borderRadius: 6,
+    padding: 1,
   },
   activeTabDot: {
     width: 5,
     height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#FFCC00',
-    marginTop: 3,
+    borderRadius: 3,
+    backgroundColor: colors.primary[400],
   },
   inactiveTabDot: {
     opacity: 0,
   },
   floatingBtnWrap: {
-    justifyContent: 'flex-start',
-    alignItems: 'center',
     flex: 1,
-    height: 58,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 2,
   },
   centerGlowBtnContainer: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#FFCC00',
-    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 4,
+    borderColor: colors.white,
+    backgroundColor: colors.primary[400],
     alignItems: 'center',
-    marginTop: -15,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
+    marginTop: -24,
+    ...shadows.md,
+    shadowOpacity: 0.18,
+    elevation: 10,
   },
   // Subscription Billing Block Overlays
   gateContainer: {
