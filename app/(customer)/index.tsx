@@ -542,6 +542,7 @@ export default function CustomerDashboard() {
         health: 'Health',
         entertainment: 'Entertainment',
         carwash: 'Car Wash',
+        travel: 'Travel & Tours',
         other: 'Services'
       };
 
@@ -600,7 +601,7 @@ export default function CustomerDashboard() {
           id: m.id,
           name: m.name || 'Merchant Store',
           slug: m.pwa_slug || m.id,
-          category: labelMap[m.category?.toLowerCase()] || m.category || 'General',
+          category: m.metadata?.sub_category_name || labelMap[m.category?.toLowerCase()] || m.category || 'General',
           city: loc?.city || 'Nearby',
           location: distanceStr,
           distance: distanceStr,

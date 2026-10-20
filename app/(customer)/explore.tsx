@@ -137,7 +137,18 @@ const LOCATIONS_LIST = [
 function determineCategoryLabel(m: any): { display: string; key: string } {
   const cat = (m.category || '').toLowerCase();
   const name = (m.name || '').toLowerCase();
+  const subCat = String(m.metadata?.sub_category || '').toLowerCase();
 
+  if (
+    subCat === 'travel_agency' ||
+    subCat === 'umrah_hajj' ||
+    subCat === 'car_rental' ||
+    subCat === 'attraction' ||
+    cat === 'travel' ||
+    /travel|tour|umrah|hajj|rental|attraction|theme park/.test(name)
+  ) {
+    return { display: m.metadata?.sub_category_name || 'Travel & Tours', key: 'travel' };
+  }
   if (name.includes('barber') || name.includes('cut studio') || name.includes('saloon')) {
     return { display: 'Barber', key: 'barber' };
   }
@@ -500,6 +511,8 @@ export default function ExploreScreen() {
         } else if ((cat.includes('spa') || cat.includes('massage')) && (mCat.includes('spa') || rawCat.includes('spa') || mName.includes('spa') || mName.includes('massage'))) {
           matched = true;
         } else if ((cat.includes('gym') || cat.includes('fitness') || cat.includes('sport')) && (mCat.includes('gym') || rawCat.includes('gym') || mName.includes('gym') || mName.includes('fitness') || mName.includes('badminton') || mName.includes('court'))) {
+          matched = true;
+        } else if ((cat.includes('travel') || cat.includes('tour') || cat.includes('umrah') || cat.includes('hajj') || cat.includes('rental') || cat.includes('attraction')) && (rawCat.includes('travel') || mCat.includes('travel') || mName.includes('travel') || mName.includes('tour') || mName.includes('umrah') || mName.includes('hajj') || mName.includes('rental') || mName.includes('theme park'))) {
           matched = true;
         } else {
           // General flexible fallback

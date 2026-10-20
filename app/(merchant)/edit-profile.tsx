@@ -25,7 +25,7 @@ import { handleSmartBack } from '@/lib/navigation';
 import { pb } from '@/lib/pocketbase';
 import AllCategoriesModal, { ALL_CATEGORIES_LIST, CategoryItemType } from '../(customer)/_components/AllCategoriesModal';
 
-function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other' {
+function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'travel' | 'other' {
   switch (subId) {
     case 'cafe':
     case 'restaurant':
@@ -48,6 +48,11 @@ function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'he
       return 'retail';
     case 'studio':
       return 'entertainment';
+    case 'travel_agency':
+    case 'umrah_hajj':
+    case 'car_rental':
+    case 'attraction':
+      return 'travel';
     default:
       return 'other';
   }

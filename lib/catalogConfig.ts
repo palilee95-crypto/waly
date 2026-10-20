@@ -58,6 +58,10 @@ export const MERCHANT_CATALOG_CONFIG: Record<string, MerchantCatalogConfig> = {
   // Existing booking models remain available without adding or locking merchant categories.
   catering: { suggestedItemTypes: ['catering', 'product', 'addon'], suggestedCategories: ['Packages', 'Food stations', 'Event setup', 'Extra pax'] },
   lodging: { suggestedItemTypes: ['lodging', 'addon', 'product'], suggestedCategories: ['Rooms', 'Homestays', 'Chalets', 'Extras'] },
+  travel_agency: { suggestedItemTypes: ['service', 'product', 'addon'], suggestedCategories: ['Tour packages', 'Flights & transfers', 'Travel insurance'] },
+  umrah_hajj: { suggestedItemTypes: ['service', 'product', 'addon'], suggestedCategories: ['Umrah packages', 'Hajj packages', 'Visa & documents'] },
+  car_rental: { suggestedItemTypes: ['facility', 'service', 'addon'], suggestedCategories: ['Self-drive', 'With driver', 'Airport transfer'] },
+  attraction: { suggestedItemTypes: ['facility', 'product', 'addon'], suggestedCategories: ['Entry tickets', 'Ride passes', 'Season passes'] },
 };
 
 const DEFAULT_CONFIG: MerchantCatalogConfig = {

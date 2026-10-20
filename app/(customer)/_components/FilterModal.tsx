@@ -52,6 +52,7 @@ const CATEGORIES = [
   { id: 'Cafe', name: 'Cafe', icon: 'cafe', family: 'Ionicons' },
   { id: 'Restaurant', name: 'Restaurant', icon: 'restaurant', family: 'Ionicons' },
   { id: 'Fitness', name: 'Fitness', icon: 'barbell-outline', family: 'Ionicons' },
+  { id: 'Travel', name: 'Travel', icon: 'airplane-outline', family: 'Ionicons' },
   { id: 'Others', name: 'Others', icon: 'ellipsis-horizontal', family: 'Ionicons' },
 ];
 

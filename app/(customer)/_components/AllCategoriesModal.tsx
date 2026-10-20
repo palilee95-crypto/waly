@@ -256,6 +256,52 @@ export const ALL_CATEGORIES_LIST: CategoryItemType[] = [
     descEn: "Photo studio, creative media & events",
     descMs: "Studio fotografi, media kreatif & acara",
   },
+
+  // ✈️ Travel & Tours
+  { 
+    id: 'travel_agency', 
+    name: 'Travel Agency', 
+    group: 'Travel & Tours', 
+    icon: 'airplane-outline', 
+    bg: '#E0F2FE', 
+    color: '#0369A1', 
+    merchantCount: 0,
+    descEn: "Tour packages, flights & holiday planning",
+    descMs: "Pakej pelancongan, penerbangan & perancangan percutian",
+  },
+  { 
+    id: 'umrah_hajj', 
+    name: 'Umrah & Hajj', 
+    group: 'Travel & Tours', 
+    icon: 'moon-outline', 
+    bg: '#ECFDF5', 
+    color: '#047857', 
+    merchantCount: 0,
+    descEn: "Pilgrimage packages, guides & visa",
+    descMs: "Pakej umrah & haji, mutawif & visa",
+  },
+  { 
+    id: 'car_rental', 
+    name: 'Car Rental', 
+    group: 'Travel & Tours', 
+    icon: 'car-outline', 
+    bg: '#F1F5F9', 
+    color: '#334155', 
+    merchantCount: 0,
+    descEn: "Self-drive, chauffeur & airport transfer",
+    descMs: "Sewa kereta, pemandu & pemindahan lapangan terbang",
+  },
+  { 
+    id: 'attraction', 
+    name: 'Attraction & Tickets', 
+    group: 'Travel & Tours', 
+    icon: 'ticket-outline', 
+    bg: '#FEF3C7', 
+    color: '#B45309', 
+    merchantCount: 0,
+    descEn: "Theme parks, entry passes & experiences",
+    descMs: "Taman tema, tiket masuk & pengalaman",
+  },
 ];
 
 type AllCategoriesModalProps = {

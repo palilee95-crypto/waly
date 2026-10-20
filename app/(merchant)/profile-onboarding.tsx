@@ -104,7 +104,7 @@ const TIME_PICKER_OPTIONS = [
   '04:00 AM', '04:30 AM', '05:00 AM', '05:30 AM',
 ];
 
-function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'other' {
+function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'health' | 'entertainment' | 'travel' | 'other' {
   switch (subId) {
     case 'cafe':
     case 'restaurant':
@@ -127,6 +127,11 @@ function mapSubCategoryToBase(subId: string): 'food' | 'retail' | 'beauty' | 'he
       return 'retail';
     case 'studio':
       return 'entertainment';
+    case 'travel_agency':
+    case 'umrah_hajj':
+    case 'car_rental':
+    case 'attraction':
+      return 'travel';
     default:
       return 'other';
   }
