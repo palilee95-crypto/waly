@@ -138,7 +138,7 @@ export default function ProfileScreen() {
   const [customerSlotLimit, setCustomerSlotLimit] = useState<number>(500);
   const [loading, setLoading] = useState(true);
   const [customersCount, setCustomersCount] = useState<number>(0);
-  const [standsCount, setStandsCount] = useState<number>(1);
+  const [standsCount, setStandsCount] = useState<number>(0);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [permissionDeniedModalVisible, setPermissionDeniedModalVisible] = useState(false);
   const [deniedFeatureTitle, setDeniedFeatureTitle] = useState('');
@@ -866,9 +866,9 @@ export default function ProfileScreen() {
           filter: `redeemed_by = "${user.merchant_id}"`,
           requestKey: null,
         });
-        setStandsCount(Math.max(1, standsRes.totalItems));
+        setStandsCount(standsRes.totalItems || 0);
       } catch (e) {
-        setStandsCount(1);
+        setStandsCount(0);
       }
     } catch (err) {
       console.warn('Failed to fetch merchant profile:', err);
@@ -1317,9 +1317,11 @@ export default function ProfileScreen() {
                         onPress={() => router.push('/(merchant)/subscription' as any)}
                         activeOpacity={0.8}
                       >
-                        <MaterialCommunityIcons name="crown-outline" size={12} color="#B45309" />
-                        <Text style={styles.upgradeInlinePillText}>Upgrade PRO</Text>
-                        <Ionicons name="chevron-forward" size={11} color="#B45309" />
+                        <MaterialCommunityIcons name="crown-outline" size={12} color="#000000" />
+                        <Text style={styles.upgradeInlinePillText}>
+                          {locale === 'en' ? 'Upgrade PRO' : 'Naik PRO'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={11} color="#000000" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1345,7 +1347,7 @@ export default function ProfileScreen() {
                 <View style={styles.statTileIconYellow}>
                   <Ionicons name="radio" size={15} color="#000000" />
                 </View>
-                <Text style={styles.statTileNumber}>{standsCount > 0 ? standsCount : 1}</Text>
+                <Text style={styles.statTileNumber}>{standsCount}</Text>
                 <Ionicons name="chevron-forward" size={14} color="#000000" />
               </View>
               <Text style={styles.statTileLabel} numberOfLines={1}>{locale === 'en' ? 'NFC Stand' : 'Stand NFC'}</Text>
@@ -1364,7 +1366,7 @@ export default function ProfileScreen() {
                 <View style={styles.statTileIconGrey}>
                   <Ionicons name="people" size={15} color="#000000" />
                 </View>
-                <Text style={styles.statTileNumber}>{customersCount || 34}</Text>
+                <Text style={styles.statTileNumber}>{customersCount}</Text>
                 <Ionicons name="chevron-forward" size={14} color="#000000" />
               </View>
               <Text style={styles.statTileLabel} numberOfLines={1}>{locale === 'en' ? 'Customers' : 'Pelanggan'}</Text>
@@ -2251,6 +2253,7 @@ const styles = StyleSheet.create({
   },
   storeInfoCol: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
     gap: 2,
   },
@@ -2275,7 +2278,10 @@ const styles = StyleSheet.create({
   storeTierRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
+    columnGap: 8,
+    rowGap: 6,
+    flexShrink: 1,
   },
   storeVipBadge: {
     flexDirection: 'row',
@@ -2316,18 +2322,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 99,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    marginLeft: 4,
+    flexShrink: 0,
   },
   upgradeInlinePillText: {
     fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#B45309',
+    color: '#000000',
+    letterSpacing: 0.1,
   },
   storeCardDivider: {
     height: 1,
