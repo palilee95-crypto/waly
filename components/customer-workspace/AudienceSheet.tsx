@@ -33,6 +33,9 @@ import {
 
 const PAGE_SIZE = 20;
 
+/** Directory chats are personal, not a win-back campaign. */
+const DIRECTORY_TEMPLATE = 'Hi {{name}}, thanks for visiting {{merchant}}!';
+
 const CARD_TITLES: Record<AudienceCard, string> = {
   return: 'Bring customers back',
   rewards: 'Customers near reward',
@@ -79,8 +82,10 @@ export default function AudienceSheet({
   const [serverTotal, setServerTotal] = useState<number | null>(null);
   const requestId = useRef(0);
 
-  // The directory reuses the "come back" wording as a generic greeting.
-  const templateCard: ActionCardId = card === 'all' ? 'return' : card;
+  // The directory is a lookup list, not a campaign: no editable template, just a
+  // plain greeting when the merchant opens a chat.
+  const isDirectory = card === 'all';
+  const templateCard: ActionCardId = isDirectory ? 'return' : card;
   const templateKey = `@ws_action_template:${merchantId}:${templateCard}`;
   const messagedKey = `@ws_action_messaged:${merchantId}:${card}`;
 
@@ -147,7 +152,7 @@ export default function AudienceSheet({
   };
 
   const messageFor = (row: AudienceRow) =>
-    renderTemplate(template, {
+    renderTemplate(isDirectory ? DIRECTORY_TEMPLATE : template, {
       name: (row.name || '').split(' ')[0] || 'there',
       merchant: merchantName,
       days: row.daysOverdue ?? '',
@@ -242,7 +247,11 @@ export default function AudienceSheet({
             </TouchableOpacity>
           </View>
 
-          {card !== 'birthday' ? (
+          {isDirectory ? (
+            <Text style={styles.directoryNote}>
+              Your full customer list, most recent visit first. Tap a customer for their details, or open a chat.
+            </Text>
+          ) : card !== 'birthday' ? (
             <View style={styles.templateBlock}>
               <Text style={styles.templateLabel}>MESSAGE</Text>
               <TextInput
@@ -444,6 +453,14 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#686868',
     marginTop: 12,
+  },
+  directoryNote: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#686868',
+    marginTop: 10,
+    marginBottom: 2,
   },
   list: { marginTop: 12 },
   row: {

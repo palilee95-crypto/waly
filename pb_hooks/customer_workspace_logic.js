@@ -473,7 +473,9 @@ function buildAudience($app, ctx, card, page, perPage) {
       total: Number(counted && counted.n) || 0,
       items: rows(
         $app,
-        "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen, COUNT(t.id) as visits " +
+        // IFNULL: a customer with a card but no sale has MAX(t.created) NULL, and the
+        // DynamicModel scans into a string default — NULL would 500 the whole page.
+        "SELECT u.id as id, u.name as name, u.phone as phone, IFNULL(MAX(t.created), '') as last_seen, COUNT(t.id) as visits " +
           "FROM loyalty_cards c JOIN users u ON u.id = c.customer " +
           "LEFT JOIN transactions t ON t.customer = c.customer AND t.merchant = c.merchant AND t.type <> 'adjust' " +
           "WHERE c.merchant = {:mid} GROUP BY u.id " +
