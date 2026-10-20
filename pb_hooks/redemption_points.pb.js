@@ -34,9 +34,12 @@ onRecordCreate((e) => {
   const cost = Number(reward.get('points_cost')) || 0;
   const balance = Number(card.get('points_balance')) || 0;
 
-  // Minimum redemption threshold, configured per program.
+  // Minimum redemption threshold and the points switch, both configured per program.
+  // "Points off" means fully off: no earning AND no spending, so a merchant who
+  // pauses points is not still honouring redemptions against old balances.
   let minRedeem = 0;
   let pointsPerRm = 100;
+  let pointsEnabled = true;
   try {
     const programId = card.get('program');
     if (programId) {
@@ -44,8 +47,13 @@ onRecordCreate((e) => {
       minRedeem = Number(prog.get('min_redeem_points')) || 0;
       const rate = Number(prog.get('points_per_rm'));
       if (rate > 0) pointsPerRm = rate;
+      pointsEnabled = prog.get('enable_points') !== false;
     }
   } catch (err) {}
+
+  if (!pointsEnabled) {
+    throw new ForbiddenError('This store has paused points. Your balance is safe — redemption will work again once they turn points back on.');
+  }
 
   if (reward.get('is_active') === false || (reward.get('stock') !== null && reward.get('stock') !== undefined && reward.get('stock') <= 0)) {
     throw new ForbiddenError('This reward is currently unavailable or out of stock.');
