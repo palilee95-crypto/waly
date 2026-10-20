@@ -117,11 +117,10 @@ function computeEarning(txn) {
     return out;
   }
 
-  if (program.get("enable_points") === false) {
-    out.skip = true;
-    out.reason = "points_disabled";
-    return out;
-  }
+  // Turning points off must stop POINTS, not the whole earn path: `bonus_stamps`
+  // campaigns belong to the stamp engine and were being disabled with them.
+  const pointsDisabled = program.get("enable_points") === false;
+  const stampsDisabled = program.get("enable_stamps") === false;
 
   const spp = Number(program.get("spend_per_point"));
   if (spp && spp > 0) out.spendPerPoint = spp;
@@ -137,29 +136,39 @@ function computeEarning(txn) {
     return out;
   }
 
-  out.basePoints = Math.floor(bill / out.spendPerPoint);
+  out.basePoints = pointsDisabled ? 0 : Math.floor(bill / out.spendPerPoint);
 
   // Campaign bonuses only make sense on a real sale. The birthday "earn" carries a
   // zero bill and its stamps are applied by birthday_helper, so it must not collect
   // flat bonuses or bonus stamps.
   if (bill > 0) {
-    const doubleCamp = activeCampaign(merchantId, "double_points", now);
-    if (doubleCamp) {
-      out.campaignMultiplier = Number(doubleCamp.get("multiplier")) || 2.0;
-      out.campaignIds.double_points = doubleCamp.id;
+    if (!pointsDisabled) {
+      const doubleCamp = activeCampaign(merchantId, "double_points", now);
+      if (doubleCamp) {
+        out.campaignMultiplier = Number(doubleCamp.get("multiplier")) || 2.0;
+        out.campaignIds.double_points = doubleCamp.id;
+      }
+
+      const flatCamp = activeCampaign(merchantId, "flat_bonus", now);
+      if (flatCamp) {
+        out.flatBonus = Number(flatCamp.get("bonus_value")) || 0;
+        out.campaignIds.flat_bonus = flatCamp.id;
+      }
     }
 
-    const flatCamp = activeCampaign(merchantId, "flat_bonus", now);
-    if (flatCamp) {
-      out.flatBonus = Number(flatCamp.get("bonus_value")) || 0;
-      out.campaignIds.flat_bonus = flatCamp.id;
+    // Bonus stamps follow the STAMP engine, so they still apply when points are off.
+    if (!stampsDisabled) {
+      const stampCamp = activeCampaign(merchantId, "bonus_stamps", now);
+      if (stampCamp) {
+        out.bonusStamps = Number(stampCamp.get("bonus_value")) || 0;
+        out.campaignIds.bonus_stamps = stampCamp.id;
+      }
     }
+  }
 
-    const stampCamp = activeCampaign(merchantId, "bonus_stamps", now);
-    if (stampCamp) {
-      out.bonusStamps = Number(stampCamp.get("bonus_value")) || 0;
-      out.campaignIds.bonus_stamps = stampCamp.id;
-    }
+  if (pointsDisabled) {
+    out.finalPoints = 0;
+    return out;
   }
 
   out.streakMultiplier = streakMultiplier(customerId);
