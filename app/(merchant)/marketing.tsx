@@ -2299,15 +2299,14 @@ export default function MarketingScreen() {
         )}
               </View>
 
-              {/* Centered Frosted Glass COMING SOON Overlay */}
+              {/* Coming-soon notice (white canvas) */}
               <View style={styles.whatsappComingSoonOverlay}>
                 <View style={styles.whatsappComingSoonCard}>
                   <View style={styles.whatsappIconCircle}>
-                    <Ionicons name="logo-whatsapp" size={34} color="#22C55E" />
+                    <Ionicons name="logo-whatsapp" size={32} color="#16A34A" />
                   </View>
 
                   <View style={styles.comingSoonBadgePill}>
-                    <View style={styles.comingSoonAmberDot} />
                     <Text style={styles.comingSoonBadgeText}>COMING SOON</Text>
                   </View>
 
@@ -2320,15 +2319,15 @@ export default function MarketingScreen() {
 
                   <View style={styles.whatsappFeatureTagsRow}>
                     <View style={styles.whatsappFeatureTag}>
-                      <Ionicons name="paper-plane-outline" size={13} color="#FFC700" />
+                      <Ionicons name="paper-plane-outline" size={13} color="#0F172A" />
                       <Text style={styles.whatsappFeatureTagText}>Blast Broadcasts</Text>
                     </View>
                     <View style={styles.whatsappFeatureTag}>
-                      <Ionicons name="repeat-outline" size={13} color="#FFC700" />
+                      <Ionicons name="repeat-outline" size={13} color="#0F172A" />
                       <Text style={styles.whatsappFeatureTagText}>Smart Follow-Ups</Text>
                     </View>
                     <View style={styles.whatsappFeatureTag}>
-                      <Ionicons name="document-text-outline" size={13} color="#FFC700" />
+                      <Ionicons name="document-text-outline" size={13} color="#0F172A" />
                       <Text style={styles.whatsappFeatureTagText}>WABA Templates</Text>
                     </View>
                   </View>
@@ -3718,7 +3717,12 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   whatsappSubTabBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#FFC700',
+    shadowColor: '#FFC700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   whatsappSubTabText: {
     fontSize: 12,
@@ -3726,40 +3730,33 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   whatsappSubTabTextActive: {
-    color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#050505',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   whatsappComingSoonOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(5, 5, 5, 0.65)',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
     borderRadius: 24,
-    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as any) : {}),
   },
   whatsappComingSoonCard: {
-    backgroundColor: '#121318',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 28,
+    paddingVertical: 30,
+    paddingHorizontal: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#E2E8F0',
     maxWidth: 440,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 10,
   },
   whatsappIconCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.25)',
+    borderRadius: 20,
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -3767,38 +3764,30 @@ const styles = StyleSheet.create({
   comingSoonBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 199, 0, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 199, 0, 0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 6,
-    marginBottom: 12,
-  },
-  comingSoonAmberDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFC700',
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    borderRadius: 99,
+    marginBottom: 14,
   },
   comingSoonBadgeText: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFC700',
+    color: '#000000',
     letterSpacing: 1,
   },
   whatsappComingSoonTitle: {
     fontSize: 20,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#FFFFFF',
+    color: '#000000',
+    letterSpacing: -0.3,
     marginBottom: 8,
     textAlign: 'center',
   },
   whatsappComingSoonDesc: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: 20,
@@ -3813,9 +3802,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E2E8F0',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -3823,7 +3812,7 @@ const styles = StyleSheet.create({
   whatsappFeatureTagText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#E2E8F0',
+    color: '#0F172A',
   },
 
   // Campaigns content styles
