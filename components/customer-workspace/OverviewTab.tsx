@@ -1,16 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  useWindowDimensions,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Polyline, Circle, Line } from 'react-native-svg';
-import { colors, radii } from '@/theme';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
+import { colors, iconSizes, radii, shadows, spacing } from '@/theme';
 import {
   WorkspaceSnapshot,
   LedgerRow,
+  LedgerType,
+  AudienceCard,
   fetchTransactions,
-  pctChange,
+  formatCount,
   formatDayLabel,
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
+import CustomerSnapshotCard from './CustomerSnapshotCard';
+import PeriodPill from './PeriodPill';
 
 type Props = {
   snapshot: WorkspaceSnapshot;
@@ -21,7 +34,17 @@ type Props = {
   onOpenReport: (report: 'customers' | 'bookings') => void;
   onOpenDirectory: () => void;
   onOpenLedger: () => void;
+  onOpenAudience: (card: AudienceCard) => void;
+  onOpenPeriod?: () => void;
+  onOpenCustomer: (row: { id: string; name: string }) => void;
 };
+
+const TRANSACTION_FILTERS: { id: LedgerType; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'earn', label: 'Earned' },
+  { id: 'redeem', label: 'Redeemed' },
+  { id: 'adjust', label: 'Adjustments' },
+];
 
 const TYPE_LABEL: Record<string, string> = {
   earn: 'Earned',
@@ -39,178 +62,168 @@ export default function OverviewTab({
   onOpenReport,
   onOpenDirectory,
   onOpenLedger,
+  onOpenAudience,
+  onOpenPeriod,
+  onOpenCustomer,
 }: Props) {
-  const { overview, trend, bookings, loyalty } = snapshot;
+  const { trend, bookings, periodInsight } = snapshot;
   const [recent, setRecent] = useState<LedgerRow[]>([]);
   const [recentTotal, setRecentTotal] = useState(0);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentFilter, setRecentFilter] = useState<LedgerType>('all');
+  const [recentQuery, setRecentQuery] = useState('');
 
   // The ledger endpoint is the single source of truth for what happened, so the
   // Overview list is the same rows the Transactions sheet shows, just shorter.
   useEffect(() => {
     let cancelled = false;
-    fetchTransactions({ branchId, from, to, page: 1, perPage: 6 })
-      .then((res) => {
-        if (cancelled) return;
-        setRecent(res.items);
-        setRecentTotal(res.total);
+    const handle = setTimeout(() => {
+      setRecentLoading(true);
+      fetchTransactions({
+        branchId,
+        from,
+        to,
+        page: 1,
+        perPage: 6,
+        type: recentFilter,
+        q: recentQuery,
       })
-      .catch(() => {
-        if (!cancelled) {
-          setRecent([]);
-          setRecentTotal(0);
-        }
-      });
+        .then((res) => {
+          if (cancelled) return;
+          setRecent(res.items);
+          setRecentTotal(res.total);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRecent([]);
+            setRecentTotal(0);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setRecentLoading(false);
+        });
+    }, 250);
     return () => {
       cancelled = true;
+      clearTimeout(handle);
     };
-  }, [branchId, from, to]);
-  const change = pctChange(overview.visited, overview.previous.visited);
-  const busiest = trend.reduce(
-    (best, d) => (d.visits > best.visits ? d : best),
-    trend[0] || { date: '', visits: 0 }
-  );
+  }, [branchId, from, to, recentFilter, recentQuery]);
 
   return (
     <View style={styles.wrap}>
-      {/* ── Customer visits ── */}
-      <View style={styles.sectionHead}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Customer Visits</Text>
-          <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
-        </View>
-        <Text style={styles.sectionMeta}>{periodLabel}</Text>
-      </View>
+      <CustomerSnapshotCard
+        snapshot={snapshot}
+        periodLabel={periodLabel}
+        onOpenAudience={onOpenAudience}
+        onOpenDirectory={onOpenDirectory}
+        onOpenPeriod={onOpenPeriod}
+      />
 
-      <View style={styles.heroCard}>
-        <Text style={styles.heroNumber}>{overview.visited.toLocaleString('en-MY')}</Text>
-        <Text style={styles.heroLabel}>customers visited</Text>
-        {change !== null ? (
-          <View style={[styles.deltaPill, change < 0 && styles.deltaPillNegative]}>
-            <Ionicons
-              name={change < 0 ? 'trending-down' : 'trending-up'}
-              size={12}
-              color={change < 0 ? '#B91C1C' : '#16A34A'}
-            />
-            <Text style={[styles.deltaText, change < 0 && { color: '#B91C1C' }]}>
-              {change > 0 ? '+' : ''}
-              {change}%
-            </Text>
-            <Text style={styles.deltaMeta}>vs last month</Text>
-          </View>
-        ) : (
-          <Text style={styles.deltaMeta}>No previous period to compare</Text>
-        )}
-      </View>
+      <VisitTrendCard
+        data={trend}
+        periodLabel={periodLabel}
+        insight={periodInsight}
+        onOpenPeriod={onOpenPeriod}
+        onOpenLedger={onOpenLedger}
+      />
 
-      <View style={styles.splitRow}>
-        <View style={[styles.splitCard, { backgroundColor: '#FFFBEA', borderColor: '#FDE68A' }]}>
-          <View style={[styles.splitIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="person" size={15} color="#B45309" />
-          </View>
-          <Text style={styles.splitValue}>{overview.newCount.toLocaleString('en-MY')}</Text>
-          <Text style={styles.splitLabel}>New customers</Text>
-          <Text style={styles.splitCaption}>First visit this month</Text>
-        </View>
+      <SmartBookingCard bookings={bookings} onOpenReport={onOpenReport} />
 
-        <View style={[styles.splitCard, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-          <View style={[styles.splitIcon, { backgroundColor: '#EEF2F7' }]}>
-            <Ionicons name="people" size={15} color="#334155" />
-          </View>
-          <Text style={styles.splitValue}>{overview.returningCount.toLocaleString('en-MY')}</Text>
-          <Text style={styles.splitLabel}>Returning customers</Text>
-          <Text style={styles.splitCaption}>Came back again</Text>
-        </View>
-      </View>
-
-      {/* ── Visit trend ── */}
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Visit Trend</Text>
-        <View style={styles.metaChip}>
-          <Text style={styles.metaChipText}>Last 7 days</Text>
-          <Ionicons name="chevron-down" size={11} color="#686868" />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <TrendChart data={trend} />
-      </View>
-
-      {busiest.visits > 0 ? (
-        <TouchableOpacity
-          style={styles.insight}
-          activeOpacity={0.85}
-          onPress={onOpenDirectory}
-        >
-          <View style={styles.insightIcon}>
-            <Ionicons name="bulb-outline" size={16} color="#B45309" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.insightTitle}>
-              {new Date(`${busiest.date}T00:00:00+08:00`).toLocaleDateString('en-MY', {
-                weekday: 'long',
-              })}{' '}
-              was your busiest day
-            </Text>
-            <Text style={styles.insightBody}>
-              {busiest.visits} visit{busiest.visits === 1 ? '' : 's'} recorded
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={15} color="#686868" />
-        </TouchableOpacity>
-      ) : null}
-
-      {/* ── Smart booking ── */}
-      <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => onOpenReport('bookings')}>
-        <View style={styles.rowBetween}>
-          <View style={styles.rowLeft}>
-            <View style={styles.rowIcon}>
-              <Ionicons name="calendar-outline" size={17} color={colors.black} />
-            </View>
-            <View>
-              <View style={styles.sectionTitleRow}>
-                <Text style={styles.rowTitle}>Smart Booking</Text>
-                <Ionicons name="information-circle-outline" size={13} color="#9CA3AF" />
-              </View>
-              <Text style={styles.rowCaption}>
-                {bookings.completed} completed appointment{bookings.completed === 1 ? '' : 's'}
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#686868" />
-        </View>
-        <Text style={styles.footnote}>
-          {bookings.nextBookingCustomers} customer
-          {bookings.nextBookingCustomers === 1 ? '' : 's'} with a future booking · {loyalty.nearReward}{' '}
-          near a reward
-        </Text>
-      </TouchableOpacity>
-
-      {/* ── All transactions ── */}
-      <View style={styles.sectionHead}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
-        </View>
-        <TouchableOpacity onPress={onOpenLedger} activeOpacity={0.7}>
-          <Text style={styles.sectionMetaLink}>
-            {recentTotal > 0 ? `All ${recentTotal.toLocaleString('en-MY')}` : 'All'}
+      {/* ── Recent transactions ── */}
+      <View style={styles.recentHead}>
+        <View style={styles.recentHeadCopy}>
+          <Text style={styles.recentTitle}>Recent Transactions</Text>
+          <Text style={styles.recentSubtitle}>
+            {recentLoading
+              ? 'Loading…'
+              : `${recentTotal.toLocaleString('en-MY')} recorded · ${periodLabel}`}
           </Text>
-        </TouchableOpacity>
+        </View>
+        {recentLoading ? (
+          <ActivityIndicator size="small" color={colors.accent[400]} />
+        ) : null}
       </View>
 
-      <View style={styles.card}>
-        {recent.length === 0 ? (
-          <Text style={styles.emptyText}>No transactions recorded in {periodLabel.toLowerCase()}.</Text>
-        ) : (
-          recent.map((row, i) => {
-            const isRedeem = row.type === 'redeem';
-            const isAdjust = row.type === 'adjust';
+      <View style={styles.recentCard}>
+        <View style={styles.recentSearch}>
+          <Ionicons name="search" size={iconSizes.sm} color={colors.accent[400]} />
+          <TextInput
+            value={recentQuery}
+            onChangeText={setRecentQuery}
+            placeholder="Search customer or phone"
+            placeholderTextColor={colors.accent[400]}
+            style={styles.recentSearchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {recentQuery ? (
+            <TouchableOpacity
+              onPress={() => setRecentQuery('')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={iconSizes.sm} color={colors.accent[400]} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.recentFilters}
+        >
+          {TRANSACTION_FILTERS.map((filter) => {
+            const active = recentFilter === filter.id;
             return (
               <TouchableOpacity
+                key={filter.id}
+                style={[styles.recentFilter, active && styles.recentFilterActive]}
+                activeOpacity={0.75}
+                onPress={() => setRecentFilter(filter.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+              >
+                <Text style={[styles.recentFilterText, active && styles.recentFilterTextActive]}>
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <View>
+          {recent.length === 0 ? (
+            <Text style={styles.recentEmpty}>
+              {recentQuery || recentFilter !== 'all'
+                ? 'No transactions match this view.'
+                : `No transactions recorded in ${periodLabel.toLowerCase()}.`}
+            </Text>
+          ) : (
+            recent.map((row, index) => {
+              const isRedeem = row.type === 'redeem';
+              const isAdjust = row.type === 'adjust';
+              const isLatest = index === 0 && recentFilter === 'all' && !recentQuery.trim();
+              return (
+              <TouchableOpacity
                 key={row.id}
-                style={[styles.txnRow, i === recent.length - 1 && styles.txnRowLast]}
+                style={[
+                  styles.txnRow,
+                  isLatest && styles.txnRowLatest,
+                  index === recent.length - 1 && styles.txnRowLast,
+                ]}
                 activeOpacity={0.7}
-                onPress={onOpenLedger}
+                onPress={() => {
+                  if (row.customerId) {
+                    onOpenCustomer({ id: row.customerId, name: row.customerName });
+                  } else {
+                    onOpenLedger();
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${row.customerName}, ${TYPE_LABEL[row.type] || row.type}`}
               >
                 <View style={styles.txnMain}>
                   <Text style={styles.txnName} numberOfLines={1}>
@@ -242,269 +255,753 @@ export default function OverviewTab({
                 <Text style={styles.txnAmount}>
                   {row.billCents > 0 ? `RM ${(row.billCents / 100).toFixed(2)}` : '—'}
                 </Text>
+                <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[400]} />
               </TouchableOpacity>
             );
           })
         )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.recentFooter}
+          activeOpacity={0.75}
+          onPress={onOpenLedger}
+          accessibilityRole="button"
+          accessibilityLabel="View all transactions"
+        >
+          <Text style={styles.recentFooterText}>View all transactions</Text>
+          <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function TrendChart({ data }: { data: { date: string; visits: number }[] }) {
-  const [width, setWidth] = useState(0);
-  const height = 116;
-  const padTop = 22;
-  const padBottom = 8;
-  const max = Math.max(1, ...data.map((d) => d.visits));
-  const inner = height - padTop - padBottom;
+// ── Visit trend ──────────────────────────────────────────────────────────────
 
-  const points = data.map((d, i) => {
-    const x = data.length > 1 ? (i / (data.length - 1)) * width : width / 2;
-    const y = padTop + inner - (d.visits / max) * inner;
-    return { x, y, value: d.visits };
-  });
+function VisitTrendCard({
+  data,
+  periodLabel,
+  insight,
+  onOpenPeriod,
+  onOpenLedger,
+}: {
+  data: WorkspaceSnapshot['trend'];
+  periodLabel: string;
+  insight: WorkspaceSnapshot['periodInsight'];
+  onOpenPeriod?: () => void;
+  onOpenLedger: () => void;
+}) {
+  const copy = insight ? getTrendInsight(insight) : null;
 
   return (
-    <View>
-      <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        {width > 0 ? (
-          <Svg width={width} height={height}>
-            <Line
-              x1={0}
-              y1={padTop + inner}
-              x2={width}
-              y2={padTop + inner}
-              stroke="#F1F5F9"
-              strokeWidth={1}
-            />
-            {points.length > 1 ? (
-              <Polyline
-                points={points.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke="#FFCC00"
-                strokeWidth={2.4}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            ) : null}
-            {points.map((p, i) => (
-              <Circle key={i} cx={p.x} cy={p.y} r={3.4} fill="#FFFFFF" stroke="#FFCC00" strokeWidth={2} />
-            ))}
-          </Svg>
-        ) : null}
-
-        {points.map((p, i) => (
-          <Text
-            key={`v${i}`}
-            style={[styles.pointValue, { left: Math.max(0, p.x - 12), top: Math.max(0, p.y - 18) }]}
-          >
-            {p.value}
-          </Text>
-        ))}
+    <View style={styles.trendCard}>
+      <View style={styles.trendHead}>
+        <View style={styles.trendHeadCopy}>
+          <Text style={styles.trendTitle}>Visit Trend</Text>
+          <Text style={styles.trendSubtitle}>Customer visits over time</Text>
+        </View>
+        <PeriodPill label={periodLabel} onPress={onOpenPeriod} />
       </View>
 
-      <View style={styles.dayRow}>
-        {data.map((d, i) => (
-          <Text key={i} style={styles.dayLabel}>
-            {formatDayLabel(d.date)}
-          </Text>
-        ))}
-      </View>
+      {data.length > 0 ? (
+        <TrendChart data={data} />
+      ) : (
+        <Text style={styles.trendEmpty}>No visits recorded in this period.</Text>
+      )}
+
+      {copy ? (
+        <TouchableOpacity
+          style={styles.trendInsight}
+          activeOpacity={0.78}
+          onPress={onOpenLedger}
+          accessibilityRole="button"
+          accessibilityLabel={`${copy.title}. ${copy.detail}`}
+        >
+          <View style={styles.trendInsightIcon}>
+            <Ionicons name="bar-chart" size={iconSizes.md} color={colors.primary[700]} />
+          </View>
+          <View style={styles.trendInsightCopy}>
+            <Text style={styles.trendInsightTitle}>{copy.title}</Text>
+            <Text style={styles.trendInsightDetail}>{copy.detail}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[500]} />
+        </TouchableOpacity>
+      ) : null}
     </View>
+  );
+}
+
+function getTrendInsight(insight: NonNullable<WorkspaceSnapshot['periodInsight']>) {
+  const detail = `${formatCount(insight.visits)} visit${insight.visits === 1 ? '' : 's'} recorded`;
+  if (insight.unit === 'hour') {
+    return { title: `${insight.label} was your busiest hour`, detail };
+  }
+  if (insight.unit === 'day') {
+    const shortDay = /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/.test(insight.label);
+    const dayNames: Record<string, string> = {
+      Sun: 'Sunday',
+      Mon: 'Monday',
+      Tue: 'Tuesday',
+      Wed: 'Wednesday',
+      Thu: 'Thursday',
+      Fri: 'Friday',
+      Sat: 'Saturday',
+    };
+    const label = shortDay
+      ? dayNames[insight.label]
+      : /^\d{4}-\d{2}-\d{2}$/.test(insight.label)
+        ? new Date(`${insight.label}T00:00:00+08:00`).toLocaleDateString('en-MY', { weekday: 'long' })
+        : insight.label;
+    return { title: `${label} was your busiest day`, detail };
+  }
+  if (insight.unit === 'week') {
+    return { title: `${insight.label} was your strongest week`, detail };
+  }
+  const label = /^\d{4}-\d{2}-\d{2}$/.test(insight.label)
+    ? new Date(`${insight.label}T00:00:00+08:00`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric' })
+    : insight.label;
+  return { title: `${label} brought your most visits`, detail };
+}
+
+function formatTrendDate(date: string, label?: string) {
+  if (label) return label;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return new Date(`${date}T00:00:00+08:00`).toLocaleDateString('en-MY', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+  return date;
+}
+
+function TrendChart({ data }: { data: WorkspaceSnapshot['trend'] }) {
+  const [width, setWidth] = useState(0);
+  const padTop = 60;
+  const padBottom = 22;
+  const padLeft = 30;
+  const padRight = 10;
+  const plotHeight = 132;
+  const totalHeight = padTop + plotHeight + padBottom;
+  const plotWidth = Math.max(1, width - padLeft - padRight);
+
+  const rawMax = Math.max(1, ...data.map((item) => item.visits));
+  const step = rawMax <= 5 ? 1 : rawMax <= 10 ? 2 : rawMax <= 25 ? 5 : rawMax <= 100 ? 10 : Math.ceil(rawMax / 50) * 10;
+  const niceMax = Math.max(step, Math.ceil(rawMax / step) * step);
+  const ticks: number[] = [];
+  for (let value = 0; value <= niceMax; value += step) ticks.push(value);
+
+  const points = data.map((item, index) => ({
+    x: padLeft + (data.length > 1 ? (index / (data.length - 1)) * plotWidth : plotWidth / 2),
+    y: padTop + plotHeight - (item.visits / niceMax) * plotHeight,
+    value: item.visits,
+    date: item.date,
+    label: item.label,
+  }));
+
+  const hasData = points.length > 0 && points.some((point) => point.value > 0);
+  const peakIndex = points.length > 0
+    ? points.reduce((best, point, index) => (point.value > points[best].value ? index : best), 0)
+    : 0;
+  const peakPoint = points[peakIndex];
+  const baseline = padTop + plotHeight;
+  const labelEvery = Math.max(1, Math.ceil(data.length / 7));
+  const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const areaPath = points.length > 0
+    ? `M ${points[0].x} ${baseline} ${points.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${points[points.length - 1].x} ${baseline} Z`
+    : '';
+  const tooltipLeft = peakPoint
+    ? Math.min(Math.max(peakPoint.x - 52, padLeft), Math.max(padLeft, width - 104))
+    : 0;
+
+  return (
+    <View style={{ height: totalHeight }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {width > 0 ? (
+        <Svg width={width} height={totalHeight}>
+          <Defs>
+            <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.primary[400]} stopOpacity="0.3" />
+              <Stop offset="1" stopColor={colors.primary[400]} stopOpacity="0.02" />
+            </LinearGradient>
+          </Defs>
+
+          {ticks.map((tick) => {
+            const y = padTop + plotHeight - (tick / niceMax) * plotHeight;
+            return (
+              <Line
+                key={`grid-${tick}`}
+                x1={padLeft}
+                y1={y}
+                x2={width - padRight}
+                y2={y}
+                stroke={colors.accent[100]}
+                strokeWidth={1}
+                strokeDasharray="4 5"
+              />
+            );
+          })}
+
+          {hasData ? (
+            <>
+              <Path d={areaPath} fill="url(#trendFill)" />
+              <Path
+                d={linePath}
+                fill="none"
+                stroke={colors.primary[400]}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {points.map((point, index) => (
+                <Circle
+                  key={`dot-${index}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={4.5}
+                  fill={colors.white}
+                  stroke={colors.primary[400]}
+                  strokeWidth={2}
+                />
+              ))}
+              {peakPoint ? (
+                <Line
+                  x1={peakPoint.x}
+                  y1={peakPoint.y + 8}
+                  x2={peakPoint.x}
+                  y2={baseline}
+                  stroke={colors.accent[200]}
+                  strokeWidth={1}
+                  strokeDasharray="4 5"
+                />
+              ) : null}
+            </>
+          ) : null}
+        </Svg>
+      ) : null}
+
+      {width > 0
+        ? ticks.map((tick) => {
+            const y = padTop + plotHeight - (tick / niceMax) * plotHeight;
+            return (
+              <Text key={`ylab-${tick}`} style={[styles.yLabel, { top: y - 7 }]}>
+                {tick}
+              </Text>
+            );
+          })
+        : null}
+
+      {width > 0
+        ? points.map((point, index) => {
+            if (index % labelEvery !== 0 && index !== points.length - 1) return null;
+            return (
+              <Text key={`xlab-${index}`} style={[styles.xLabel, { left: point.x - 20 }]}>
+                {point.label !== undefined ? point.label : formatDayLabel(point.date)}
+              </Text>
+            );
+          })
+        : null}
+
+      {width > 0 && data.length <= 14
+        ? points.map((point, index) => (
+            <Text
+              key={`val-${index}`}
+              style={[styles.pointValue, { left: point.x - 14, top: Math.max(0, point.y - 20) }]}
+            >
+              {point.value}
+            </Text>
+          ))
+        : null}
+
+      {width > 0 && hasData && peakPoint ? (
+        <View style={[styles.tooltip, { left: tooltipLeft, top: Math.max(2, peakPoint.y - 54) }]}>
+          <View style={styles.tooltipDot} />
+          <View>
+            <Text style={styles.tooltipDate}>{formatTrendDate(peakPoint.date, peakPoint.label)}</Text>
+            <Text style={styles.tooltipValue}>{formatCount(peakPoint.value)} visits</Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// ── Smart booking ────────────────────────────────────────────────────────────
+
+function SmartBookingCard({
+  bookings,
+  onOpenReport,
+}: {
+  bookings: WorkspaceSnapshot['bookings'];
+  onOpenReport: (report: 'customers' | 'bookings') => void;
+}) {
+  const { width } = useWindowDimensions();
+  const compact = width < 560;
+  const openBookings = () => onOpenReport('bookings');
+  const upcomingCopy = bookings.upcoming > 0
+    ? `${bookings.upcoming} upcoming appointment${bookings.upcoming === 1 ? '' : 's'}`
+    : 'No upcoming appointments';
+
+  return (
+    <View style={styles.bookingCard}>
+      <TouchableOpacity
+        style={styles.bookingHead}
+        activeOpacity={0.8}
+        onPress={openBookings}
+        accessibilityRole="button"
+        accessibilityLabel="Smart Booking, appointment overview"
+      >
+        <View style={styles.bookingHeadIcon}>
+          <Ionicons name="calendar" size={iconSizes.lg} color={colors.black} />
+        </View>
+        <View style={styles.bookingHeadCopy}>
+          <View style={styles.bookingTitleRow}>
+            <Text style={styles.bookingTitle}>Smart Booking</Text>
+            <Ionicons
+              name="information-circle-outline"
+              size={iconSizes.sm}
+              color={colors.accent[400]}
+            />
+          </View>
+          <Text style={styles.bookingSubtitle}>Appointment overview</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={iconSizes.md} color={colors.accent[500]} />
+      </TouchableOpacity>
+
+      <View style={styles.bookingStats}>
+        <BookingMini
+          value={bookings.completed}
+          label={compact ? 'Completed' : 'Completed appointments'}
+          icon="calendar"
+          tone="primary"
+          onPress={openBookings}
+        />
+        <BookingMini
+          value={bookings.upcoming}
+          label={compact ? 'Upcoming' : 'Upcoming appointments'}
+          icon="calendar-outline"
+          tone="neutral"
+          onPress={openBookings}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={styles.bookingFooter}
+        activeOpacity={0.75}
+        onPress={openBookings}
+        accessibilityRole="button"
+        accessibilityLabel={`${upcomingCopy}. View bookings`}
+      >
+        <View style={styles.bookingFooterLeft}>
+          <Ionicons name="calendar-outline" size={iconSizes.sm} color={colors.accent[400]} />
+          <Text style={styles.bookingFooterText} numberOfLines={1}>
+            {upcomingCopy}
+          </Text>
+        </View>
+        <View style={styles.bookingFooterAction}>
+          <Text style={styles.bookingFooterActionText}>View bookings</Text>
+          <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function BookingMini({
+  value,
+  label,
+  icon,
+  tone,
+  onPress,
+}: {
+  value: number;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  tone: 'primary' | 'neutral';
+  onPress: () => void;
+}) {
+  const primary = tone === 'primary';
+  return (
+    <TouchableOpacity
+      style={[styles.bookingMini, primary ? styles.bookingMiniPrimary : styles.bookingMiniNeutral]}
+      activeOpacity={0.78}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${value} ${label}`}
+    >
+      <View
+        style={[
+          styles.bookingMiniIcon,
+          primary ? styles.bookingMiniIconPrimary : styles.bookingMiniIconNeutral,
+        ]}
+      >
+        <Ionicons
+          name={icon}
+          size={iconSizes.md}
+          color={primary ? colors.primary[700] : colors.accent[700]}
+        />
+      </View>
+      <View style={styles.bookingMiniCopy}>
+        <Text style={styles.bookingMiniValue}>{value}</Text>
+        <Text style={styles.bookingMiniLabel} numberOfLines={2}>
+          {label}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[500]} />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
-  sectionHead: {
+  recentHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[3],
     marginTop: 4,
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sectionTitle: {
-    fontSize: 15,
+  recentHeadCopy: { flex: 1, minWidth: 0 },
+  recentTitle: {
+    fontSize: 17,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: colors.black,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
-  sectionMeta: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#9CA3AF' },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F6F6F6',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radii.full,
+  recentSubtitle: {
+    fontSize: 11.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: colors.accent[500],
+    marginTop: 2,
   },
-  metaChipText: { fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#686868' },
-  heroCard: {
+  recentCard: {
     backgroundColor: colors.white,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: '#EEEEF0',
-    padding: 18,
+    borderColor: colors.accent[100],
+    padding: spacing[4],
+    gap: spacing[3],
+    ...shadows.sm,
   },
-  heroNumber: {
-    fontSize: 46,
-    lineHeight: 50,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.black,
-    letterSpacing: -1.8,
-  },
-  heroLabel: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#686868',
-    marginTop: 2,
-  },
-  deltaPill: {
+  recentSearch: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    gap: spacing[2],
+    height: 40,
+    paddingHorizontal: spacing[3],
     borderRadius: radii.full,
-    marginTop: 10,
+    backgroundColor: colors.accent[50],
+    borderWidth: 1,
+    borderColor: colors.accent[100],
   },
-  deltaPillNegative: { backgroundColor: '#FEF2F2' },
-  deltaText: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#16A34A' },
-  deltaMeta: {
-    fontSize: 10,
+  recentSearchInput: {
+    flex: 1,
+    height: 40,
+    paddingVertical: 0,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginLeft: 4,
+    fontSize: 16,
+    color: colors.black,
   },
-  splitRow: { flexDirection: 'row', gap: 10 },
-  splitCard: { flex: 1, borderRadius: radii.lg, borderWidth: 1, padding: 14 },
-  splitIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+  recentFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: 1,
+  },
+  recentFilter: {
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1.5],
+    borderRadius: radii.full,
+    backgroundColor: colors.accent[50],
+  },
+  recentFilterActive: { backgroundColor: colors.black },
+  recentFilterText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11.5,
+    color: colors.accent[700],
+  },
+  recentFilterTextActive: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.white,
+  },
+  recentEmpty: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    color: colors.accent[400],
+    paddingVertical: spacing[3],
+    textAlign: 'center',
+  },
+  recentFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    gap: spacing[1],
+    height: 44,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent[50],
+    marginTop: spacing[1],
   },
-  splitValue: {
-    fontSize: 22,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.black,
-    letterSpacing: -0.6,
-  },
-  splitLabel: {
-    fontSize: 12.5,
+  recentFooterText: {
     fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12.5,
     color: colors.black,
-    marginTop: 2,
   },
-  splitCaption: {
-    fontSize: 10.5,
+
+  yLabel: {
+    position: 'absolute',
+    left: 0,
+    width: 24,
+    textAlign: 'right',
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 1,
+    fontSize: 9.5,
+    color: colors.accent[400],
   },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: '#EEEEF0',
-    padding: 16,
-    gap: 10,
+  xLabel: {
+    position: 'absolute',
+    bottom: 0,
+    width: 36,
+    textAlign: 'center',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 10,
+    color: colors.accent[400],
   },
   pointValue: {
     position: 'absolute',
     width: 24,
     textAlign: 'center',
-    fontSize: 9.5,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#686868',
-  },
-  dayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  dayLabel: {
-    flex: 1,
-    textAlign: 'center',
     fontSize: 10,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
+    color: colors.accent[500],
   },
-  insight: {
+  tooltip: {
+    position: 'absolute',
+    width: 104,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FFFBEA',
-    borderRadius: radii.lg,
+    gap: spacing[1],
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#FDE68A',
-    padding: 14,
+    borderColor: colors.accent[100],
+    paddingHorizontal: spacing[1.5],
+    paddingVertical: spacing[1],
+    ...shadows.sm,
   },
-  insightIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
+  tooltipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.primary[400],
   },
-  insightTitle: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' },
-  insightBody: {
+  tooltipDate: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 9,
+    color: colors.accent[500],
+  },
+  tooltipValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 11,
+    color: colors.black,
+  },
+
+  trendCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  trendHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing[3],
+  },
+  trendHeadCopy: { flex: 1, minWidth: 0 },
+  trendTitle: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 18,
+    lineHeight: 23,
+    letterSpacing: -0.5,
+    color: colors.black,
+  },
+  trendSubtitle: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 2,
-  },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#F6F6F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowTitle: { fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
-  rowCaption: {
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 2,
-  },
-  footnote: {
-    fontSize: 10.5,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
-    borderTopWidth: 1,
-    borderTopColor: '#F6F6F6',
-    paddingTop: 8,
-  },
-  sectionMetaLink: {
     fontSize: 11.5,
+    color: colors.accent[500],
+    marginTop: 2,
+  },
+  trendEmpty: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: colors.accent[400],
+    paddingVertical: spacing[4],
+    textAlign: 'center',
+  },
+  trendInsight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    backgroundColor: colors.primary[50],
+    borderRadius: radii.lg,
+    padding: spacing[2.5],
+    marginTop: spacing[3],
+  },
+  trendInsightIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.md,
+    backgroundColor: colors.primary[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trendInsightCopy: { flex: 1, minWidth: 0 },
+  trendInsightTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#686868',
+    fontSize: 13,
+    color: colors.black,
   },
-  emptyText: {
-    fontSize: 11.5,
+  trendInsightDetail: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
-    paddingVertical: 6,
+    fontSize: 11,
+    color: colors.accent[500],
+    marginTop: 1,
   },
+
+  bookingCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  bookingHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  bookingHeadIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookingHeadCopy: { flex: 1, minWidth: 0 },
+  bookingTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  bookingTitle: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 16,
+    letterSpacing: -0.3,
+    color: colors.black,
+  },
+  bookingSubtitle: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    color: colors.accent[500],
+    marginTop: 2,
+  },
+  bookingStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+    marginTop: spacing[3],
+  },
+  bookingMini: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 140,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    padding: spacing[2.5],
+    borderRadius: radii.lg,
+  },
+  bookingMiniPrimary: { backgroundColor: colors.primary[50] },
+  bookingMiniNeutral: { backgroundColor: colors.accent[50] },
+  bookingMiniIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookingMiniIconPrimary: { backgroundColor: colors.primary[100] },
+  bookingMiniIconNeutral: { backgroundColor: colors.accent[100] },
+  bookingMiniCopy: { flex: 1, minWidth: 0 },
+  bookingMiniValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 22,
+    lineHeight: 26,
+    letterSpacing: -0.5,
+    color: colors.black,
+  },
+  bookingMiniLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12.5,
+    color: colors.black,
+    marginTop: -1,
+  },
+  bookingFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.accent[100],
+    marginTop: spacing[3],
+    paddingTop: spacing[2],
+  },
+  bookingFooterLeft: {
+    flex: 1,
+    minWidth: 170,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  bookingFooterText: {
+    flexShrink: 1,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: colors.accent[500],
+  },
+  bookingFooterAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    marginLeft: 'auto',
+  },
+  bookingFooterActionText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12.5,
+    color: colors.black,
+  },
+
   txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
+    gap: spacing[2],
+    paddingVertical: spacing[2.5],
+    paddingHorizontal: spacing[2],
+    marginHorizontal: -spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: '#F6F6F6',
+    borderBottomColor: colors.accent[50],
+  },
+  txnRowLatest: {
+    backgroundColor: colors.primary[50],
+    borderRadius: radii.md,
+    borderBottomWidth: 0,
   },
   txnRowLast: { borderBottomWidth: 0 },
   txnMain: { flex: 1, minWidth: 0 },
   txnName: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: colors.black,
   },
@@ -513,17 +1010,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: radii.full,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.accent[100],
   },
-  txnTagRedeem: { backgroundColor: '#FFFBEA' },
-  txnTagAdjust: { backgroundColor: '#FEF2F2' },
-  txnTagText: { fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#334155' },
-  txnTagTextRedeem: { color: '#B45309' },
-  txnTagTextAdjust: { color: '#B91C1C' },
+  txnTagRedeem: { backgroundColor: colors.primary[50] },
+  txnTagAdjust: { backgroundColor: colors.error.light },
+  txnTagText: { fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.accent[700] },
+  txnTagTextRedeem: { color: colors.warning.dark },
+  txnTagTextAdjust: { color: colors.error.dark },
   txnMeta: {
     fontSize: 10.5,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
+    color: colors.accent[400],
     flexShrink: 1,
   },
   txnAmount: {

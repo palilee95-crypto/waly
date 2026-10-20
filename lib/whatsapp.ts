@@ -33,7 +33,7 @@ export function renderTemplate(template: string, vars: TemplateVars): string {
   });
 }
 
-export type ActionCardId = 'return' | 'rewards' | 'rebook' | 'birthday';
+export type ActionCardId = 'return' | 'rewards' | 'rebook' | 'birthday' | 'new_customers' | 'returning_customers';
 
 export const DEFAULT_ACTION_TEMPLATES: Record<ActionCardId, string> = {
   return:
@@ -44,4 +44,8 @@ export const DEFAULT_ACTION_TEMPLATES: Record<ActionCardId, string> = {
     "Hi {{name}}, it's been {{days}} days since your last appointment at {{merchant}}. Want me to book you in for your usual?",
   birthday:
     'Happy birthday month, {{name}}! {{merchant}} has a little something for you — drop by any time this month.',
+  new_customers:
+    'Hi {{name}}, thanks for visiting {{merchant}}! We would love to welcome you back soon.',
+  returning_customers:
+    'Hi {{name}}, great to see you again at {{merchant}}! We look forward to your next visit.',
 };

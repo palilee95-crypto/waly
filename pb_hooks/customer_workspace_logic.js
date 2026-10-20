@@ -190,25 +190,98 @@ function buildSnapshot($app, ctx) {
     return total + (Number(r.sales) || 0);
   }, 0);
 
-  // Daily visit counts (last 7 local days) for the Overview trend.
-  const trendFrom = localDateToUtcStart(addDays(localDate(0), -6));
+  // The trend and peak insight follow the selected global period.
+  const fromMs = new Date(ctx.fromDate + "T00:00:00+08:00").getTime();
+  const toMs = new Date(ctx.toDate + "T00:00:00+08:00").getTime();
+  const rangeDays = Math.max(1, Math.round((toMs - fromMs) / DAY_MS));
+  let insightUnit = "month";
+  if (ctx.periodId === "today") insightUnit = "hour";
+  else if (ctx.periodId === "last_7") insightUnit = "day";
+  else if (ctx.periodId === "last_30" || ctx.periodId === "this_month" || ctx.periodId === "last_month") insightUnit = "week";
+  else if (ctx.periodId === "this_year") insightUnit = "month";
+  else insightUnit = rangeDays <= 1 ? "hour" : rangeDays <= 14 ? "day" : rangeDays <= 92 ? "week" : "month";
+
   const trendRows = rows(
     $app,
-    "SELECT substr(t.created, 1, 10) as day, COUNT(*) as visits FROM transactions t " +
+    "SELECT strftime('%Y-%m-%d', t.created, '+8 hours') as day, COUNT(*) as visits FROM transactions t " +
       "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
-      " AND t.created >= {:trendFrom} AND t.type <> 'adjust' GROUP BY day",
-    { mid: ctx.merchantId, trendFrom: trendFrom, bid: ctx.branchId || "" },
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.type <> 'adjust' GROUP BY day",
+    base,
     { day: "", visits: 0 }
   );
   const trendMap = {};
-  trendRows.forEach(function (r) {
-    trendMap[r.day] = Number(r.visits) || 0;
+  trendRows.forEach(function (r) { trendMap[r.day] = Number(r.visits) || 0; });
+  const dailyBuckets = [];
+  for (let local = ctx.fromDate; local < ctx.toDate; local = addDays(local, 1)) {
+    dailyBuckets.push({ date: local, visits: trendMap[local] || 0 });
+  }
+  const weekMap = {};
+  dailyBuckets.forEach(function (bucket) {
+    const weekday = new Date(bucket.date + "T00:00:00Z").getUTCDay();
+    const start = addDays(bucket.date, -((weekday + 6) % 7));
+    if (!weekMap[start]) weekMap[start] = { date: start, end: addDays(start, 7), visits: 0 };
+    weekMap[start].visits += bucket.visits;
   });
-  const trend = [];
-  for (let i = 6; i >= 0; i--) {
-    const local = addDays(localDate(0), -i);
-    const utcDay = localDateToUtcStart(local).slice(0, 10);
-    trend.push({ date: local, visits: trendMap[utcDay] || 0 });
+  const weekBuckets = Object.keys(weekMap).sort().map(function (key) { return weekMap[key]; });
+  const monthMap = {};
+  dailyBuckets.forEach(function (bucket) {
+    const month = bucket.date.slice(0, 7) + "-01";
+    monthMap[month] = (monthMap[month] || 0) + bucket.visits;
+  });
+  const monthBuckets = Object.keys(monthMap).sort().map(function (date) { return { date: date, visits: monthMap[date] }; });
+
+  let trend = [];
+  let insightBuckets = [];
+  if (insightUnit === "hour") {
+    const hourlyRows = rows(
+      $app,
+      "SELECT CAST(strftime('%H', t.created, '+8 hours') AS INTEGER) as hour, COUNT(*) as visits FROM transactions t " +
+        "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.type <> 'adjust' GROUP BY hour",
+      base,
+      { hour: 0, visits: 0 }
+    );
+    const hourMap = {};
+    hourlyRows.forEach(function (r) { hourMap[Number(r.hour)] = Number(r.visits) || 0; });
+    const hourLabel = function (hour) {
+      const start = hour % 12 || 12;
+      const endHour = (hour + 1) % 24;
+      const end = endHour % 12 || 12;
+      const suffix = hour < 12 ? "AM" : "PM";
+      const endSuffix = endHour < 12 ? "AM" : "PM";
+      return start + (suffix === endSuffix ? "–" + end + " " + suffix : " " + suffix + "–" + end + " " + endSuffix);
+    };
+    for (let hour = 0; hour < 24; hour++) {
+      const visits = hourMap[hour] || 0;
+      insightBuckets.push({ date: ctx.fromDate, label: hourLabel(hour), visits: visits });
+      trend.push({ date: ctx.fromDate, label: hour % 6 === 0 ? (hour % 12 || 12) + (hour < 12 ? " AM" : " PM") : "", visits: visits });
+    }
+  } else if (insightUnit === "day") {
+    insightBuckets = dailyBuckets;
+    trend = dailyBuckets.map(function (bucket) { return Object.assign({}, bucket); });
+  } else if (insightUnit === "week") {
+    insightBuckets = weekBuckets;
+    trend = weekBuckets.map(function (bucket) {
+      const lastDate = addDays(bucket.end, -1);
+      return { date: bucket.date, label: bucket.date.slice(5, 10) + "–" + lastDate.slice(5, 10), visits: bucket.visits };
+    });
+  } else {
+    insightBuckets = monthBuckets;
+    trend = monthBuckets.map(function (bucket) {
+      return { date: bucket.date, label: bucket.date.slice(5, 7) + "/" + bucket.date.slice(0, 4).slice(2), visits: bucket.visits };
+    });
+  }
+  let periodInsight = null;
+  if (insightBuckets.length > 0) {
+    const peak = insightBuckets.reduce(function (best, item) { return item.visits > best.visits ? item : best; }, insightBuckets[0]);
+    const average = insightBuckets.reduce(function (sum, item) { return sum + item.visits; }, 0) / insightBuckets.length;
+    const quieterCount = insightBuckets.filter(function (item) { return item !== peak && item.visits < average; }).length;
+    if (peak.visits > 0) {
+      let label = peak.label || peak.date;
+      if (insightUnit === "week") label = peak.date.slice(5, 10) + "–" + addDays(peak.end, -1).slice(5, 10);
+      if (insightUnit === "month") label = peak.date.slice(0, 7);
+      periodInsight = { unit: insightUnit, label: label, visits: peak.visits, quieterCount: quieterCount };
+    }
   }
 
   // Top customers by recorded spend in the selected scope and period.
@@ -723,6 +796,7 @@ function buildSnapshot($app, ctx) {
       },
     },
     trend: trend,
+    periodInsight: periodInsight,
     topCustomers: topCustomers,
     inactive: inactive,
     attention: [

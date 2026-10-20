@@ -99,6 +99,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace", (e) => {
     isHqBranch: isHqBranch,
     fromDate: fromDate,
     toDate: toDate,
+    periodId: ["today", "last_7", "last_30", "this_month", "last_month", "this_year", "custom"].indexOf(String(query.period || "")) >= 0 ? String(query.period) : "custom",
     fromUtc: logic.localDateToUtcStart(fromDate),
     toUtc: logic.localDateToUtcStart(toDate),
     returnDays: Number(merchant.getInt ? merchant.getInt("inactive_threshold_days") : 0) || 30,

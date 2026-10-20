@@ -48,7 +48,13 @@ export type WorkspaceSnapshot = {
       salesCents: number;
     };
   };
-  trend: { date: string; visits: number }[];
+  trend: { date: string; label?: string; visits: number }[];
+  periodInsight?: {
+    unit: 'hour' | 'day' | 'week' | 'month';
+    label: string;
+    visits: number;
+    quieterCount: number;
+  } | null;
   topCustomers: {
     id: string;
     name: string;
@@ -209,6 +215,7 @@ export async function fetchTransactions(params: {
 
 export type FetchWorkspaceParams = {
   branchId?: string;
+  periodId?: string;
   from: string;
   to: string;
   signal?: AbortSignal;
@@ -259,11 +266,12 @@ function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
 
 export async function fetchWorkspace({
   branchId = 'all',
+  periodId = 'custom',
   from,
   to,
   signal,
 }: FetchWorkspaceParams): Promise<WorkspaceSnapshot> {
-  const qs = new URLSearchParams({ branch: branchId || 'all', from, to }).toString();
+  const qs = new URLSearchParams({ branch: branchId || 'all', period: periodId, from, to }).toString();
   const raw = await pb.send<WorkspaceSnapshot>(
     `/api/risev/merchant/customer-workspace?${qs}`,
     { method: 'GET', requestKey: null, signal }

@@ -26,7 +26,7 @@ export function useCustomerWorkspace(branchId: string, period: WorkspacePeriod) 
   const requestId = useRef(0);
 
   // v2: the v1 entries predate the report aggregates and have no `sales` block.
-  const key = `workspace:v2:${branchId}:${period.from}:${period.to}`;
+  const key = `workspace:v3:${branchId}:${period.id}:${period.from}:${period.to}`;
 
   const load = useCallback(
     async (force = false) => {
@@ -35,7 +35,7 @@ export function useCustomerWorkspace(branchId: string, period: WorkspacePeriod) 
       try {
         const snapshot = await cachedFetch(
           key,
-          () => fetchWorkspace({ branchId, from: period.from, to: period.to }),
+          () => fetchWorkspace({ branchId, periodId: period.id, from: period.from, to: period.to }),
           { ttl: TTL_MS, force }
         );
         if (id !== requestId.current) return; // a newer filter change won

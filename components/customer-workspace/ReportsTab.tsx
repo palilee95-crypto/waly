@@ -4,16 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
 import {
   WorkspaceSnapshot,
+  AudienceCard,
   formatMoney,
   formatCount,
-  pctChange,
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
+import CustomerSnapshotCard from './CustomerSnapshotCard';
 
 type ReportId = 'customers' | 'bookings' | 'sales' | 'loyalty' | 'reviews';
 
 const REPORTS: { id: ReportId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'customers', label: 'Customers', icon: 'person-outline' },
+  { id: 'customers', label: 'Customers', icon: 'person' },
   { id: 'bookings', label: 'Bookings', icon: 'calendar-outline' },
   { id: 'sales', label: 'Sales', icon: 'wallet-outline' },
   { id: 'loyalty', label: 'Loyalty', icon: 'gift-outline' },
@@ -24,7 +25,8 @@ type Props = {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
   onOpenDirectory: () => void;
-  onOpenAudience: (id: 'return' | 'rewards' | 'rebook') => void;
+  onOpenAudience: (card: AudienceCard) => void;
+  onOpenPeriod?: () => void;
   onOpenAnalytics: () => void;
   onOpenLedger: () => void;
   onOpenCustomer: (row: { id: string; name: string }) => void;
@@ -35,6 +37,7 @@ export default function ReportsTab({
   periodLabel,
   onOpenDirectory,
   onOpenAudience,
+  onOpenPeriod,
   onOpenAnalytics,
   onOpenLedger,
   onOpenCustomer,
@@ -53,14 +56,22 @@ export default function ReportsTab({
           return (
             <TouchableOpacity
               key={r.id}
-              style={styles.tab}
+              style={[styles.tab, active && styles.tabActive]}
               activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
               onPress={() => setReport(r.id)}
             >
               <View style={[styles.tabIcon, active && styles.tabIconActive]}>
-                <Ionicons name={r.icon} size={16} color={active ? colors.black : '#94A3B8'} />
+                <Ionicons name={r.icon} size={18} color={active ? colors.black : '#94A3B8'} />
               </View>
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{r.label}</Text>
+              <Text
+                numberOfLines={1}
+                allowFontScaling={false}
+                style={[styles.tabLabel, active && styles.tabLabelActive]}
+              >
+                {r.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -71,6 +82,8 @@ export default function ReportsTab({
           snapshot={snapshot}
           periodLabel={periodLabel}
           onOpenDirectory={onOpenDirectory}
+          onOpenAudience={onOpenAudience}
+          onOpenPeriod={onOpenPeriod}
           onOpenCustomer={onOpenCustomer}
         />
       ) : (
@@ -94,71 +107,31 @@ function CustomersReport({
   snapshot,
   periodLabel,
   onOpenDirectory,
+  onOpenAudience,
+  onOpenPeriod,
   onOpenCustomer,
 }: {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
   onOpenDirectory: () => void;
+  onOpenAudience: (card: AudienceCard) => void;
+  onOpenPeriod?: () => void;
   onOpenCustomer: (row: { id: string; name: string }) => void;
 }) {
-  const { overview, topCustomers, inactive, customers } = snapshot;
-  const total = overview.visited;
-  const newShare = total ? Math.round((overview.newCount / total) * 100) : 0;
-  const change = pctChange(overview.visited, overview.previous.visited);
-
-  const series = customers.series;
-  const peak = Math.max(1, ...series.map((s) => s.newCount + s.returningCount));
+  const { topCustomers, inactive, customers } = snapshot;
 
   return (
     <View style={styles.body}>
-      <View style={styles.kpiGrid}>
-        <Kpi label="Customers" value={formatCount(overview.visited)} sub={change === null ? periodLabel : `${change >= 0 ? '+' : ''}${change}% vs prev`} />
-        <Kpi label="New" value={formatCount(overview.newCount)} sub={`${newShare}% of visitors`} />
-        <Kpi label="Returning" value={formatCount(overview.returningCount)} sub={`${100 - newShare}% of visitors`} />
-        <Kpi
-          label="Need a nudge"
-          value={formatCount(snapshot.attention.find((a) => a.id === 'return')?.count ?? null)}
-          sub="Past their return window"
-        />
-      </View>
+      <CustomerSnapshotCard
+        snapshot={snapshot}
+        periodLabel={periodLabel}
+        onOpenAudience={onOpenAudience}
+        onOpenDirectory={onOpenDirectory}
+        onOpenPeriod={onOpenPeriod}
+      />
 
       <Card>
-        <Text style={styles.cardTitle}>New vs returning</Text>
-        <Text style={styles.cardNote}>
-          Each bar is one {series.length > 12 ? 'bucket' : 'day'}. Dark is returning, amber is new.
-        </Text>
-        <View style={styles.chart}>
-          {series.map((s) => {
-            const h = (s.newCount + s.returningCount) / peak;
-            return (
-              <View key={s.date} style={styles.barSlot}>
-                <View style={[styles.barStack, { height: Math.max(2, h * 90) }]}>
-                  <View
-                    style={{
-                      flex: s.returningCount || 0.0001,
-                      backgroundColor: colors.black,
-                    }}
-                  />
-                  <View
-                    style={{
-                      flex: s.newCount || 0.0001,
-                      backgroundColor: '#FFCC00',
-                    }}
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-        <View style={styles.legendRow}>
-          <Legend color={colors.black} label={`Returning ${overview.returningCount}`} />
-          <Legend color="#FFCC00" label={`New ${overview.newCount}`} />
-        </View>
-      </Card>
-
-      <Card>
-        <Text style={styles.cardTitle}>How often they visit</Text>
-        <Text style={styles.cardNote}>Customers by number of recorded visits in {periodLabel}.</Text>
+        <View style={styles.cardHeaderLine}><View><Text style={styles.cardTitle}>Visit frequency</Text><Text style={styles.cardNote}>How often customers visited in {periodLabel}.</Text></View><Ionicons name="repeat-outline" size={19} color="#9AA3B2" /></View>
         {customers.frequency.map((f) => {
           const max = Math.max(1, ...customers.frequency.map((x) => x.count));
           return (
@@ -173,7 +146,7 @@ function CustomersReport({
         })}
       </Card>
 
-      <Section title={`Top customers · ${periodLabel}`} action="Directory" onPress={onOpenDirectory}>
+      <Section title={`Top customers · ${periodLabel}`} action="View all" onPress={onOpenDirectory}>
         {topCustomers.length === 0 ? (
           <Text style={styles.empty}>No recorded spend in this period.</Text>
         ) : (
@@ -614,7 +587,7 @@ function Section({
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>{title}</Text>
         {action ? (
-          <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.sectionAction} onPress={onPress} activeOpacity={0.7}>
             <Text style={styles.viewAll}>{action}</Text>
           </TouchableOpacity>
         ) : null}
@@ -662,70 +635,103 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  tabRow: { gap: 4, paddingHorizontal: 4, paddingBottom: 6 },
-  tab: { alignItems: 'center', width: 66, paddingVertical: 4 },
+  tabRow: {
+    width: '100%',
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 0,
+    paddingHorizontal: 6,
+    paddingBottom: 12,
+    paddingTop: 4,
+  },
+  tab: {
+    flex: 1,
+    maxWidth: 78,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    flexDirection: 'column',
+    gap: 5,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  tabActive: { backgroundColor: 'transparent', borderColor: 'transparent' },
   tabIcon: {
-    width: 40,
-    height: 34,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabIconActive: { backgroundColor: '#FFCC00' },
   tabLabel: {
+    width: '100%',
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 10,
-    color: '#94A3B8',
-    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+    color: '#667085',
   },
   tabLabelActive: { color: colors.black, fontFamily: 'PlusJakartaSans_700Bold' },
 
-  body: { paddingTop: 8, paddingBottom: 28 },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  body: { paddingTop: 6, paddingBottom: 32, gap: 12 },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 0 },
   kpi: {
     flexGrow: 1,
     flexBasis: '47%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: radii.lg,
-    padding: 12,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ECEFF3',
+    padding: 15,
   },
   kpiLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     color: '#94A3B8',
   },
   kpiValue: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 18,
+    fontSize: 21,
     color: colors.black,
     marginTop: 3,
   },
-  kpiSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#64748B', marginTop: 2 },
+  kpiSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: '#64748B', marginTop: 3 },
 
   card: {
     backgroundColor: colors.white,
-    borderRadius: radii.xl,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#EEF2F6',
-    padding: 14,
-    marginBottom: 12,
+    padding: 16,
+    marginBottom: 0,
+    shadowColor: '#142033',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.035,
+    shadowRadius: 12,
+    elevation: 1,
   },
-  cardTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, color: colors.black },
+  cardTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, color: colors.black, letterSpacing: -0.2 },
   cardNote: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     color: '#94A3B8',
     marginTop: 3,
   },
   bigValue: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
+    fontSize: 25,
     color: colors.black,
     marginTop: 6,
   },
+
+  cardHeaderLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
 
   chart: {
     flexDirection: 'row',
@@ -770,7 +776,7 @@ const styles = StyleSheet.create({
     width: 26,
   },
 
-  section: { marginBottom: 12 },
+  section: { marginBottom: 0 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -779,21 +785,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12.5, color: colors.black },
+  sectionAction: { minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center', paddingHorizontal: 4 },
   viewAll: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#686868' },
   sectionBody: {
     backgroundColor: colors.white,
-    borderRadius: radii.xl,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#EEF2F6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
   },
 
   rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
+    minHeight: 56,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
@@ -803,19 +811,19 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     width: 22,
   },
-  rankName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: colors.black },
-  rankMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#94A3B8', marginTop: 1 },
-  rankValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, color: colors.black },
+  rankName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: colors.black },
+  rankMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: '#7D8796', marginTop: 2 },
+  rankValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, color: colors.black },
 
   rowsCard: {
     backgroundColor: colors.white,
-    borderRadius: radii.xl,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#EEF2F6',
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    marginBottom: 0,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, minHeight: 60 },
   rowIcon: {
     width: 30,
     height: 30,

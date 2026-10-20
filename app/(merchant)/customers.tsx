@@ -159,6 +159,9 @@ export default function CustomerWorkspaceScreen() {
                 onOpenReport={() => setMainTab('reports')}
                 onOpenDirectory={openDirectory}
                 onOpenLedger={() => setShowLedger(true)}
+                onOpenAudience={(id) => setAudienceCard(id)}
+                onOpenPeriod={() => setPicker('period')}
+                onOpenCustomer={(row) => setDetailCustomer({ id: row.id, name: row.name })}
               />
             )}
             {mainTab === 'actions' && (
@@ -175,6 +178,7 @@ export default function CustomerWorkspaceScreen() {
                 periodLabel={period.label}
                 onOpenDirectory={openDirectory}
                 onOpenAudience={(id) => setAudienceCard(id)}
+                onOpenPeriod={() => setPicker('period')}
                 onOpenAnalytics={goAnalytics}
                 onOpenLedger={() => setShowLedger(true)}
                 onOpenCustomer={(row) => setDetailCustomer({ id: row.id, name: row.name })}

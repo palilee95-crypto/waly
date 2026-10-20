@@ -67,6 +67,13 @@ opencode.jsonc
 
 # Agent customizations
 .agents/
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/start/
+.agents/skills/start/*
+!.agents/skills/start/SKILL.md
 .commandcode/
 .mcp.json
 
