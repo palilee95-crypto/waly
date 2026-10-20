@@ -16,7 +16,7 @@
 import { pb } from './pocketbase';
 
 export type AttentionItem = {
-  id: 'return' | 'rewards';
+  id: 'return' | 'rewards' | 'rebook';
   title: string;
   detail: string;
   count: number | null;
@@ -27,10 +27,9 @@ export type DailyStamps = { date: string; stamps: number };
 export type WorkspaceSnapshot = {
   asOf: string;
   timeZone: string;
-  merchant: { id: string; name: string };
+  merchant: { id: string; name: string; logo: string };
   branches: { id: string; name: string; isHq: boolean }[];
   scope: { branchId: string; from: string; to: string };
-  entitlements: { reports: boolean };
   overview: {
     visited: number;
     newCount: number;
@@ -41,7 +40,24 @@ export type WorkspaceSnapshot = {
     orders: number;
     avgOrderCents: number | null;
     vouchersRedeemed: number;
+    previous: {
+      from: string;
+      visited: number;
+      newCount: number;
+      returningCount: number;
+      salesCents: number;
+    };
   };
+  trend: { date: string; visits: number }[];
+  topCustomers: {
+    id: string;
+    name: string;
+    avatar: string;
+    visits: number;
+    lastVisit: string;
+    spendCents: number;
+  }[];
+  inactive: { id: string; name: string; avatar: string; lastVisit: string; daysIdle: number | null }[];
   attention: AttentionItem[];
   loyalty: { nearReward: number; availableVouchers: number; daily: DailyStamps[] };
   bookings: {
@@ -112,7 +128,7 @@ export async function fetchWorkspace({
   });
 }
 
-export type AudienceCard = 'return' | 'rewards' | 'birthday';
+export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday';
 
 export type AudienceRow = {
   id: string;
@@ -162,6 +178,25 @@ export function formatMoney(cents: number | null): string {
 export function formatCount(value: number | null): string {
   if (value === null || value === undefined) return 'No data';
   return value.toLocaleString('en-MY');
+}
+
+/** Percent change vs the previous period, or null when there is no baseline. */
+export function pctChange(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/** '2026-07-21 16:04:02.998Z' -> '2 days ago' / 'today'. */
+export function relativeDays(iso: string): string {
+  if (!iso) return '';
+  let v = String(iso).trim().replace(' ', 'T');
+  if (!/Z$/i.test(v)) v += 'Z';
+  const t = new Date(v).getTime();
+  if (isNaN(t)) return '';
+  const days = Math.floor((Date.now() - t) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
 }
 
 export function formatShortDateFromIso(iso: string): string {

@@ -22,8 +22,9 @@ const PAGE_SIZE = 20;
 
 const CARD_TITLES: Record<AudienceCard, string> = {
   return: 'Bring customers back',
-  rewards: 'Rewards ready',
-  birthday: 'Birthdays this week',
+  rewards: 'Customers near reward',
+  rebook: 'Not rebooked yet',
+  birthday: 'Upcoming birthdays',
 };
 
 type Props = {
@@ -197,7 +198,7 @@ export default function AudienceSheet({
                       {row.name || 'Customer'}
                     </Text>
                     <Text style={styles.rowMeta} numberOfLines={1}>
-                      {card === 'return'
+                      {card === 'return' || card === 'rebook'
                         ? `Last visit ${row.daysOverdue ?? '?'} days ago`
                         : card === 'rewards'
                           ? row.reason === 'voucher'

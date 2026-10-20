@@ -132,6 +132,78 @@ function buildSnapshot($app, ctx) {
   }).length;
   const returningCount = visitedCustomers.length - newCount;
 
+  // Previous period of equal length, for the "vs last month" comparisons.
+  const periodDays = Math.max(
+    1,
+    Math.round(
+      (new Date(ctx.toDate + "T00:00:00+08:00").getTime() -
+        new Date(ctx.fromDate + "T00:00:00+08:00").getTime()) / DAY_MS
+    )
+  );
+  const prevFromDate = addDays(ctx.fromDate, -periodDays);
+  const prevFromUtc = localDateToUtcStart(prevFromDate);
+
+  const prevPeriod = rows(
+    $app,
+    "SELECT t.customer as customer, COUNT(*) as visits, " +
+      "CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as sales " +
+      "FROM transactions t WHERE " + scope +
+      " AND t.created >= {:prevFromUtc} AND t.created < {:fromUtc} GROUP BY t.customer",
+    Object.assign({}, base, { prevFromUtc: prevFromUtc }),
+    { customer: "", visits: 0, sales: "" }
+  );
+  const prevVisited = prevPeriod.map(function (r) {
+    return r.customer;
+  });
+  const prevNew = prevVisited.filter(function (id) {
+    return firstSeen[id] && firstSeen[id] >= prevFromUtc;
+  }).length;
+  const prevSales = prevPeriod.reduce(function (total, r) {
+    return total + (Number(r.sales) || 0);
+  }, 0);
+
+  // Daily visit counts (last 7 local days) for the Overview trend.
+  const trendFrom = localDateToUtcStart(addDays(localDate(0), -6));
+  const trendRows = rows(
+    $app,
+    "SELECT substr(t.created, 1, 10) as day, COUNT(*) as visits FROM transactions t " +
+      "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
+      " AND t.created >= {:trendFrom} AND t.type <> 'adjust' GROUP BY day",
+    { mid: ctx.merchantId, trendFrom: trendFrom, bid: ctx.branchId || "" },
+    { day: "", visits: 0 }
+  );
+  const trendMap = {};
+  trendRows.forEach(function (r) {
+    trendMap[r.day] = Number(r.visits) || 0;
+  });
+  const trend = [];
+  for (let i = 6; i >= 0; i--) {
+    const local = addDays(localDate(0), -i);
+    const utcDay = localDateToUtcStart(local).slice(0, 10);
+    trend.push({ date: local, visits: trendMap[utcDay] || 0 });
+  }
+
+  // Top customers by recorded spend in the selected scope and period.
+  const topCustomers = rows(
+    $app,
+    "SELECT u.id as id, u.name as name, u.avatar as avatar, COUNT(*) as visits, " +
+      "MAX(t.created) as last_visit, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend " +
+      "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} " +
+      "GROUP BY u.id ORDER BY SUM(t.bill_amount) DESC, COUNT(*) DESC LIMIT 3",
+    base,
+    { id: "", name: "", avatar: "", visits: 0, last_visit: "", spend: "" }
+  ).map(function (r) {
+    return {
+      id: r.id,
+      name: r.name,
+      avatar: r.avatar || "",
+      visits: Number(r.visits) || 0,
+      lastVisit: r.last_visit,
+      spendCents: Math.round((Number(r.spend) || 0) * 100),
+    };
+  });
+
   let sales = 0;
   let stamps = 0;
   let points = 0;
@@ -190,6 +262,46 @@ function buildSnapshot($app, ctx) {
   let overdueCount = 0;
   Object.keys(lastSeen).forEach(function (id) {
     if (lastSeen[id] && lastSeen[id] < cutoff && !hasFutureBooking[id]) overdueCount++;
+  });
+
+  // Previously booked, overdue, and nothing booked ahead — a distinct audience from
+  // "Bring customers back" (which includes people who never booked at all).
+  const rebookCount = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM (SELECT t.customer as id FROM transactions t WHERE " + scope +
+        " GROUP BY t.customer HAVING MAX(t.created) < {:cutoff}) " +
+        "WHERE id IN (SELECT b3.customer FROM service_bookings b3 WHERE b3.merchant = {:mid2} " +
+        "AND b3.status = 'completed' AND b3.customer != '') " +
+        "AND id NOT IN (SELECT b4.customer FROM service_bookings b4 WHERE b4.merchant = {:mid3} " +
+        "AND b4.customer != '' AND b4.status IN ('booked','arrived','in_service') AND b4.booking_date >= {:today})",
+      Object.assign({}, base, {
+        cutoff: cutoff,
+        mid2: ctx.merchantId,
+        mid3: ctx.merchantId,
+        today: localDate(0),
+      }),
+      "v"
+    )
+  ) || 0;
+
+  // The "Inactive Customers" strip on the Reports screen.
+  const inactive = rows(
+    $app,
+    "SELECT u.id as id, u.name as name, u.avatar as avatar, MAX(t.created) as last_seen " +
+      "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+      " GROUP BY u.id HAVING MAX(t.created) < {:cutoff} ORDER BY MAX(t.created) ASC LIMIT 5",
+    Object.assign({}, base, { cutoff: cutoff }),
+    { id: "", name: "", avatar: "", last_seen: "" }
+  ).map(function (r) {
+    const seen = parsePbDate(r.last_seen);
+    return {
+      id: r.id,
+      name: r.name,
+      avatar: r.avatar || "",
+      lastVisit: r.last_seen,
+      daysIdle: seen === null ? null : Math.floor((Date.now() - seen) / DAY_MS),
+    };
   });
 
   // Loyalty: near reward (1-2 stamps left) and available vouchers.
@@ -309,10 +421,21 @@ function buildSnapshot($app, ctx) {
       orders: orders,
       avgOrderCents: orders > 0 ? Math.round((sales * 100) / orders) : null,
       vouchersRedeemed: vouchersRedeemed,
+      previous: {
+        from: prevFromDate,
+        visited: prevVisited.length,
+        newCount: prevNew,
+        returningCount: prevVisited.length - prevNew,
+        salesCents: Math.round(prevSales * 100),
+      },
     },
+    trend: trend,
+    topCustomers: topCustomers,
+    inactive: inactive,
     attention: [
       { id: "return", title: "Bring customers back", detail: "Past their usual return window.", count: overdueCount },
       { id: "rewards", title: "Rewards ready", detail: "Valid voucher or 1-2 stamps from a reward.", count: rewardAudience },
+      { id: "rebook", title: "Not rebooked yet", detail: "Previously booked, past the expected return date.", count: rebookCount },
     ],
     loyalty: { nearReward: nearReward, availableVouchers: availableVouchers, daily: daily },
     bookings: {
@@ -337,13 +460,20 @@ function buildAudience($app, ctx, card, page, perPage) {
   const returnDays = Number(ctx.returnDays) > 0 ? Number(ctx.returnDays) : DEFAULT_RETURN_DAYS;
   const cutoff = new Date(Date.now() - returnDays * DAY_MS).toISOString().replace("T", " ").slice(0, 19);
 
-  if (card === "return") {
+  if (card === "return" || card === "rebook") {
     const scope = "t.merchant = {:mid}" + branchClause(ctx, "t.branch") + " AND t.type <> 'adjust'";
     const base = bindBase(ctx);
+    // "rebook" is the subset who have actually completed a booking before.
+    const rebookClause =
+      card === "rebook"
+        ? " AND t.customer IN (SELECT b5.customer FROM service_bookings b5 WHERE b5.merchant = {:mid3} " +
+          "AND b5.status = 'completed' AND b5.customer != '') "
+        : "";
     const rowsOut = rows(
       $app,
       "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen " +
         "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+        rebookClause +
         // Already booked in? Then they are not someone to win back — matches the
         // overview count, which also excludes customers with a future booking.
         " AND t.customer NOT IN (SELECT b2.customer FROM service_bookings b2 " +
@@ -355,6 +485,7 @@ function buildAudience($app, ctx, card, page, perPage) {
         limit: limit,
         offset: offset,
         mid2: ctx.merchantId,
+        mid3: ctx.merchantId,
         today: localDate(0),
       }),
       { id: "", name: "", phone: "", last_seen: "" }

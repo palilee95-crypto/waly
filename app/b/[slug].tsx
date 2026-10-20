@@ -478,6 +478,7 @@ export default function CustomerBookingPwaScreen() {
   // Merchant vouchers state
   const [showVouchersModal, setShowVouchersModal] = useState(false);
   const [selectedVoucherForQR, setSelectedVoucherForQR] = useState<any>(null);
+  const [storeVouchers, setStoreVouchers] = useState<any[]>([]);
 
   // Google & Store Review Funnel State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -761,6 +762,34 @@ export default function CustomerBookingPwaScreen() {
   }, [slug]);
 
   const { user } = useAuth();
+
+  // The Vouchers sheet used to render two invented vouchers, so merchants saw
+  // "Store Promo Voucher" cards they never created. Load this customer's real active
+  // vouchers for this store instead; the sheet shows an empty state when there are none.
+  useEffect(() => {
+    if (!showVouchersModal) return;
+    if (!user?.id || !merchant?.id) {
+      setStoreVouchers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await pb.collection('vouchers').getFullList({
+          filter: `customer = '${user.id}' && status = 'active' && reward.merchant = '${merchant.id}'`,
+          expand: 'reward',
+          sort: '-created',
+          requestKey: null,
+        });
+        if (!cancelled) setStoreVouchers(list);
+      } catch (e) {
+        if (!cancelled) setStoreVouchers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showVouchersModal, user?.id, merchant?.id]);
 
   useEffect(() => {
     loadMerchantAndData();
@@ -3725,30 +3754,33 @@ export default function CustomerBookingPwaScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', marginTop: 8 }}>
               {(() => {
-                const merchantVouchersList = [
-                  {
-                    id: 'v-1',
-                    merchantName: merchant?.store_name || 'Risev Official Merchant',
-                    logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=150',
-                    title: 'Free reward upon completing loyalty card',
-                    subtitle: 'Stamp Card Reward',
-                    expiry: 'Valid until 01/11/2026',
-                    status: 'active',
-                    serialNo: 'NO. 81389',
-                    color: '#0F172A',
-                  },
-                  {
-                    id: 'v-2',
-                    merchantName: merchant?.store_name || 'Risev Official Merchant',
-                    logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=150',
-                    title: '10% OFF Total Bill',
-                    subtitle: 'Exclusive Store Promo Voucher',
-                    expiry: 'Valid until 15/11/2026',
-                    status: 'active',
-                    serialNo: 'NO. 45920',
-                    color: '#0F172A',
-                  },
-                ];
+                const merchantVouchersList = storeVouchers.map((v: any) => ({
+                  id: v.id,
+                  merchantName: merchant?.store_name || merchant?.name || 'Store',
+                  logo: merchant?.logo ? `${pb.baseUrl}/api/files/merchants/${merchant.id}/${merchant.logo}` : 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=150',
+                  title: v.expand?.reward?.name || 'Store voucher',
+                  subtitle: v.expand?.reward?.description || 'Loyalty reward',
+                  expiry: v.expires_at
+                    ? `Valid until ${new Date(String(v.expires_at).replace(' ', 'T')).toLocaleDateString('en-GB')}`
+                    : 'No expiry date',
+                  status: 'active',
+                  serialNo: v.code ? `NO. ${v.code}` : '',
+                  color: '#0F172A',
+                }));
+
+                if (merchantVouchersList.length === 0) {
+                  return (
+                    <View style={{ paddingVertical: 36, alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="ticket-outline" size={30} color={themeStyles.textSecondaryColor} />
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: themeStyles.textPrimaryColor }}>
+                        No vouchers available
+                      </Text>
+                      <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: themeStyles.textSecondaryColor, textAlign: 'center' }}>
+                        Vouchers appear here once this store issues one to you.
+                      </Text>
+                    </View>
+                  );
+                }
 
                 return merchantVouchersList.map((item) => (
                   <View

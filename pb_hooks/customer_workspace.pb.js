@@ -9,8 +9,9 @@
 //   * ids are always bound, never string-interpolated into SQL;
 //   * errors branch on status/instance, never on err.name (always undefined here).
 
-const CUSTOMER_WORKSPACE_PRO_PLANS = ["pro", "business", "enterprise"];
-
+// NOTE: no file-level values may be referenced inside a handler — JSVM handlers are
+// re-evaluated without file scope, so a module-level const throws ReferenceError.
+// Anything shared must live inside the handler or in a require()d module.
 routerAdd("GET", "/api/risev/merchant/customer-workspace", (e) => {
   const logic = require(`${__hooks}/customer_workspace_logic.js`);
 
@@ -91,24 +92,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace", (e) => {
     return e.json(400, { code: "INVALID_PERIOD", message: "The period end must be after its start." });
   }
 
-  // ── Entitlement: Reports are PRO ──
-  let reportsEntitled = false;
-  try {
-    const subs = $app.findRecordsByFilter(
-      "subscriptions",
-      "merchant = '" + merchantId + "' && (status = 'active' || status = 'trialing')",
-      "-created",
-      20,
-      0
-    );
-    for (let i = 0; i < subs.length; i++) {
-      const plan = String(subs[i].getString("plan") || "").toLowerCase();
-      if (CUSTOMER_WORKSPACE_PRO_PLANS.indexOf(plan) !== -1) reportsEntitled = true;
-    }
-  } catch (err) {
-    reportsEntitled = false;
-  }
-
+  // Reports are available on every plan — no entitlement gate.
   const ctx = {
     merchantId: merchantId,
     branchId: branchId,
@@ -126,12 +110,15 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace", (e) => {
       {
         asOf: new Date().toISOString(),
         timeZone: "Asia/Kuala_Lumpur",
-        merchant: { id: merchant.id, name: merchant.getString("name") },
+        merchant: {
+          id: merchant.id,
+          name: merchant.getString("name"),
+          logo: merchant.getString("logo") || "",
+        },
         branches: branches.map(function (b) {
           return { id: b.id, name: b.getString("name"), isHq: b.getBool("is_hq") };
         }),
         scope: { branchId: branchId || "all", from: fromDate, to: toDate },
-        entitlements: { reports: reportsEntitled },
       },
       snapshot
     ));
@@ -172,7 +159,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
 
   const query = (e.requestInfo() && e.requestInfo().query) || {};
   const card = String(query.card || "");
-  if (["return", "rewards", "birthday"].indexOf(card) === -1) {
+  if (["return", "rewards", "rebook", "birthday"].indexOf(card) === -1) {
     return e.json(400, { code: "INVALID_CARD", message: "Unknown audience card." });
   }
 
