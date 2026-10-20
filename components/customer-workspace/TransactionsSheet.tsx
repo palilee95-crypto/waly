@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
-import { LedgerRow, LedgerType, fetchTransactions, formatShortDateFromIso } from '@/lib/customer-workspace';
+import { LedgerRow, LedgerType, type LedgerFocus, fetchTransactions, formatLedgerImpact, formatShortDateFromIso } from '@/lib/customer-workspace';
 import { collectLedger, buildLedgerCsv, shareCsv } from '@/lib/customer-csv';
 import CustomerDetailSheet from './CustomerDetailSheet';
 
@@ -31,12 +31,23 @@ const TYPE_LABEL: Record<string, string> = {
   adjust: 'Adjusted',
 };
 
+function compactImpact(row: LedgerRow): string {
+  if (row.billCents > 0) return `RM ${(row.billCents / 100).toFixed(2)}`;
+  if (row.stamps) return `${row.stamps > 0 ? '+' : ''}${row.stamps} stamp${Math.abs(row.stamps) === 1 ? '' : 's'}`;
+  if (row.points) return `${row.points > 0 ? '+' : ''}${row.points} pts`;
+  if (row.type === 'redeem') return 'Reward';
+  if (row.type === 'expire') return 'Expired';
+  if (row.type === 'adjust') return 'Adjusted';
+  return 'Activity';
+}
+
 type Props = {
   visible: boolean;
   branchId: string;
   from: string;
   to: string;
   periodLabel: string;
+  focus?: LedgerFocus | null;
   onClose: () => void;
 };
 
@@ -46,8 +57,12 @@ export default function TransactionsSheet({
   from,
   to,
   periodLabel,
+  focus,
   onClose,
 }: Props) {
+  const effectiveBranchId = focus?.branchId ?? branchId;
+  const effectiveFrom = focus?.from ?? from;
+  const effectiveTo = focus?.to ?? to;
   const [items, setItems] = useState<LedgerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -73,13 +88,18 @@ export default function TransactionsSheet({
       setError(null);
       try {
         const res = await fetchTransactions({
-          branchId,
-          from,
-          to,
+          branchId: effectiveBranchId,
+          from: effectiveFrom,
+          to: effectiveTo,
           page: nextPage,
           perPage: PAGE_SIZE,
-          type,
+          type: focus?.salesOnly ? 'all' : type,
           q: search,
+          staffId: focus?.staffId,
+          unassignedOutlet: focus?.unassignedOutlet,
+          unassignedStaff: focus?.unassignedStaff,
+          hour: focus?.hour,
+          salesOnly: focus?.salesOnly,
         });
         if (id !== requestId.current) return;
         setItems((prev) => (nextPage === 1 ? res.items : [...prev, ...res.items]));
@@ -92,7 +112,7 @@ export default function TransactionsSheet({
         if (id === requestId.current) setLoading(false);
       }
     },
-    [branchId, from, to, type, search]
+    [effectiveBranchId, effectiveFrom, effectiveTo, type, search, focus?.staffId, focus?.unassignedOutlet, focus?.unassignedStaff, focus?.hour, focus?.salesOnly]
   );
 
   useEffect(() => {
@@ -106,9 +126,9 @@ export default function TransactionsSheet({
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const rows = await collectLedger({ branchId, from, to, type, q: search });
+      const rows = await collectLedger({ branchId: effectiveBranchId, from: effectiveFrom, to: effectiveTo, type: focus?.salesOnly ? 'all' : type, q: search, staffId: focus?.staffId, unassignedOutlet: focus?.unassignedOutlet, unassignedStaff: focus?.unassignedStaff, hour: focus?.hour, salesOnly: focus?.salesOnly });
       if (!rows.length) return;
-      await shareCsv(`risev-transactions-${from}_${to}.csv`, buildLedgerCsv(rows));
+      await shareCsv(`risev-transactions-${effectiveFrom}_${effectiveTo}.csv`, buildLedgerCsv(rows));
     } catch {
       setError('Export failed. Try again.');
     } finally {
@@ -127,19 +147,19 @@ export default function TransactionsSheet({
 
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Transactions</Text>
+              <Text style={styles.title}>{focus?.title || 'Transactions'}</Text>
               <Text style={styles.subtitle}>
-                {total.toLocaleString('en-MY')} recorded · {periodLabel}
+                {total.toLocaleString('en-MY')} recorded · {focus?.from || focus?.to ? `${effectiveFrom}–${effectiveTo}` : periodLabel}
               </Text>
             </View>
-            <TouchableOpacity onPress={exportCsv} style={styles.iconBtn} disabled={exporting} activeOpacity={0.7}>
+            <TouchableOpacity onPress={exportCsv} style={styles.iconBtn} disabled={exporting} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Export transactions">
               {exporting ? (
                 <ActivityIndicator size="small" color={colors.black} />
               ) : (
                 <Ionicons name="download-outline" size={17} color={colors.black} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={onClose} style={styles.iconBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Close transactions">
               <Ionicons name="close" size={18} color={colors.black} />
             </TouchableOpacity>
           </View>
@@ -161,82 +181,72 @@ export default function TransactionsSheet({
             ) : null}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeRow}>
+          {!focus?.salesOnly ? <ScrollView horizontal style={styles.typeScroll} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeRow}>
             {TYPES.map((t) => (
               <TouchableOpacity
                 key={t.id}
                 style={[styles.typePill, type === t.id && styles.typePillActive]}
                 onPress={() => setType(t.id)}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityState={{ selected: type === t.id }}
               >
                 <Text style={[styles.typePillText, type === t.id && styles.typePillTextActive]}>
                   {t.label}
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </ScrollView> : null}
 
           <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 10 }}>
             {items.map((row) => {
               const isRedeem = row.type === 'redeem';
               const isAdjust = row.type === 'adjust';
+              const impact = compactImpact(row);
+              const detail = [row.branchName || 'HQ', row.staffName || null, row.voucherCode || null]
+                .filter(Boolean).join(' · ');
               return (
                 <TouchableOpacity
                   key={row.id}
                   style={styles.row}
                   activeOpacity={0.7}
                   onPress={() => setDetail(row)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.customerName}, ${TYPE_LABEL[row.type] || row.type}, ${formatLedgerImpact(row)}`}
                 >
-                  <View style={styles.rowMain}>
-                    <View style={styles.rowTop}>
-                      <Text style={styles.rowName} numberOfLines={1}>
-                        {row.customerName}
-                      </Text>
+                  <View style={styles.rowContent}>
+                    <View style={[styles.eventIcon, isRedeem && styles.eventIconRedeem, isAdjust && styles.eventIconAdjust]}>
+                      <Ionicons
+                        name={isRedeem ? 'gift-outline' : isAdjust ? 'options-outline' : 'receipt-outline'}
+                        size={19}
+                        color={colors.black}
+                      />
+                    </View>
+                    <View style={styles.rowMain}>
+                      <Text style={styles.rowName} numberOfLines={1}>{row.customerName}</Text>
                       <Text style={styles.rowWhen}>
                         {formatShortDateFromIso(row.created)} · {row.created.slice(11, 16)}
                       </Text>
                     </View>
-
-                    <View style={styles.rowTags}>
-                      <View
-                        style={[
-                          styles.tag,
-                          isRedeem && styles.tagRedeem,
-                          isAdjust && styles.tagAdjust,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.tagText,
-                            isRedeem && styles.tagTextRedeem,
-                            isAdjust && styles.tagTextAdjust,
-                          ]}
-                        >
-                          {TYPE_LABEL[row.type] || row.type}
+                    <View style={styles.rowRight}>
+                      <Text style={styles.amount} numberOfLines={2}>{impact}</Text>
+                      {row.billCents > 0 && (row.stamps !== 0 || row.points !== 0) ? (
+                        <Text style={styles.impactMeta} numberOfLines={1}>
+                          {[
+                            row.stamps ? `${row.stamps > 0 ? '+' : ''}${row.stamps} st` : null,
+                            row.points ? `${row.points > 0 ? '+' : ''}${row.points} pts` : null,
+                          ].filter(Boolean).join(' · ')}
                         </Text>
-                      </View>
-                      <Text style={styles.rowMeta} numberOfLines={1}>
-                        {[row.branchName || 'HQ', row.staffName || null, row.voucherCode || null]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Text>
+                      ) : null}
                     </View>
                   </View>
-
-                  <View style={styles.rowRight}>
-                    {row.billCents > 0 ? (
-                      <Text style={styles.amount}>RM {(row.billCents / 100).toFixed(2)}</Text>
-                    ) : (
-                      <Text style={styles.amountMuted}>—</Text>
-                    )}
-                    <Text style={styles.rowMeta}>
-                      {[
-                        row.stamps ? `${row.stamps > 0 ? '+' : ''}${row.stamps} st` : null,
-                        row.points ? `${row.points} pts` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') || ' '}
-                    </Text>
+                  <View style={styles.rowDetails}>
+                    <View style={[styles.tag, isRedeem && styles.tagRedeem, isAdjust && styles.tagAdjust]}>
+                      <Text style={[styles.tagText, isRedeem && styles.tagTextRedeem, isAdjust && styles.tagTextAdjust]}>
+                        {TYPE_LABEL[row.type] || row.type}
+                      </Text>
+                    </View>
+                    <Text style={styles.rowMeta} numberOfLines={1}>{detail}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -294,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingTop: 8,
     paddingBottom: 16,
     height: '92%',
@@ -311,12 +321,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 18, color: colors.black },
-  subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: '#64748B', marginTop: 2 },
+  title: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 20, color: colors.black },
+  subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: '#64748B', marginTop: 2 },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -327,7 +337,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     paddingHorizontal: 12,
-    height: 38,
+    height: 44,
     borderRadius: radii.full,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -336,14 +346,15 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12.5,
+    fontSize: 14,
     color: colors.black,
     outlineWidth: 0,
   } as any,
-  typeRow: { gap: 6, paddingVertical: 10 },
+  typeScroll: { flexGrow: 0, height: 52 },
+  typeRow: { gap: 6, alignItems: 'center', paddingVertical: 6 },
   typePill: {
     paddingHorizontal: 12,
-    height: 30,
+    height: 38,
     borderRadius: radii.full,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
@@ -354,33 +365,33 @@ const styles = StyleSheet.create({
   typePillTextActive: { color: '#FFFFFF' },
   list: { flex: 1, marginTop: 2 },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#E9EDF3',
   },
+  rowContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  eventIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF5CB', alignItems: 'center', justifyContent: 'center' },
+  eventIconRedeem: { backgroundColor: '#F2F4F7' },
+  eventIconAdjust: { backgroundColor: '#FEF2F2' },
   rowMain: { flex: 1, minWidth: 0 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: colors.black, flexShrink: 1 },
-  rowWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#94A3B8' },
-  rowTags: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  rowName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: colors.black },
+  rowWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: '#64748B', marginTop: 3 },
+  rowDetails: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 9, marginLeft: 52 },
   tag: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: radii.full,
     backgroundColor: '#F1F5F9',
   },
   tagRedeem: { backgroundColor: '#FFFBEA' },
   tagAdjust: { backgroundColor: '#FEF2F2' },
-  tagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9.5, color: '#334155' },
+  tagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10.5, color: '#334155' },
   tagTextRedeem: { color: '#B45309' },
   tagTextAdjust: { color: '#B91C1C' },
-  rowMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#94A3B8', flexShrink: 1 },
-  rowRight: { alignItems: 'flex-end', minWidth: 78 },
-  amount: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12.5, color: colors.black },
-  amountMuted: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: '#CBD5E1' },
+  rowMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#64748B', flex: 1, minWidth: 0 },
+  rowRight: { alignItems: 'flex-end', width: 112, flexShrink: 0 },
+  amount: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, color: colors.black, textAlign: 'right' },
+  impactMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#64748B', marginTop: 3, textAlign: 'right' },
   center: { paddingVertical: 28, alignItems: 'center', gap: 10 },
   errorText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, color: '#B91C1C' },
   smallBtn: {

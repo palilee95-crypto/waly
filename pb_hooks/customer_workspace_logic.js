@@ -287,17 +287,18 @@ function buildSnapshot($app, ctx) {
   // Top customers by recorded spend in the selected scope and period.
   const topCustomers = rows(
     $app,
-    "SELECT u.id as id, u.name as name, u.avatar as avatar, COUNT(*) as visits, " +
+    "SELECT u.id as id, u.name as name, u.phone as phone, u.avatar as avatar, COUNT(*) as visits, " +
       "MAX(t.created) as last_visit, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend " +
       "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
       " AND t.created >= {:fromUtc} AND t.created < {:toUtc} " +
       "GROUP BY u.id ORDER BY SUM(t.bill_amount) DESC, COUNT(*) DESC LIMIT 3",
     base,
-    { id: "", name: "", avatar: "", visits: 0, last_visit: "", spend: "" }
+    { id: "", name: "", phone: "", avatar: "", visits: 0, last_visit: "", spend: "" }
   ).map(function (r) {
     return {
       id: r.id,
       name: r.name,
+      phone: r.phone || "",
       avatar: r.avatar || "",
       visits: Number(r.visits) || 0,
       lastVisit: r.last_visit,
@@ -343,6 +344,14 @@ function buildSnapshot($app, ctx) {
     bookingCounts[key] = (bookingCounts[key] || 0) + (Number(r.cnt) || 0);
     bookingTotal += Number(r.cnt) || 0;
   });
+  const bookingUpcomingCount = Number(scalar(
+    $app,
+    "SELECT COUNT(*) as v FROM service_bookings b WHERE b.merchant = {:mid}" + bookingBranch +
+      " AND b.status IN ('booked','arrived','in_service') AND b.booking_date >= {:today}" +
+      " AND b.booking_date >= {:fromDate} AND b.booking_date < {:toDate}",
+    bookingBase,
+    "v"
+  )) || 0;
 
   const futureBookingRows = rows(
     $app,
@@ -450,8 +459,9 @@ function buildSnapshot($app, ctx) {
     scalar(
       $app,
       "SELECT COUNT(*) as v FROM vouchers v JOIN rewards r ON r.id = v.reward " +
-        "WHERE r.merchant = {:mid} AND v.status = 'used' AND v.used_at >= {:fromUtc} AND v.used_at < {:toUtc}",
-      { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc },
+        "WHERE r.merchant = {:mid}" + branchClause(ctx, "v.branch") +
+        " AND v.status = 'used' AND v.used_at >= {:fromUtc} AND v.used_at < {:toUtc}",
+      base,
       "v"
     )
   ) || 0;
@@ -476,27 +486,66 @@ function buildSnapshot($app, ctx) {
     )
   ) || 0;
 
-  // Daily stamp series (last 7 local days). A day with no rows is a true zero stamps.
-  const chartFrom = localDateToUtcStart(addDays(localDate(0), -6));
-  const dailyRows = rows(
+  // Stamp activity shares Visit Trend's selected local period, branch and bucket size.
+  const stampRows = rows(
     $app,
-    "SELECT substr(t.created, 1, 10) as day, CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps FROM transactions t " +
+    "SELECT strftime('%Y-%m-%d', t.created, '+8 hours') as day, " +
+      "CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps FROM transactions t " +
       "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
-      " AND t.created >= {:chartFrom} GROUP BY day",
-    // Branch clause binds {:bid}; every bind map that uses it must carry the key.
-    { mid: ctx.merchantId, chartFrom: chartFrom, bid: ctx.branchId || "" },
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY day",
+    base,
     { day: "", stamps: "" }
   );
-  const dailyMap = {};
-  dailyRows.forEach(function (r) {
-    dailyMap[r.day] = Number(r.stamps) || 0;
-  });
-  const daily = [];
-  for (let i = 6; i >= 0; i--) {
-    const local = addDays(localDate(0), -i);
-    // created is UTC: a local-day bucket starts 8h before the local date string.
-    const utcDay = localDateToUtcStart(local).slice(0, 10);
-    daily.push({ date: local, stamps: dailyMap[utcDay] || 0 });
+  const stampDayMap = {};
+  stampRows.forEach(function (r) { stampDayMap[r.day] = Number(r.stamps) || 0; });
+  const stampSeries = [];
+  if (insightUnit === "hour") {
+    const stampHourRows = rows(
+      $app,
+      "SELECT CAST(strftime('%H', t.created, '+8 hours') AS INTEGER) as hour, " +
+        "CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps FROM transactions t " +
+        "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY hour",
+      base,
+      { hour: 0, stamps: "" }
+    );
+    const stampHourMap = {};
+    stampHourRows.forEach(function (r) { stampHourMap[Number(r.hour)] = Number(r.stamps) || 0; });
+    for (let hour = 0; hour < 24; hour++) {
+      stampSeries.push({
+        date: ctx.fromDate + "T" + pad2(hour),
+        label: (hour % 12 || 12) + (hour < 12 ? "a" : "p"),
+        detail: ctx.fromDate + " · " + pad2(hour) + ":00–" + pad2(hour) + ":59",
+        stamps: stampHourMap[hour] || 0,
+      });
+    }
+  } else if (insightUnit === "day") {
+    dailyBuckets.forEach(function (bucket) {
+      stampSeries.push({ date: bucket.date, label: bucket.date.slice(8), detail: bucket.date, stamps: stampDayMap[bucket.date] || 0 });
+    });
+  } else {
+    const grouped = {};
+    dailyBuckets.forEach(function (bucket) {
+      let key = bucket.date.slice(0, 7) + "-01";
+      if (insightUnit === "week") {
+        const weekday = new Date(bucket.date + "T00:00:00Z").getUTCDay();
+        key = addDays(bucket.date, -((weekday + 6) % 7));
+      }
+      if (!grouped[key]) grouped[key] = { stamps: 0, first: bucket.date, last: bucket.date };
+      grouped[key].stamps += stampDayMap[bucket.date] || 0;
+      grouped[key].last = bucket.date;
+    });
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    Object.keys(grouped).sort().forEach(function (key) {
+      const bucket = grouped[key];
+      const isWeek = insightUnit === "week";
+      stampSeries.push({
+        date: key,
+        label: isWeek ? bucket.first.slice(8) + "–" + bucket.last.slice(8) : monthNames[Number(key.slice(5, 7)) - 1],
+        detail: isWeek ? bucket.first + " – " + bucket.last : key.slice(0, 7),
+        stamps: bucket.stamps,
+      });
+    });
   }
 
   // Feedback is merchant-wide: store_feedbacks has no branch relation.
@@ -563,6 +612,39 @@ function buildSnapshot($app, ctx) {
   // A year of daily points is unreadable, so long periods roll up by month.
   const periodDayList = localDays(ctx.fromDate, ctx.toDate);
   const granularity = periodDayList.length > 92 ? "month" : "day";
+  const buyerBucket = granularity === "month" ? 7 : 10;
+  const buyersByPeriod = rows(
+    $app,
+    "SELECT substr(datetime(t.created, '+8 hours'), 1, " + buyerBucket + ") as bucket, " +
+      "COUNT(DISTINCT t.customer) as buyers FROM transactions t WHERE " + scope +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.bill_amount > 0 " +
+      "AND t.customer <> '' GROUP BY bucket",
+    base,
+    { bucket: "", buyers: 0 }
+  );
+  const buyersByBucket = {};
+  buyersByPeriod.forEach(function (r) { buyersByBucket[r.bucket] = Number(r.buyers) || 0; });
+  const buyerCount = Number(scalar(
+    $app,
+    "SELECT COUNT(DISTINCT t.customer) as v FROM transactions t WHERE " + scope +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.bill_amount > 0 AND t.customer <> ''",
+    base,
+    "v"
+  )) || 0;
+  const cohortSales = rows(
+    $app,
+    "SELECT CAST(COALESCE(SUM(CASE WHEN t.customer <> '' AND f.first_seen >= {:fromUtc} " +
+      "THEN t.bill_amount ELSE 0 END), 0) AS TEXT) as new_sales, " +
+      "CAST(COALESCE(SUM(CASE WHEN t.customer <> '' AND f.first_seen < {:fromUtc} " +
+      "THEN t.bill_amount ELSE 0 END), 0) AS TEXT) as returning_sales, " +
+      "CAST(COALESCE(SUM(CASE WHEN t.customer IS NULL OR t.customer = '' " +
+      "THEN t.bill_amount ELSE 0 END), 0) AS TEXT) as unattributed_sales " +
+      "FROM transactions t LEFT JOIN (SELECT customer, MIN(created) as first_seen FROM transactions " +
+      "WHERE merchant = {:mid_all} AND bill_amount > 0 GROUP BY customer) f ON f.customer = t.customer " +
+      "WHERE " + scope + " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.bill_amount > 0",
+    Object.assign({}, base, { mid_all: ctx.merchantId }),
+    { new_sales: "", returning_sales: "", unattributed_sales: "" }
+  )[0] || {};
   const seriesMap = {};
   periodDayList.forEach(function (d) {
     const key = granularity === "month" ? d.slice(0, 7) : d;
@@ -586,6 +668,7 @@ function buildSnapshot($app, ctx) {
       date: s.date,
       salesCents: Math.round(s.sales * 100),
       orders: s.orders,
+      buyers: buyersByBucket[s.date] || 0,
       newCount: s.newCount,
       returningCount: s.returningCount,
     };
@@ -664,20 +747,17 @@ function buildSnapshot($app, ctx) {
   for (let i = 0; i < 7; i++) next7.push({ date: addDays(localDate(0), i), count: 0, revenueCents: 0 });
   const serviceMap = {};
   let bookingRevenue = 0;
+  let completedBookingRevenue = 0;
+  let upcomingBookingRevenue = 0;
   bookingDetailRows.forEach(function (r) {
     const status = String(r.status || "");
     const price = Number(r.price) || 0;
     if (status === "cancelled" || status === "no_show") return;
+    if ((status === "booked" || status === "arrived" || status === "in_service") &&
+        String(r.booking_date || "") < bookingBase.today) return;
     bookingRevenue += price;
-
-    const day = String(r.booking_date || "");
-    const slot = next7.find(function (n) {
-      return n.date === day;
-    });
-    if (slot) {
-      slot.count++;
-      slot.revenueCents += Math.round(price * 100);
-    }
+    if (status === "completed") completedBookingRevenue += price;
+    if (status === "booked" || status === "arrived" || status === "in_service") upcomingBookingRevenue += price;
 
     let items = r.items;
     if (typeof items === "string") {
@@ -695,6 +775,28 @@ function buildSnapshot($app, ctx) {
       entry.count++;
       entry.revenue += itemPrice;
       serviceMap[name] = entry;
+    }
+  });
+  // The forward schedule is independent of the report period. A historical
+  // period must not make the next seven days appear empty.
+  const upcomingSchedule = rows(
+    $app,
+    "SELECT b.booking_date as booking_date, COUNT(*) as cnt, " +
+      "CAST(COALESCE(SUM(b.total_price), 0) AS TEXT) as price " +
+      "FROM service_bookings b WHERE b.merchant = {:mid}" + bookingBranch +
+      " AND b.status IN ('booked','arrived','in_service') AND b.booking_date >= {:today} " +
+      "GROUP BY b.booking_date ORDER BY b.booking_date ASC LIMIT 8",
+    bookingBase,
+    { booking_date: "", cnt: 0, price: "" }
+  );
+  let nextUpcomingDate = null;
+  upcomingSchedule.forEach(function (r) {
+    const day = String(r.booking_date || "");
+    if (!nextUpcomingDate) nextUpcomingDate = day;
+    const slot = next7.find(function (n) { return n.date === day; });
+    if (slot) {
+      slot.count += Number(r.cnt) || 0;
+      slot.revenueCents += Math.round((Number(r.price) || 0) * 100);
     }
   });
   const topServices = Object.keys(serviceMap)
@@ -717,8 +819,21 @@ function buildSnapshot($app, ctx) {
     scalar(
       $app,
       "SELECT COUNT(*) as v FROM vouchers v JOIN rewards r ON r.id = v.reward " +
-        "WHERE r.merchant = {:mid} AND v.created >= {:fromUtc} AND v.created < {:toUtc}",
-      { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc },
+        "WHERE r.merchant = {:mid}" + branchClause(ctx, "v.branch") +
+        " AND v.created >= {:fromUtc} AND v.created < {:toUtc}",
+      base,
+      "v"
+    )
+  ) || 0;
+  // Cohort numerator: vouchers issued in this period that have since been used.
+  // It is deliberately different from vouchers redeemed during this period.
+  const issuedRedeemed = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM vouchers v JOIN rewards r ON r.id = v.reward " +
+        "WHERE r.merchant = {:mid}" + branchClause(ctx, "v.branch") +
+        " AND v.created >= {:fromUtc} AND v.created < {:toUtc} AND v.status = 'used'",
+      base,
       "v"
     )
   ) || 0;
@@ -730,9 +845,9 @@ function buildSnapshot($app, ctx) {
     $app,
     "SELECT CAST(COALESCE(SUM(CASE WHEN t.points < 0 THEN -t.points ELSE 0 END), 0) AS TEXT) as pts, " +
       "COUNT(CASE WHEN t.points < 0 THEN 1 END) as cnt FROM transactions t " +
-      "WHERE t.merchant = {:mid} AND t.type = 'redeem' " +
+      "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") + " AND t.type = 'redeem' " +
       "AND t.created >= {:fromUtc} AND t.created < {:toUtc}",
-    { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc },
+    base,
     { pts: "", cnt: 0 }
   )[0];
 
@@ -804,10 +919,10 @@ function buildSnapshot($app, ctx) {
       { id: "rewards", title: "Rewards ready", detail: "Valid voucher or 1-2 stamps from a reward.", count: rewardAudience },
       { id: "rebook", title: "Not rebooked yet", detail: "Previously booked, past the expected return date.", count: rebookCount },
     ],
-    loyalty: { nearReward: nearReward, availableVouchers: availableVouchers, daily: daily },
+    loyalty: { nearReward: nearReward, availableVouchers: availableVouchers, series: stampSeries, granularity: insightUnit },
     bookings: {
       completed: bookingCounts.completed || 0,
-      upcoming: (bookingCounts.booked || 0) + (bookingCounts.arrived || 0) + (bookingCounts.in_service || 0),
+      upcoming: bookingUpcomingCount,
       cancelled: bookingCounts.cancelled || 0,
       noShow: bookingCounts.no_show || 0,
       total: bookingTotal,
@@ -820,6 +935,10 @@ function buildSnapshot($app, ctx) {
       series: salesSeries,
       granularity: granularity,
       hours: hours,
+      buyerCount: buyerCount,
+      newSalesCents: Math.round((Number(cohortSales.new_sales) || 0) * 100),
+      returningSalesCents: Math.round((Number(cohortSales.returning_sales) || 0) * 100),
+      unattributedSalesCents: Math.round((Number(cohortSales.unattributed_sales) || 0) * 100),
       outlets: outlets,
       staff: staffPerformance,
     },
@@ -832,6 +951,9 @@ function buildSnapshot($app, ctx) {
     },
     bookingDetail: {
       revenueCents: Math.round(bookingRevenue * 100),
+      completedValueCents: Math.round(completedBookingRevenue * 100),
+      upcomingValueCents: Math.round(upcomingBookingRevenue * 100),
+      nextUpcomingDate: nextUpcomingDate,
       noShowRate: noShowRate,
       next7: next7,
       topServices: topServices,
@@ -839,8 +961,9 @@ function buildSnapshot($app, ctx) {
     loyaltyDetail: {
       vouchersIssued: vouchersIssued,
       vouchersUsed: vouchersRedeemed,
+      issuedRedeemed: issuedRedeemed,
       redemptionRate:
-        vouchersIssued > 0 ? Math.round((vouchersRedeemed / vouchersIssued) * 1000) / 10 : null,
+        vouchersIssued > 0 ? Math.round((issuedRedeemed / vouchersIssued) * 1000) / 10 : null,
       pointsRedeemed: pointsRedeemedRow ? Number(pointsRedeemedRow.pts) || 0 : 0,
       redemptions: pointsRedeemedRow ? Number(pointsRedeemedRow.cnt) || 0 : 0,
       activeCards: activeCards,
@@ -873,6 +996,21 @@ function buildTransactions($app, ctx, opts) {
     where.push("(u.name LIKE {:q} OR u.phone LIKE {:q})");
     params.q = "%" + String(opts.q) + "%";
   }
+  if (opts.staffId) {
+    where.push("t.staff = {:staffId}");
+    params.staffId = String(opts.staffId);
+  } else if (opts.unassignedStaff) {
+    where.push("(t.staff = '' OR t.staff IS NULL)");
+  }
+  if (opts.unassignedOutlet) where.push("(t.branch = '' OR t.branch IS NULL)");
+  if (opts.hour !== undefined && opts.hour !== null && String(opts.hour) !== '') {
+    const hour = Number(opts.hour);
+    if (Number.isInteger(hour) && hour >= 0 && hour < 24) {
+      where.push("strftime('%H', t.created, '+8 hours') = {:localHour}");
+      params.localHour = hour < 10 ? '0' + hour : String(hour);
+    }
+  }
+  if (opts.salesOnly) where.push("t.type <> 'adjust' AND t.bill_amount > 0");
 
   const scopeSql = where.join(" AND ") + branchClause(ctx, "t.branch");
 
@@ -943,6 +1081,77 @@ function buildAudience($app, ctx, card, page, perPage) {
   const nowUtc = utcNowString();
   const returnDays = Number(ctx.returnDays) > 0 ? Number(ctx.returnDays) : DEFAULT_RETURN_DAYS;
   const cutoff = new Date(Date.now() - returnDays * DAY_MS).toISOString().replace("T", " ").slice(0, 19);
+
+  if (card === "top") {
+    const scope = "t.merchant = {:mid}" + branchClause(ctx, "t.branch") + " AND t.type <> 'adjust'";
+    const countParams = bindBase(ctx);
+    const params = Object.assign({}, countParams, { limit: limit, offset: offset });
+    const total = Number(scalar(
+      $app,
+      "SELECT COUNT(DISTINCT t.customer) as v FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc}",
+      countParams,
+      "v"
+    )) || 0;
+    const ranked = rows(
+      $app,
+      "SELECT u.id as id, u.name as name, u.phone as phone, COUNT(*) as visits, " +
+        "MAX(t.created) as last_seen, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend " +
+        "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc} " +
+        "GROUP BY u.id ORDER BY SUM(t.bill_amount) DESC, COUNT(*) DESC LIMIT {:limit} OFFSET {:offset}",
+      params,
+      { id: "", name: "", phone: "", visits: 0, last_seen: "", spend: "" }
+    );
+    return {
+      total: total,
+      items: ranked.map(function (r) {
+        return {
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          visits: Number(r.visits) || 0,
+          lastVisit: r.last_seen,
+          spendCents: Math.round((Number(r.spend) || 0) * 100),
+        };
+      }),
+    };
+  }
+
+  if (card === "inactive") {
+    const scope = "t.merchant = {:mid}" + branchClause(ctx, "t.branch") + " AND t.type <> 'adjust'";
+    const countParams = Object.assign({}, bindBase(ctx), { cutoff: cutoff });
+    const params = Object.assign({}, countParams, { limit: limit, offset: offset });
+    const total = Number(scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM (SELECT u.id FROM transactions t JOIN users u ON u.id = t.customer " +
+        "WHERE " + scope + " GROUP BY u.id HAVING MAX(t.created) < {:cutoff})",
+      countParams,
+      "v"
+    )) || 0;
+    const inactiveRows = rows(
+      $app,
+      "SELECT u.id as id, u.name as name, u.phone as phone, MAX(t.created) as last_seen " +
+        "FROM transactions t JOIN users u ON u.id = t.customer WHERE " + scope +
+        " GROUP BY u.id HAVING MAX(t.created) < {:cutoff} ORDER BY MAX(t.created) ASC " +
+        "LIMIT {:limit} OFFSET {:offset}",
+      params,
+      { id: "", name: "", phone: "", last_seen: "" }
+    );
+    return {
+      total: total,
+      items: inactiveRows.map(function (r) {
+        const seen = parsePbDate(r.last_seen);
+        return {
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          lastVisit: r.last_seen,
+          daysOverdue: seen === null ? null : Math.floor((Date.now() - seen) / DAY_MS),
+        };
+      }),
+    };
+  }
 
   if (card === "all") {
     // The customer directory that used to live on the separate activity screen.

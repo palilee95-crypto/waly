@@ -14,26 +14,23 @@ import {
   formatCount,
   pctChange,
 } from '@/lib/customer-workspace';
-import PeriodPill from './PeriodPill';
 
 type Props = {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
   onOpenAudience: (card: AudienceCard) => void;
   onOpenDirectory?: () => void;
-  onOpenPeriod?: () => void;
 };
 
 export default function CustomerSnapshotCard({
   snapshot,
   periodLabel,
   onOpenDirectory,
-  onOpenPeriod,
 }: Props) {
   const { overview } = snapshot;
   const { width } = useWindowDimensions();
   const compact = width < 390;
-  const stackFooter = width < 560;
+  const stackFooter = width < 350;
 
   const visited = overview.visited;
   const returningCount = overview.returningCount;
@@ -53,7 +50,7 @@ export default function CustomerSnapshotCard({
           <Text style={[styles.title, compact && styles.titleCompact]}>Your customers</Text>
         </View>
 
-        <PeriodPill label={periodLabel} onPress={onOpenPeriod} />
+        <Text style={styles.periodLabel}>{periodLabel}</Text>
       </View>
 
       <View style={styles.visitedRow}>
@@ -85,13 +82,8 @@ export default function CustomerSnapshotCard({
       </View>
 
       <View style={[styles.footerRow, stackFooter && styles.footerRowStack]}>
-        <TouchableOpacity
+        <View
           style={[styles.mini, stackFooter ? styles.miniStacked : styles.miniFlex]}
-          activeOpacity={onOpenDirectory ? 0.75 : 1}
-          disabled={!onOpenDirectory}
-          onPress={onOpenDirectory}
-          accessibilityRole={onOpenDirectory ? 'button' : undefined}
-          accessibilityLabel={`${formatCount(newCount)} new customers`}
         >
           <View style={[styles.miniIcon, styles.miniIconNew]}>
             <Ionicons name="person-add" size={iconSizes.md} color={colors.primary[600]} />
@@ -101,32 +93,37 @@ export default function CustomerSnapshotCard({
             <Text style={styles.miniLabel}>New customers</Text>
             <Text style={styles.miniCaption}>{newCaption}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[400]} />
-        </TouchableOpacity>
+        </View>
 
         <View style={[styles.footerDivider, stackFooter && styles.footerDividerStack]} />
 
-        <TouchableOpacity
+        <View
           style={[styles.mini, stackFooter ? styles.miniStacked : styles.miniFlex]}
-          activeOpacity={onOpenDirectory ? 0.75 : 1}
-          disabled={!onOpenDirectory}
-          onPress={onOpenDirectory}
-          accessibilityRole={onOpenDirectory ? 'button' : undefined}
-          accessibilityLabel={`${formatCount(returningCount)} returning customers`}
         >
           <View style={[styles.miniIcon, styles.miniIconReturning]}>
             <Ionicons name="people" size={iconSizes.md} color={colors.black} />
           </View>
           <View style={styles.miniCopy}>
             <Text style={styles.miniValue}>{formatCount(returningCount)}</Text>
-            <Text style={styles.miniLabel}>Returning customer</Text>
+            <Text style={styles.miniLabel}>Returning</Text>
             <Text style={styles.miniCaption}>
               Came back again{visited > 0 ? ` · ${returningShare}%` : ''}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[400]} />
-        </TouchableOpacity>
+        </View>
       </View>
+      {onOpenDirectory ? (
+        <TouchableOpacity
+          style={styles.directoryLink}
+          onPress={onOpenDirectory}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="View all customers"
+        >
+          <Text style={styles.directoryText}>View all customers</Text>
+          <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -147,6 +144,12 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   headCopy: { flex: 1, minWidth: 0 },
+  periodLabel: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    color: colors.accent[500],
+    marginTop: 3,
+  },
   eyebrow: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
@@ -166,8 +169,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[4],
-    marginTop: spacing[4],
-    paddingBottom: spacing[4],
+    marginTop: spacing[3],
+    paddingBottom: spacing[3],
   },
   visitedCopy: { flex: 1, minWidth: 0 },
   visitedValue: {
@@ -231,8 +234,8 @@ const styles = StyleSheet.create({
   miniFlex: { flex: 1 },
   miniStacked: { width: '100%', paddingVertical: spacing[2] },
   miniIcon: {
-    width: 48,
-    height: 48,
+    width: 38,
+    height: 38,
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
   },
   miniLabel: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13.5,
+    fontSize: 12.5,
     color: colors.black,
     marginTop: -1,
   },
@@ -269,5 +272,20 @@ const styles = StyleSheet.create({
     height: 1,
     marginHorizontal: 0,
     marginVertical: spacing[2],
+  },
+  directoryLink: {
+    minHeight: 44,
+    marginTop: spacing[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+    borderRadius: radii.md,
+    backgroundColor: colors.accent[50],
+  },
+  directoryText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12.5,
+    color: colors.black,
   },
 });

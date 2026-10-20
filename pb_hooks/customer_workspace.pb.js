@@ -1,7 +1,7 @@
 // Customer Workspace — read-only metrics for the merchant Customers tab.
 //
 //   GET /api/risev/merchant/customer-workspace?branch=<id|all>&from=YYYY-MM-DD&to=YYYY-MM-DD
-//   GET /api/risev/merchant/customer-workspace/audience?card=return|rewards|birthday&page=1&perPage=20
+//   GET /api/risev/merchant/customer-workspace/audience?card=return|rewards|rebook|birthday|all|top|inactive&page=1&perPage=20
 //
 // Read-only: no writes, no messaging. JSVM rules honoured here:
 //   * every helper lives INSIDE the handler (file-level functions are not visible);
@@ -160,7 +160,7 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
 
   const query = (e.requestInfo() && e.requestInfo().query) || {};
   const card = String(query.card || "");
-  if (["return", "rewards", "rebook", "birthday", "all"].indexOf(card) === -1) {
+  if (["return", "rewards", "rebook", "birthday", "all", "top", "inactive"].indexOf(card) === -1) {
     return e.json(400, { code: "INVALID_CARD", message: "Unknown audience card." });
   }
 
@@ -190,12 +190,27 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
     }
   }
 
+  const today = logic.localDate(0);
+  const monthStart = today.slice(0, 8) + "01";
+  const nextMonthStart = (function () {
+    const y = Number(today.slice(0, 4));
+    const m = Number(today.slice(5, 7));
+    return m === 12 ? String(y + 1) + "-01-01" : String(y) + "-" + (m + 1 < 10 ? "0" + (m + 1) : m + 1) + "-01";
+  })();
+  const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(String(query.from || "")) ? String(query.from) : monthStart;
+  const toDate = /^\d{4}-\d{2}-\d{2}$/.test(String(query.to || "")) ? String(query.to) : nextMonthStart;
+  if (toDate <= fromDate) {
+    return e.json(400, { code: "INVALID_PERIOD", message: "The period end must be after its start." });
+  }
+
   try {
     const result = logic.buildAudience($app, {
       merchantId: merchantId,
       branchId: branchId,
       isHqBranch: isHqBranch,
       returnDays: Number(merchant.getInt ? merchant.getInt("inactive_threshold_days") : 0) || 30,
+      fromUtc: logic.localDateToUtcStart(fromDate),
+      toUtc: logic.localDateToUtcStart(toDate),
     }, card, query.page, query.perPage);
 
     return e.json(200, {
@@ -302,6 +317,11 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/transactions", (e) => {
       perPage: query.perPage,
       type: query.type,
       q: query.q,
+      staffId: query.staff,
+      unassignedOutlet: query.unassignedOutlet === '1',
+      unassignedStaff: query.unassignedStaff === '1',
+      hour: query.hour,
+      salesOnly: query.salesOnly === '1',
     }));
   } catch (err) {
     console.log("[CUSTOMER WORKSPACE] Ledger failed:", err && err.message ? err.message : err);

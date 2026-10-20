@@ -15,10 +15,10 @@ import NfcClaimModal from '@/components/NfcClaimModal';
 import ManualPosLauncher from '@/components/ManualPosLauncher';
 import GooeyTabBarBackground from './_components/GooeyTabBarBackground';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import SubscriptionScreen from './subscription';
 import { playClaimChime } from '@/lib/audioChime';
 
+const MOBILE_TAB_BAR_HEIGHT = 70;
 
 // Custom Merchant Tab Bar / Sidebar component
 function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpanded, toggleSidebar, sidebarWidth }: any) {
@@ -180,11 +180,11 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
   }
 
   // Mobile Bottom Tab Bar view
-  const tabBarWidth = Math.max(0, width - 32);
+  const tabBarHeight = MOBILE_TAB_BAR_HEIGHT + Math.max(insets.bottom, 12);
 
   return (
-    <View style={[styles.mobileTabBarWrap, { bottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
-      <GooeyTabBarBackground width={tabBarWidth} color="#121214" />
+    <View style={[styles.mobileTabBarWrap, { height: tabBarHeight }]}>
+      <GooeyTabBarBackground width={width} height={tabBarHeight} />
       <View style={styles.mobileTabBar}>
         {state.routes.filter((route: any) => allowedTabs.includes(route.name)).map((route: any) => {
           const isFocused = state.routes[state.index]?.name === route.name;
@@ -212,23 +212,12 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
                 onPress={onPress}
                 style={styles.floatingBtnWrap}
                 activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel="Issue stamps"
+                accessibilityState={{ selected: isFocused }}
               >
                 <View style={styles.centerGlowBtnContainer}>
-                  <LinearGradient
-                    colors={['#FFFEE0', '#FFC700', '#FF8F00']}
-                    start={{ x: 0.2, y: 0.2 }}
-                    end={{ x: 0.8, y: 0.8 }}
-                    style={styles.centerGlowBtnGradient}
-                  >
-                    {/* Glass Orb Top Highlight */}
-                    <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.65)', 'rgba(255, 255, 255, 0.0)']}
-                      start={{ x: 0.5, y: 0 }}
-                      end={{ x: 0.5, y: 1 }}
-                      style={styles.orbHighlight}
-                    />
-                    <Ionicons name="qr-code" size={22} color="#FFFFFF" style={styles.qrIconShadow} />
-                  </LinearGradient>
+                  <Ionicons name="qr-code" size={25} color="#08090B" />
                 </View>
               </TouchableOpacity>
             );
@@ -250,12 +239,20 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
           const isLockedMarketing = route.name === 'marketing' && !isOwner && !staffPermissions?.can_view_marketing;
 
           return (
-            <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabButton} activeOpacity={0.8}>
-              <View style={[styles.iconContainer, isFocused && styles.iconContainerActive]}>
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.tabButton}
+              activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: isFocused }}
+            >
+              <View style={styles.iconContainer}>
                 <Ionicons
                   name={isFocused ? (iconName as any) : (`${iconName}-outline` as any)}
-                  size={18}
-                  color={isFocused ? '#050505' : '#94A3B8'}
+                  size={21}
+                  color={isFocused ? '#FFFFFF' : '#A3AAB5'}
                 />
                 {isLockedMarketing && (
                   <View style={{ position: 'absolute', top: -2, right: -4, backgroundColor: '#050505', borderRadius: 6, padding: 1 }}>
@@ -263,9 +260,10 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
                   </View>
                 )}
               </View>
-              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>
                 {label}
               </Text>
+              <View style={[styles.activeTabDot, !isFocused && styles.inactiveTabDot]} />
             </TouchableOpacity>
           );
         })}
@@ -280,6 +278,7 @@ export default function MerchantLayout() {
   const { isAuthenticated, isLoading, activeRole, user, refreshSession, logout, switchRole } = useAuth();
   const { locale } = useLanguage();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isDesktop = width >= 768;
   const [isPaying, setIsPaying] = React.useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(true);
@@ -959,6 +958,7 @@ export default function MerchantLayout() {
   }
 
   const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding') || pathname.includes('edit-profile') || pathname.includes('branches') || pathname.includes('staff');
+  const compactSupportFab = pathname.includes('customers');
 
   return (
     <View style={styles.container}>
@@ -995,6 +995,8 @@ export default function MerchantLayout() {
       {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && (
         <TouchableOpacity
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Chat with Risev support"
           onPress={() => {
             if (Platform.OS === 'web' && typeof window !== 'undefined') {
               window.open('https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.', '_blank');
@@ -1004,7 +1006,7 @@ export default function MerchantLayout() {
           }}
           style={{
             position: 'absolute',
-            bottom: isDesktop ? 36 : 82,
+            bottom: isDesktop ? 36 : MOBILE_TAB_BAR_HEIGHT + Math.max(insets.bottom, 12) + 8,
             right: 16,
             shadowColor: '#050505',
             shadowOffset: { width: 0, height: 4 },
@@ -1017,21 +1019,24 @@ export default function MerchantLayout() {
             borderWidth: 1.5,
             borderColor: '#F2BD00',
             backgroundColor: '#FFCC00',
+            ...(compactSupportFab ? { width: 46, height: 46 } : {}),
           }}
         >
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              paddingVertical: 9,
-              paddingHorizontal: 15,
+              paddingVertical: compactSupportFab ? 0 : 9,
+              paddingHorizontal: compactSupportFab ? 0 : 15,
               gap: 7,
+              flex: compactSupportFab ? 1 : undefined,
+              justifyContent: 'center',
             }}
           >
             <Ionicons name="chatbubble-ellipses" size={17} color="#000000" />
-            <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, letterSpacing: 0.2 }}>
+            {!compactSupportFab ? <Text style={{ color: '#000000', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, letterSpacing: 0.2 }}>
               {locale === 'en' ? 'Need Help?' : 'Perlu Bantuan?'}
-            </Text>
+            </Text> : null}
           </View>
         </TouchableOpacity>
       )}
@@ -1046,88 +1051,76 @@ const styles = StyleSheet.create({
   },
   mobileTabBarWrap: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 1000,
   },
   mobileTabBar: {
+    position: 'absolute',
+    top: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    height: 56, // Reduced height for sleeker profile
-    alignItems: 'center',
+    height: 58,
+    alignItems: 'flex-start',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
   },
   tabButton: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     flex: 1,
-    height: 56,
-    paddingTop: 2,
+    height: 58,
+    paddingTop: 4,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
+    width: 27,
+    height: 25,
     marginBottom: 2,
   },
-  iconContainerActive: {
-    backgroundColor: '#FFFFFF', // Active tab gets a white circle background
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
   tabLabel: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#94A3B8',
+    color: '#A3AAB5',
   },
   tabLabelActive: {
     color: '#FFFFFF',
   },
+  activeTabDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#FFCC00',
+    marginTop: 3,
+  },
+  inactiveTabDot: {
+    opacity: 0,
+  },
   floatingBtnWrap: {
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    height: 56,
-    width: 56,
+    flex: 1,
+    height: 58,
     zIndex: 2,
   },
   centerGlowBtnContainer: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.85)', // Crisp white border ring
-    shadowColor: '#FF8F00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 6,
-    marginTop: -20, // Float nicely above the hump
-    overflow: 'hidden',
-  },
-  centerGlowBtnGradient: {
-    width: '100%',
-    height: '100%',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FFCC00',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  orbHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-  },
-  qrIconShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    marginTop: -15,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   // Subscription Billing Block Overlays
   gateContainer: {

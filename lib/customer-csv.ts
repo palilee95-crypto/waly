@@ -11,7 +11,7 @@ import {
 } from './customer-workspace';
 
 const MAX_ROWS = 2000;
-const PAGE = 200;
+const PAGE = 50;
 
 function escapeField(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -22,11 +22,13 @@ function escapeField(value: unknown): string {
 /** Every customer in the given audience, pulled page by page up to a sane cap. */
 export async function collectAudience(
   card: AudienceCard,
-  branchId: string
+  branchId: string,
+  from?: string,
+  to?: string
 ): Promise<AudienceRow[]> {
   const all: AudienceRow[] = [];
   for (let page = 1; all.length < MAX_ROWS; page++) {
-    const res = await fetchAudience({ card, branchId, page, perPage: PAGE });
+    const res = await fetchAudience({ card, branchId, from, to, page, perPage: PAGE });
     all.push(...res.items);
     if (res.items.length < PAGE) break;
   }
@@ -34,9 +36,12 @@ export async function collectAudience(
 }
 
 export function buildAudienceCsv(rows: AudienceRow[], card: AudienceCard): string {
-  const header =
-    card === 'all'
+  const header = card === 'top'
+    ? ['Name', 'Phone', 'Visits', 'Last Visit', 'Recorded Spend (RM)']
+    : card === 'all'
       ? ['Name', 'Phone', 'Visits', 'Last Visit', 'Days Since Visit']
+      : card === 'inactive'
+        ? ['Name', 'Phone', 'Last Visit', 'Days Since Visit']
       : ['Name', 'Phone', 'Days Since Visit', 'Reason'];
 
   const lines = [header.join(',')];
@@ -50,8 +55,12 @@ export function buildAudienceCsv(rows: AudienceRow[], card: AudienceCard): strin
           ? `Birthday ${row.birthday ?? ''}`.trim()
           : '';
     const fields =
-      card === 'all'
+      card === 'top'
+        ? [row.name, row.phone, row.visits ?? 0, row.lastVisit ?? '', ((row.spendCents ?? 0) / 100).toFixed(2)]
+        : card === 'all'
         ? [row.name, row.phone, row.visits ?? 0, row.lastVisit ?? '', row.daysOverdue ?? '']
+        : card === 'inactive'
+          ? [row.name, row.phone, row.lastVisit ?? '', row.daysOverdue ?? '']
         : [row.name, row.phone, row.daysOverdue ?? '', reason];
     lines.push(fields.map(escapeField).join(','));
   }
@@ -66,6 +75,11 @@ export async function collectLedger(params: {
   to: string;
   type?: LedgerType;
   q?: string;
+  staffId?: string;
+  unassignedOutlet?: boolean;
+  unassignedStaff?: boolean;
+  hour?: number;
+  salesOnly?: boolean;
 }): Promise<LedgerRow[]> {
   const all: LedgerRow[] = [];
   for (let page = 1; all.length < LEDGER_MAX; page++) {

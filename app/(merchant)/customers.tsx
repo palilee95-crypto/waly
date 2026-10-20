@@ -18,11 +18,11 @@ import * as Clipboard from 'expo-clipboard';
 import { colors, radii } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
-import { workspacePeriods, AudienceCard } from '@/lib/customer-workspace';
+import { workspacePeriods, AudienceCard, type LedgerFocus } from '@/lib/customer-workspace';
 import { useCustomerWorkspace } from '@/components/customer-workspace/useCustomerWorkspace';
 import OverviewTab from '@/components/customer-workspace/OverviewTab';
 import ActionsTab from '@/components/customer-workspace/ActionsTab';
-import ReportsTab from '@/components/customer-workspace/ReportsTab';
+import ReportsTab, { type ReportId } from '@/components/customer-workspace/ReportsTab';
 import AudienceSheet from '@/components/customer-workspace/AudienceSheet';
 import TransactionsSheet from '@/components/customer-workspace/TransactionsSheet';
 import CustomerDetailSheet from '@/components/customer-workspace/CustomerDetailSheet';
@@ -45,9 +45,11 @@ export default function CustomerWorkspaceScreen() {
   });
   const [branchId, setBranchId] = useState('');
   const [mainTab, setMainTab] = useState<MainTab>('overview');
+  const [selectedReport, setSelectedReport] = useState<ReportId>('customers');
   const [audienceCard, setAudienceCard] = useState<AudienceCard | null>(null);
   const [picker, setPicker] = useState<'branch' | 'period' | null>(null);
   const [showLedger, setShowLedger] = useState(false);
+  const [ledgerFocus, setLedgerFocus] = useState<LedgerFocus | null>(null);
   const [detailCustomer, setDetailCustomer] = useState<{ id: string; name: string } | null>(null);
 
   const period = periods[periodIndex];
@@ -156,11 +158,13 @@ export default function CustomerWorkspaceScreen() {
                 branchId={branchId}
                 from={period.from}
                 to={period.to}
-                onOpenReport={() => setMainTab('reports')}
+                onOpenReport={(report) => {
+                  setSelectedReport(report);
+                  setMainTab('reports');
+                }}
                 onOpenDirectory={openDirectory}
-                onOpenLedger={() => setShowLedger(true)}
+                onOpenLedger={() => { setLedgerFocus(null); setShowLedger(true); }}
                 onOpenAudience={(id) => setAudienceCard(id)}
-                onOpenPeriod={() => setPicker('period')}
                 onOpenCustomer={(row) => setDetailCustomer({ id: row.id, name: row.name })}
               />
             )}
@@ -169,19 +173,31 @@ export default function CustomerWorkspaceScreen() {
                 snapshot={snapshot}
                 onOpenAudience={setAudienceCard}
                 onShareStore={shareStore}
-                onOpenReports={() => setMainTab('reports')}
+                onOpenReports={() => {
+                  setSelectedReport('customers');
+                  setMainTab('reports');
+                }}
               />
             )}
             {mainTab === 'reports' && (
               <ReportsTab
                 snapshot={snapshot}
                 periodLabel={period.label}
+                report={selectedReport}
+                onSelectReport={setSelectedReport}
                 onOpenDirectory={openDirectory}
                 onOpenAudience={(id) => setAudienceCard(id)}
-                onOpenPeriod={() => setPicker('period')}
                 onOpenAnalytics={goAnalytics}
-                onOpenLedger={() => setShowLedger(true)}
+                onOpenLedger={(focus) => { setLedgerFocus(focus ?? null); setShowLedger(true); }}
                 onOpenCustomer={(row) => setDetailCustomer({ id: row.id, name: row.name })}
+                onOpenBookings={(filter) => router.push({
+                  pathname: '/(merchant)/bookings',
+                  params: {
+                    reportView: filter?.date || !filter?.status ? 'calendar' : 'appointments',
+                    ...(filter?.status ? { reportStatus: filter.status } : {}),
+                    ...(filter?.date ? { reportDate: filter.date } : {}),
+                  },
+                } as any)}
               />
             )}
           </>
@@ -220,8 +236,13 @@ export default function CustomerWorkspaceScreen() {
           merchantId={snapshot.merchant.id}
           merchantName={snapshot.merchant.name}
           branchId={branchId}
+          from={period.from}
+          to={period.to}
+          periodLabel={period.label}
           total={
-            audienceCard === 'birthday'
+            audienceCard === 'top' || audienceCard === 'inactive'
+              ? 0
+              : audienceCard === 'birthday'
               ? snapshot.birthdays
               : audienceCard === 'rewards'
                 ? snapshot.loyalty.nearReward
@@ -238,7 +259,8 @@ export default function CustomerWorkspaceScreen() {
         from={period.from}
         to={period.to}
         periodLabel={period.label}
-        onClose={() => setShowLedger(false)}
+        focus={ledgerFocus}
+        onClose={() => { setShowLedger(false); setLedgerFocus(null); }}
       />
 
       <CustomerDetailSheet

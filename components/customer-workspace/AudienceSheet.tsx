@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   fetchAudience,
   fetchDeletionAllowance,
   DeletionAllowance,
+  formatMoney,
 } from '@/lib/customer-workspace';
 import { collectAudience, buildAudienceCsv, shareCsv } from '@/lib/customer-csv';
 import CustomerDetailSheet from './CustomerDetailSheet';
@@ -35,6 +36,7 @@ const PAGE_SIZE = 20;
 
 /** Directory chats are personal, not a win-back campaign. */
 const DIRECTORY_TEMPLATE = 'Hi {{name}}, thanks for visiting {{merchant}}!';
+const INACTIVE_TEMPLATE = "Hi {{name}}, it's been a while since we saw you at {{merchant}}. We'd love to welcome you back!";
 
 const CARD_TITLES: Record<AudienceCard, string> = {
   return: 'Bring customers back',
@@ -42,7 +44,18 @@ const CARD_TITLES: Record<AudienceCard, string> = {
   rebook: 'Not rebooked yet',
   birthday: 'Upcoming birthdays',
   all: 'All customers',
+  top: 'Top customers',
+  inactive: 'Inactive customers',
 };
+
+function initials(name: string): string {
+  return (name || 'Customer')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+}
 
 type Props = {
   visible: boolean;
@@ -50,6 +63,9 @@ type Props = {
   merchantId: string;
   merchantName: string;
   branchId: string;
+  from?: string;
+  to?: string;
+  periodLabel?: string;
   total: number;
   onClose: () => void;
   /** Fired after a customer is removed so the workspace can refresh its counts. */
@@ -62,6 +78,9 @@ export default function AudienceSheet({
   merchantId,
   merchantName,
   branchId,
+  from,
+  to,
+  periodLabel,
   total,
   onClose,
   onChanged,
@@ -71,10 +90,11 @@ export default function AudienceSheet({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState(
-    DEFAULT_ACTION_TEMPLATES[card === 'all' ? 'return' : card] ?? DEFAULT_ACTION_TEMPLATES.return
+    DEFAULT_ACTION_TEMPLATES[card === 'all' || card === 'top' || card === 'inactive' ? 'return' : card] ?? DEFAULT_ACTION_TEMPLATES.return
   );
   const [messaged, setMessaged] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [detailRow, setDetailRow] = useState<AudienceRow | null>(null);
   const [allowance, setAllowance] = useState<DeletionAllowance>(null);
   const [exporting, setExporting] = useState(false);
@@ -85,7 +105,9 @@ export default function AudienceSheet({
   // The directory is a lookup list, not a campaign: no editable template, just a
   // plain greeting when the merchant opens a chat.
   const isDirectory = card === 'all';
-  const templateCard: ActionCardId = isDirectory ? 'return' : card;
+  const isReportList = card === 'top' || card === 'inactive';
+  const isDirectoryLike = isDirectory || isReportList;
+  const templateCard: ActionCardId = isDirectoryLike ? 'return' : card;
   const templateKey = `@ws_action_template:${merchantId}:${templateCard}`;
   const messagedKey = `@ws_action_messaged:${merchantId}:${card}`;
 
@@ -95,7 +117,7 @@ export default function AudienceSheet({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetchAudience({ card, branchId, page: nextPage, perPage: PAGE_SIZE });
+        const res = await fetchAudience({ card, branchId, from, to, page: nextPage, perPage: PAGE_SIZE });
         if (id !== requestId.current) return;
         setItems((prev) => (nextPage === 1 ? res.items : [...prev, ...res.items]));
         setPage(nextPage);
@@ -107,7 +129,7 @@ export default function AudienceSheet({
         if (id === requestId.current) setLoading(false);
       }
     },
-    [card, branchId]
+    [card, branchId, from, to]
   );
 
   useEffect(() => {
@@ -152,7 +174,7 @@ export default function AudienceSheet({
   };
 
   const messageFor = (row: AudienceRow) =>
-    renderTemplate(isDirectory ? DIRECTORY_TEMPLATE : template, {
+    renderTemplate(card === 'inactive' ? INACTIVE_TEMPLATE : isDirectoryLike ? DIRECTORY_TEMPLATE : template, {
       name: (row.name || '').split(' ')[0] || 'there',
       merchant: merchantName,
       days: row.daysOverdue ?? '',
@@ -162,29 +184,40 @@ export default function AudienceSheet({
   const openChat = async (row: AudienceRow) => {
     const link = buildWhatsAppLink(row.phone, messageFor(row));
     if (!link) return;
-    markMessaged(row.id);
     try {
       await Linking.openURL(link);
+      markMessaged(row.id);
     } catch {
       /* the device has no WhatsApp handler; nothing else to do */
     }
   };
 
   const copyNumbers = async () => {
-    const numbers = items
-      .map((r) => (r.phone || '').replace(/[^\d+]/g, ''))
-      .filter(Boolean)
-      .join('\n');
-    if (!numbers) return;
-    await Clipboard.setStringAsync(numbers);
-    setCopied(true);
+    setCopying(true);
+    setExportError(null);
+    try {
+      const audience = await collectAudience(card, branchId, from, to);
+      const numbers = [...new Set(audience
+        .map((r) => (r.phone || '').replace(/[^\d+]/g, ''))
+        .filter(Boolean))].join('\n');
+      if (!numbers) {
+        setExportError('No phone numbers available to copy.');
+        return;
+      }
+      await Clipboard.setStringAsync(numbers);
+      setCopied(true);
+    } catch {
+      setExportError('Could not copy numbers. Try again.');
+    } finally {
+      setCopying(false);
+    }
   };
 
   const exportCsv = async () => {
     setExporting(true);
     setExportError(null);
     try {
-      const rows = await collectAudience(card, branchId);
+      const rows = await collectAudience(card, branchId, from, to);
       if (!rows.length) {
         setExportError('Nothing to export yet.');
         return;
@@ -210,10 +243,6 @@ export default function AudienceSheet({
 
   const effectiveTotal = serverTotal ?? total;
   const canLoadMore = items.length > 0 && items.length < effectiveTotal;
-  const messagedToday = useMemo(
-    () => items.filter((r) => messaged.includes(r.id)).length,
-    [items, messaged]
-  );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -226,8 +255,9 @@ export default function AudienceSheet({
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>{CARD_TITLES[card]}</Text>
               <Text style={styles.subtitle}>
-                {effectiveTotal.toLocaleString('en-MY')} customer{effectiveTotal === 1 ? '' : 's'} ·{' '}
-                {messagedToday} opened here
+                {isReportList && serverTotal === null
+                  ? 'Loading customers…'
+                  : `${effectiveTotal.toLocaleString('en-MY')} customer${effectiveTotal === 1 ? '' : 's'}${isDirectory ? ' · Most recent visits first' : card === 'top' ? ` · ${periodLabel || 'Selected period'}` : card === 'inactive' ? ' · Longest away first' : ''}`}
               </Text>
             </View>
             <TouchableOpacity
@@ -235,6 +265,8 @@ export default function AudienceSheet({
               style={styles.closeBtn}
               activeOpacity={0.7}
               disabled={exporting}
+              accessibilityRole="button"
+              accessibilityLabel="Export customer list"
             >
               {exporting ? (
                 <ActivityIndicator size="small" color={colors.black} />
@@ -242,14 +274,24 @@ export default function AudienceSheet({
                 <Ionicons name="download-outline" size={17} color={colors.black} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Close customer list"
+            >
               <Ionicons name="close" size={18} color={colors.black} />
             </TouchableOpacity>
           </View>
 
-          {isDirectory ? (
+          {isDirectoryLike ? (
             <Text style={styles.directoryNote}>
-              Your full customer list, most recent visit first. Tap a customer for their details, or open a chat.
+              {card === 'top'
+                ? 'Ranked by recorded spend. Tap a customer to view their activity.'
+                : card === 'inactive'
+                  ? 'Customers who have not visited recently. Open a chat to check in.'
+                  : 'Tap a customer to view their visits and rewards.'}
             </Text>
           ) : card !== 'birthday' ? (
             <View style={styles.templateBlock}>
@@ -275,22 +317,35 @@ export default function AudienceSheet({
           )}
 
           <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 8 }}>
-            {items.map((row) => {
+            {items.map((row, index) => {
               const hasPhone = !!buildWhatsAppLink(row.phone, '');
               const opened = messaged.includes(row.id);
               return (
                 <View key={row.id} style={styles.row}>
                   <TouchableOpacity
-                    style={{ flex: 1 }}
+                    style={styles.rowMain}
                     activeOpacity={0.7}
                     onPress={() => setDetailRow(row)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${row.name || 'customer'} details`}
                   >
-                    <Text style={styles.rowName} numberOfLines={1}>
-                      {row.name || 'Customer'}
-                    </Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {card === 'return' || card === 'rebook'
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{card === 'top' ? `#${index + 1}` : initials(row.name)}</Text>
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <View style={styles.rowNameLine}>
+                        <Text style={styles.rowName} numberOfLines={1}>{row.name || 'Customer'}</Text>
+                        {opened ? <Ionicons name="checkmark-circle" size={14} color="#8A94A6" /> : null}
+                      </View>
+                      <Text style={styles.rowMeta} numberOfLines={2}>
+                        {card === 'return' || card === 'rebook'
                         ? `Last visit ${row.daysOverdue ?? '?'} days ago`
+                        : card === 'top'
+                          ? `${formatMoney(row.spendCents ?? 0)} recorded spend · ${row.visits ?? 0} visit${row.visits === 1 ? '' : 's'}`
+                        : card === 'inactive'
+                          ? row.daysOverdue === null || row.daysOverdue === undefined
+                            ? 'No recorded visit'
+                            : `Last visit ${row.daysOverdue} days ago`
                         : card === 'all'
                           ? `${row.visits ?? 0} visit${row.visits === 1 ? '' : 's'} · ${
                               row.daysOverdue === null || row.daysOverdue === undefined
@@ -306,20 +361,22 @@ export default function AudienceSheet({
                             : row.birthday
                               ? `Birthday ${row.birthday}`
                               : 'Birthday this week'}
-                    </Text>
+                        {!hasPhone ? ' · No phone on file' : ''}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
-                  {opened ? <Ionicons name="checkmark" size={14} color="#686868" style={{ marginRight: 6 }} /> : null}
-                  <TouchableOpacity
-                    style={[styles.waBtn, !hasPhone && styles.waBtnDisabled]}
-                    activeOpacity={0.85}
-                    disabled={!hasPhone}
-                    onPress={() => openChat(row)}
-                  >
-                    <Ionicons name="logo-whatsapp" size={15} color={hasPhone ? colors.black : '#9CA3AF'} />
-                    <Text style={[styles.waText, !hasPhone && { color: '#9CA3AF' }]}>
-                      {hasPhone ? 'Chat' : 'No phone'}
-                    </Text>
-                  </TouchableOpacity>
+                  {hasPhone ? (
+                    <TouchableOpacity
+                      style={[styles.waBtn, isDirectoryLike && styles.waBtnDirectory]}
+                      activeOpacity={0.85}
+                      onPress={() => openChat(row)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open WhatsApp chat with ${row.name || 'customer'}`}
+                    >
+                      <Ionicons name="logo-whatsapp" size={19} color={colors.black} />
+                      {!isDirectoryLike ? <Text style={styles.waText}>Chat</Text> : null}
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               );
             })}
@@ -343,12 +400,14 @@ export default function AudienceSheet({
           <View style={styles.footer}>
             <TouchableOpacity
               style={[styles.secondaryBtn, !items.length && { opacity: 0.4 }]}
-              disabled={!items.length}
+              disabled={!items.length || copying}
               onPress={copyNumbers}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Copy all customer phone numbers"
             >
-              <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={15} color={colors.black} />
-              <Text style={styles.secondaryText}>{copied ? 'Copied' : 'Copy numbers'}</Text>
+              {copying ? <ActivityIndicator size="small" color={colors.black} /> : <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={17} color={colors.black} />}
+              <Text style={styles.secondaryText}>{copying ? 'Copying' : copied ? 'Copied' : 'Copy numbers'}</Text>
             </TouchableOpacity>
 
             {canLoadMore ? (
@@ -359,7 +418,7 @@ export default function AudienceSheet({
                 disabled={loading}
               >
                 <Ionicons name="chevron-down" size={15} color={colors.black} />
-                <Text style={styles.secondaryText}>More</Text>
+                <Text style={styles.secondaryText}>Load more</Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -373,7 +432,7 @@ export default function AudienceSheet({
           {exportError ? <Text style={styles.exportError}>{exportError}</Text> : null}
 
           <Text style={styles.disclaimer}>
-            Opens WhatsApp on this device with the message prefilled. Risev cannot confirm it was sent.
+            WhatsApp opens with a draft message. Sending is not tracked here.
           </Text>
 
           <CustomerDetailSheet
@@ -401,6 +460,9 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'web' ? 22 : 34,
     paddingTop: 8,
     maxHeight: '88%',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   handle: {
     width: 40,
@@ -410,20 +472,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 12,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  title: { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
   subtitle: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 2,
+    color: '#64748B',
+    marginTop: 3,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E9E9E9',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -455,39 +516,46 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   directoryNote: {
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 10,
-    marginBottom: 2,
+    color: '#64748B',
+    marginTop: 12,
+    marginBottom: 0,
   },
-  list: { marginTop: 12 },
+  list: { marginTop: 12, flexGrow: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F6F6F6',
+    borderBottomColor: '#E9EDF3',
   },
-  rowName: { fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
+  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 11, minWidth: 0, minHeight: 48 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFF4C7', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#705000' },
+  rowCopy: { flex: 1, minWidth: 0 },
+  rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  rowName: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black, flexShrink: 1 },
   rowMeta: {
-    fontSize: 11,
+    fontSize: 11.5,
+    lineHeight: 17,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 2,
+    color: '#64748B',
+    marginTop: 3,
   },
   waBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 11,
-    paddingVertical: 7,
+    minHeight: 44,
     borderRadius: radii.full,
     backgroundColor: '#FFCC00',
+    justifyContent: 'center',
   },
-  waBtnDisabled: { backgroundColor: '#F6F6F6' },
+  waBtnDirectory: { width: 44, paddingHorizontal: 0, backgroundColor: '#FFF4C7', borderWidth: 1, borderColor: '#FFE691' },
   waText: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
   center: { paddingVertical: 24, alignItems: 'center', gap: 10 },
   errorText: { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#686868' },
@@ -533,10 +601,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   disclaimer: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 16,
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#9CA3AF',
+    color: '#64748B',
     marginTop: 10,
     textAlign: 'center',
   },

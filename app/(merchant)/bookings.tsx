@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
@@ -117,6 +117,7 @@ const POD_COLOR_PALETTES = [
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const reportParams = useLocalSearchParams<{ reportStatus?: string; reportDate?: string; reportView?: string }>();
   const { user } = useAuth();
   const { locale } = useLanguage();
   const { width } = useWindowDimensions();
@@ -141,6 +142,29 @@ export default function BookingsScreen() {
   const [calMonthDate, setCalMonthDate] = useState<Date>(new Date());
   const [calViewMode, setCalViewMode] = useState<'day' | 'week' | 'month'>('month');
   const [selectedCalIsoDate, setSelectedCalIsoDate] = useState<string>(new Date().toISOString().substring(0, 10));
+
+  useEffect(() => {
+    const status = reportParams.reportStatus;
+    const date = reportParams.reportDate;
+    if (status && ['upcoming', 'completed', 'cancelled', 'no_show'].includes(status)) {
+      setActiveTab('appointments');
+      setFilterStatus(status);
+    } else if (reportParams.reportView === 'calendar') {
+      setActiveTab('appointments');
+      setFilterStatus('all');
+    }
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const selected = new Date(`${date}T00:00:00`);
+      if (!isNaN(selected.getTime())) {
+        setSelectedCalIsoDate(date);
+        setCalMonthDate(new Date(selected.getFullYear(), selected.getMonth(), 1));
+        setSelectedDateTitle(selected.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' }));
+        setSelectedDateSubtitle(selected.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+        setCalViewMode('day');
+      }
+    }
+    if (reportParams.reportView === 'calendar') setShowCalendarModal(true);
+  }, [reportParams.reportStatus, reportParams.reportDate, reportParams.reportView]);
 
   // No-Show Confirmation Modal State
   const [noShowTargetBooking, setNoShowTargetBooking] = useState<BookingItem | null>(null);
@@ -1443,11 +1467,13 @@ export default function BookingsScreen() {
     }
   };
 
+  const localNow = new Date();
+  const localToday = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
   const filteredBookings = bookings.filter(b => {
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'today') {
-      const todayIso = new Date().toISOString().substring(0, 10);
-      return b.booking_date === todayIso;
+    if (filterStatus === 'today') return b.booking_date === localToday;
+    if (filterStatus === 'upcoming') {
+      return ['booked', 'arrived', 'in_service'].includes(b.status) && b.booking_date >= localToday;
     }
     return b.status === filterStatus;
   });
@@ -1459,8 +1485,8 @@ export default function BookingsScreen() {
     return true;
   });
 
-  const arrivedCount = bookings.filter(b => b.status === 'arrived').length;
-  const bookedCount = bookings.filter(b => b.status === 'booked').length;
+  const arrivedCount = bookings.filter(b => b.booking_date === localToday && ['booked', 'arrived', 'in_service'].includes(b.status)).length;
+  const bookedCount = bookings.filter(b => ['booked', 'arrived', 'in_service'].includes(b.status) && b.booking_date >= localToday).length;
   const completedCount = bookings.filter(b => b.status === 'completed').length;
 
   // Real month calendar days calculation
@@ -1846,12 +1872,13 @@ export default function BookingsScreen() {
               </LinearGradient>
 
               {/* Status Filter Chips */}
-              <View style={styles.filterPillsRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
                 {[
                   { key: 'all', label: 'All' },
                   { key: 'today', label: 'Today' },
-                  { key: 'booked', label: 'Upcoming' },
+                  { key: 'upcoming', label: 'Upcoming' },
                   { key: 'completed', label: 'Completed' },
+                  { key: 'cancelled', label: 'Cancelled' },
                   { key: 'no_show', label: 'No Show' },
                 ].map(st => (
                   <TouchableOpacity
@@ -1864,14 +1891,16 @@ export default function BookingsScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
 
               {/* Section Header */}
               <View style={styles.appointmentsHeaderRow}>
-                <Text style={styles.appointmentsSectionTitle}>Today</Text>
-                <TouchableOpacity style={styles.btnDateSelect}>
+                <Text style={styles.appointmentsSectionTitle}>
+                  {{ all: 'All appointments', today: 'Today', upcoming: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No shows' }[filterStatus] || 'Appointments'}
+                </Text>
+                <TouchableOpacity style={styles.btnDateSelect} onPress={() => setShowCalendarModal(true)} accessibilityRole="button">
                   <Ionicons name="calendar-outline" size={14} color="#000" />
-                  <Text style={styles.btnDateSelectText}>5 Oct 2026</Text>
+                  <Text style={styles.btnDateSelectText}>Calendar</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1884,7 +1913,7 @@ export default function BookingsScreen() {
                       {/* Time Badge on Left */}
                       <View style={styles.timeColumn}>
                         <Text style={styles.timeText}>{b.start_time || '10:00'}</Text>
-                        <Text style={styles.timeSubText}>Today</Text>
+                        <Text style={styles.timeSubText}>{b.booking_date === localToday ? 'Today' : b.booking_date ? new Date(`${b.booking_date}T00:00:00`).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' }) : ''}</Text>
                       </View>
 
                       {/* Main Booking Card on Right */}
@@ -1898,14 +1927,14 @@ export default function BookingsScreen() {
                             styles.statusBadge,
                             b.status === 'arrived' ? styles.statusBadgeArrived :
                             b.status === 'completed' ? styles.statusBadgeCompleted :
-                            b.status === 'no_show' ? styles.statusBadgeNoShow : styles.statusBadgeBooked
+                            b.status === 'no_show' || b.status === 'cancelled' ? styles.statusBadgeNoShow : styles.statusBadgeBooked
                           ]}>
                             <Text style={[
                               styles.statusBadgeText,
                               b.status === 'arrived' && { color: '#15803D' },
-                              b.status === 'no_show' && { color: '#DC2626' }
+                              (b.status === 'no_show' || b.status === 'cancelled') && { color: '#DC2626' }
                             ]}>
-                              {b.status === 'arrived' ? '● ARRIVED' : b.status === 'completed' ? 'COMPLETED' : b.status === 'no_show' ? 'NO SHOW' : 'SCHEDULED'}
+                              {b.status === 'arrived' ? '● ARRIVED' : b.status === 'in_service' ? 'IN SERVICE' : b.status === 'completed' ? 'COMPLETED' : b.status === 'no_show' ? 'NO SHOW' : b.status === 'cancelled' ? 'CANCELLED' : 'SCHEDULED'}
                             </Text>
                           </View>
                         </View>

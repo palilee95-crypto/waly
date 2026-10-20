@@ -4,9 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  useWindowDimensions,
-  TextInput,
-  ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,15 +12,14 @@ import { colors, iconSizes, radii, shadows, spacing } from '@/theme';
 import {
   WorkspaceSnapshot,
   LedgerRow,
-  LedgerType,
   AudienceCard,
   fetchTransactions,
   formatCount,
   formatDayLabel,
+  formatLedgerImpact,
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import CustomerSnapshotCard from './CustomerSnapshotCard';
-import PeriodPill from './PeriodPill';
 
 type Props = {
   snapshot: WorkspaceSnapshot;
@@ -35,16 +31,8 @@ type Props = {
   onOpenDirectory: () => void;
   onOpenLedger: () => void;
   onOpenAudience: (card: AudienceCard) => void;
-  onOpenPeriod?: () => void;
   onOpenCustomer: (row: { id: string; name: string }) => void;
 };
-
-const TRANSACTION_FILTERS: { id: LedgerType; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'earn', label: 'Earned' },
-  { id: 'redeem', label: 'Redeemed' },
-  { id: 'adjust', label: 'Adjustments' },
-];
 
 const TYPE_LABEL: Record<string, string> = {
   earn: 'Earned',
@@ -63,15 +51,13 @@ export default function OverviewTab({
   onOpenDirectory,
   onOpenLedger,
   onOpenAudience,
-  onOpenPeriod,
   onOpenCustomer,
 }: Props) {
   const { trend, bookings, periodInsight } = snapshot;
+  const returnCount = snapshot.attention.find((item) => item.id === 'return')?.count ?? 0;
   const [recent, setRecent] = useState<LedgerRow[]>([]);
   const [recentTotal, setRecentTotal] = useState(0);
   const [recentLoading, setRecentLoading] = useState(true);
-  const [recentFilter, setRecentFilter] = useState<LedgerType>('all');
-  const [recentQuery, setRecentQuery] = useState('');
 
   // The ledger endpoint is the single source of truth for what happened, so the
   // Overview list is the same rows the Transactions sheet shows, just shorter.
@@ -84,9 +70,8 @@ export default function OverviewTab({
         from,
         to,
         page: 1,
-        perPage: 6,
-        type: recentFilter,
-        q: recentQuery,
+        perPage: 4,
+        type: 'all',
       })
         .then((res) => {
           if (cancelled) return;
@@ -107,7 +92,7 @@ export default function OverviewTab({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [branchId, from, to, recentFilter, recentQuery]);
+  }, [branchId, from, to]);
 
   return (
     <View style={styles.wrap}>
@@ -116,15 +101,33 @@ export default function OverviewTab({
         periodLabel={periodLabel}
         onOpenAudience={onOpenAudience}
         onOpenDirectory={onOpenDirectory}
-        onOpenPeriod={onOpenPeriod}
       />
+
+      {returnCount > 0 ? (
+        <TouchableOpacity
+          style={styles.returnPrompt}
+          activeOpacity={0.76}
+          onPress={() => onOpenAudience('return')}
+          accessibilityRole="button"
+          accessibilityLabel={`${returnCount} customers have not visited recently. View customers to bring back.`}
+        >
+          <View style={styles.returnPromptIcon}>
+            <Ionicons name="people-outline" size={iconSizes.md} color={colors.black} />
+          </View>
+          <View style={styles.returnPromptCopy}>
+            <Text style={styles.returnPromptTitle}>Bring customers back</Text>
+            <Text style={styles.returnPromptDetail}>
+              {formatCount(returnCount)} customers haven’t visited recently
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
+        </TouchableOpacity>
+      ) : null}
 
       <VisitTrendCard
         data={trend}
         periodLabel={periodLabel}
         insight={periodInsight}
-        onOpenPeriod={onOpenPeriod}
-        onOpenLedger={onOpenLedger}
       />
 
       <SmartBookingCard bookings={bookings} onOpenReport={onOpenReport} />
@@ -145,73 +148,20 @@ export default function OverviewTab({
       </View>
 
       <View style={styles.recentCard}>
-        <View style={styles.recentSearch}>
-          <Ionicons name="search" size={iconSizes.sm} color={colors.accent[400]} />
-          <TextInput
-            value={recentQuery}
-            onChangeText={setRecentQuery}
-            placeholder="Search customer or phone"
-            placeholderTextColor={colors.accent[400]}
-            style={styles.recentSearchInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {recentQuery ? (
-            <TouchableOpacity
-              onPress={() => setRecentQuery('')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close-circle" size={iconSizes.sm} color={colors.accent[400]} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.recentFilters}
-        >
-          {TRANSACTION_FILTERS.map((filter) => {
-            const active = recentFilter === filter.id;
-            return (
-              <TouchableOpacity
-                key={filter.id}
-                style={[styles.recentFilter, active && styles.recentFilterActive]}
-                activeOpacity={0.75}
-                onPress={() => setRecentFilter(filter.id)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
-              >
-                <Text style={[styles.recentFilterText, active && styles.recentFilterTextActive]}>
-                  {filter.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
         <View>
           {recent.length === 0 ? (
             <Text style={styles.recentEmpty}>
-              {recentQuery || recentFilter !== 'all'
-                ? 'No transactions match this view.'
-                : `No transactions recorded in ${periodLabel.toLowerCase()}.`}
+              {recentLoading ? 'Loading recent activity…' : `No transactions recorded in ${periodLabel.toLowerCase()}.`}
             </Text>
           ) : (
             recent.map((row, index) => {
               const isRedeem = row.type === 'redeem';
               const isAdjust = row.type === 'adjust';
-              const isLatest = index === 0 && recentFilter === 'all' && !recentQuery.trim();
               return (
               <TouchableOpacity
                 key={row.id}
                 style={[
                   styles.txnRow,
-                  isLatest && styles.txnRowLatest,
                   index === recent.length - 1 && styles.txnRowLast,
                 ]}
                 activeOpacity={0.7}
@@ -253,7 +203,7 @@ export default function OverviewTab({
                   </View>
                 </View>
                 <Text style={styles.txnAmount}>
-                  {row.billCents > 0 ? `RM ${(row.billCents / 100).toFixed(2)}` : '—'}
+                  {formatLedgerImpact(row)}
                 </Text>
                 <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[400]} />
               </TouchableOpacity>
@@ -283,14 +233,10 @@ function VisitTrendCard({
   data,
   periodLabel,
   insight,
-  onOpenPeriod,
-  onOpenLedger,
 }: {
   data: WorkspaceSnapshot['trend'];
   periodLabel: string;
   insight: WorkspaceSnapshot['periodInsight'];
-  onOpenPeriod?: () => void;
-  onOpenLedger: () => void;
 }) {
   const copy = insight ? getTrendInsight(insight) : null;
 
@@ -299,9 +245,8 @@ function VisitTrendCard({
       <View style={styles.trendHead}>
         <View style={styles.trendHeadCopy}>
           <Text style={styles.trendTitle}>Visit Trend</Text>
-          <Text style={styles.trendSubtitle}>Customer visits over time</Text>
+          <Text style={styles.trendSubtitle}>Customer visits over time · {periodLabel}</Text>
         </View>
-        <PeriodPill label={periodLabel} onPress={onOpenPeriod} />
       </View>
 
       {data.length > 0 ? (
@@ -311,12 +256,8 @@ function VisitTrendCard({
       )}
 
       {copy ? (
-        <TouchableOpacity
+        <View
           style={styles.trendInsight}
-          activeOpacity={0.78}
-          onPress={onOpenLedger}
-          accessibilityRole="button"
-          accessibilityLabel={`${copy.title}. ${copy.detail}`}
         >
           <View style={styles.trendInsightIcon}>
             <Ionicons name="bar-chart" size={iconSizes.md} color={colors.primary[700]} />
@@ -325,8 +266,7 @@ function VisitTrendCard({
             <Text style={styles.trendInsightTitle}>{copy.title}</Text>
             <Text style={styles.trendInsightDetail}>{copy.detail}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[500]} />
-        </TouchableOpacity>
+        </View>
       ) : null}
     </View>
   );
@@ -335,7 +275,7 @@ function VisitTrendCard({
 function getTrendInsight(insight: NonNullable<WorkspaceSnapshot['periodInsight']>) {
   const detail = `${formatCount(insight.visits)} visit${insight.visits === 1 ? '' : 's'} recorded`;
   if (insight.unit === 'hour') {
-    return { title: `${insight.label} was your busiest hour`, detail };
+    return { title: `Most customers visited at ${insight.label}`, detail };
   }
   if (insight.unit === 'day') {
     const shortDay = /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/.test(insight.label);
@@ -353,7 +293,7 @@ function getTrendInsight(insight: NonNullable<WorkspaceSnapshot['periodInsight']
       : /^\d{4}-\d{2}-\d{2}$/.test(insight.label)
         ? new Date(`${insight.label}T00:00:00+08:00`).toLocaleDateString('en-MY', { weekday: 'long' })
         : insight.label;
-    return { title: `${label} was your busiest day`, detail };
+    return { title: `${label} brought your most visits`, detail };
   }
   if (insight.unit === 'week') {
     return { title: `${insight.label} was your strongest week`, detail };
@@ -378,6 +318,7 @@ function formatTrendDate(date: string, label?: string) {
 
 function TrendChart({ data }: { data: WorkspaceSnapshot['trend'] }) {
   const [width, setWidth] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const padTop = 60;
   const padBottom = 22;
   const padLeft = 30;
@@ -411,12 +352,22 @@ function TrendChart({ data }: { data: WorkspaceSnapshot['trend'] }) {
   const areaPath = points.length > 0
     ? `M ${points[0].x} ${baseline} ${points.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${points[points.length - 1].x} ${baseline} Z`
     : '';
-  const tooltipLeft = peakPoint
-    ? Math.min(Math.max(peakPoint.x - 52, padLeft), Math.max(padLeft, width - 104))
-    : 0;
+  const selectedPoint = selectedIndex !== null ? points[selectedIndex] : null;
 
   return (
-    <View style={{ height: totalHeight }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    <View
+      style={{ height: totalHeight + 34 }}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onResponderRelease={(event) => {
+        if (!points.length) return;
+        const touchX = event.nativeEvent.locationX;
+        const nearest = points.reduce((best, point, index) =>
+          Math.abs(point.x - touchX) < Math.abs(points[best].x - touchX) ? index : best, 0);
+        setSelectedIndex(nearest);
+      }}
+      accessibilityLabel="Visit trend chart. Tap to inspect a data point."
+    >
       {width > 0 ? (
         <Svg width={width} height={totalHeight}>
           <Defs>
@@ -513,15 +464,17 @@ function TrendChart({ data }: { data: WorkspaceSnapshot['trend'] }) {
           ))
         : null}
 
-      {width > 0 && hasData && peakPoint ? (
-        <View style={[styles.tooltip, { left: tooltipLeft, top: Math.max(2, peakPoint.y - 54) }]}>
-          <View style={styles.tooltipDot} />
-          <View>
-            <Text style={styles.tooltipDate}>{formatTrendDate(peakPoint.date, peakPoint.label)}</Text>
-            <Text style={styles.tooltipValue}>{formatCount(peakPoint.value)} visits</Text>
-          </View>
-        </View>
-      ) : null}
+      <View style={styles.chartReadout}>
+        {selectedPoint ? (
+          <>
+            <View style={styles.tooltipDot} />
+            <Text style={styles.chartReadoutDate}>{formatTrendDate(selectedPoint.date, selectedPoint.label)}</Text>
+            <Text style={styles.chartReadoutValue}>{formatCount(selectedPoint.value)} visits</Text>
+          </>
+        ) : (
+          <Text style={styles.chartHint}>Tap the chart to inspect visits</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -535,116 +488,23 @@ function SmartBookingCard({
   bookings: WorkspaceSnapshot['bookings'];
   onOpenReport: (report: 'customers' | 'bookings') => void;
 }) {
-  const { width } = useWindowDimensions();
-  const compact = width < 560;
   const openBookings = () => onOpenReport('bookings');
-  const upcomingCopy = bookings.upcoming > 0
-    ? `${bookings.upcoming} upcoming appointment${bookings.upcoming === 1 ? '' : 's'}`
-    : 'No upcoming appointments';
 
-  return (
-    <View style={styles.bookingCard}>
-      <TouchableOpacity
-        style={styles.bookingHead}
-        activeOpacity={0.8}
-        onPress={openBookings}
-        accessibilityRole="button"
-        accessibilityLabel="Smart Booking, appointment overview"
-      >
-        <View style={styles.bookingHeadIcon}>
-          <Ionicons name="calendar" size={iconSizes.lg} color={colors.black} />
-        </View>
-        <View style={styles.bookingHeadCopy}>
-          <View style={styles.bookingTitleRow}>
-            <Text style={styles.bookingTitle}>Smart Booking</Text>
-            <Ionicons
-              name="information-circle-outline"
-              size={iconSizes.sm}
-              color={colors.accent[400]}
-            />
-          </View>
-          <Text style={styles.bookingSubtitle}>Appointment overview</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={iconSizes.md} color={colors.accent[500]} />
-      </TouchableOpacity>
-
-      <View style={styles.bookingStats}>
-        <BookingMini
-          value={bookings.completed}
-          label={compact ? 'Completed' : 'Completed appointments'}
-          icon="calendar"
-          tone="primary"
-          onPress={openBookings}
-        />
-        <BookingMini
-          value={bookings.upcoming}
-          label={compact ? 'Upcoming' : 'Upcoming appointments'}
-          icon="calendar-outline"
-          tone="neutral"
-          onPress={openBookings}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={styles.bookingFooter}
-        activeOpacity={0.75}
-        onPress={openBookings}
-        accessibilityRole="button"
-        accessibilityLabel={`${upcomingCopy}. View bookings`}
-      >
-        <View style={styles.bookingFooterLeft}>
-          <Ionicons name="calendar-outline" size={iconSizes.sm} color={colors.accent[400]} />
-          <Text style={styles.bookingFooterText} numberOfLines={1}>
-            {upcomingCopy}
-          </Text>
-        </View>
-        <View style={styles.bookingFooterAction}>
-          <Text style={styles.bookingFooterActionText}>View bookings</Text>
-          <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function BookingMini({
-  value,
-  label,
-  icon,
-  tone,
-  onPress,
-}: {
-  value: number;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  tone: 'primary' | 'neutral';
-  onPress: () => void;
-}) {
-  const primary = tone === 'primary';
   return (
     <TouchableOpacity
-      style={[styles.bookingMini, primary ? styles.bookingMiniPrimary : styles.bookingMiniNeutral]}
-      activeOpacity={0.78}
-      onPress={onPress}
+      style={styles.bookingCard}
+      activeOpacity={0.76}
+      onPress={openBookings}
       accessibilityRole="button"
-      accessibilityLabel={`${value} ${label}`}
+      accessibilityLabel={`Smart Booking. ${bookings.completed} completed, ${bookings.upcoming} upcoming. View bookings`}
     >
-      <View
-        style={[
-          styles.bookingMiniIcon,
-          primary ? styles.bookingMiniIconPrimary : styles.bookingMiniIconNeutral,
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={iconSizes.md}
-          color={primary ? colors.primary[700] : colors.accent[700]}
-        />
+      <View style={styles.bookingHeadIcon}>
+        <Ionicons name="calendar-outline" size={iconSizes.lg} color={colors.black} />
       </View>
-      <View style={styles.bookingMiniCopy}>
-        <Text style={styles.bookingMiniValue}>{value}</Text>
-        <Text style={styles.bookingMiniLabel} numberOfLines={2}>
-          {label}
+      <View style={styles.bookingHeadCopy}>
+        <Text style={styles.bookingTitle}>Smart Booking</Text>
+        <Text style={styles.bookingSubtitle}>
+          <Text style={styles.bookingCount}>{bookings.completed}</Text> completed · <Text style={styles.bookingCount}>{bookings.upcoming}</Text> upcoming
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[500]} />
@@ -654,6 +514,29 @@ function BookingMini({
 
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
+  returnPrompt: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  returnPromptIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.primary[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  returnPromptCopy: { flex: 1, minWidth: 0 },
+  returnPromptTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.black },
+  returnPromptDetail: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: colors.accent[700], marginTop: 2 },
   recentHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -870,13 +753,42 @@ const styles = StyleSheet.create({
     color: colors.accent[500],
     marginTop: 1,
   },
+  chartReadout: {
+    position: 'absolute',
+    bottom: 0,
+    left: 28,
+    right: 10,
+    height: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  chartReadoutDate: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    color: colors.accent[700],
+  },
+  chartReadoutValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 11,
+    color: colors.black,
+    marginLeft: 'auto',
+  },
+  chartHint: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: colors.accent[500],
+  },
 
   bookingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
     backgroundColor: colors.white,
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.accent[100],
-    padding: spacing[4],
+    padding: spacing[3],
     ...shadows.sm,
   },
   bookingHead: {
@@ -906,6 +818,7 @@ const styles = StyleSheet.create({
     color: colors.accent[500],
     marginTop: 2,
   },
+  bookingCount: { fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
   bookingStats: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1027,5 +940,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: colors.black,
+    maxWidth: 110,
+    textAlign: 'right',
   },
 });

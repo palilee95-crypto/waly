@@ -22,7 +22,7 @@ export type AttentionItem = {
   count: number | null;
 };
 
-export type DailyStamps = { date: string; stamps: number };
+export type StampBucket = { date: string; label: string; detail: string; stamps: number };
 
 export type WorkspaceSnapshot = {
   asOf: string;
@@ -59,13 +59,20 @@ export type WorkspaceSnapshot = {
     id: string;
     name: string;
     avatar: string;
+    phone?: string;
     visits: number;
     lastVisit: string;
     spendCents: number;
   }[];
   inactive: { id: string; name: string; avatar: string; lastVisit: string; daysIdle: number | null }[];
   attention: AttentionItem[];
-  loyalty: { nearReward: number; availableVouchers: number; daily: DailyStamps[] };
+  loyalty: {
+    nearReward: number;
+    /** Distinct customers holding at least one active, unexpired voucher. */
+    availableVouchers: number;
+    series: StampBucket[];
+    granularity: 'hour' | 'day' | 'week' | 'month';
+  };
   bookings: {
     completed: number;
     upcoming: number;
@@ -88,12 +95,17 @@ export type WorkspaceSnapshot = {
       date: string;
       salesCents: number;
       orders: number;
+      buyers?: number;
       newCount: number;
       returningCount: number;
     }[];
     granularity: 'day' | 'month';
     /** Orders by local hour, index 0–23. */
     hours: number[];
+    buyerCount: number | null;
+    newSalesCents: number | null;
+    returningSalesCents: number | null;
+    unattributedSalesCents: number | null;
     outlets: { id: string; name: string; salesCents: number; orders: number }[];
     staff: { id: string; name: string; salesCents: number; orders: number; stamps: number }[];
   };
@@ -103,13 +115,19 @@ export type WorkspaceSnapshot = {
   };
   bookingDetail: {
     revenueCents: number;
+    completedValueCents: number | null;
+    upcomingValueCents: number | null;
+    nextUpcomingDate?: string | null;
     noShowRate: number | null;
     next7: { date: string; count: number; revenueCents: number }[];
     topServices: { name: string; count: number; revenueCents: number }[];
   };
   loyaltyDetail: {
     vouchersIssued: number;
+    /** Vouchers used in the selected period, regardless of issue date. */
     vouchersUsed: number;
+    /** Vouchers issued in the selected period and used by now. */
+    issuedRedeemed: number | null;
     redemptionRate: number | null;
     pointsRedeemed: number;
     redemptions: number;
@@ -185,7 +203,30 @@ export type LedgerRow = {
   voucherCode: string;
 };
 
+/** A ledger event can be a stamp or reward without a sale amount. */
+export function formatLedgerImpact(row: LedgerRow): string {
+  if (row.billCents > 0) return `RM ${(row.billCents / 100).toFixed(2)}`;
+  if (row.stamps !== 0) return `${row.stamps > 0 ? '+' : ''}${row.stamps} stamp${Math.abs(row.stamps) === 1 ? '' : 's'}`;
+  if (row.points !== 0) return `${row.points > 0 ? '+' : ''}${row.points} pts`;
+  if (row.type === 'redeem') return 'Reward redeemed';
+  if (row.type === 'expire') return 'Expired';
+  if (row.type === 'adjust') return 'Adjustment';
+  return 'Activity';
+}
+
 export type LedgerPage = { page: number; perPage: number; total: number; items: LedgerRow[] };
+
+export type LedgerFocus = {
+  from?: string;
+  to?: string;
+  branchId?: string;
+  unassignedOutlet?: boolean;
+  staffId?: string;
+  unassignedStaff?: boolean;
+  hour?: number;
+  salesOnly?: boolean;
+  title?: string;
+};
 
 /** The transaction ledger. Server-side so the filters and scope cannot drift. */
 export async function fetchTransactions(params: {
@@ -196,6 +237,11 @@ export async function fetchTransactions(params: {
   perPage?: number;
   type?: LedgerType;
   q?: string;
+  staffId?: string;
+  unassignedOutlet?: boolean;
+  unassignedStaff?: boolean;
+  hour?: number;
+  salesOnly?: boolean;
 }): Promise<LedgerPage> {
   const { branchId, from, to, page = 1, perPage = 25, type = 'all', q = '' } = params;
   const qs = new URLSearchParams({
@@ -207,6 +253,11 @@ export async function fetchTransactions(params: {
     type,
   });
   if (q.trim()) qs.set('q', q.trim());
+  if (params.staffId) qs.set('staff', params.staffId);
+  if (params.unassignedOutlet) qs.set('unassignedOutlet', '1');
+  if (params.unassignedStaff) qs.set('unassignedStaff', '1');
+  if (params.hour !== undefined) qs.set('hour', String(params.hour));
+  if (params.salesOnly) qs.set('salesOnly', '1');
   return pb.send<LedgerPage>(`/api/risev/merchant/customer-workspace/transactions?${qs.toString()}`, {
     method: 'GET',
     requestKey: null,
@@ -232,10 +283,20 @@ function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
   const emptyHours = () => new Array(24).fill(0) as number[];
   return {
     ...raw,
+    loyalty: {
+      nearReward: raw.loyalty?.nearReward ?? 0,
+      availableVouchers: raw.loyalty?.availableVouchers ?? 0,
+      series: raw.loyalty?.series ?? [],
+      granularity: raw.loyalty?.granularity ?? 'day',
+    },
     sales: {
       series: raw.sales?.series ?? [],
       granularity: raw.sales?.granularity ?? 'day',
       hours: raw.sales?.hours?.length === 24 ? raw.sales.hours : emptyHours(),
+      buyerCount: raw.sales?.buyerCount ?? null,
+      newSalesCents: raw.sales?.newSalesCents ?? null,
+      returningSalesCents: raw.sales?.returningSalesCents ?? null,
+      unattributedSalesCents: raw.sales?.unattributedSalesCents ?? null,
       outlets: raw.sales?.outlets ?? [],
       staff: raw.sales?.staff ?? [],
     },
@@ -245,6 +306,9 @@ function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     },
     bookingDetail: {
       revenueCents: raw.bookingDetail?.revenueCents ?? 0,
+      completedValueCents: raw.bookingDetail?.completedValueCents ?? null,
+      upcomingValueCents: raw.bookingDetail?.upcomingValueCents ?? null,
+      nextUpcomingDate: raw.bookingDetail?.nextUpcomingDate,
       noShowRate: raw.bookingDetail?.noShowRate ?? null,
       next7: raw.bookingDetail?.next7 ?? [],
       topServices: raw.bookingDetail?.topServices ?? [],
@@ -252,7 +316,9 @@ function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     loyaltyDetail: {
       vouchersIssued: raw.loyaltyDetail?.vouchersIssued ?? 0,
       vouchersUsed: raw.loyaltyDetail?.vouchersUsed ?? 0,
-      redemptionRate: raw.loyaltyDetail?.redemptionRate ?? null,
+      issuedRedeemed: raw.loyaltyDetail?.issuedRedeemed ?? null,
+      // Old server snapshots used a different denominator/numerator pairing.
+      redemptionRate: raw.loyaltyDetail?.issuedRedeemed == null ? null : raw.loyaltyDetail?.redemptionRate ?? null,
       pointsRedeemed: raw.loyaltyDetail?.pointsRedeemed ?? 0,
       redemptions: raw.loyaltyDetail?.redemptions ?? 0,
       activeCards: raw.loyaltyDetail?.activeCards ?? 0,
@@ -279,7 +345,7 @@ export async function fetchWorkspace({
   return normalizeSnapshot(raw);
 }
 
-export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday' | 'all';
+export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday' | 'all' | 'top' | 'inactive';
 
 export type AudienceRow = {
   id: string;
@@ -294,13 +360,14 @@ export type AudienceRow = {
   birthday?: string | null;
   /** all-customers directory */
   visits?: number;
+  spendCents?: number;
 };
 
 export type AudiencePage = {
   card: AudienceCard;
   page: number;
   items: AudienceRow[];
-  /** Only the directory reports a total; the other cards take theirs from the snapshot. */
+  /** Directory and report lists report a total; action cards take theirs from the snapshot. */
   total?: number;
 };
 
@@ -308,18 +375,23 @@ export type AudiencePage = {
 export async function fetchAudience(params: {
   card: AudienceCard;
   branchId?: string;
+  from?: string;
+  to?: string;
   page?: number;
   perPage?: number;
   signal?: AbortSignal;
 }): Promise<AudiencePage> {
-  const { card, branchId = 'all', page = 1, perPage = 20, signal } = params;
+  const { card, branchId = 'all', from, to, page = 1, perPage = 20, signal } = params;
   const qs = new URLSearchParams({
     card,
     branch: branchId || 'all',
     page: String(page),
     perPage: String(perPage),
   }).toString();
-  return pb.send<AudiencePage>(`/api/risev/merchant/customer-workspace/audience?${qs}`, {
+  const scope = new URLSearchParams(qs);
+  if (from) scope.set('from', from);
+  if (to) scope.set('to', to);
+  return pb.send<AudiencePage>(`/api/risev/merchant/customer-workspace/audience?${scope.toString()}`, {
     method: 'GET',
     requestKey: null,
     signal,
