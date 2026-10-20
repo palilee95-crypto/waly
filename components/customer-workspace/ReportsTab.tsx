@@ -1,25 +1,22 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
 import { colors, radii } from '@/theme';
-import { pb } from '@/lib/pocketbase';
 import {
   WorkspaceSnapshot,
   formatMoney,
   formatCount,
-  formatDayLabel,
   pctChange,
-  relativeDays,
+  formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 
 type ReportId = 'customers' | 'bookings' | 'sales' | 'loyalty' | 'reviews';
 
-const REPORTS: { id: ReportId; label: string; icon: any }[] = [
+const REPORTS: { id: ReportId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'customers', label: 'Customers', icon: 'person-outline' },
   { id: 'bookings', label: 'Bookings', icon: 'calendar-outline' },
   { id: 'sales', label: 'Sales', icon: 'wallet-outline' },
-  { id: 'loyalty', label: 'Loyalty', icon: 'ribbon-outline' },
+  { id: 'loyalty', label: 'Loyalty', icon: 'gift-outline' },
   { id: 'reviews', label: 'Reviews', icon: 'star-outline' },
 ];
 
@@ -29,6 +26,8 @@ type Props = {
   onOpenDirectory: () => void;
   onOpenAudience: (id: 'return' | 'rewards' | 'rebook') => void;
   onOpenAnalytics: () => void;
+  onOpenLedger: () => void;
+  onOpenCustomer: (row: { id: string; name: string }) => void;
 };
 
 export default function ReportsTab({
@@ -37,24 +36,31 @@ export default function ReportsTab({
   onOpenDirectory,
   onOpenAudience,
   onOpenAnalytics,
+  onOpenLedger,
+  onOpenCustomer,
 }: Props) {
   const [report, setReport] = useState<ReportId>('customers');
 
   return (
-    <View style={styles.wrap}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.iconTabs}>
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabRow}
+      >
         {REPORTS.map((r) => {
-          const active = r.id === report;
+          const active = report === r.id;
           return (
             <TouchableOpacity
               key={r.id}
-              style={[styles.iconTab, active && styles.iconTabActive]}
+              style={styles.tab}
+              activeOpacity={0.75}
               onPress={() => setReport(r.id)}
-              activeOpacity={0.85}
             >
-              <Ionicons name={r.icon} size={15} color={active ? '#FFCC00' : '#686868'} />
-              <Text style={[styles.iconTabText, active && styles.iconTabTextActive]}>{r.label}</Text>
-              {active ? <View style={styles.activeUnderline} /> : null}
+              <View style={[styles.tabIcon, active && styles.tabIconActive]}>
+                <Ionicons name={r.icon} size={16} color={active ? colors.black : '#94A3B8'} />
+              </View>
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{r.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -65,367 +71,555 @@ export default function ReportsTab({
           snapshot={snapshot}
           periodLabel={periodLabel}
           onOpenDirectory={onOpenDirectory}
+          onOpenCustomer={onOpenCustomer}
         />
       ) : (
         <OtherReport
           report={report}
           snapshot={snapshot}
+          periodLabel={periodLabel}
           onOpenDirectory={onOpenDirectory}
           onOpenAudience={onOpenAudience}
           onOpenAnalytics={onOpenAnalytics}
+          onOpenLedger={onOpenLedger}
         />
       )}
     </View>
   );
 }
 
+// ── Customers ────────────────────────────────────────────────────────────────
+
 function CustomersReport({
   snapshot,
   periodLabel,
   onOpenDirectory,
+  onOpenCustomer,
 }: {
   snapshot: WorkspaceSnapshot;
   periodLabel: string;
   onOpenDirectory: () => void;
+  onOpenCustomer: (row: { id: string; name: string }) => void;
 }) {
-  const { overview, topCustomers, inactive } = snapshot;
+  const { overview, topCustomers, inactive, customers } = snapshot;
   const total = overview.visited;
-  const newPct = total ? Math.round((overview.newCount / total) * 100) : 0;
-  const returningPct = total ? Math.round((overview.returningCount / total) * 100) : 0;
-  const returnDelta = pctChange(overview.returningCount, overview.previous.returningCount);
+  const newShare = total ? Math.round((overview.newCount / total) * 100) : 0;
+  const change = pctChange(overview.visited, overview.previous.visited);
+
+  const series = customers.series;
+  const peak = Math.max(1, ...series.map((s) => s.newCount + s.returningCount));
 
   return (
-    <View style={{ gap: 12 }}>
-      <View style={styles.sectionHead}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Customer Retention</Text>
-          <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
-        </View>
-        <View style={styles.metaChip}>
-          <Text style={styles.metaChipText}>{periodLabel}</Text>
-          <Ionicons name="chevron-down" size={11} color="#686868" />
-        </View>
+    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <View style={styles.kpiGrid}>
+        <Kpi label="Customers" value={formatCount(overview.visited)} sub={change === null ? periodLabel : `${change >= 0 ? '+' : ''}${change}% vs prev`} />
+        <Kpi label="New" value={formatCount(overview.newCount)} sub={`${newShare}% of visitors`} />
+        <Kpi label="Returning" value={formatCount(overview.returningCount)} sub={`${100 - newShare}% of visitors`} />
+        <Kpi
+          label="Need a nudge"
+          value={formatCount(snapshot.attention.find((a) => a.id === 'return')?.count ?? null)}
+          sub="Past their return window"
+        />
       </View>
 
-      <View style={styles.retentionRow}>
-        <View style={styles.donutCard}>
-          <Donut total={total} newPct={newPct} />
-          <View style={styles.legend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#FFCC00' }]} />
-              <View>
-                <Text style={styles.legendLabel}>New</Text>
-                <Text style={styles.legendMeta}>
-                  {overview.newCount} ({newPct}%)
-                </Text>
+      <Card>
+        <Text style={styles.cardTitle}>New vs returning</Text>
+        <Text style={styles.cardNote}>
+          Each bar is one {series.length > 12 ? 'bucket' : 'day'}. Dark is returning, amber is new.
+        </Text>
+        <View style={styles.chart}>
+          {series.map((s) => {
+            const h = (s.newCount + s.returningCount) / peak;
+            return (
+              <View key={s.date} style={styles.barSlot}>
+                <View style={[styles.barStack, { height: Math.max(2, h * 90) }]}>
+                  <View
+                    style={{
+                      flex: s.returningCount || 0.0001,
+                      backgroundColor: colors.black,
+                    }}
+                  />
+                  <View
+                    style={{
+                      flex: s.newCount || 0.0001,
+                      backgroundColor: '#FFCC00',
+                    }}
+                  />
+                </View>
               </View>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#111111' }]} />
-              <View>
-                <Text style={styles.legendLabel}>Returning</Text>
-                <Text style={styles.legendMeta}>
-                  {overview.returningCount} ({returningPct}%)
-                </Text>
+            );
+          })}
+        </View>
+        <View style={styles.legendRow}>
+          <Legend color={colors.black} label={`Returning ${overview.returningCount}`} />
+          <Legend color="#FFCC00" label={`New ${overview.newCount}`} />
+        </View>
+      </Card>
+
+      <Card>
+        <Text style={styles.cardTitle}>How often they visit</Text>
+        <Text style={styles.cardNote}>Customers by number of recorded visits in {periodLabel}.</Text>
+        {customers.frequency.map((f) => {
+          const max = Math.max(1, ...customers.frequency.map((x) => x.count));
+          return (
+            <View key={f.bucket} style={styles.freqRow}>
+              <Text style={styles.freqLabel}>{f.bucket}</Text>
+              <View style={styles.freqTrack}>
+                <View style={[styles.freqFill, { width: `${(f.count / max) * 100}%` }]} />
               </View>
+              <Text style={styles.freqCount}>{f.count}</Text>
             </View>
-          </View>
-        </View>
+          );
+        })}
+      </Card>
 
-        <View style={styles.returnedCard}>
-          <Text style={styles.returnedPct}>{returningPct}%</Text>
-          <Text style={styles.returnedLabel}>returned this month</Text>
-          {returnDelta !== null ? (
-            <View style={styles.returnedDelta}>
-              <Ionicons
-                name={returnDelta < 0 ? 'trending-down' : 'trending-up'}
-                size={11}
-                color={returnDelta < 0 ? '#B91C1C' : '#16A34A'}
-              />
-              <Text
-                style={[styles.returnedDeltaText, returnDelta < 0 && { color: '#B91C1C' }]}
-              >
-                {returnDelta > 0 ? '+' : ''}
-                {returnDelta}%
-              </Text>
-            </View>
-          ) : null}
-          <Text style={styles.returnedMeta}>vs last month</Text>
-        </View>
-      </View>
-
-      <View style={styles.sectionHead}>
-        <View style={styles.sectionTitleRow}>
-          <Ionicons name="trophy" size={13} color="#B45309" />
-          <Text style={styles.sectionTitle}>Top Customers</Text>
-        </View>
-        <View style={styles.metaChip}>
-          <Text style={styles.metaChipText}>By Spend</Text>
-          <Ionicons name="chevron-down" size={11} color="#686868" />
-        </View>
-      </View>
-
-      <View style={styles.listCard}>
+      <Section title={`Top customers · ${periodLabel}`} action="Directory" onPress={onOpenDirectory}>
         {topCustomers.length === 0 ? (
-          <Text style={styles.emptyText}>No recorded spend in this period.</Text>
+          <Text style={styles.empty}>No recorded spend in this period.</Text>
         ) : (
           topCustomers.map((c, i) => (
-            <View key={c.id} style={[styles.topRow, i > 0 && styles.rowDivider]}>
-              <Text style={styles.rank}>{i + 1}</Text>
-              <Avatar id={c.id} avatar={c.avatar} name={c.name} size={34} />
+            <TouchableOpacity
+              key={c.id}
+              style={styles.rankRow}
+              activeOpacity={0.7}
+              onPress={() => onOpenCustomer({ id: c.id, name: c.name })}
+            >
+              <Text style={styles.rank}>#{i + 1}</Text>
               <View style={{ flex: 1 }}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.topName} numberOfLines={1}>
-                    {c.name || 'Customer'}
-                  </Text>
-                  {i === 0 ? (
-                    <View style={styles.vipBadge}>
-                      <Text style={styles.vipText}>TOP</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.topMeta} numberOfLines={1}>
-                  {c.visits} visit{c.visits === 1 ? '' : 's'} · Last visit {relativeDays(c.lastVisit)}
+                <Text style={styles.rankName} numberOfLines={1}>
+                  {c.name || 'Customer'}
+                </Text>
+                <Text style={styles.rankMeta}>
+                  {c.visits} visit{c.visits === 1 ? '' : 's'} · last {formatShortDateFromIso(c.lastVisit)}
                 </Text>
               </View>
-              <Text style={styles.topSpend}>{formatMoney(c.spendCents)}</Text>
-            </View>
+              <Text style={styles.rankValue}>{formatMoney(c.spendCents)}</Text>
+            </TouchableOpacity>
           ))
         )}
-      </View>
+      </Section>
 
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Inactive Customers (&gt; {snapshot.bookings ? 30 : 30} days)</Text>
-        <TouchableOpacity onPress={onOpenDirectory} activeOpacity={0.7}>
-          <Text style={styles.viewAll}>View All</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inactiveRow}>
+      <Section title="Inactive customers" action="View all" onPress={onOpenDirectory}>
         {inactive.length === 0 ? (
-          <Text style={styles.emptyText}>Every customer has visited recently.</Text>
+          <Text style={styles.empty}>Everyone has visited recently.</Text>
         ) : (
-          inactive.slice(0, 5).map((c) => (
-            <View key={c.id} style={styles.inactiveCard}>
-              <Avatar id={c.id} avatar={c.avatar} name={c.name} size={34} />
-              <Text style={styles.inactiveName} numberOfLines={1}>
-                {c.name || 'Customer'}
-              </Text>
-              <Text style={styles.inactiveDays}>{c.daysIdle ?? '?'} days idle</Text>
-            </View>
+          inactive.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={styles.rankRow}
+              activeOpacity={0.7}
+              onPress={() => onOpenCustomer({ id: c.id, name: c.name })}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rankName} numberOfLines={1}>
+                  {c.name || 'Customer'}
+                </Text>
+                <Text style={styles.rankMeta}>
+                  {c.daysIdle === null ? 'No recorded visit' : `${c.daysIdle} days ago`}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
+            </TouchableOpacity>
           ))
         )}
-      </ScrollView>
-    </View>
+      </Section>
+    </ScrollView>
   );
 }
+
+// ── Bookings, Sales, Loyalty, Reviews ────────────────────────────────────────
 
 function OtherReport({
   report,
   snapshot,
+  periodLabel,
   onOpenDirectory,
   onOpenAudience,
   onOpenAnalytics,
+  onOpenLedger,
 }: {
   report: ReportId;
   snapshot: WorkspaceSnapshot;
+  periodLabel: string;
   onOpenDirectory: () => void;
   onOpenAudience: (id: 'return' | 'rewards' | 'rebook') => void;
   onOpenAnalytics: () => void;
+  onOpenLedger: () => void;
 }) {
-  const { overview, bookings, loyalty, feedback, unavailable } = snapshot;
+  const { overview, bookings, bookingDetail, loyalty, loyaltyDetail, feedback, reviews, sales } =
+    snapshot;
 
   if (report === 'bookings') {
     return (
-      <View style={styles.card}>
-        <View style={styles.metricRow}>
-          <Metric label="Completed" value={formatCount(bookings.completed)} />
-          <Metric label="Upcoming" value={formatCount(bookings.upcoming)} />
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.kpiGrid}>
+          <Kpi label="Completed" value={formatCount(bookings.completed)} sub={periodLabel} />
+          <Kpi label="Upcoming" value={formatCount(bookings.upcoming)} sub="Not yet served" />
+          <Kpi label="Cancelled" value={formatCount(bookings.cancelled)} sub="By the customer" />
+          <Kpi
+            label="No-show rate"
+            value={bookingDetail.noShowRate === null ? 'No data' : `${bookingDetail.noShowRate}%`}
+            sub={`${bookings.noShow} no-shows`}
+          />
         </View>
-        <View style={styles.metricRow}>
-          <Metric label="Cancelled" value={formatCount(bookings.cancelled)} />
-          <Metric label="No-show" value={formatCount(bookings.noShow)} />
-        </View>
-        <Text style={styles.note}>
-          {bookings.total} appointment{bookings.total === 1 ? '' : 's'} in this period. Statuses are not
-          interchangeable, and a scheduled booking is not a completed return.
-        </Text>
-        <Row
-          title="Customers with a future booking"
-          detail="Booked or in service after today."
-          value={formatCount(bookings.nextBookingCustomers)}
-          icon="calendar-outline"
-        />
-        <Row
-          title="Available slots"
-          detail={unavailable.availableSlots ? 'Needs staff and resource schedules to compute.' : ''}
-          value="Unavailable"
-          icon="time-outline"
-        />
-      </View>
+
+        <Card>
+          <Text style={styles.cardTitle}>Booking value</Text>
+          <Text style={styles.bigValue}>{formatMoney(bookingDetail.revenueCents)}</Text>
+          <Text style={styles.cardNote}>
+            Total price of bookings that were not cancelled or missed, in {periodLabel}.
+          </Text>
+        </Card>
+
+        <Section title="Next 7 days">
+          {bookingDetail.next7.map((d) => (
+            <View key={d.date} style={styles.rankRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rankName}>{formatShortDateFromIso(d.date)}</Text>
+                <Text style={styles.rankMeta}>
+                  {d.count} booking{d.count === 1 ? '' : 's'}
+                </Text>
+              </View>
+              <Text style={styles.rankValue}>
+                {d.revenueCents > 0 ? formatMoney(d.revenueCents) : '—'}
+              </Text>
+            </View>
+          ))}
+        </Section>
+
+        <Section title="Top services">
+          {bookingDetail.topServices.length === 0 ? (
+            <Text style={styles.empty}>No services booked in this period.</Text>
+          ) : (
+            bookingDetail.topServices.map((s) => (
+              <View key={s.name} style={styles.rankRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  <Text style={styles.rankMeta}>
+                    {s.count} booking{s.count === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                <Text style={styles.rankValue}>{formatMoney(s.revenueCents)}</Text>
+              </View>
+            ))
+          )}
+        </Section>
+      </ScrollView>
     );
   }
 
   if (report === 'sales') {
+    const peak = Math.max(1, ...sales.series.map((s) => s.salesCents));
+    const hourPeak = sales.hours.reduce(
+      (best, count, hour) => (count > best.count ? { hour, count } : best),
+      { hour: 0, count: 0 }
+    );
+    const maxHour = Math.max(1, ...sales.hours);
+
     return (
-      <View style={styles.card}>
-        <View style={styles.metricRow}>
-          <Metric label="Recorded sales" value={formatMoney(overview.salesCents)} />
-          <Metric label="Orders" value={formatCount(overview.orders)} />
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.kpiGrid}>
+          <Kpi label="Recorded sales" value={formatMoney(overview.salesCents)} sub={periodLabel} />
+          <Kpi label="Orders" value={formatCount(overview.orders)} sub="Bills above zero" />
+          <Kpi
+            label="Average order"
+            value={overview.avgOrderCents === null ? 'No data' : formatMoney(overview.avgOrderCents)}
+            sub="Sales ÷ orders"
+          />
+          <Kpi label="Vouchers used" value={formatCount(overview.vouchersRedeemed)} sub="Redeemed" />
         </View>
-        <View style={styles.metricRow}>
-          <Metric label="Average order" value={formatMoney(overview.avgOrderCents)} />
-          <Metric label="Vouchers used" value={formatCount(overview.vouchersRedeemed)} />
+
+        <Card>
+          <Text style={styles.cardTitle}>
+            Sales by {sales.granularity === 'month' ? 'month' : 'day'}
+          </Text>
+          <View style={styles.chart}>
+            {sales.series.map((s) => (
+              <View key={s.date} style={styles.barSlot}>
+                <View
+                  style={[
+                    styles.bar,
+                    { height: Math.max(2, (s.salesCents / peak) * 96) },
+                    s.orders === 0 && styles.barEmpty,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.axisRow}>
+            <Text style={styles.axisLabel}>
+              {sales.series[0] ? labelFor(sales.series[0].date, sales.granularity) : ''}
+            </Text>
+            <Text style={styles.axisLabel}>Peak {formatMoney(peak)}</Text>
+            <Text style={styles.axisLabel}>
+              {sales.series.length
+                ? labelFor(sales.series[sales.series.length - 1].date, sales.granularity)
+                : ''}
+            </Text>
+          </View>
+        </Card>
+
+        <Card>
+          <Text style={styles.cardTitle}>Busiest hours</Text>
+          <Text style={styles.cardNote}>
+            {hourPeak.count > 0
+              ? `Most orders land at ${hourLabel(hourPeak.hour)} — ${hourPeak.count} in ${periodLabel}.`
+              : 'No orders recorded in this period.'}
+          </Text>
+          <View style={styles.chart}>
+            {sales.hours.map((count, hour) => (
+              <View key={hour} style={styles.hourSlot}>
+                <View
+                  style={[
+                    styles.bar,
+                    { height: Math.max(2, (count / maxHour) * 70) },
+                    count === 0 && styles.barEmpty,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.axisRow}>
+            <Text style={styles.axisLabel}>12am</Text>
+            <Text style={styles.axisLabel}>12pm</Text>
+            <Text style={styles.axisLabel}>11pm</Text>
+          </View>
+        </Card>
+
+        {sales.outlets.length > 0 ? (
+          <Section title="By outlet">
+            {sales.outlets.map((o) => {
+              const share = overview.salesCents ? Math.round((o.salesCents / overview.salesCents) * 100) : 0;
+              return (
+                <View key={o.id || 'hq'} style={styles.rankRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rankName} numberOfLines={1}>
+                      {o.name}
+                    </Text>
+                    <Text style={styles.rankMeta}>
+                      {o.orders} order{o.orders === 1 ? '' : 's'} · {share}% of sales
+                    </Text>
+                  </View>
+                  <Text style={styles.rankValue}>{formatMoney(o.salesCents)}</Text>
+                </View>
+              );
+            })}
+          </Section>
+        ) : null}
+
+        <Section title="Staff performance">
+          {sales.staff.length === 0 ? (
+            <Text style={styles.empty}>No staff attributed in this period.</Text>
+          ) : (
+            sales.staff.map((s) => (
+              <View key={s.id || 'none'} style={styles.rankRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  <Text style={styles.rankMeta}>
+                    {s.orders} order{s.orders === 1 ? '' : 's'} · {s.stamps} stamp
+                    {s.stamps === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                <Text style={styles.rankValue}>{formatMoney(s.salesCents)}</Text>
+              </View>
+            ))
+          )}
+        </Section>
+
+        <View style={styles.rowsCard}>
+          <Row
+            title="All transactions"
+            detail="Every recorded sale, redemption and correction."
+            icon="receipt-outline"
+            onPress={onOpenLedger}
+          />
+          <Row
+            title="Customer directory"
+            detail="Every customer at this store, newest visit first."
+            icon="people-outline"
+            onPress={onOpenDirectory}
+          />
+          <Row
+            title="Open full analytics"
+            detail="Outlet comparison and deeper breakdowns."
+            icon="bar-chart-outline"
+            onPress={onOpenAnalytics}
+          />
         </View>
-        <Text style={styles.note}>
-          Recorded eligible sales, not all store revenue. Average order value divides sales by orders, never
-          by customers.
-        </Text>
-        <Row
-          title="Customer directory"
-          detail="Every customer at this store, newest visit first."
-          icon="people-outline"
-          onPress={onOpenDirectory}
-        />
-        <Row
-          title="Open full analytics"
-          detail="Outlet comparison and deeper breakdowns."
-          icon="bar-chart-outline"
-          onPress={onOpenAnalytics}
-        />
-      </View>
+      </ScrollView>
     );
   }
 
   if (report === 'loyalty') {
-    const max = Math.max(1, ...loyalty.daily.map((d) => d.stamps));
+    const stampPeak = Math.max(1, ...loyalty.daily.map((d) => d.stamps));
     return (
-      <View style={styles.card}>
-        <View style={styles.metricRow}>
-          <Metric label="Stamps given" value={formatCount(overview.stamps)} />
-          <Metric label="Points earned" value={formatCount(overview.pointsEarned)} />
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.kpiGrid}>
+          <Kpi label="Near reward" value={formatCount(loyalty.nearReward)} sub="1–2 stamps away" />
+          <Kpi label="Vouchers live" value={formatCount(loyalty.availableVouchers)} sub="Unused and valid" />
+          <Kpi label="Issued" value={formatCount(loyaltyDetail.vouchersIssued)} sub={periodLabel} />
+          <Kpi
+            label="Redemption rate"
+            value={loyaltyDetail.redemptionRate === null ? 'No data' : `${loyaltyDetail.redemptionRate}%`}
+            sub={`${loyaltyDetail.vouchersUsed} used`}
+          />
         </View>
-        <View style={styles.chart}>
-          {loyalty.daily.map((d) => (
-            <View key={d.date} style={styles.barSlot}>
-              <Text style={styles.barValue}>{d.stamps}</Text>
-              <View style={[styles.bar, { height: Math.max(3, (d.stamps / max) * 54) }]} />
-              <Text style={styles.barLabel}>{formatDayLabel(d.date)}</Text>
+
+        <View style={styles.kpiGrid}>
+          <Kpi label="Points earned" value={formatCount(overview.pointsEarned)} sub={periodLabel} />
+          <Kpi label="Points spent" value={formatCount(loyaltyDetail.pointsRedeemed)} sub={`${loyaltyDetail.redemptions} redeems`} />
+          <Kpi label="Active cards" value={formatCount(loyaltyDetail.activeCards)} sub="Being collected" />
+          <Kpi label="Stamps issued" value={formatCount(overview.stamps)} sub="Net events" />
+        </View>
+
+        <Card>
+          <Text style={styles.cardTitle}>Stamps · last 7 days</Text>
+          <View style={styles.chart}>
+            {loyalty.daily.map((d) => (
+              <View key={d.date} style={styles.barSlot}>
+                <View
+                  style={[
+                    styles.bar,
+                    { height: Math.max(2, (d.stamps / stampPeak) * 80) },
+                    d.stamps === 0 && styles.barEmpty,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.axisRow}>
+            {loyalty.daily.map((d) => (
+              <Text key={d.date} style={styles.axisLabel}>
+                {d.date.slice(8)}
+              </Text>
+            ))}
+          </View>
+        </Card>
+
+        <View style={styles.rowsCard}>
+          <Row
+            title="Customers near a reward"
+            detail="One or two stamps left on an active card."
+            value={formatCount(loyalty.nearReward)}
+            icon="gift-outline"
+            onPress={() => onOpenAudience('rewards')}
+          />
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // reviews
+  const maxStars = Math.max(1, ...reviews.distribution.map((d) => d.count));
+  return (
+    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <View style={styles.kpiGrid}>
+        <Kpi label="Responses" value={formatCount(feedback.responses)} sub={periodLabel} />
+        <Kpi
+          label="Average rating"
+          value={feedback.avgRating === null ? 'No data' : feedback.avgRating.toFixed(1)}
+          sub={`Out of 5 stars`}
+        />
+      </View>
+
+      <Card>
+        <Text style={styles.cardTitle}>Rating breakdown</Text>
+        {feedback.responses === 0 ? (
+          <Text style={styles.empty}>No feedback in this period.</Text>
+        ) : (
+          reviews.distribution.map((d) => (
+            <View key={d.stars} style={styles.starRow}>
+              <Text style={styles.starLabel}>{d.stars}★</Text>
+              <View style={styles.freqTrack}>
+                <View style={[styles.freqFill, { width: `${(d.count / maxStars) * 100}%` }]} />
+              </View>
+              <Text style={styles.freqCount}>{d.count}</Text>
             </View>
-          ))}
-        </View>
-        <Text style={styles.note}>
-          Bars are stamp events, not customers or visits. {loyalty.nearReward} customers are 1–2 stamps from
-          a reward; a completed card is not near a reward.
-        </Text>
-        <Row
-          title="Customers near a reward"
-          detail="One or two stamps left on an active card."
-          value={formatCount(loyalty.nearReward)}
-          icon="gift-outline"
-          onPress={() => onOpenAudience('rewards')}
-        />
-      </View>
-    );
+          ))
+        )}
+      </Card>
+
+      <Section title="Recent feedback">
+        {reviews.recent.length === 0 ? (
+          <Text style={styles.empty}>No feedback in this period.</Text>
+        ) : (
+          reviews.recent.map((r, i) => (
+            <View key={`${r.createdAt}-${i}`} style={styles.reviewRow}>
+              <View style={styles.reviewHead}>
+                <Text style={styles.rankName} numberOfLines={1}>
+                  {r.name}
+                </Text>
+                <Text style={styles.stars}>{'★'.repeat(r.stars)}</Text>
+              </View>
+              {r.feedback ? <Text style={styles.reviewText}>{r.feedback}</Text> : null}
+              <Text style={styles.rankMeta}>{formatShortDateFromIso(r.createdAt)}</Text>
+            </View>
+          ))
+        )}
+      </Section>
+    </ScrollView>
+  );
+}
+
+// ── Small pieces ─────────────────────────────────────────────────────────────
+
+function labelFor(date: string, granularity: 'day' | 'month') {
+  if (granularity === 'month') {
+    const [y, m] = date.split('-');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[Number(m) - 1] || m} ${y.slice(2)}`;
   }
+  return formatShortDateFromIso(date);
+}
 
+function hourLabel(hour: number) {
+  if (hour === 0) return '12am';
+  if (hour === 12) return '12pm';
+  return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
+}
+
+function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <View style={styles.card}>
-      <View style={styles.metricRow}>
-        <Metric
-          label="Risev rating"
-          value={feedback.avgRating === null ? 'No ratings' : `${feedback.avgRating.toFixed(1)}/5`}
-        />
-        <Metric label="Responses" value={formatCount(feedback.responses)} />
-      </View>
-      <Text style={styles.note}>
-        Ratings are collected inside Risev. Opening a Google review link is not proof of a published review
-        {unavailable.googleReviewOpens ? ', and link opens are not tracked yet' : ''}.
+    <View style={styles.kpi}>
+      <Text style={styles.kpiLabel}>{label}</Text>
+      <Text style={styles.kpiValue} numberOfLines={1}>
+        {value}
       </Text>
+      {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
     </View>
   );
 }
 
-function Donut({ total, newPct }: { total: number; newPct: number }) {
-  const size = 96;
-  const stroke = 12;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const newLen = (Math.max(0, Math.min(100, newPct)) / 100) * c;
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="#111111" strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          stroke="#FFCC00"
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={`${newLen} ${c - newLen}`}
-          strokeLinecap="butt"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <View style={styles.donutCenter}>
-        <Text style={styles.donutTotal}>{total}</Text>
-        <Text style={styles.donutLabel}>total{'\n'}customers</Text>
-      </View>
-    </View>
-  );
+function Card({ children }: { children: ReactNode }) {
+  return <View style={styles.card}>{children}</View>;
 }
 
-function Avatar({
-  id,
-  avatar,
-  name,
-  size,
+function Section({
+  title,
+  action,
+  onPress,
+  children,
 }: {
-  id: string;
-  avatar: string;
-  name: string;
-  size: number;
+  title: string;
+  action?: string;
+  onPress?: () => void;
+  children: ReactNode;
 }) {
-  const initials = (name || '?')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join('');
-
-  if (avatar) {
-    return (
-      <Image
-        source={{ uri: `${pb.baseUrl}/api/files/_pb_users_auth_/${id}/${avatar}` }}
-        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#F1F5F9' }}
-      />
-    );
-  }
   return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: '#F1F5F9',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#475569' }}>
-        {initials}
-      </Text>
-    </View>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {action ? (
+          <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+            <Text style={styles.viewAll}>{action}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.sectionBody}>{children}</View>
     </View>
   );
 }
@@ -440,243 +634,215 @@ function Row({
   title: string;
   detail: string;
   value?: string;
-  icon: any;
-  onPress?: () => void;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.row} activeOpacity={onPress ? 0.85 : 1} onPress={onPress}>
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.rowIcon}>
         <Ionicons name={icon} size={16} color={colors.black} />
       </View>
-      <View style={styles.rowBody}>
+      <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowDetail}>{detail}</Text>
       </View>
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      {onPress ? <Ionicons name="chevron-forward" size={15} color="#686868" /> : null}
+      <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
     </TouchableOpacity>
   );
 }
 
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  wrap: { gap: 12 },
-  iconTabs: { gap: 6, paddingVertical: 2, paddingRight: 8 },
-  iconTab: {
+  tabRow: { gap: 4, paddingHorizontal: 4, paddingBottom: 6 },
+  tab: { alignItems: 'center', width: 66, paddingVertical: 4 },
+  tabIcon: {
+    width: 40,
+    height: 34,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: radii.md,
-    minWidth: 68,
   },
-  iconTabActive: { backgroundColor: '#111111' },
-  iconTabText: {
-    fontSize: 10.5,
+  tabIconActive: { backgroundColor: '#FFCC00' },
+  tabLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#686868',
-  },
-  iconTabTextActive: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold' },
-  activeUnderline: {
-    position: 'absolute',
-    bottom: 4,
-    width: 18,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: '#FFCC00',
-  },
-  sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sectionTitle: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.black,
-    letterSpacing: -0.2,
-  },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F6F6F6',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radii.full,
-  },
-  metaChipText: { fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#686868' },
-  retentionRow: { flexDirection: 'row', gap: 10, alignItems: 'stretch' },
-  donutCard: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: '#EEEEF0',
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  donutCenter: { position: 'absolute', alignItems: 'center' },
-  donutTotal: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.black,
-    letterSpacing: -0.6,
-  },
-  donutLabel: {
-    fontSize: 8.5,
-    lineHeight: 11,
-    textAlign: 'center',
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-  },
-  legend: { flex: 1, gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
-  legendLabel: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
-  legendMeta: { fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#686868' },
-  returnedCard: {
-    width: 118,
-    backgroundColor: '#ECFDF5',
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    padding: 14,
-    justifyContent: 'center',
-  },
-  returnedPct: {
-    fontSize: 24,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#047857',
-    letterSpacing: -0.8,
-  },
-  returnedLabel: {
-    fontSize: 10.5,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: '#047857',
-    marginTop: 1,
-  },
-  returnedDelta: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
-  returnedDeltaText: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#16A34A' },
-  returnedMeta: { fontSize: 9.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#16A34A' },
-  listCard: {
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: '#EEEEF0',
-    paddingHorizontal: 14,
-  },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  rowDivider: { borderTopWidth: 1, borderTopColor: '#F6F6F6' },
-  rank: {
-    width: 14,
-    fontSize: 11,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topName: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black, flexShrink: 1 },
-  vipBadge: {
-    backgroundColor: '#FFCC00',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  vipText: { fontSize: 8, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111' },
-  topMeta: {
-    fontSize: 10.5,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
+    fontSize: 10,
+    color: '#94A3B8',
     marginTop: 2,
   },
-  topSpend: { fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
-  viewAll: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#DC2626' },
-  inactiveRow: { gap: 10, paddingRight: 8 },
-  inactiveCard: {
-    width: 108,
-    backgroundColor: colors.white,
+  tabLabelActive: { color: colors.black, fontFamily: 'PlusJakartaSans_700Bold' },
+
+  body: { paddingTop: 8, paddingBottom: 28 },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  kpi: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    backgroundColor: '#F8FAFC',
     borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: '#EEEEF0',
     padding: 12,
-    alignItems: 'center',
-    gap: 6,
   },
-  inactiveName: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
-  inactiveDays: { fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#DC2626' },
-  emptyText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    paddingVertical: 16,
+  kpiLabel: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: '#94A3B8',
   },
+  kpiValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 18,
+    color: colors.black,
+    marginTop: 3,
+  },
+  kpiSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#64748B', marginTop: 2 },
+
   card: {
     backgroundColor: colors.white,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: '#EEEEF0',
-    padding: 16,
-    gap: 12,
+    borderColor: '#EEF2F6',
+    padding: 14,
+    marginBottom: 12,
   },
-  metricRow: { flexDirection: 'row', gap: 8 },
-  metric: { flex: 1 },
-  metricValue: {
-    fontSize: 18,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: colors.black,
-    letterSpacing: -0.3,
-  },
-  metricLabel: {
-    fontSize: 11,
+  cardTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13, color: colors.black },
+  cardNote: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: '#94A3B8',
     marginTop: 3,
   },
-  note: {
-    fontSize: 11,
-    lineHeight: 16,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
+  bigValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 22,
+    color: colors.black,
+    marginTop: 6,
   },
-  row: {
+
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 100,
+    gap: 2,
+    marginTop: 12,
+  },
+  barSlot: { flex: 1, alignItems: 'stretch', justifyContent: 'flex-end', height: 96 },
+  hourSlot: { flex: 1, alignItems: 'stretch', justifyContent: 'flex-end', height: 72 },
+  barStack: { borderRadius: 3, overflow: 'hidden', justifyContent: 'flex-end' },
+  bar: { backgroundColor: colors.black, borderRadius: 2, width: '100%' },
+  barEmpty: { backgroundColor: '#E2E8F0' },
+  axisRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  axisLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9.5, color: '#94A3B8' },
+  legendRow: { flexDirection: 'row', gap: 14, marginTop: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, color: '#64748B' },
+
+  freqRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  freqLabel: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    color: '#475569',
+    width: 76,
+  },
+  freqTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: '#F1F5F9', overflow: 'hidden' },
+  freqFill: { height: 8, borderRadius: 4, backgroundColor: colors.black },
+  freqCount: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    color: colors.black,
+    width: 26,
+    textAlign: 'right',
+  },
+  starRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  starLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    color: '#B45309',
+    width: 26,
+  },
+
+  section: { marginBottom: 12 },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12.5, color: colors.black },
+  viewAll: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#686868' },
+  sectionBody: {
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: '#EEF2F6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+
+  rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F6F6F6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
+  rank: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 11,
+    color: '#94A3B8',
+    width: 22,
+  },
+  rankName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: colors.black },
+  rankMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#94A3B8', marginTop: 1 },
+  rankValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, color: colors.black },
+
+  rowsCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: '#EEF2F6',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
   rowIcon: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 10,
-    backgroundColor: '#F6F6F6',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowBody: { flex: 1 },
-  rowTitle: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: colors.black },
-  rowDetail: {
-    fontSize: 11,
+  rowTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: colors.black },
+  rowDetail: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#94A3B8', marginTop: 1 },
+  rowValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, color: colors.black },
+
+  empty: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    color: '#686868',
-    marginTop: 2,
+    fontSize: 11.5,
+    color: '#94A3B8',
+    paddingVertical: 12,
   },
-  rowValue: { fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: colors.black },
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 92,
-    paddingTop: 6,
+  reviewRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  reviewHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  stars: { color: '#F59E0B', fontSize: 11 },
+  reviewText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: '#475569',
+    marginTop: 3,
   },
-  barSlot: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  bar: { width: 16, borderRadius: 4, backgroundColor: '#FFCC00' },
-  barValue: { fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#686868' },
-  barLabel: { fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: '#686868' },
 });
+

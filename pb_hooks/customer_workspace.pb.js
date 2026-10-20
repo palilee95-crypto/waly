@@ -208,3 +208,102 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/audience", (e) => {
     return e.json(500, { code: "AUDIENCE_FAILED", message: "Could not load that audience." });
   }
 });
+
+// ── Transaction ledger ───────────────────────────────────────────────────────
+//   GET /api/risev/merchant/customer-workspace/transactions
+//       ?branch=<id|all>&from&to&page&perPage&type=all|earn|redeem|expire|adjust&q=<name or phone>
+// Same session-resolved merchant and branch rules as the snapshot; every helper
+// stays inside the handler (JSVM loses file scope inside handlers).
+routerAdd("GET", "/api/risev/merchant/customer-workspace/transactions", (e) => {
+  const logic = require(`${__hooks}/customer_workspace_logic.js`);
+
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { code: "AUTH_REQUIRED", message: "Sign in to view transactions." });
+  }
+
+  let merchantId = "";
+  try {
+    merchantId = authRecord.getString("merchant_id") || "";
+  } catch (err) {}
+  if (!merchantId) {
+    try {
+      const owned = $app.findRecordsByFilter("merchants", "owner = '" + authRecord.id + "'", "", 1, 0);
+      if (owned && owned.length > 0) merchantId = owned[0].id;
+    } catch (err) {}
+  }
+  if (!merchantId) {
+    return e.json(403, { code: "MERCHANT_REQUIRED", message: "No merchant profile is linked to this account." });
+  }
+
+  try {
+    $app.findRecordById("merchants", merchantId);
+  } catch (err) {
+    return e.json(403, { code: "MERCHANT_REQUIRED", message: "Merchant profile not found." });
+  }
+
+  const query = (e.requestInfo() && e.requestInfo().query) || {};
+
+  let staffBranch = "";
+  try {
+    staffBranch = authRecord.getString("branch") || "";
+  } catch (err) {}
+
+  let branchId = String(query.branch || "all") === "all" ? "" : String(query.branch);
+  if (staffBranch) {
+    if (branchId && branchId !== staffBranch) {
+      return e.json(403, { code: "BRANCH_FORBIDDEN", message: "You can only view your own outlet." });
+    }
+    branchId = staffBranch;
+  }
+
+  let isHqBranch = false;
+  if (branchId) {
+    try {
+      const b = $app.findRecordById("branches", branchId);
+      if (b.getString("merchant") !== merchantId) {
+        return e.json(400, { code: "INVALID_BRANCH", message: "That outlet does not belong to this merchant." });
+      }
+      isHqBranch = !!b.getBool("is_hq");
+    } catch (err) {
+      return e.json(400, { code: "INVALID_BRANCH", message: "That outlet does not belong to this merchant." });
+    }
+  }
+
+  const today = logic.localDate(0);
+  const monthStart = today.slice(0, 8) + "01";
+  const nextMonthStart = (function () {
+    const y = Number(today.slice(0, 4));
+    const m = Number(today.slice(5, 7));
+    return m === 12 ? String(y + 1) + "-01-01" : String(y) + "-" + (m + 1 < 10 ? "0" + (m + 1) : m + 1) + "-01";
+  })();
+
+  const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(String(query.from || "")) ? String(query.from) : monthStart;
+  const toDate = /^\d{4}-\d{2}-\d{2}$/.test(String(query.to || "")) ? String(query.to) : nextMonthStart;
+  if (toDate <= fromDate) {
+    return e.json(400, { code: "INVALID_PERIOD", message: "The period end must be after its start." });
+  }
+
+  const ctx = {
+    merchantId: merchantId,
+    branchId: branchId,
+    isHqBranch: isHqBranch,
+    fromDate: fromDate,
+    toDate: toDate,
+    fromUtc: logic.localDateToUtcStart(fromDate),
+    toUtc: logic.localDateToUtcStart(toDate),
+    returnDays: 30,
+  };
+
+  try {
+    return e.json(200, logic.buildTransactions($app, ctx, {
+      page: query.page,
+      perPage: query.perPage,
+      type: query.type,
+      q: query.q,
+    }));
+  } catch (err) {
+    console.log("[CUSTOMER WORKSPACE] Ledger failed:", err && err.message ? err.message : err);
+    return e.json(500, { code: "LEDGER_FAILED", message: "Could not load transactions." });
+  }
+});

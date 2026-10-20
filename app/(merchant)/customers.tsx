@@ -24,6 +24,8 @@ import OverviewTab from '@/components/customer-workspace/OverviewTab';
 import ActionsTab from '@/components/customer-workspace/ActionsTab';
 import ReportsTab from '@/components/customer-workspace/ReportsTab';
 import AudienceSheet from '@/components/customer-workspace/AudienceSheet';
+import TransactionsSheet from '@/components/customer-workspace/TransactionsSheet';
+import CustomerDetailSheet from '@/components/customer-workspace/CustomerDetailSheet';
 
 type MainTab = 'overview' | 'actions' | 'reports';
 
@@ -37,11 +39,16 @@ export default function CustomerWorkspaceScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const periods = useMemo(() => workspacePeriods(), []);
-  const [periodIndex, setPeriodIndex] = useState(0);
+  const [periodIndex, setPeriodIndex] = useState(() => {
+    const i = periods.findIndex((p) => p.id === 'this_month');
+    return i >= 0 ? i : 0;
+  });
   const [branchId, setBranchId] = useState('');
   const [mainTab, setMainTab] = useState<MainTab>('overview');
   const [audienceCard, setAudienceCard] = useState<AudienceCard | null>(null);
   const [picker, setPicker] = useState<'branch' | 'period' | null>(null);
+  const [showLedger, setShowLedger] = useState(false);
+  const [detailCustomer, setDetailCustomer] = useState<{ id: string; name: string } | null>(null);
 
   const period = periods[periodIndex];
   const { snapshot, loading, error, retry } = useCustomerWorkspace(branchId, period);
@@ -165,6 +172,8 @@ export default function CustomerWorkspaceScreen() {
                 onOpenDirectory={openDirectory}
                 onOpenAudience={(id) => setAudienceCard(id)}
                 onOpenAnalytics={goAnalytics}
+                onOpenLedger={() => setShowLedger(true)}
+                onOpenCustomer={(row) => setDetailCustomer({ id: row.id, name: row.name })}
               />
             )}
           </>
@@ -212,6 +221,26 @@ export default function CustomerWorkspaceScreen() {
           onChanged={retry}
         />
       ) : null}
+
+      <TransactionsSheet
+        visible={showLedger}
+        branchId={branchId}
+        from={period.from}
+        to={period.to}
+        periodLabel={period.label}
+        onClose={() => setShowLedger(false)}
+      />
+
+      <CustomerDetailSheet
+        visible={!!detailCustomer}
+        customerId={detailCustomer?.id ?? null}
+        name={detailCustomer?.name}
+        onClose={() => setDetailCustomer(null)}
+        onDeleted={() => {
+          setDetailCustomer(null);
+          retry();
+        }}
+      />
     </SafeAreaView>
   );
 }

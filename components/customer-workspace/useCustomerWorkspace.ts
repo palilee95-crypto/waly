@@ -25,7 +25,8 @@ export function useCustomerWorkspace(branchId: string, period: WorkspacePeriod) 
   const [state, setState] = useState<State>({ snapshot: null, loading: true, error: null });
   const requestId = useRef(0);
 
-  const key = `workspace:${branchId}:${period.from}:${period.to}`;
+  // v2: the v1 entries predate the report aggregates and have no `sales` block.
+  const key = `workspace:v2:${branchId}:${period.from}:${period.to}`;
 
   const load = useCallback(
     async (force = false) => {

@@ -1,7 +1,14 @@
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { AudienceCard, AudienceRow, fetchAudience } from './customer-workspace';
+import {
+  AudienceCard,
+  AudienceRow,
+  LedgerRow,
+  LedgerType,
+  fetchAudience,
+  fetchTransactions,
+} from './customer-workspace';
 
 const MAX_ROWS = 2000;
 const PAGE = 200;
@@ -46,6 +53,58 @@ export function buildAudienceCsv(rows: AudienceRow[], card: AudienceCard): strin
       card === 'all'
         ? [row.name, row.phone, row.visits ?? 0, row.lastVisit ?? '', row.daysOverdue ?? '']
         : [row.name, row.phone, row.daysOverdue ?? '', reason];
+    lines.push(fields.map(escapeField).join(','));
+  }
+  return lines.join('\n');
+}
+
+const LEDGER_MAX = 5000;
+
+export async function collectLedger(params: {
+  branchId: string;
+  from: string;
+  to: string;
+  type?: LedgerType;
+  q?: string;
+}): Promise<LedgerRow[]> {
+  const all: LedgerRow[] = [];
+  for (let page = 1; all.length < LEDGER_MAX; page++) {
+    const res = await fetchTransactions({ ...params, page, perPage: 100 });
+    all.push(...res.items);
+    if (res.items.length < 100) break;
+  }
+  return all.slice(0, LEDGER_MAX);
+}
+
+export function buildLedgerCsv(rows: LedgerRow[]): string {
+  const header = [
+    'Date',
+    'Time',
+    'Customer',
+    'Phone',
+    'Type',
+    'Outlet',
+    'Staff',
+    'Bill (RM)',
+    'Stamps',
+    'Points',
+    'Voucher',
+  ];
+  const lines = [header.join(',')];
+  for (const row of rows) {
+    const fields = [
+      row.created.slice(0, 10),
+      row.created.slice(11, 16),
+      row.customerName,
+      row.customerPhone,
+      row.type,
+      row.branchName || 'HQ',
+      row.staffName || 'Unassigned',
+      (row.billCents / 100).toFixed(2),
+      row.stamps,
+      row.points,
+      row.voucherCode,
+    ];
     lines.push(fields.map(escapeField).join(','));
   }
   return lines.join('\n');

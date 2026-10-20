@@ -51,6 +51,34 @@ function parsePbDate(value) {
   return isNaN(t) ? null : t;
 }
 
+/**
+ * '2026-10-20 15' (a UTC hour bucket) -> the local UTC+8 day and hour.
+ * The store calendar is UTC+8, so a local day starts eight hours before its
+ * date string; bucketing on the raw UTC prefix would shift every evening sale.
+ */
+function bucketToLocal(bucket) {
+  const t = new Date(String(bucket).replace(" ", "T") + ":00:00Z");
+  if (isNaN(t.getTime())) return null;
+  const u = new Date(t.getTime() + 8 * 3600000);
+  return {
+    day: u.getUTCFullYear() + "-" + pad2(u.getUTCMonth() + 1) + "-" + pad2(u.getUTCDate()),
+    hour: u.getUTCHours(),
+  };
+}
+
+/** Local day strings from `fromDate` (inclusive) to `toDate` (exclusive). */
+function localDays(fromDate, toDate) {
+  const out = [];
+  let cursor = fromDate;
+  let guard = 0;
+  while (cursor < toDate && guard < 400) {
+    out.push(cursor);
+    cursor = addDays(cursor, 1);
+    guard++;
+  }
+  return out;
+}
+
 function addDays(dateStr, days) {
   const t = new Date(String(dateStr) + "T00:00:00+08:00");
   const u = new Date(t.getTime() + days * DAY_MS + 8 * 3600000);
@@ -410,6 +438,271 @@ function buildSnapshot($app, ctx) {
   const feedbackCount = feedbackRow ? Number(feedbackRow.cnt) || 0 : 0;
   const avgRating = feedbackCount > 0 ? Number(feedbackRow.avg) : null;
 
+  // ── Sales depth ───────────────────────────────────────────────────────────
+  // Hour buckets rather than day buckets: `created` is UTC, and the local day
+  // has to be derived after shifting by +8h (see bucketToLocal).
+  const salesBuckets = rows(
+    $app,
+    "SELECT substr(t.created, 1, 13) as bucket, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as sales, " +
+      "COUNT(*) as orders FROM transactions t WHERE " + scope +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.bill_amount > 0 GROUP BY bucket",
+    base,
+    { bucket: "", sales: "", orders: 0 }
+  );
+
+  const salesByDay = {};
+  const hours = [];
+  for (let i = 0; i < 24; i++) hours.push(0);
+  salesBuckets.forEach(function (r) {
+    const local = bucketToLocal(r.bucket);
+    if (!local) return;
+    const amount = Number(r.sales) || 0;
+    const orders = Number(r.orders) || 0;
+    const day = salesByDay[local.day] || { sales: 0, orders: 0 };
+    day.sales += amount;
+    day.orders += orders;
+    salesByDay[local.day] = day;
+    hours[local.hour] += orders;
+  });
+
+  // New vs returning per bucket, against each customer's first-ever visit.
+  const newBuckets = rows(
+    $app,
+    "SELECT substr(t.created, 1, 13) as bucket, " +
+      "COUNT(DISTINCT CASE WHEN t.created = f.first_seen THEN t.customer END) as new_cnt, " +
+      "COUNT(DISTINCT CASE WHEN t.created > f.first_seen THEN t.customer END) as ret_cnt " +
+      "FROM transactions t JOIN (SELECT customer, MIN(created) as first_seen FROM transactions " +
+      "WHERE merchant = {:mid_all} GROUP BY customer) f ON f.customer = t.customer " +
+      "WHERE " + scope + " AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY bucket",
+    Object.assign({}, base, { mid_all: ctx.merchantId }),
+    { bucket: "", new_cnt: 0, ret_cnt: 0 }
+  );
+  const newByDay = {};
+  newBuckets.forEach(function (r) {
+    const local = bucketToLocal(r.bucket);
+    if (!local) return;
+    const day = newByDay[local.day] || { newCount: 0, returningCount: 0 };
+    day.newCount += Number(r.new_cnt) || 0;
+    day.returningCount += Number(r.ret_cnt) || 0;
+    newByDay[local.day] = day;
+  });
+
+  // A year of daily points is unreadable, so long periods roll up by month.
+  const periodDayList = localDays(ctx.fromDate, ctx.toDate);
+  const granularity = periodDayList.length > 92 ? "month" : "day";
+  const seriesMap = {};
+  periodDayList.forEach(function (d) {
+    const key = granularity === "month" ? d.slice(0, 7) : d;
+    if (!seriesMap[key]) {
+      seriesMap[key] = { date: key, sales: 0, orders: 0, newCount: 0, returningCount: 0 };
+    }
+    const s = salesByDay[d];
+    if (s) {
+      seriesMap[key].sales += s.sales;
+      seriesMap[key].orders += s.orders;
+    }
+    const n = newByDay[d];
+    if (n) {
+      seriesMap[key].newCount += n.newCount;
+      seriesMap[key].returningCount += n.returningCount;
+    }
+  });
+  const salesSeries = Object.keys(seriesMap).map(function (key) {
+    const s = seriesMap[key];
+    return {
+      date: s.date,
+      salesCents: Math.round(s.sales * 100),
+      orders: s.orders,
+      newCount: s.newCount,
+      returningCount: s.returningCount,
+    };
+  });
+
+  // Outlet comparison is merchant-wide — it only makes sense on "All Branches".
+  let outlets = [];
+  if (!ctx.branchId) {
+    outlets = rows(
+      $app,
+      "SELECT t.branch as id, IFNULL(b.name, '') as name, " +
+        "CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as sales, COUNT(*) as orders " +
+        "FROM transactions t LEFT JOIN branches b ON b.id = t.branch " +
+        "WHERE t.merchant = {:mid} AND t.type <> 'adjust' AND t.bill_amount > 0 " +
+        "AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY t.branch ORDER BY SUM(t.bill_amount) DESC",
+      base,
+      { id: "", name: "", sales: "", orders: 0 }
+    ).map(function (r) {
+      return {
+        id: r.id || "",
+        name: r.name || "Unassigned outlet",
+        salesCents: Math.round((Number(r.sales) || 0) * 100),
+        orders: Number(r.orders) || 0,
+      };
+    });
+  }
+
+  // Staff leaderboard. Older rows carry no staff relation, so they are grouped
+  // under "Unassigned" instead of being dropped from the totals.
+  const staffPerformance = rows(
+    $app,
+    "SELECT t.staff as id, IFNULL(u.name, '') as name, " +
+      "CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as sales, COUNT(*) as orders, " +
+      "CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps " +
+      "FROM transactions t LEFT JOIN users u ON u.id = t.staff WHERE " + scope +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.bill_amount > 0 " +
+      "GROUP BY t.staff ORDER BY SUM(t.bill_amount) DESC LIMIT 8",
+    base,
+    { id: "", name: "", sales: "", orders: 0, stamps: "" }
+  ).map(function (r) {
+    return {
+      id: r.id || "",
+      name: r.name || "Unassigned staff",
+      salesCents: Math.round((Number(r.sales) || 0) * 100),
+      orders: Number(r.orders) || 0,
+      stamps: Number(r.stamps) || 0,
+    };
+  });
+
+  // ── Customer depth ────────────────────────────────────────────────────────
+  const frequency = [
+    { bucket: "1 visit", count: 0 },
+    { bucket: "2–3 visits", count: 0 },
+    { bucket: "4+ visits", count: 0 },
+  ];
+  period.forEach(function (r) {
+    const visits = Number(r.visits) || 0;
+    if (visits <= 0) return;
+    if (visits === 1) frequency[0].count++;
+    else if (visits <= 3) frequency[1].count++;
+    else frequency[2].count++;
+  });
+
+  // ── Booking depth ─────────────────────────────────────────────────────────
+  const bookingDetailRows = rows(
+    $app,
+    "SELECT b.status as status, b.booking_date as booking_date, " +
+      "CAST(COALESCE(b.total_price, 0) AS TEXT) as price, b.items_summary as items " +
+      "FROM service_bookings b WHERE b.merchant = {:mid}" + bookingBranch +
+      " AND b.booking_date >= {:fromDate} AND b.booking_date < {:toDate}",
+    bookingBase,
+    { status: "", booking_date: "", price: "", items: "" }
+  );
+
+  const next7 = [];
+  for (let i = 0; i < 7; i++) next7.push({ date: addDays(localDate(0), i), count: 0, revenueCents: 0 });
+  const serviceMap = {};
+  let bookingRevenue = 0;
+  bookingDetailRows.forEach(function (r) {
+    const status = String(r.status || "");
+    const price = Number(r.price) || 0;
+    if (status === "cancelled" || status === "no_show") return;
+    bookingRevenue += price;
+
+    const day = String(r.booking_date || "");
+    const slot = next7.find(function (n) {
+      return n.date === day;
+    });
+    if (slot) {
+      slot.count++;
+      slot.revenueCents += Math.round(price * 100);
+    }
+
+    let items = r.items;
+    if (typeof items === "string") {
+      try {
+        items = JSON.parse(items || "[]");
+      } catch (e) {
+        items = [];
+      }
+    }
+    if (!items || typeof items.length !== "number") return;
+    for (let i = 0; i < items.length; i++) {
+      const name = String((items[i] && items[i].name) || "Service");
+      const itemPrice = Number((items[i] && items[i].price) || 0);
+      const entry = serviceMap[name] || { name: name, count: 0, revenue: 0 };
+      entry.count++;
+      entry.revenue += itemPrice;
+      serviceMap[name] = entry;
+    }
+  });
+  const topServices = Object.keys(serviceMap)
+    .map(function (name) {
+      return {
+        name: name,
+        count: serviceMap[name].count,
+        revenueCents: Math.round(serviceMap[name].revenue * 100),
+      };
+    })
+    .sort(function (a, b) {
+      return b.revenueCents - a.revenueCents;
+    })
+    .slice(0, 5);
+
+  const noShowRate = bookingTotal > 0 ? Math.round(((bookingCounts.no_show || 0) / bookingTotal) * 1000) / 10 : null;
+
+  // ── Loyalty depth ─────────────────────────────────────────────────────────
+  const vouchersIssued = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM vouchers v JOIN rewards r ON r.id = v.reward " +
+        "WHERE r.merchant = {:mid} AND v.created >= {:fromUtc} AND v.created < {:toUtc}",
+      { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc },
+      "v"
+    )
+  ) || 0;
+
+  // Points are spent on `redeem` transactions, recorded as a negative `points`
+  // value. The redemptions table only holds voucher records, so summing it
+  // undercounted (1 vs the 33 recorded redeems).
+  const pointsRedeemedRow = rows(
+    $app,
+    "SELECT CAST(COALESCE(SUM(CASE WHEN t.points < 0 THEN -t.points ELSE 0 END), 0) AS TEXT) as pts, " +
+      "COUNT(CASE WHEN t.points < 0 THEN 1 END) as cnt FROM transactions t " +
+      "WHERE t.merchant = {:mid} AND t.type = 'redeem' " +
+      "AND t.created >= {:fromUtc} AND t.created < {:toUtc}",
+    { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc },
+    { pts: "", cnt: 0 }
+  )[0];
+
+  const activeCards = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM loyalty_cards WHERE merchant = {:mid} AND status = 'active'",
+      { mid: ctx.merchantId },
+      "v"
+    )
+  ) || 0;
+
+  // ── Reviews depth ─────────────────────────────────────────────────────────
+  const distributionRows = rows(
+    $app,
+    "SELECT rating as stars, COUNT(*) as cnt FROM store_feedbacks " +
+      "WHERE merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc} GROUP BY rating ORDER BY rating DESC",
+    feedbackBase,
+    { stars: 0, cnt: 0 }
+  );
+  const distribution = [5, 4, 3, 2, 1].map(function (stars) {
+    const hit = distributionRows.find(function (r) {
+      return Number(r.stars) === stars;
+    });
+    return { stars: stars, count: hit ? Number(hit.cnt) || 0 : 0 };
+  });
+
+  const recentReviews = rows(
+    $app,
+    "SELECT IFNULL(customer_name, '') as name, rating as stars, IFNULL(feedback, '') as feedback, created as created " +
+      "FROM store_feedbacks WHERE merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc} " +
+      "ORDER BY created DESC LIMIT 5",
+    feedbackBase,
+    { name: "", stars: 0, feedback: "", created: "" }
+  ).map(function (r) {
+    return {
+      name: r.name || "Customer",
+      stars: Number(r.stars) || 0,
+      feedback: r.feedback || "",
+      createdAt: r.created,
+    };
+  });
+
   return {
     overview: {
       visited: visitedCustomers.length,
@@ -449,7 +742,124 @@ function buildSnapshot($app, ctx) {
     birthdays: birthdayCount,
     feedback: { responses: feedbackCount, avgRating: avgRating },
     unavailable: { googleReviewOpens: true, campaignResults: true, branchFeedback: true, availableSlots: true },
+    sales: {
+      series: salesSeries,
+      granularity: granularity,
+      hours: hours,
+      outlets: outlets,
+      staff: staffPerformance,
+    },
+    customers: {
+      frequency: frequency,
+      // New vs returning shares the sales series (same buckets, same period).
+      series: salesSeries.map(function (s) {
+        return { date: s.date, newCount: s.newCount, returningCount: s.returningCount };
+      }),
+    },
+    bookingDetail: {
+      revenueCents: Math.round(bookingRevenue * 100),
+      noShowRate: noShowRate,
+      next7: next7,
+      topServices: topServices,
+    },
+    loyaltyDetail: {
+      vouchersIssued: vouchersIssued,
+      vouchersUsed: vouchersRedeemed,
+      redemptionRate:
+        vouchersIssued > 0 ? Math.round((vouchersRedeemed / vouchersIssued) * 1000) / 10 : null,
+      pointsRedeemed: pointsRedeemedRow ? Number(pointsRedeemedRow.pts) || 0 : 0,
+      redemptions: pointsRedeemedRow ? Number(pointsRedeemedRow.cnt) || 0 : 0,
+      activeCards: activeCards,
+    },
+    reviews: {
+      distribution: distribution,
+      recent: recentReviews,
+    },
   };
+}
+
+/**
+ * The transaction ledger: one row per recorded transaction, newest first.
+ * `adjust` rows are corrections, so the caller filters them out of sales but they
+ * stay visible here — hiding them is how a ledger stops matching the till.
+ */
+function buildTransactions($app, ctx, opts) {
+  const limit = Math.max(1, Math.min(100, Number(opts.perPage) || 25));
+  const page = Math.max(1, Number(opts.page) || 1);
+  const offset = (page - 1) * limit;
+
+  const where = ["t.merchant = {:mid}"];
+  const params = Object.assign({}, bindBase(ctx));
+
+  if (opts.type && opts.type !== "all") {
+    where.push("t.type = {:type}");
+    params.type = String(opts.type);
+  }
+  if (opts.q) {
+    where.push("(u.name LIKE {:q} OR u.phone LIKE {:q})");
+    params.q = "%" + String(opts.q) + "%";
+  }
+
+  const scopeSql = where.join(" AND ") + branchClause(ctx, "t.branch");
+
+  const total = Number(
+    scalar(
+      $app,
+      "SELECT COUNT(*) as v FROM transactions t LEFT JOIN users u ON u.id = t.customer WHERE " +
+        scopeSql +
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc}",
+      params,
+      "v"
+    )
+  ) || 0;
+
+  const items = rows(
+    $app,
+    "SELECT t.id as id, t.created as created, t.type as type, t.customer as customer_id, " +
+      "CAST(COALESCE(t.bill_amount, 0) AS TEXT) as bill, " +
+      "CAST(COALESCE(t.stamps, 0) AS TEXT) as stamps, " +
+      "CAST(COALESCE(t.points, 0) AS TEXT) as points, " +
+      "IFNULL(u.name, '') as customer_name, IFNULL(u.phone, '') as customer_phone, " +
+      "IFNULL(b.name, '') as branch_name, IFNULL(s.name, '') as staff_name, " +
+      "IFNULL(json_extract(t.metadata, '$.voucher_code'), '') as voucher_code " +
+      "FROM transactions t LEFT JOIN users u ON u.id = t.customer " +
+      "LEFT JOIN branches b ON b.id = t.branch LEFT JOIN users s ON s.id = t.staff WHERE " +
+      scopeSql +
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} " +
+      "ORDER BY t.created DESC LIMIT {:limit} OFFSET {:offset}",
+    Object.assign({}, params, { limit: limit, offset: offset }),
+    {
+      id: "",
+      created: "",
+      type: "",
+      bill: "",
+      stamps: "",
+      points: "",
+      customer_id: "",
+      customer_name: "",
+      customer_phone: "",
+      branch_name: "",
+      staff_name: "",
+      voucher_code: "",
+    }
+  ).map(function (r) {
+    return {
+      id: r.id,
+      created: r.created,
+      type: r.type,
+      billCents: Math.round((Number(r.bill) || 0) * 100),
+      stamps: Number(r.stamps) || 0,
+      points: Number(r.points) || 0,
+      customerId: r.customer_id || "",
+      customerName: r.customer_name || "Customer",
+      customerPhone: r.customer_phone || "",
+      branchName: r.branch_name || "",
+      staffName: r.staff_name || "",
+      voucherCode: r.voucher_code || "",
+    };
+  });
+
+  return { page: page, perPage: limit, total: total, items: items };
 }
 
 /** Audience rows for the Actions cards. Paginated; counts live in the snapshot. */
@@ -593,6 +1003,7 @@ function buildAudience($app, ctx, card, page, perPage) {
 
 module.exports = {
   buildSnapshot: buildSnapshot,
+  buildTransactions: buildTransactions,
   buildAudience: buildAudience,
   localDate: localDate,
   localDateToUtcStart: localDateToUtcStart,

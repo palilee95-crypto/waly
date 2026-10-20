@@ -76,6 +76,43 @@ export type WorkspaceSnapshot = {
     branchFeedback: boolean;
     availableSlots: boolean;
   };
+  sales: {
+    /** Day buckets, or month buckets when the period is longer than 92 days. */
+    series: {
+      date: string;
+      salesCents: number;
+      orders: number;
+      newCount: number;
+      returningCount: number;
+    }[];
+    granularity: 'day' | 'month';
+    /** Orders by local hour, index 0–23. */
+    hours: number[];
+    outlets: { id: string; name: string; salesCents: number; orders: number }[];
+    staff: { id: string; name: string; salesCents: number; orders: number; stamps: number }[];
+  };
+  customers: {
+    frequency: { bucket: string; count: number }[];
+    series: { date: string; newCount: number; returningCount: number }[];
+  };
+  bookingDetail: {
+    revenueCents: number;
+    noShowRate: number | null;
+    next7: { date: string; count: number; revenueCents: number }[];
+    topServices: { name: string; count: number; revenueCents: number }[];
+  };
+  loyaltyDetail: {
+    vouchersIssued: number;
+    vouchersUsed: number;
+    redemptionRate: number | null;
+    pointsRedeemed: number;
+    redemptions: number;
+    activeCards: number;
+  };
+  reviews: {
+    distribution: { stars: number; count: number }[];
+    recent: { name: string; stars: number; feedback: string; createdAt: string }[];
+  };
 };
 
 export type WorkspacePeriod = { id: string; label: string; from: string; to: string };
@@ -96,15 +133,78 @@ function monthRange(year: number, month: number) {
   return { from, to: `${next.y}-${pad2(next.m)}-01` };
 }
 
+/** Local (UTC+8) calendar date for an offset in days, as YYYY-MM-DD. */
+function localDate(offsetDays: number): string {
+  const t = new Date(Date.now() + 8 * 3600 * 1000 + offsetDays * 86400000);
+  return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
+}
+
+function addDaysStr(date: string, days: number): string {
+  const t = new Date(`${date}T00:00:00+08:00`);
+  const u = new Date(t.getTime() + days * 86400000 + 8 * 3600 * 1000);
+  return `${u.getUTCFullYear()}-${pad2(u.getUTCMonth() + 1)}-${pad2(u.getUTCDate())}`;
+}
+
 /** Dynamic periods — never the pack's fixed Oct/Sep 2026 demo dates. */
 export function workspacePeriods(now = localNow()): WorkspacePeriod[] {
   const thisMonth = monthRange(now.year, now.month);
   const prev = now.month === 1 ? { y: now.year - 1, m: 12 } : { y: now.year, m: now.month - 1 };
   const lastMonth = monthRange(prev.y, prev.m);
+  const today = localDate(0);
+  const tomorrow = addDaysStr(today, 1);
   return [
+    { id: 'today', label: 'Today', from: today, to: tomorrow },
+    { id: 'last_7', label: 'Last 7 days', from: localDate(-6), to: tomorrow },
+    { id: 'last_30', label: 'Last 30 days', from: localDate(-29), to: tomorrow },
     { id: 'this_month', label: 'This month', ...thisMonth },
     { id: 'last_month', label: 'Last month', ...lastMonth },
+    { id: 'this_year', label: 'This year', from: `${now.year}-01-01`, to: `${now.year + 1}-01-01` },
   ];
+}
+
+export type LedgerType = 'all' | 'earn' | 'redeem' | 'expire' | 'adjust';
+
+export type LedgerRow = {
+  id: string;
+  created: string;
+  type: string;
+  billCents: number;
+  stamps: number;
+  points: number;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  branchName: string;
+  staffName: string;
+  voucherCode: string;
+};
+
+export type LedgerPage = { page: number; perPage: number; total: number; items: LedgerRow[] };
+
+/** The transaction ledger. Server-side so the filters and scope cannot drift. */
+export async function fetchTransactions(params: {
+  branchId: string;
+  from: string;
+  to: string;
+  page?: number;
+  perPage?: number;
+  type?: LedgerType;
+  q?: string;
+}): Promise<LedgerPage> {
+  const { branchId, from, to, page = 1, perPage = 25, type = 'all', q = '' } = params;
+  const qs = new URLSearchParams({
+    branch: branchId || 'all',
+    from,
+    to,
+    page: String(page),
+    perPage: String(perPage),
+    type,
+  });
+  if (q.trim()) qs.set('q', q.trim());
+  return pb.send<LedgerPage>(`/api/risev/merchant/customer-workspace/transactions?${qs.toString()}`, {
+    method: 'GET',
+    requestKey: null,
+  });
 }
 
 export type FetchWorkspaceParams = {
@@ -114,6 +214,49 @@ export type FetchWorkspaceParams = {
   signal?: AbortSignal;
 };
 
+/**
+ * Fills in report blocks the server did not send.
+ *
+ * A running dev client can hold a snapshot fetched before the hooks were
+ * redeployed, and a missing array used to crash the tab outright. Missing means
+ * empty, never invented — the "No data" rules still apply on top.
+ */
+function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
+  const emptyHours = () => new Array(24).fill(0) as number[];
+  return {
+    ...raw,
+    sales: {
+      series: raw.sales?.series ?? [],
+      granularity: raw.sales?.granularity ?? 'day',
+      hours: raw.sales?.hours?.length === 24 ? raw.sales.hours : emptyHours(),
+      outlets: raw.sales?.outlets ?? [],
+      staff: raw.sales?.staff ?? [],
+    },
+    customers: {
+      frequency: raw.customers?.frequency ?? [],
+      series: raw.customers?.series ?? [],
+    },
+    bookingDetail: {
+      revenueCents: raw.bookingDetail?.revenueCents ?? 0,
+      noShowRate: raw.bookingDetail?.noShowRate ?? null,
+      next7: raw.bookingDetail?.next7 ?? [],
+      topServices: raw.bookingDetail?.topServices ?? [],
+    },
+    loyaltyDetail: {
+      vouchersIssued: raw.loyaltyDetail?.vouchersIssued ?? 0,
+      vouchersUsed: raw.loyaltyDetail?.vouchersUsed ?? 0,
+      redemptionRate: raw.loyaltyDetail?.redemptionRate ?? null,
+      pointsRedeemed: raw.loyaltyDetail?.pointsRedeemed ?? 0,
+      redemptions: raw.loyaltyDetail?.redemptions ?? 0,
+      activeCards: raw.loyaltyDetail?.activeCards ?? 0,
+    },
+    reviews: {
+      distribution: raw.reviews?.distribution ?? [],
+      recent: raw.reviews?.recent ?? [],
+    },
+  };
+}
+
 export async function fetchWorkspace({
   branchId = 'all',
   from,
@@ -121,11 +264,11 @@ export async function fetchWorkspace({
   signal,
 }: FetchWorkspaceParams): Promise<WorkspaceSnapshot> {
   const qs = new URLSearchParams({ branch: branchId || 'all', from, to }).toString();
-  return pb.send<WorkspaceSnapshot>(`/api/risev/merchant/customer-workspace?${qs}`, {
-    method: 'GET',
-    requestKey: null,
-    signal,
-  });
+  const raw = await pb.send<WorkspaceSnapshot>(
+    `/api/risev/merchant/customer-workspace?${qs}`,
+    { method: 'GET', requestKey: null, signal }
+  );
+  return normalizeSnapshot(raw);
 }
 
 export type AudienceCard = 'return' | 'rewards' | 'rebook' | 'birthday' | 'all';
