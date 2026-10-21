@@ -1145,7 +1145,8 @@ export default function CustomerBookingPwaScreen() {
       // Fetch staff (live active staff only)
       try {
         const stRes = await pb.collection('merchant_staff').getList(1, 20, {
-          filter: `merchant = "${mRecord.id}" && is_active = true`
+          filter: `merchant = "${mRecord.id}" && is_active = true`,
+          sort: 'sort_order,created'
         });
         const activeStaff = (stRes.items || []).filter((s: any) => s.is_active !== false && s.attendance_status !== 'on_leave');
 
