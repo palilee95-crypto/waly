@@ -366,6 +366,11 @@ export default function CustomerBookingPwaScreen() {
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffItem | null>(null);
   const [showStaffPicker, setShowStaffPicker] = useState(false);
+
+  // A service can require a staff member even when the store does not offer
+  // customers the full team picker (merchant_services.requires_staff).
+  const staffRequired = selectedServices.some((service: any) => service.requires_staff === true);
+  const showStaffSelection = allowStaffSelection || staffRequired;
   const [selectedIsoDate, setSelectedIsoDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const d = new Date();
@@ -761,7 +766,21 @@ export default function CustomerBookingPwaScreen() {
     };
   }, [slug]);
 
-  const { user } = useAuth();
+  const { user, activeRole } = useAuth();
+
+  // A merchant browsing a booking page is not the customer. Prefill the form
+  // only from a genuine customer session, otherwise the store owner ends up
+  // booking as themselves and their name/phone leak into the walk-in flow.
+  const customerSessionIdentity = (): { name: string; phone: string } => {
+    const model: any = (pb.authStore as any)?.record || (pb.authStore as any)?.model || null;
+    const role = String((user as any)?.role || model?.role || '');
+    const isCustomer = activeRole === 'customer' || (activeRole !== 'merchant' && role === 'customer');
+    if (!isCustomer) return { name: '', phone: '' };
+    return {
+      name: String(user?.name || model?.name || ''),
+      phone: String(user?.phone || model?.phone || ''),
+    };
+  };
 
   // The Vouchers sheet used to render two invented vouchers, so merchants saw
   // "Store Promo Voucher" cards they never created. Load this customer's real active
@@ -799,23 +818,20 @@ export default function CustomerBookingPwaScreen() {
   useEffect(() => {
     const qName = (typeof queryName === 'string' ? queryName : '').trim();
     const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
+    const session = customerSessionIdentity();
 
     if (qName) {
       setCustomerName(qName);
-    } else if (user?.name) {
-      setCustomerName(user.name);
-    } else if ((pb.authStore?.model as any)?.name) {
-      setCustomerName((pb.authStore.model as any).name);
+    } else if (session.name) {
+      setCustomerName(session.name);
     }
 
     if (qPhone) {
       setCustomerPhone(qPhone);
-    } else if (user?.phone) {
-      setCustomerPhone(user.phone);
-    } else if ((pb.authStore?.model as any)?.phone) {
-      setCustomerPhone((pb.authStore.model as any).phone);
+    } else if (session.phone) {
+      setCustomerPhone(session.phone);
     }
-  }, [user, queryName, queryPhone]);
+  }, [user, activeRole, queryName, queryPhone]);
 
   useEffect(() => {
     if (queryRef === 'nfc_walkin') {
@@ -827,8 +843,9 @@ export default function CustomerBookingPwaScreen() {
     try {
       const qName = (typeof queryName === 'string' ? queryName : '').trim();
       const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
-      const activeName = user?.name || (pb.authStore?.model as any)?.name;
-      const activePhone = user?.phone || (pb.authStore?.model as any)?.phone;
+      const session = customerSessionIdentity();
+      const activeName = session.name;
+      const activePhone = session.phone;
 
       if (qName) {
         setCustomerName(qName);
@@ -1156,7 +1173,7 @@ export default function CustomerBookingPwaScreen() {
 
       // Check if customer already has an active booking for this merchant
       try {
-        const activePhone = user?.phone || (pb.authStore?.model as any)?.phone;
+        const activePhone = customerSessionIdentity().phone;
         const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
         const phoneToQuery = activePhone || savedPhone;
 
@@ -1378,7 +1395,7 @@ export default function CustomerBookingPwaScreen() {
 
         const totalPrice = calculateTotal();
         const serviceNameStr = selectedServices.map(s => s.name).join(', ');
-        const staffNameStr = !allowStaffSelection
+        const staffNameStr = !showStaffSelection
           ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team')
           : (selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'));
         const itemsSummaryData = selectedServices.map(s => ({
@@ -1400,7 +1417,7 @@ export default function CustomerBookingPwaScreen() {
         const payloadToSave = {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
-          staff: (!allowStaffSelection || !selectedStaff?.id) ? null : selectedStaff.id,
+          staff: (!showStaffSelection || !selectedStaff?.id) ? null : selectedStaff.id,
           customer_name: customerName,
           customer_phone: customerPhone,
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
@@ -2575,7 +2592,7 @@ export default function CustomerBookingPwaScreen() {
           <View style={styles.stepContainer}>
             
             {/* Choose Staff Section Header (conditionally shown if merchant allows staff selection) */}
-            {allowStaffSelection && (
+            {showStaffSelection && (
               <>
                 <View style={styles.staffHeaderRow}>
                   <View>
@@ -2916,7 +2933,7 @@ export default function CustomerBookingPwaScreen() {
               <View style={styles.recapItemRow}>
                 <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>
-                  {!allowStaffSelection
+                  {!showStaffSelection
                     ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team')
                     : (selectedStaff?.name || (staffList.length === 0 ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team') : 'Any Available'))}
                 </Text>

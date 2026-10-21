@@ -676,7 +676,7 @@ export default function NfcLandingScreen() {
     preview_declined?: string;
     preview_voucher?: string;
   }>();
-  const { user, logout, refreshSession } = useAuth();
+  const { user, logout, refreshSession, activeRole } = useAuth();
   const { locale } = useLanguage();
   const isEn = locale === 'en';
   const { width: windowWidth } = useWindowDimensions();
@@ -1288,8 +1288,11 @@ export default function NfcLandingScreen() {
 
   const handleNavigateToBooking = () => {
     if (!bookingSlug) return;
-    const phone = (phoneInput || user?.phone || '').trim();
-    const name = (nameInput || user?.name || '').trim();
+    // A merchant (or a merchant-mode account) is not the walk-in customer, so
+    // only a real customer session may supply the identity when none was typed.
+    const sessionIsCustomer = activeRole === 'customer';
+    const phone = (phoneInput || (sessionIsCustomer ? user?.phone || '' : '')).trim();
+    const name = (nameInput || (sessionIsCustomer ? user?.name || '' : '')).trim();
     const q = new URLSearchParams();
     if (phone) q.append('phone', phone);
     if (name) q.append('name', name);
