@@ -508,20 +508,12 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
     }
 
     if (oldStatus !== newStatus) {
+      // Saving fires onRecordUpdate below, which owns processCompletedBooking.
+      // Calling it here as well ran the completion twice: when the transaction
+      // creation fails (velocity limit) the idempotency guard cannot stop the
+      // second pass and the customer is awarded stamps twice.
       booking.set("status", newStatus);
       $app.save(booking);
-    }
-
-    if (oldStatus !== "completed" && newStatus === "completed") {
-      try {
-        let bHelper = null;
-        try { bHelper = require(`${__hooks}/booking_helper.js`); } catch (bhErr) {}
-        if (bHelper && typeof bHelper.processCompletedBooking === "function") {
-          bHelper.processCompletedBooking(booking);
-        }
-      } catch (compErr) {
-        console.log("[BOOKING STATUS ENDPOINT COMPLETE ERROR]", compErr.message || compErr);
-      }
     }
 
     return e.json(200, { success: true, booking_id: bookingId, status: newStatus });

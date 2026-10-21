@@ -82,7 +82,10 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
 
   let meta = {};
   try {
-    meta = JSON.parse(txn.getString("metadata") || "{}");
+    // Unset JSON reads back as "null" → JSON.parse gives null, not an object.
+    const rawMeta = txn.getString("metadata") || "";
+    const parsedMeta = rawMeta && rawMeta !== "null" ? JSON.parse(rawMeta) : null;
+    if (parsedMeta && typeof parsedMeta === "object" && !Array.isArray(parsedMeta)) meta = parsedMeta;
   } catch (err) {}
   const source = sourceOverride || meta;
   const rawItems = Array.isArray(source.items)

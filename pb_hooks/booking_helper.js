@@ -546,8 +546,12 @@ function processCompletedBooking(rec) {
     if (!newTx || totalPrice <= 0) return newTx;
     var receiptMeta = {};
     try {
+      // An unset JSON field reads back as the literal string "null", and
+      // JSON.parse("null") is null — assigning it would throw on the first
+      // property read and abort the receipt.
       var receiptMetaRaw = rec.getString ? rec.getString("metadata") : "";
-      receiptMeta = receiptMetaRaw ? JSON.parse(receiptMetaRaw) : {};
+      var parsedMeta = receiptMetaRaw && receiptMetaRaw !== "null" ? JSON.parse(receiptMetaRaw) : null;
+      if (parsedMeta && typeof parsedMeta === "object" && !Array.isArray(parsedMeta)) receiptMeta = parsedMeta;
     } catch (metaErr) { receiptMeta = {}; }
     var dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     var receiptCode = "REC-" + dateStr + "-" + $security.randomString(4).toUpperCase();
