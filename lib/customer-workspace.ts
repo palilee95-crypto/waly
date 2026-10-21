@@ -482,6 +482,18 @@ export type CustomerActivity = {
   method: string;
 };
 
+/** The card design the customer actually sees, straight from their loyalty program. */
+export type CustomerCardDesign = {
+  programName: string;
+  cardColor: string;
+  stampColor: string;
+  fontColor: string;
+  cardIcon: string;
+  cardBackground: string;
+  enableStamps: boolean;
+  enablePoints: boolean;
+};
+
 export type CustomerDetail = {
   id: string;
   name: string;
@@ -494,6 +506,9 @@ export type CustomerDetail = {
   vouchers: number;
   lastActivity: string;
   activity: CustomerActivity[];
+  card: CustomerCardDesign | null;
+  merchantName: string;
+  merchantLogo: string;
 };
 
 /**
@@ -507,7 +522,7 @@ export async function fetchCustomerDetail(
   fallback: { name?: string; phone?: string } = {}
 ): Promise<CustomerDetail> {
   const merchantId = String(pb.authStore.record?.merchant_id || '');
-  const [cards, txns, vouchers] = await Promise.all([
+  const [cards, txns, vouchers, merchant] = await Promise.all([
     pb
       .collection('loyalty_cards')
       .getList(1, 1, {
@@ -531,11 +546,16 @@ export async function fetchCustomerDetail(
         requestKey: null,
       })
       .catch(() => null),
+    merchantId
+      ? pb.collection('merchants').getOne(merchantId, { requestKey: null }).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const card: any = cards?.items?.[0] || null;
   const rows: any[] = txns?.items || [];
   const expanded: any = rows.find((r) => r.expand?.customer)?.expand?.customer || null;
+  const program: any = card?.expand?.program || null;
+  const merchantRecord: any = merchant || null;
 
   return {
     id: customerId,
@@ -557,6 +577,24 @@ export async function fetchCustomerDetail(
       created: r.created,
       method: String(r.method || ''),
     })),
+    card: program
+      ? {
+          programName: String(program.name || ''),
+          cardColor: String(program.card_color || ''),
+          stampColor: String(program.stamp_color || ''),
+          fontColor: String(program.font_color || ''),
+          cardIcon: String(program.card_icon || ''),
+          cardBackground: program.card_background
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
+            : '',
+          enableStamps: program.enable_stamps !== false,
+          enablePoints: program.enable_points === true,
+        }
+      : null,
+    merchantName: String(merchantRecord?.name || ''),
+    merchantLogo: merchantRecord?.logo
+      ? `${pb.baseUrl}/api/files/merchants/${merchantRecord.id}/${merchantRecord.logo}`
+      : '',
   };
 }
 
