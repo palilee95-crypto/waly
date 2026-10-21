@@ -395,20 +395,24 @@ export default function CustomerManagePanel({ customerId, visitDate, visitsOnDat
           </View>
 
           <View style={styles.presetRow}>
-            {[-5, -1, 1, 5].map((amount) => {
-              const selected = delta.trim() === String(amount);
+            {[-5, -1, 1, 5].map((step) => {
+              const selected = delta.trim() === String(step);
               return (
                 <TouchableOpacity
-                  key={amount}
+                  key={step}
                   style={[styles.presetChip, selected && styles.presetChipActive]}
-                  onPress={() => setDelta(String(amount))}
+                  onPress={() => setDelta(String((Number.isFinite(adjustAmount) ? adjustAmount : 0) + step))}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={`${amount > 0 ? 'Add' : 'Remove'} ${Math.abs(amount)} ${adjustUnit}`}
+                  accessibilityLabel={`${step > 0 ? 'Increase' : 'Decrease'} the amount by ${Math.abs(step)} ${adjustUnit}`}
                 >
-                  <Text style={[styles.presetChipText, selected && styles.presetChipTextActive]}>
-                    {amount > 0 ? `+${amount}` : `−${Math.abs(amount)}`}
+                  <Text
+                    style={[styles.presetChipText, selected && styles.presetChipTextActive]}
+                    numberOfLines={1}
+                    allowFontScaling={false}
+                  >
+                    {step > 0 ? `+${step}` : `−${Math.abs(step)}`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -760,9 +764,9 @@ const styles = StyleSheet.create({
   input: { height: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.accent[100], backgroundColor: colors.accent[50], paddingHorizontal: spacing[3], fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, color: colors.black },
   helperText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[400] },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[1] },
-  presetChip: { minWidth: 58, minHeight: 40, paddingHorizontal: spacing[4], alignItems: 'center', justifyContent: 'center', borderRadius: radii.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.accent[200] },
+  presetChip: { minWidth: 58, height: 40, paddingHorizontal: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radii.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.accent[200] },
   presetChipActive: { backgroundColor: colors.black, borderColor: colors.black },
-  presetChipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.black },
+  presetChipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, lineHeight: 16, color: colors.black, textAlign: 'center', includeFontPadding: false },
   presetChipTextActive: { color: colors.white },
   fieldWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], height: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.accent[100], backgroundColor: colors.accent[50], paddingHorizontal: spacing[3] },
   fieldInput: { flex: 1, minWidth: 0, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: colors.black, paddingVertical: 0 },
