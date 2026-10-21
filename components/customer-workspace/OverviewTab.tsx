@@ -304,6 +304,17 @@ function getTrendInsight(insight: NonNullable<WorkspaceSnapshot['periodInsight']
   return { title: `${label} brought your most visits`, detail };
 }
 
+/** Axis labels must fit on one line: a weekly range collapses to its first day. */
+function compactAxisLabel(label?: string, date?: string) {
+  if (label !== undefined && label !== null) {
+    const raw = String(label).trim();
+    if (!raw) return '';
+    const range = raw.match(/^(\d{2}-\d{2})\s*[–-]\s*\d{2}-\d{2}$/);
+    return range ? range[1] : raw;
+  }
+  return formatDayLabel(date || '');
+}
+
 function formatTrendDate(date: string, label?: string) {
   if (label) return label;
   if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -445,9 +456,15 @@ function TrendChart({ data }: { data: WorkspaceSnapshot['trend'] }) {
       {width > 0
         ? points.map((point, index) => {
             if (index % labelEvery !== 0 && index !== points.length - 1) return null;
+            const labelWidth = 52;
+            const left = Math.max(0, Math.min(point.x - labelWidth / 2, Math.max(0, width - labelWidth)));
             return (
-              <Text key={`xlab-${index}`} style={[styles.xLabel, { left: point.x - 20 }]}>
-                {point.label !== undefined ? point.label : formatDayLabel(point.date)}
+              <Text
+                key={`xlab-${index}`}
+                style={[styles.xLabel, { left, width: labelWidth }]}
+                numberOfLines={1}
+              >
+                {compactAxisLabel(point.label, point.date)}
               </Text>
             );
           })
@@ -643,11 +660,10 @@ const styles = StyleSheet.create({
   },
   xLabel: {
     position: 'absolute',
-    bottom: 0,
-    width: 36,
+    bottom: 34,
     textAlign: 'center',
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 10,
+    fontSize: 9.5,
     color: colors.accent[400],
   },
   pointValue: {
