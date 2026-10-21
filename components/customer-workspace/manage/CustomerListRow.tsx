@@ -1,15 +1,13 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, iconSizes, radii, spacing } from '@/theme';
+import { colors, radii, spacing } from '@/theme';
 import { formatMoney, relativeDays } from '@/lib/customer-workspace';
 import { avatarUrl, type ManageCustomerRow } from '@/lib/customer-management';
+import { customerSignal } from '@/lib/customer-outreach';
+import { whatsappNumber } from '@/lib/whatsapp';
 
-type Props = {
-  row: ManageCustomerRow;
-  selected?: boolean;
-  onPress: () => void;
-};
+type Props = { row: ManageCustomerRow; selected?: boolean; visitDate?: string; onPress: () => void; onWhatsApp: () => void };
 
 function initials(name: string) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -17,129 +15,51 @@ function initials(name: string) {
   return (parts[0].charAt(0) + (parts[1]?.charAt(0) || '')).toUpperCase();
 }
 
-export default function CustomerListRow({ row, selected, onPress }: Props) {
+export default function CustomerListRow({ row, selected, visitDate, onPress, onWhatsApp }: Props) {
   const last = row.lastVisit ? relativeDays(row.lastVisit) : 'never visited';
+  const signal = customerSignal(row);
+  const canMessage = !!whatsappNumber(row.phone);
 
   return (
-    <TouchableOpacity
-      style={[styles.row, selected && styles.rowSelected]}
-      activeOpacity={0.78}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${row.name}, ${row.visits} visits, ${last}`}
-    >
-      {row.avatar ? (
-        <Image source={{ uri: avatarUrl(row.id, row.avatar) }} style={styles.avatar} />
-      ) : (
-        <View style={styles.avatarFallback}>
-          <Text style={styles.avatarText}>{initials(row.name)}</Text>
-        </View>
-      )}
-
-      <View style={styles.copy}>
-        <Text style={styles.name} numberOfLines={1}>
-          {row.name || 'Customer'}
-        </Text>
-        <Text style={styles.phone} numberOfLines={1}>
-          {row.phone || 'No phone on file'}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {row.visits} visit{row.visits === 1 ? '' : 's'} · {last}
-        </Text>
-        <View style={styles.chips}>
-          <View style={styles.chip}>
-            <Ionicons name="ribbon-outline" size={10} color={colors.accent[500]} />
-            <Text style={styles.chipText}>
-              {row.stamps}/{row.stampGoal}
-            </Text>
+    <View style={[styles.row, selected && styles.rowSelected]}>
+      <TouchableOpacity style={styles.profileTap} activeOpacity={0.78} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open ${row.name || 'customer'} profile, ${signal.title}`}>
+        {row.avatar ? <Image source={{ uri: avatarUrl(row.id, row.avatar) }} style={styles.avatar} /> : (
+          <View style={styles.avatarFallback}><Text style={styles.avatarText}>{initials(row.name)}</Text></View>
+        )}
+        <View style={styles.copy}>
+          <Text style={styles.name} numberOfLines={1}>{row.name || 'Customer'}</Text>
+          <View style={styles.signalRow}>
+            <Ionicons name={signal.icon} size={13} color={colors.primary[700]} />
+            <Text style={styles.signal} numberOfLines={1}>{signal.title}</Text>
           </View>
-          <View style={styles.chip}>
-            <Ionicons name="sparkles-outline" size={10} color={colors.accent[500]} />
-            <Text style={styles.chipText}>{row.points} pts</Text>
-          </View>
-          {row.activeVouchers > 0 ? (
-            <View style={styles.chip}>
-              <Ionicons name="gift-outline" size={10} color={colors.accent[500]} />
-              <Text style={styles.chipText}>{row.activeVouchers}</Text>
-            </View>
-          ) : null}
+          <Text style={styles.meta} numberOfLines={1}>
+            {visitDate ? `${row.visitsOnDate} visit${row.visitsOnDate === 1 ? '' : 's'} on this day` : `${row.visits} visit${row.visits === 1 ? '' : 's'} · ${last}`}
+            {' · '}{formatMoney(row.spendCents)}
+          </Text>
         </View>
-      </View>
-
-      <View style={styles.right}>
-        <Text style={styles.spend}>{formatMoney(row.spendCents)}</Text>
-        <Ionicons name="chevron-forward" size={iconSizes.sm} color={colors.accent[400]} />
-      </View>
-    </TouchableOpacity>
+        <Ionicons name="chevron-forward" size={16} color={colors.accent[400]} />
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.messageButton, !canMessage && styles.messageDisabled]} disabled={!canMessage} onPress={onWhatsApp} accessibilityRole="button" accessibilityLabel={canMessage ? `Message ${row.name || 'customer'} on WhatsApp` : `Cannot message ${row.name || 'customer'}: no usable phone number`} accessibilityState={{ disabled: !canMessage }}>
+        <Ionicons name="logo-whatsapp" size={19} color={canMessage ? '#128C5E' : colors.accent[400]} />
+      </TouchableOpacity>
+      {!canMessage ? <Text style={styles.noPhone}>Add phone to message</Text> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    paddingVertical: spacing[2.5],
-    paddingHorizontal: spacing[2],
-    borderRadius: radii.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.accent[50],
-  },
-  rowSelected: {
-    backgroundColor: colors.primary[50],
-    borderBottomColor: 'transparent',
-  },
+  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing[1], paddingVertical: spacing[1], paddingHorizontal: spacing[1], borderRadius: radii.lg, borderBottomWidth: 1, borderBottomColor: colors.accent[50] },
+  rowSelected: { backgroundColor: colors.primary[50], borderBottomColor: 'transparent' },
+  profileTap: { flex: 1, minWidth: 0, minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.accent[100] },
-  avatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 14,
-    color: colors.primary[700],
-  },
-  copy: { flex: 1, minWidth: 0 },
-  name: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13.5,
-    color: colors.black,
-  },
-  phone: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 10.5,
-    color: colors.accent[400],
-    marginTop: 1,
-  },
-  meta: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 10.5,
-    color: colors.accent[500],
-    marginTop: 2,
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], marginTop: spacing[1.5] },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing[1.5],
-    paddingVertical: 1,
-    borderRadius: radii.full,
-    backgroundColor: colors.accent[50],
-  },
-  chipText: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 9,
-    color: colors.accent[700],
-  },
-  right: { alignItems: 'flex-end', gap: spacing[2] },
-  spend: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 12,
-    color: colors.black,
-  },
+  avatarFallback: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary[50], alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 14, color: colors.primary[700] },
+  copy: { flex: 1, minWidth: 0, gap: 2 },
+  name: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: colors.black },
+  signalRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  signal: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: colors.primary[700] },
+  meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[500] },
+  messageButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E8F6EE', alignItems: 'center', justifyContent: 'center', marginLeft: spacing[1] },
+  messageDisabled: { backgroundColor: colors.accent[50] },
+  noPhone: { width: '100%', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9.5, color: colors.accent[500], textAlign: 'right', paddingRight: spacing[1], marginTop: -4 },
 });

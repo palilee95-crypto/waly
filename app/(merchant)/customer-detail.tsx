@@ -9,8 +9,12 @@ import CustomerManagePanel from '@/components/customer-workspace/manage/Customer
 
 export default function CustomerDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ customerId?: string | string[] }>();
+  const params = useLocalSearchParams<{ customerId?: string | string[]; visitDate?: string | string[]; visitsOnDate?: string | string[]; issueVoucher?: string | string[] }>();
   const customerId = Array.isArray(params.customerId) ? params.customerId[0] : params.customerId;
+  const rawDate = Array.isArray(params.visitDate) ? params.visitDate[0] : params.visitDate;
+  const visitDate = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : '';
+  const rawCount = Array.isArray(params.visitsOnDate) ? params.visitsOnDate[0] : params.visitsOnDate;
+  const visitsOnDate = Math.max(0, Number(rawCount) || 0);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -32,6 +36,9 @@ export default function CustomerDetailScreen() {
         {customerId ? (
           <CustomerManagePanel
             customerId={String(customerId)}
+            visitDate={visitDate}
+            visitsOnDate={visitsOnDate}
+            startIssueVoucher={params.issueVoucher === '1'}
             onDeleted={() => handleSmartBack(router, '/(merchant)/manage-customers')}
           />
         ) : (

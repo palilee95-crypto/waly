@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import { colors, iconSizes, radii, shadows, spacing } from '@/theme';
+import { detailSignal, validVouchers } from '@/lib/customer-outreach';
+import { whatsappNumber } from '@/lib/whatsapp';
+import { formatVisitDate } from './CustomerVisitDatePicker';
+import CustomerWhatsAppComposer from './CustomerWhatsAppComposer';
 import {
   deleteCustomer,
   fetchDeletionAllowance,
@@ -36,6 +40,9 @@ import {
 
 type Props = {
   customerId: string;
+  visitDate?: string;
+  visitsOnDate?: number;
+  startIssueVoucher?: boolean;
   onChanged?: () => void;
   onDeleted?: () => void;
 };
@@ -63,7 +70,7 @@ function errorMessage(error: any) {
   return raw || 'Something went wrong.';
 }
 
-export default function CustomerManagePanel({ customerId, onChanged, onDeleted }: Props) {
+export default function CustomerManagePanel({ customerId, visitDate, visitsOnDate, startIssueVoucher, onChanged, onDeleted }: Props) {
   const { user, isOwner, staffPermissions } = useAuth();
   const canManage = !!isOwner || !!staffPermissions?.can_manage_customers;
 
@@ -86,7 +93,12 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
   const [rewardId, setRewardId] = useState('');
   const [issuing, setIssuing] = useState(false);
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerVoucherId, setComposerVoucherId] = useState('');
   const requestRef = useRef(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const voucherY = useRef(0);
+  const issueStarted = useRef(false);
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current;
@@ -190,6 +202,17 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
     }
   };
 
+  const showIssue = () => {
+    void openIssue();
+    setTimeout(() => scrollRef.current?.scrollTo({ y: voucherY.current, animated: true }), 180);
+  };
+
+  useEffect(() => {
+    if (!detail || !startIssueVoucher || issueStarted.current) return;
+    issueStarted.current = true;
+    showIssue();
+  }, [detail?.profile.id, startIssueVoucher]);
+
   const issueVoucher = async () => {
     if (!detail || !rewardId) {
       setActionError('Choose a reward first.');
@@ -271,9 +294,13 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
   const canAdjustStamps = canManage && loyalty.enableStamps;
   const canAdjustPoints = canManage && loyalty.enablePoints;
   const stampProgress = loyalty.stampGoal > 0 ? Math.min(1, loyalty.stamps / loyalty.stampGoal) : 0;
+  const activeVouchers = validVouchers(vouchers);
+  const signal = detailSignal(detail);
+  const hasPhone = !!whatsappNumber(profile.phone);
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <>
+    <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
       <View style={styles.profileCard}>
         <View style={styles.profileRow}>
           {profile.avatar ? (
@@ -299,6 +326,9 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
               </Text>
             </View>
           </View>
+          <TouchableOpacity style={[styles.profileMessage, !hasPhone && styles.disabled]} onPress={() => setComposerOpen(true)} disabled={!hasPhone} accessibilityRole="button" accessibilityLabel={hasPhone ? `Message ${profile.name} on WhatsApp` : 'No usable phone number to message on WhatsApp'} accessibilityState={{ disabled: !hasPhone }}>
+            <Ionicons name="logo-whatsapp" size={21} color={hasPhone ? '#128C5E' : colors.accent[400]} />
+          </TouchableOpacity>
         </View>
         <Text style={styles.profileFootnote}>
           {profile.optInMarketing ? 'Marketing messages allowed' : 'Marketing messages opted out'}
@@ -307,16 +337,35 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
         </Text>
       </View>
 
+      {visitDate ? (
+        <View style={styles.visitDateContext}>
+          <Ionicons name="calendar-outline" size={18} color={colors.black} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.visitDateTitle}>{visitsOnDate || 'Recorded'} {visitsOnDate === 1 ? 'visit' : 'visits'} on {formatVisitDate(visitDate)}</Text>
+            <Text style={styles.visitDateDetail}>The profile and lifetime totals below show the customer's current record.</Text>
+          </View>
+        </View>
+      ) : null}
+
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {actionError ? <Text style={styles.errorBanner}>{actionError}</Text> : null}
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
+      <View style={styles.nextStepCard}>
+        <View style={styles.nextIcon}><Ionicons name={signal.icon} size={21} color={colors.black} /></View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.nextEyebrow}>SUGGESTED NEXT STEP</Text>
+          <Text style={styles.nextTitle}>{signal.title}</Text>
+          <Text style={styles.nextDetail}>{signal.detail}</Text>
+        </View>
+        {hasPhone && profile.optInMarketing ? <TouchableOpacity style={styles.nextAction} onPress={() => setComposerOpen(true)} accessibilityRole="button" accessibilityLabel="Draft a WhatsApp message"><Ionicons name="arrow-forward" size={18} color={colors.black} /></TouchableOpacity> : null}
+      </View>
+
       <View style={styles.metricGrid}>
         <Metric label="Visits" value={String(metrics.visits)} icon="repeat-outline" />
         <Metric label="Lifetime spend" value={formatMoney(metrics.spendCents)} icon="wallet-outline" />
-        <Metric label="Avg. spend" value={metrics.avgSpendCents === null ? '—' : formatMoney(metrics.avgSpendCents)} icon="stats-chart-outline" />
-        <Metric label="Active vouchers" value={String(vouchers.filter((v) => v.status === 'active').length)} icon="gift-outline" />
       </View>
+      {metrics.avgSpendCents !== null ? <Text style={styles.metricFootnote}>Average spend per visit · {formatMoney(metrics.avgSpendCents)}</Text> : null}
 
       <View style={styles.card}>
         <View style={styles.sectionHead}>
@@ -342,6 +391,82 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${stampProgress * 100}%` }]} />
         </View>
+        <Text style={styles.progressHint}>{loyalty.stampGoal > 0 ? `${Math.max(0, loyalty.stampGoal - loyalty.stamps)} stamps to the next reward` : 'Stamp rewards are not active'}</Text>
+      </View>
+
+      <View style={styles.card} onLayout={(event) => { voucherY.current = event.nativeEvent.layout.y; if (issueOpen) requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: voucherY.current, animated: true })); }}>
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Vouchers {activeVouchers.length ? `· ${activeVouchers.length} active` : ''}</Text>
+          {canManage ? (
+            <TouchableOpacity onPress={showIssue} activeOpacity={0.75} accessibilityRole="button">
+              <Text style={styles.link}>Issue voucher</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {issueOpen ? (
+          <View style={styles.issueBox}>
+            <Text style={styles.formHint}>Choose a reward. The voucher expires in 30 days.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rewardRow}>
+              {rewards.map((reward) => {
+                const active = rewardId === reward.id;
+                return (
+                  <TouchableOpacity
+                    key={reward.id}
+                    style={[styles.rewardChip, active && styles.rewardChipActive]}
+                    onPress={() => setRewardId(reward.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.rewardChipText, active && styles.rewardChipTextActive]}>
+                      {reward.name || reward.title || 'Reward'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {rewards.length === 0 ? <Text style={styles.empty}>No active rewards.</Text> : null}
+            </ScrollView>
+            <View style={styles.formActions}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIssueOpen(false)} activeOpacity={0.8}>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.primaryBtn, issuing && styles.disabled]} onPress={issueVoucher} disabled={issuing} activeOpacity={0.85}>
+                <Text style={styles.primaryBtnText}>{issuing ? 'Issuing…' : 'Issue voucher'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        {activeVouchers.length === 0 ? <Text style={styles.empty}>No active voucher to share right now.</Text> : activeVouchers.map((voucher) => (
+          <View key={voucher.id} style={styles.activeVoucher}>
+            <View style={styles.voucherTop}>
+              <Ionicons name="gift-outline" size={19} color={colors.primary[700]} />
+              <Text style={styles.voucherName} numberOfLines={1}>{voucher.rewardName}</Text>
+              <Text style={styles.activeTag}>ACTIVE</Text>
+            </View>
+            <Text style={styles.voucherMeta}>{voucher.code}{voucher.expiresAt ? ` · expires ${formatShortDateFromIso(voucher.expiresAt)}` : ''}</Text>
+            <View style={styles.voucherActions}>
+              {hasPhone && profile.optInMarketing ? <TouchableOpacity style={styles.shareVoucher} onPress={() => { setComposerVoucherId(voucher.id); setComposerOpen(true); }} accessibilityRole="button" accessibilityLabel={`Share ${voucher.rewardName} on WhatsApp`}><Ionicons name="logo-whatsapp" size={16} color="#128C5E" /><Text style={styles.shareVoucherText}>Share on WhatsApp</Text></TouchableOpacity> : null}
+              {canManage ? <TouchableOpacity style={styles.voidButton} onPress={() => voidVoucher(voucher.id)} activeOpacity={0.75} accessibilityRole="button"><Text style={styles.voidLink}>{confirmVoidId === voucher.id ? 'Confirm void' : 'Void'}</Text></TouchableOpacity> : null}
+            </View>
+          </View>
+        ))}
+        {vouchers.some((voucher) => !activeVouchers.some((active) => active.id === voucher.id)) ? <Text style={styles.historyLabel}>PAST VOUCHERS</Text> : null}
+        {vouchers.filter((voucher) => !activeVouchers.some((active) => active.id === voucher.id)).map((voucher) => (
+            <View key={voucher.id} style={styles.voucherRow}>
+              <View style={[styles.voucherIcon, styles.voucherIconMuted]}>
+                <Ionicons name="gift-outline" size={iconSizes.sm} color={colors.accent[400]} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.voucherName} numberOfLines={1}>
+                  {voucher.rewardName}
+                </Text>
+                <Text style={styles.voucherMeta} numberOfLines={1}>
+                  {voucher.code} · {voucher.status === 'active' ? 'expired' : voucher.status}
+                  {voucher.expiresAt ? ` · expires ${formatShortDateFromIso(voucher.expiresAt)}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
       </View>
 
       {canManage ? (
@@ -421,101 +546,6 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
         </View>
       ) : null}
 
-      {isOwner ? (
-        <View style={styles.dangerCard}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.dangerTitle}>Remove from this store</Text>
-            <Text style={styles.dangerDetail}>
-              {allowance ? `${allowance.used} of ${allowance.max} removals used` : 'Removals are unlimited on this plan.'}
-            </Text>
-            {confirmDelete ? (
-              <Text style={styles.dangerConfirm}>
-                This removes the customer's loyalty history from this store only. Tap again to confirm.
-              </Text>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            style={[styles.dangerBtn, deleting && styles.disabled]}
-            onPress={removeCustomer}
-            disabled={deleting}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dangerBtnText}>
-              {deleting ? 'Removing…' : confirmDelete ? 'Confirm remove' : 'Remove'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      <View style={styles.card}>
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Vouchers</Text>
-          {canManage ? (
-            <TouchableOpacity onPress={openIssue} activeOpacity={0.75}>
-              <Text style={styles.link}>Issue voucher</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {issueOpen ? (
-          <View style={styles.issueBox}>
-            <Text style={styles.formHint}>Choose a reward. The voucher expires in 30 days.</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rewardRow}>
-              {rewards.map((reward) => {
-                const active = rewardId === reward.id;
-                return (
-                  <TouchableOpacity
-                    key={reward.id}
-                    style={[styles.rewardChip, active && styles.rewardChipActive]}
-                    onPress={() => setRewardId(reward.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.rewardChipText, active && styles.rewardChipTextActive]}>
-                      {reward.name || reward.title || 'Reward'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              {rewards.length === 0 ? <Text style={styles.empty}>No active rewards.</Text> : null}
-            </ScrollView>
-            <View style={styles.formActions}>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIssueOpen(false)} activeOpacity={0.8}>
-                <Text style={styles.secondaryBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.primaryBtn, issuing && styles.disabled]} onPress={issueVoucher} disabled={issuing} activeOpacity={0.85}>
-                <Text style={styles.primaryBtnText}>{issuing ? 'Issuing…' : 'Issue voucher'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {vouchers.length === 0 ? (
-          <Text style={styles.empty}>No vouchers yet.</Text>
-        ) : (
-          vouchers.map((voucher) => (
-            <View key={voucher.id} style={styles.voucherRow}>
-              <View style={[styles.voucherIcon, voucher.status === 'active' ? styles.voucherIconActive : styles.voucherIconMuted]}>
-                <Ionicons name="gift-outline" size={iconSizes.sm} color={voucher.status === 'active' ? colors.primary[700] : colors.accent[400]} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.voucherName} numberOfLines={1}>
-                  {voucher.rewardName}
-                </Text>
-                <Text style={styles.voucherMeta} numberOfLines={1}>
-                  {voucher.code} · {voucher.status}
-                  {voucher.expiresAt ? ` · expires ${formatShortDateFromIso(voucher.expiresAt)}` : ''}
-                </Text>
-              </View>
-              {canManage && voucher.status === 'active' ? (
-                <TouchableOpacity onPress={() => voidVoucher(voucher.id)} activeOpacity={0.75}>
-                  <Text style={styles.voidLink}>{confirmVoidId === voucher.id ? 'Confirm' : 'Void'}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ))
-        )}
-      </View>
-
       <View style={styles.card}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Recent activity</Text>
@@ -551,7 +581,28 @@ export default function CustomerManagePanel({ customerId, onChanged, onDeleted }
           ))
         )}
       </View>
+      {isOwner ? (
+        <View style={styles.dangerCard}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.dangerTitle}>Remove from this store</Text>
+            <Text style={styles.dangerDetail}>{allowance ? `${allowance.used} of ${allowance.max} removals used` : 'Removals are unlimited on this plan.'}</Text>
+            {confirmDelete ? <Text style={styles.dangerConfirm}>This removes the customer's loyalty history from this store only. Tap again to confirm.</Text> : null}
+          </View>
+          <TouchableOpacity style={[styles.dangerBtn, deleting && styles.disabled]} onPress={removeCustomer} disabled={deleting} activeOpacity={0.85} accessibilityRole="button">
+            <Text style={styles.dangerBtnText}>{deleting ? 'Removing…' : confirmDelete ? 'Confirm remove' : 'Remove'}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </ScrollView>
+    <CustomerWhatsAppComposer
+      visible={composerOpen}
+      customerId={customerId}
+      preferredVoucherId={composerVoucherId}
+      onClose={() => { setComposerOpen(false); setComposerVoucherId(''); }}
+      onOpened={() => setNotice('Opened in WhatsApp. Risev cannot confirm whether the message was sent.')}
+      onIssueVoucher={canManage ? showIssue : undefined}
+    />
+    </>
   );
 }
 
@@ -599,6 +650,7 @@ const styles = StyleSheet.create({
   avatarFallback: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary[50], alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 18, color: colors.primary[700] },
   profileCopy: { flex: 1, minWidth: 0 },
+  profileMessage: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F6EE' },
   profileName: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 19, color: colors.black },
   profilePhone: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: colors.accent[500], marginTop: 2 },
   profileMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1.5] },
@@ -606,14 +658,25 @@ const styles = StyleSheet.create({
   tierText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9.5, color: colors.accent[700], textTransform: 'capitalize' },
   profileMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[400] },
   profileFootnote: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[400], marginTop: spacing[2] },
+  visitDateContext: { backgroundColor: colors.primary[50], borderColor: colors.primary[200], borderWidth: 1, borderRadius: radii.lg, padding: spacing[3], flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  visitDateTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12, color: colors.black },
+  visitDateDetail: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, lineHeight: 15, color: colors.accent[600], marginTop: 3 },
 
   notice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11.5, color: colors.success.dark, backgroundColor: colors.success.light, borderRadius: radii.md, padding: spacing[2] },
   errorBanner: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11.5, color: colors.error.dark, backgroundColor: colors.error.light, borderRadius: radii.md, padding: spacing[2] },
+
+  nextStepCard: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.primary[50], borderColor: colors.primary[200], borderWidth: 1, borderRadius: radii.xl, padding: spacing[4] },
+  nextIcon: { width: 42, height: 42, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary[200] },
+  nextEyebrow: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 9.5, color: colors.primary[700], letterSpacing: 0.6 },
+  nextTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: colors.black, marginTop: 2 },
+  nextDetail: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: colors.accent[600], marginTop: 2 },
+  nextAction: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary[400], alignItems: 'center', justifyContent: 'center' },
 
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   metric: { flexGrow: 1, flexBasis: '47%', minWidth: 130, backgroundColor: colors.white, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.accent[100], padding: spacing[3], gap: 2 },
   metricValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 19, color: colors.black, marginTop: 2 },
   metricLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[400] },
+  metricFootnote: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[500], marginTop: -spacing[2], paddingHorizontal: spacing[1] },
 
   card: { backgroundColor: colors.white, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.accent[100], padding: spacing[4], gap: spacing[2], ...shadows.sm },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
@@ -627,6 +690,7 @@ const styles = StyleSheet.create({
   loyaltyLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: colors.accent[400], marginTop: 1 },
   progressTrack: { height: 7, borderRadius: 4, backgroundColor: colors.accent[100], overflow: 'hidden', marginTop: spacing[2] },
   progressFill: { height: 7, borderRadius: 4, backgroundColor: colors.primary[400] },
+  progressHint: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[500], marginTop: spacing[1] },
 
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   actionBtn: { flexGrow: 1, flexBasis: '22%', minWidth: 88, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1], borderRadius: radii.md, backgroundColor: colors.accent[50], borderWidth: 1, borderColor: colors.accent[100] },
@@ -665,6 +729,14 @@ const styles = StyleSheet.create({
   rewardChipTextActive: { color: colors.white },
 
   voucherRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: colors.accent[50] },
+  activeVoucher: { borderWidth: 1, borderColor: colors.primary[200], backgroundColor: colors.primary[50], borderRadius: radii.lg, padding: spacing[3], gap: spacing[1.5] },
+  voucherTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  activeTag: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 9, color: colors.primary[700], marginLeft: 'auto' },
+  voucherActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2], marginTop: spacing[1] },
+  shareVoucher: { minHeight: 44, paddingHorizontal: spacing[3], borderRadius: radii.full, backgroundColor: '#E8F6EE', flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  voidButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing[2] },
+  shareVoucherText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10.5, color: '#128C5E' },
+  historyLabel: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 9.5, letterSpacing: 0.4, color: colors.accent[400], marginTop: spacing[2] },
   voucherIcon: { width: 34, height: 34, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
   voucherIconActive: { backgroundColor: colors.primary[50] },
   voucherIconMuted: { backgroundColor: colors.accent[50] },

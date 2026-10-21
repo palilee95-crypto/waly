@@ -11,6 +11,7 @@ export type ManageCustomerRow = {
   phone: string;
   avatar: string;
   visits: number;
+  visitsOnDate: number;
   lastVisit: string | null;
   daysIdle: number | null;
   spendCents: number;
@@ -80,6 +81,7 @@ export type ManageCustomersPage = {
   total: number;
   page: number;
   perPage: number;
+  date?: string;
 };
 
 export type ManageSort = 'last_visit' | 'name' | 'visits' | 'spend';
@@ -95,6 +97,7 @@ export type ManageReward = {
 
 export async function fetchManageCustomers(params: {
   branchId?: string;
+  date?: string;
   q?: string;
   sort?: ManageSort;
   filter?: ManageFilter;
@@ -110,10 +113,15 @@ export async function fetchManageCustomers(params: {
     perPage: String(params.perPage || 25),
   });
   if (params.q?.trim()) qs.set('q', params.q.trim());
-  return pb.send<ManageCustomersPage>(
+  if (params.date) qs.set('date', params.date);
+  const result = await pb.send<ManageCustomersPage>(
     `/api/risev/merchant/customer-workspace/customers?${qs.toString()}`,
     { method: 'GET', requestKey: null, signal: params.signal }
   );
+  if (params.date && result.date !== params.date) {
+    throw new Error('Date filtering is not available on this server yet. Deploy the latest backend, then retry.');
+  }
+  return result;
 }
 
 export async function fetchManageCustomer(

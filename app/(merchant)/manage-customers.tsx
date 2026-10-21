@@ -27,6 +27,8 @@ import {
 } from '@/lib/customer-management';
 import CustomerListRow from '@/components/customer-workspace/manage/CustomerListRow';
 import CustomerManagePanel from '@/components/customer-workspace/manage/CustomerManagePanel';
+import CustomerWhatsAppComposer from '@/components/customer-workspace/manage/CustomerWhatsAppComposer';
+import CustomerVisitDatePicker, { formatVisitDate, malaysiaToday, shiftVisitDate } from '@/components/customer-workspace/manage/CustomerVisitDatePicker';
 
 type Branch = { id: string; name: string; is_hq?: boolean };
 type Picker = 'branch' | 'sort' | null;
@@ -49,7 +51,8 @@ const SORTS: { id: ManageSort; label: string }[] = [
 
 export default function ManageCustomersScreen() {
   const router = useRouter();
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, staffPermissions } = useAuth();
+  const canManage = !!isOwner || !!staffPermissions?.can_manage_customers;
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
@@ -65,9 +68,13 @@ export default function ManageCustomersScreen() {
   const [filter, setFilter] = useState<ManageFilter>('all');
   const [sort, setSort] = useState<ManageSort>('last_visit');
   const [branchId, setBranchId] = useState('');
+  const [visitDate, setVisitDate] = useState('');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker>(null);
+  const [messageCustomer, setMessageCustomer] = useState<ManageCustomerRow | null>(null);
+  const [messageNotice, setMessageNotice] = useState('');
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -91,12 +98,17 @@ export default function ManageCustomersScreen() {
   const load = useCallback(
     async (targetPage: number, replace: boolean) => {
       const requestId = ++requestRef.current;
-      if (replace) setLoading(true);
+      if (replace) {
+        setLoading(true);
+        setItems([]);
+        setTotal(0);
+      }
       else setLoadingMore(true);
       setError('');
       try {
         const result = await fetchManageCustomers({
           branchId,
+          date: visitDate,
           q: debouncedQuery,
           sort,
           filter,
@@ -130,7 +142,7 @@ export default function ManageCustomersScreen() {
         }
       }
     },
-    [branchId, debouncedQuery, sort, filter, isDesktop]
+    [branchId, visitDate, debouncedQuery, sort, filter, isDesktop]
   );
 
   useFocusEffect(
@@ -161,7 +173,7 @@ export default function ManageCustomersScreen() {
     } else {
       router.push({
         pathname: '/(merchant)/customer-detail',
-        params: { customerId: row.id },
+        params: { customerId: row.id, ...(visitDate ? { visitDate, visitsOnDate: String(row.visitsOnDate) } : {}) },
       } as any);
     }
   };
@@ -186,7 +198,9 @@ export default function ManageCustomersScreen() {
         <View style={styles.headerCopy}>
           <Text style={styles.title}>Manage customers</Text>
           <Text style={styles.subtitle}>
-            {loading && items.length === 0 ? 'Loading…' : `${total.toLocaleString('en-MY')} customers · ${branchLabel}`}
+            {loading && items.length === 0 ? 'Loading…' : visitDate
+              ? `${total.toLocaleString('en-MY')} visited · ${formatVisitDate(visitDate)}`
+              : `${total.toLocaleString('en-MY')} customers · ${branchLabel}`}
           </Text>
         </View>
         <TouchableOpacity
@@ -215,6 +229,24 @@ export default function ManageCustomersScreen() {
           {query ? (
             <TouchableOpacity onPress={() => setQuery('')} hitSlop={8} activeOpacity={0.7} accessibilityLabel="Clear search">
               <Ionicons name="close-circle" size={iconSizes.sm} color={colors.accent[400]} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.dateRow}>
+          {visitDate ? (
+            <TouchableOpacity style={styles.dateStep} onPress={() => setVisitDate(shiftVisitDate(visitDate, -1))} accessibilityRole="button" accessibilityLabel="Previous day">
+              <Ionicons name="chevron-back" size={17} color={colors.black} />
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={[styles.dateButton, visitDate && styles.dateButtonActive]} onPress={() => setDatePickerOpen(true)} accessibilityRole="button" accessibilityLabel={visitDate ? `Visit date ${formatVisitDate(visitDate)}. Choose another date` : 'Choose a visit date'}>
+            <Ionicons name="calendar-outline" size={17} color={colors.black} />
+            <Text style={styles.dateText} numberOfLines={1}>{visitDate ? `Visited · ${formatVisitDate(visitDate)}` : 'All visit dates'}</Text>
+            <Ionicons name="chevron-down" size={15} color={colors.accent[500]} />
+          </TouchableOpacity>
+          {visitDate ? (
+            <TouchableOpacity style={styles.dateStep} onPress={() => setVisitDate(shiftVisitDate(visitDate, 1))} disabled={visitDate >= malaysiaToday()} accessibilityRole="button" accessibilityLabel="Next day">
+              <Ionicons name="chevron-forward" size={17} color={visitDate >= malaysiaToday() ? colors.accent[300] : colors.black} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -256,6 +288,7 @@ export default function ManageCustomersScreen() {
             );
           })}
         </ScrollView>
+        {visitDate ? <Text style={styles.dateHint}>Showing recorded visits on this day. Loyalty and spend figures remain lifetime totals; segments reflect current status.</Text> : null}
       </View>
 
       {error ? (
@@ -267,6 +300,7 @@ export default function ManageCustomersScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+      {messageNotice ? <Text style={styles.messageNotice}>{messageNotice}</Text> : null}
 
       <View style={[styles.content, isDesktop && styles.contentDesktop]}>
         <View style={[styles.listCard, isDesktop && styles.listCardDesktop]}>
@@ -282,8 +316,10 @@ export default function ManageCustomersScreen() {
               renderItem={({ item }) => (
                 <CustomerListRow
                   row={item}
+                  visitDate={visitDate}
                   selected={isDesktop && selectedId === item.id}
                   onPress={() => openCustomer(item)}
+                  onWhatsApp={() => setMessageCustomer(item)}
                 />
               )}
               contentContainerStyle={styles.listContent}
@@ -293,13 +329,15 @@ export default function ManageCustomersScreen() {
               }
               onEndReached={loadMore}
               onEndReachedThreshold={0.4}
-              ListEmptyComponent={
+              ListEmptyComponent={error ? null :
                 <View style={styles.emptyWrap}>
                   <Ionicons name="people-outline" size={iconSizes.xl} color={colors.accent[300]} />
                   <Text style={styles.emptyTitle}>No customers found</Text>
                   <Text style={styles.emptyText}>
-                    {query || filter !== 'all'
-                      ? 'Try a different search or filter.'
+                    {visitDate
+                      ? `No recorded customer visits on ${formatVisitDate(visitDate)} for these filters. Try another day or choose All dates.`
+                      : query || filter !== 'all'
+                        ? 'Try a different search or filter.'
                       : 'Customers will appear here after their first visit.'}
                   </Text>
                 </View>
@@ -318,6 +356,8 @@ export default function ManageCustomersScreen() {
             {selectedId ? (
               <CustomerManagePanel
                 customerId={selectedId}
+                visitDate={visitDate}
+                visitsOnDate={items.find((row) => row.id === selectedId)?.visitsOnDate}
                 onChanged={() => load(1, true)}
                 onDeleted={() => {
                   setSelectedId(null);
@@ -362,6 +402,23 @@ export default function ManageCustomersScreen() {
           </View>
         </View>
       </Modal>
+      <CustomerVisitDatePicker
+        visible={datePickerOpen}
+        value={visitDate}
+        onSelect={(date) => { setVisitDate(date); setFilter('all'); }}
+        onClose={() => setDatePickerOpen(false)}
+      />
+      <CustomerWhatsAppComposer
+        visible={!!messageCustomer}
+        customerId={messageCustomer?.id || null}
+        onClose={() => setMessageCustomer(null)}
+        onOpened={() => setMessageNotice('Opened in WhatsApp. Risev cannot confirm whether the message was sent.')}
+        onIssueVoucher={canManage ? () => {
+          if (!messageCustomer) return;
+          router.push({ pathname: '/(merchant)/customer-detail', params: { customerId: messageCustomer.id, issueVoucher: '1' } } as any);
+          setMessageCustomer(null);
+        } : undefined}
+      />
     </SafeAreaView>
   );
 }
@@ -410,6 +467,12 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     ...shadows.sm,
   },
+  dateRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'center' },
+  dateButton: { flex: 1, minHeight: 44, paddingHorizontal: spacing[3], borderRadius: radii.md, backgroundColor: colors.accent[50], borderWidth: 1, borderColor: colors.accent[100], flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dateButtonActive: { backgroundColor: colors.primary[50], borderColor: colors.primary[200] },
+  dateText: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: colors.black },
+  dateStep: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.accent[50], borderWidth: 1, borderColor: colors.accent[100], alignItems: 'center', justifyContent: 'center' },
+  dateHint: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, lineHeight: 15, color: colors.accent[500] },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -460,6 +523,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: colors.error.light,
   },
+  messageNotice: { marginHorizontal: spacing[4], marginTop: spacing[2], padding: spacing[3], borderRadius: radii.md, backgroundColor: colors.success.light, color: colors.success.dark, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
   errorText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: colors.error.dark },
   retryText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11.5, color: colors.error.dark },
 

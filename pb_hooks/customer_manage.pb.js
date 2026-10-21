@@ -1,6 +1,6 @@
 // Full-page customer management endpoints.
 //
-//   GET  /api/risev/merchant/customer-workspace/customers
+//   GET  /api/risev/merchant/customer-workspace/customers?date=YYYY-MM-DD
 //   GET  /api/risev/merchant/customer-workspace/customer?customer=<id>
 //   POST /api/risev/merchant/customer/stamps-adjust
 //   POST /api/risev/merchant/customer/points-adjust
@@ -25,9 +25,18 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/customers", (e) => {
   const query = (e.requestInfo() && e.requestInfo().query) || {};
   const context = helper.buildManageContext($app, e.auth, merchant, query.branch);
   if (context.error) return helper.branchError(e, context.error);
+  const date = String(query.date || "").trim();
+  if (date) {
+    const parsed = new Date(date + "T00:00:00+08:00");
+    const roundTrip = isNaN(parsed.getTime()) ? "" : new Date(parsed.getTime() + 8 * 3600000).toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || roundTrip !== date || date > logic.localDate(0)) {
+      return e.json(400, { code: "INVALID_DATE", message: "Choose a valid date up to today." });
+    }
+  }
 
   try {
     return e.json(200, logic.buildManageCustomers($app, context.ctx, {
+      date: date,
       q: query.q,
       sort: query.sort,
       filter: query.filter,

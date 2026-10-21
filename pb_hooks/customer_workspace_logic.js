@@ -1392,7 +1392,8 @@ function buildAudience($app, ctx, card, page, perPage) {
 
 /**
  * Full customer directory for Manage Customers.
- * Options: q, sort=last_visit|name|visits|spend, filter=all|at_risk|near_reward|new,
+ * Options: date=YYYY-MM-DD (merchant local day), q,
+ * sort=last_visit|name|visits|spend, filter=all|at_risk|near_reward|new,
  * page, perPage. Merchant-wide unless ctx.branchId is set.
  */
 function buildManageCustomers($app, ctx, options) {
@@ -1401,6 +1402,7 @@ function buildManageCustomers($app, ctx, options) {
   const page = Math.max(1, Number(opts.page) || 1);
   const offset = (page - 1) * limit;
   const q = String(opts.q || "").trim();
+  const visitDate = String(opts.date || "").trim();
   const sort = ["last_visit", "name", "visits", "spend"].indexOf(String(opts.sort || "")) >= 0
     ? String(opts.sort)
     : "last_visit";
@@ -1418,6 +1420,10 @@ function buildManageCustomers($app, ctx, options) {
     limit: limit,
     offset: offset,
   });
+  if (visitDate) {
+    params.dayFrom = localDateToUtcStart(visitDate);
+    params.dayTo = localDateToUtcStart(addDays(visitDate, 1));
+  }
 
   const innerWhere = ["c.merchant = {:mid}"];
   if (q) {
@@ -1442,7 +1448,9 @@ function buildManageCustomers($app, ctx, options) {
     "SELECT u.id as id, u.name as name, u.phone as phone, u.avatar as avatar, " +
     "COALESCE(u.tier, 'bronze') as tier, u.birthday as birthday, COALESCE(u.created, '') as joined, " +
     "IFNULL(MAX(t.created), '') as last_seen, IFNULL(MIN(t.created), '') as first_seen, " +
-    "COUNT(t.id) as visits, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend, " +
+    "COUNT(t.id) as visits, " +
+    (visitDate ? "COUNT(CASE WHEN t.created >= {:dayFrom} AND t.created < {:dayTo} THEN t.id END)" : "0") + " as day_visits, " +
+    "CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend, " +
     "MAX(COALESCE(c.stamps_collected, 0)) as stamps, MAX(COALESCE(p.stamp_goal, 10)) as goal, " +
     "MAX(COALESCE(c.points_balance, 0)) as points, MAX(COALESCE(c.opt_in_marketing, 1)) as opt_in, " +
     "(SELECT COUNT(*) FROM vouchers v JOIN rewards r ON r.id = v.reward " +
@@ -1455,6 +1463,7 @@ function buildManageCustomers($app, ctx, options) {
     " WHERE " + innerWhere.join(" AND ") + " GROUP BY u.id";
 
   const outerWhere = [];
+  if (visitDate) outerWhere.push("x.day_visits > 0");
   if (filter === "at_risk") outerWhere.push("x.last_seen <> '' AND x.last_seen < {:cutoff}");
   if (filter === "near_reward") outerWhere.push("x.goal > 0 AND (x.goal - x.stamps) BETWEEN 1 AND 2");
   if (filter === "new") outerWhere.push("x.first_seen <> '' AND x.first_seen >= {:cutoff}");
@@ -1487,7 +1496,7 @@ function buildManageCustomers($app, ctx, options) {
     params,
     {
       id: "", name: "", phone: "", avatar: "", tier: "", birthday: "", joined: "",
-      last_seen: "", first_seen: "", visits: 0, spend: "", stamps: 0, goal: 10,
+      last_seen: "", first_seen: "", visits: 0, day_visits: 0, spend: "", stamps: 0, goal: 10,
       points: 0, opt_in: 1, active_vouchers: 0,
     }
   ).map(function (r) {
@@ -1498,6 +1507,7 @@ function buildManageCustomers($app, ctx, options) {
       phone: r.phone || "",
       avatar: r.avatar || "",
       visits: Number(r.visits) || 0,
+      visitsOnDate: Number(r.day_visits) || 0,
       lastVisit: r.last_seen || null,
       daysIdle: seen === null ? null : Math.floor((Date.now() - seen) / DAY_MS),
       spendCents: Math.round((Number(r.spend) || 0) * 100),
@@ -1516,6 +1526,7 @@ function buildManageCustomers($app, ctx, options) {
     total: Number(countRow && countRow.n) || 0,
     page: page,
     perPage: limit,
+    date: visitDate,
   };
 }
 
