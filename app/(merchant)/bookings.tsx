@@ -1960,6 +1960,14 @@ export default function BookingsScreen() {
                           </View>
                         </View>
 
+                        {/* Customer note from the booking page */}
+                        {b.notes ? (
+                          <View style={styles.bookingNoteRow}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={13} color="#B45309" />
+                            <Text style={styles.bookingNoteText} numberOfLines={3}>{b.notes}</Text>
+                          </View>
+                        ) : null}
+
                         {/* Actions Buttons */}
                         <View style={styles.bookingActionsRow}>
                           {b.status === 'arrived' && (
@@ -3926,6 +3934,9 @@ export default function BookingsScreen() {
                             {b.service_name || 'Service'} • {b.staff_name || 'Staff'}
                             {b.total_price ? ` • RM ${Number(b.total_price).toFixed(2)}` : ''}
                           </Text>
+                          {b.notes ? (
+                            <Text style={styles.calApptNote} numberOfLines={1}>{b.notes}</Text>
+                          ) : null}
                         </View>
 
                         {/* Status Badge */}
@@ -4411,6 +4422,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+  bookingNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+    padding: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  bookingNoteText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#92400E',
   },
 
   bookingActionsRow: {
@@ -5656,6 +5685,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_500Medium',
     color: '#64748B',
+  },
+  calApptNote: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#B45309',
+    marginTop: 2,
   },
 
   // Status Badges
