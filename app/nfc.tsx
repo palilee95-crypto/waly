@@ -677,6 +677,18 @@ export default function NfcLandingScreen() {
     preview_voucher?: string;
   }>();
   const { user, logout, refreshSession, activeRole } = useAuth();
+
+  // A merchant scanning a stand is not the customer. Only a genuine customer
+  // session may supply an identity; otherwise the merchant's own number gets
+  // pre-filled into the stamp form and attached to the claim.
+  const sessionIsCustomer = activeRole === 'customer';
+  const sessionPhone = sessionIsCustomer
+    ? String(user?.phone || (pb.authStore as any)?.record?.phone || '')
+    : '';
+  const sessionName = sessionIsCustomer
+    ? String(user?.name || (pb.authStore as any)?.record?.name || '')
+    : '';
+
   const { locale } = useLanguage();
   const isEn = locale === 'en';
   const { width: windowWidth } = useWindowDimensions();
@@ -747,8 +759,8 @@ export default function NfcLandingScreen() {
   const [showAddBranchModal, setShowAddBranchModal] = useState<boolean>(false);
   const [pairingStaff, setPairingStaff] = useState<StaffOption[]>([]);
 
-  const [phoneInput, setPhoneInput] = useState(user?.phone ? user.phone.replace('+60', '').replace('+', '') : '');
-  const [nameInput, setNameInput] = useState(user?.name || '');
+  const [phoneInput, setPhoneInput] = useState(sessionPhone ? sessionPhone.replace('+60', '').replace('+', '') : '');
+  const [nameInput, setNameInput] = useState(sessionName);
 
   const [showNameField, setShowNameField] = useState(false);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
@@ -1054,7 +1066,7 @@ export default function NfcLandingScreen() {
       const activeClaimId = claimIdRef.current || claimId;
       if (activeClaimId) {
         pb.collection('digital_receipts').getList(1, 1, {
-          filter: `customer_phone = "${phoneInput || user?.phone || ''}" && merchant = "${merchant?.id}"`,
+          filter: `customer_phone = "${phoneInput || sessionPhone}" && merchant = "${merchant?.id}"`,
           sort: '-created'
         }).then(res => {
           if (res.items.length > 0) setReceiptData(res.items[0]);
@@ -1088,7 +1100,7 @@ export default function NfcLandingScreen() {
         hasTriggeredReviewRef.current = true;
 
         const checkAndTriggerReview = async () => {
-          const phone = phoneInput || user?.phone || '';
+          const phone = phoneInput || sessionPhone;
           const storageKey = `risev_reviewed_${merchant.id}_${phone}`;
           
           let hasReviewedLocal = false;
@@ -1133,8 +1145,8 @@ export default function NfcLandingScreen() {
 
   const handleSelectStar = async (star: number) => {
     setReviewRating(star);
-    const phone = phoneInput || user?.phone || '';
-    const name = nameInput || user?.name || '';
+    const phone = phoneInput || sessionPhone;
+    const name = nameInput || sessionName;
     const storageKey = `risev_reviewed_${merchant?.id}_${phone}`;
 
     if (star === 5) {
@@ -1191,8 +1203,8 @@ export default function NfcLandingScreen() {
   const handleSubmitPrivateFeedback = async () => {
     if (reviewRating === 0) return;
     setIsSubmittingReview(true);
-    const phone = phoneInput || user?.phone || '';
-    const name = nameInput || user?.name || '';
+    const phone = phoneInput || sessionPhone;
+    const name = nameInput || sessionName;
     const storageKey = `risev_reviewed_${merchant?.id}_${phone}`;
 
     try {
@@ -1248,7 +1260,7 @@ export default function NfcLandingScreen() {
   const handleViewStampCard = () => {
     // Always redirect to login page with phone pre-filled
     // Registered users will see password step; new users will see register step
-    const rawPhone = phoneInput || user?.phone || '';
+    const rawPhone = phoneInput || sessionPhone;
     // Strip country code prefix — login page prepends +60 itself
     const strippedPhone = rawPhone.startsWith('+60')
       ? rawPhone.slice(3)
@@ -1288,11 +1300,10 @@ export default function NfcLandingScreen() {
 
   const handleNavigateToBooking = () => {
     if (!bookingSlug) return;
-    // A merchant (or a merchant-mode account) is not the walk-in customer, so
-    // only a real customer session may supply the identity when none was typed.
-    const sessionIsCustomer = activeRole === 'customer';
-    const phone = (phoneInput || (sessionIsCustomer ? user?.phone || '' : '')).trim();
-    const name = (nameInput || (sessionIsCustomer ? user?.name || '' : '')).trim();
+    // sessionPhone/sessionName are empty for a merchant session, so nothing of
+    // the owner's leaks into the walk-in booking link.
+    const phone = (phoneInput || sessionPhone).trim();
+    const name = (nameInput || sessionName).trim();
     const q = new URLSearchParams();
     if (phone) q.append('phone', phone);
     if (name) q.append('name', name);
@@ -1553,11 +1564,11 @@ export default function NfcLandingScreen() {
 
   // 3. Auto-populate phone/name input if user state updates
   useEffect(() => {
-    if (user?.phone && !phoneInput) {
-      setPhoneInput(user.phone.replace('+60', '').replace('+', ''));
+    if (sessionPhone && !phoneInput) {
+      setPhoneInput(sessionPhone.replace('+60', '').replace('+', ''));
     }
-    if (user?.name && !nameInput) {
-      setNameInput(user.name);
+    if (sessionName && !nameInput) {
+      setNameInput(sessionName);
     }
   }, [user]);
 
@@ -1995,7 +2006,7 @@ export default function NfcLandingScreen() {
       // Always check the entered phone against DB unless:
       // 1. Name field is already showing (user already filled it in), OR
       // 2. The entered phone matches the currently logged-in user's own phone
-      const enteredPhoneMatchesUser = user?.phone && (user.phone === cleanPhone || user.phone === cleanPhone.replace('+', ''));
+      const enteredPhoneMatchesUser = !!sessionPhone && (sessionPhone === cleanPhone || sessionPhone === cleanPhone.replace('+', ''));
       const shouldCheckPhone = !showNameField && !enteredPhoneMatchesUser;
 
       if (shouldCheckPhone) {
@@ -2022,8 +2033,8 @@ export default function NfcLandingScreen() {
         } finally {
           setIsCheckingPhone(false);
         }
-      } else if (enteredPhoneMatchesUser && user?.name) {
-        finalName = user.name;
+      } else if (enteredPhoneMatchesUser && sessionName) {
+        finalName = sessionName;
       }
 
       // Fallback name if still empty
@@ -2165,7 +2176,7 @@ export default function NfcLandingScreen() {
       if (digits.startsWith('0')) digits = '6' + digits;
       if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
       phone = '+' + digits;
-      name = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+      name = nameInput.trim() || sessionName || ('Customer ' + digits.slice(-4));
     }
 
     await executeNfcClaim(phone, name || 'Customer', selectedVoucherToUse);
@@ -2182,7 +2193,7 @@ export default function NfcLandingScreen() {
       if (digits.startsWith('0')) digits = '6' + digits;
       if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
       phone = '+' + digits;
-      name = nameInput.trim() || user?.name || ('Customer ' + digits.slice(-4));
+      name = nameInput.trim() || sessionName || ('Customer ' + digits.slice(-4));
     }
 
     await executeNfcClaim(phone, name || 'Customer', null);
@@ -2894,7 +2905,7 @@ export default function NfcLandingScreen() {
                       CARD HOLDER
                     </Text>
                     <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: cardFontColor, marginTop: 2, letterSpacing: 0.5, textTransform: 'uppercase' }} numberOfLines={1}>
-                      {isApproved ? (user?.name || 'VALUED CUSTOMER').toUpperCase() : '----'}
+                      {isApproved ? (nameInput || sessionName || 'VALUED CUSTOMER').toUpperCase() : '----'}
                     </Text>
                   </View>
 
@@ -3276,7 +3287,7 @@ export default function NfcLandingScreen() {
                         },
                         Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                       ]}
-                      placeholder="1110209669"
+                      placeholder="123456789"
                       placeholderTextColor="#94A3B8"
                       value={phoneInput}
                       onChangeText={(text) => {
@@ -4393,7 +4404,7 @@ export default function NfcLandingScreen() {
                       ]}
                       numberOfLines={1}
                     >
-                      {(user?.name || 'Valued Customer').toUpperCase()}
+                      {(nameInput || sessionName || 'Valued Customer').toUpperCase()}
                     </Text>
                   </View>
 
