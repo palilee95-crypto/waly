@@ -25,6 +25,8 @@ import { handleSmartBack } from '@/lib/navigation';
 import Svg, { Circle, G, Defs, LinearGradient, Stop, Path, Polyline } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import FlippableLoyaltyCard from '../(customer)/_components/FlippableLoyaltyCard';
+import { avatarUrl as customerAvatarUrl, fetchManageCustomers, type ManageCustomerRow } from '@/lib/customer-management';
+import { formatMoney } from '@/lib/customer-workspace';
 
 export default function AnalyticsScreen() {
   const { user, isOwner, staffPermissions } = useAuth();
@@ -58,7 +60,13 @@ export default function AnalyticsScreen() {
   // Customer Filter State
   const [customerFilter, setCustomerFilter] = useState<'all' | 'vip' | 'atRisk' | 'nearClaim'>('all');
   const [customerFilterModalVisible, setCustomerFilterModalVisible] = useState(false);
-  const [customerPage, setCustomerPage] = useState(0);
+
+  // Customer directory — the same server source as Customers › Manage customers
+  const [dirRows, setDirRows] = useState<ManageCustomerRow[]>([]);
+  const [dirTotal, setDirTotal] = useState(0);
+  const [dirPage, setDirPage] = useState(1);
+  const [dirQuery, setDirQuery] = useState('');
+  const [dirLoading, setDirLoading] = useState(false);
   
   // Customer Profile State
   const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<any>(null);
@@ -643,57 +651,48 @@ export default function AnalyticsScreen() {
     };
   }, [loyaltyCards, filteredTransactions]);
 
-  const customerList = useMemo(() => {
-    const cmap: Record<string, any> = {};
-
-    filteredTransactions.forEach(tx => {
-      if (!tx.customer) return;
-      if (!cmap[tx.customer]) {
-        cmap[tx.customer] = {
-          id: tx.customer,
-          totalSpend: 0,
-          totalVisits: 0,
-          lastVisit: tx.created,
-          stamps: 0,
-          name: 'Anonymous',
-          phone: '',
-          avatar: '',
-        };
-      }
-      
-      const c = cmap[tx.customer];
-      if (tx.bill_amount) c.totalSpend += Number(tx.bill_amount);
-      if (tx.type === 'earn') c.totalVisits++;
-      if (new Date(tx.created).getTime() > new Date(c.lastVisit).getTime()) {
-        c.lastVisit = tx.created;
-      }
-    });
-
-    loyaltyCards.forEach(card => {
-      if (cmap[card.customer]) {
-        cmap[card.customer].stamps = card.stamps_collected || 0;
-        if (card.expand?.customer) {
-          cmap[card.customer].name = card.expand.customer.name || card.expand.customer.phone || 'Anonymous';
-          cmap[card.customer].phone = card.expand.customer.phone || '';
-          cmap[card.customer].avatar = card.expand.customer.avatar ? pb.files.getURL(card.expand.customer, card.expand.customer.avatar) : '';
+  // Customer directory: server-side, so it matches Customers › Manage customers
+  // and includes customers with no transaction in the selected timeframe.
+  useEffect(() => {
+    if (activeTab !== 'customers') return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setDirLoading(true);
+      try {
+        const branchObj = selectedBranch === 'All Branches'
+          ? null
+          : branchList.find((b: any) => b.name === selectedBranch || b.id === selectedBranch);
+        const filter: 'all' | 'at_risk' | 'near_reward' =
+          customerFilter === 'atRisk' ? 'at_risk' : customerFilter === 'nearClaim' ? 'near_reward' : 'all';
+        const sort: 'last_visit' | 'spend' = customerFilter === 'vip' ? 'spend' : 'last_visit';
+        const res = await fetchManageCustomers({
+          branchId: branchObj?.id || 'all',
+          q: dirQuery,
+          sort,
+          filter,
+          page: dirPage,
+          perPage: 25,
+        });
+        if (cancelled) return;
+        setDirRows(res.items || []);
+        setDirTotal(res.total || 0);
+        if ((res.items || []).length === 0 && dirPage > 1 && (res.total || 0) > 0) {
+          setDirPage(1);
         }
+      } catch (err) {
+        if (!cancelled) {
+          setDirRows([]);
+          setDirTotal(0);
+        }
+      } finally {
+        if (!cancelled) setDirLoading(false);
       }
-    });
-
-    let list = Object.values(cmap).sort((a, b) => new Date(b.lastVisit).getTime() - new Date(a.lastVisit).getTime());
-
-    if (customerFilter === 'vip') {
-      list = list.sort((a, b) => b.totalSpend - a.totalSpend);
-    } else if (customerFilter === 'atRisk') {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      list = list.filter(c => new Date(c.lastVisit) < thirtyDaysAgo);
-    } else if (customerFilter === 'nearClaim') {
-      list = list.filter(c => c.stamps >= 8); 
-    }
-
-    return list;
-  }, [filteredTransactions, loyaltyCards, customerFilter]);
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeTab, selectedBranch, branchList, customerFilter, dirQuery, dirPage]);
 
   const donutData = useMemo(() => {
     const total = funnelMetrics.tier1 + funnelMetrics.tier2 + funnelMetrics.tier3;
@@ -1603,16 +1602,35 @@ export default function AnalyticsScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={styles.sectionTitle}>Customer Database</Text>
-                  <TouchableOpacity onPress={() => showHelp('Customer DB', 'View and filter all your customers. VIPs are top spenders, At-Risk are inactive for >30 days.')}>
+                  <TouchableOpacity onPress={() => showHelp('Customer DB', 'Every customer of this store, straight from the customer directory. VIPs are sorted by spend, At-Risk have not visited for 30 days.')}>
                     <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{customerList.length} total</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{dirTotal} total</Text>
+              </View>
+
+              {/* Search */}
+              <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 44, backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Ionicons name="search" size={16} color="#94A3B8" />
+                  <TextInput
+                    value={dirQuery}
+                    onChangeText={(text) => { setDirQuery(text); setDirPage(1); }}
+                    placeholder={locale === 'ms' ? 'Cari nama atau telefon' : 'Search name or phone'}
+                    placeholderTextColor="#94A3B8"
+                    style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#050505', paddingVertical: 0 }}
+                  />
+                  {dirQuery ? (
+                    <TouchableOpacity onPress={() => { setDirQuery(''); setDirPage(1); }} accessibilityRole="button" accessibilityLabel="Clear search">
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
 
               {/* Filter Dropdown Pill */}
               <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setCustomerFilterModalVisible(true)}
                   activeOpacity={0.8}
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' }}
@@ -1625,38 +1643,44 @@ export default function AnalyticsScreen() {
               </View>
 
               <View style={{ paddingHorizontal: 20 }}>
-                {customerList.slice(customerPage * 10, (customerPage + 1) * 10).map((c, idx) => (
-                  <TouchableOpacity 
-                    key={c.id} 
+                {dirLoading && dirRows.length === 0 ? (
+                  <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                    <ActivityIndicator color="#050505" />
+                  </View>
+                ) : null}
+
+                {dirRows.map((c, idx) => (
+                  <TouchableOpacity
+                    key={c.id}
                     activeOpacity={0.6}
                     onPress={() => openCustomerProfile(c)}
                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: '#F1F5F9' }}
                   >
                     {c.avatar ? (
-                      <Image source={{ uri: c.avatar }} style={{ width: 42, height: 42, borderRadius: 21, marginRight: 12 }} />
+                      <Image source={{ uri: customerAvatarUrl(c.id, c.avatar) }} style={{ width: 42, height: 42, borderRadius: 21, marginRight: 12 }} />
                     ) : (
                       <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                         <Ionicons name="person" size={18} color="#94A3B8" />
                       </View>
                     )}
-                    
+
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', marginBottom: 2 }} numberOfLines={1}>
                         {c.name}
                       </Text>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
-                        Last visit: {new Date(c.lastVisit).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }} numberOfLines={1}>
+                        {c.phone || 'No phone'} · {c.lastVisit ? `last ${new Date(c.lastVisit).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : 'never visited'}
                       </Text>
                     </View>
 
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>
-                        RM {c.totalSpend.toFixed(2)}
+                        {formatMoney(c.spendCents)}
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                         <Ionicons name="ribbon-outline" size={10} color="#64748B" />
                         <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                          {c.stamps} stamps • {c.totalVisits} visits
+                          {c.stamps} stamps • {c.visits} visits
                         </Text>
                       </View>
                     </View>
@@ -1664,31 +1688,43 @@ export default function AnalyticsScreen() {
                 ))}
 
                 {/* Pagination Controls */}
-                {customerList.length > 0 && (
+                {dirTotal > 0 && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-                    <TouchableOpacity 
-                      disabled={customerPage === 0}
-                      onPress={() => setCustomerPage(prev => Math.max(0, prev - 1))}
-                      style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: customerPage === 0 ? '#F8FAFC' : '#050505', borderRadius: 12 }}
+                    <TouchableOpacity
+                      disabled={dirPage === 1}
+                      onPress={() => setDirPage(prev => Math.max(1, prev - 1))}
+                      style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: dirPage === 1 ? '#F8FAFC' : '#050505', borderRadius: 12 }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: customerPage === 0 ? '#94A3B8' : '#FFFFFF' }}>Previous</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage === 1 ? '#94A3B8' : '#FFFFFF' }}>Previous</Text>
                     </TouchableOpacity>
-                    
+
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                      Page {customerPage + 1} of {Math.ceil(customerList.length / 10) || 1}
+                      Page {dirPage} of {Math.max(1, Math.ceil(dirTotal / 25))}
                     </Text>
 
-                    <TouchableOpacity 
-                      disabled={(customerPage + 1) * 10 >= customerList.length}
-                      onPress={() => setCustomerPage(prev => prev + 1)}
-                      style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: (customerPage + 1) * 10 >= customerList.length ? '#F8FAFC' : '#050505', borderRadius: 12 }}
+                    <TouchableOpacity
+                      disabled={dirPage * 25 >= dirTotal}
+                      onPress={() => setDirPage(prev => prev + 1)}
+                      style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: dirPage * 25 >= dirTotal ? '#F8FAFC' : '#050505', borderRadius: 12 }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: (customerPage + 1) * 10 >= customerList.length ? '#94A3B8' : '#FFFFFF' }}>Next</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage * 25 >= dirTotal ? '#94A3B8' : '#FFFFFF' }}>Next</Text>
                     </TouchableOpacity>
                   </View>
                 )}
 
-                {customerList.length === 0 && (
+                {dirTotal > 0 ? (
+                  <TouchableOpacity
+                    onPress={() => router.push('/(merchant)/manage-customers' as any)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open full customer management"
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, minHeight: 44, borderRadius: 12, backgroundColor: '#F1F5F9' }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Manage customers</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#050505" />
+                  </TouchableOpacity>
+                ) : null}
+
+                {!dirLoading && dirTotal === 0 && (
                   <View style={{ paddingVertical: 30, alignItems: 'center' }}>
                     <Ionicons name="people-outline" size={32} color="#CBD5E1" />
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 12 }}>
@@ -2053,7 +2089,7 @@ export default function AnalyticsScreen() {
                     key={f}
                     onPress={() => {
                       setCustomerFilter(f);
-                      setCustomerPage(0);
+                      setDirPage(1);
                       setCustomerFilterModalVisible(false);
                     }}
                     style={{

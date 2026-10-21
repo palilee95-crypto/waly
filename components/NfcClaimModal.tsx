@@ -428,6 +428,7 @@ export default function NfcClaimModal() {
         const bRes = await pb.collection('service_bookings').getList(1, 1, {
           filter: `merchant = "${merchantId}" && customer_phone = "${claim.customer_phone}" && (status = "booked" || status = "arrived" || status = "in_service") && booking_date ~ "${todayStr}"`,
           sort: '-created',
+          expand: 'staff',
         });
         if (bRes.items.length > 0) {
           bk = bRes.items[0];
@@ -448,9 +449,46 @@ export default function NfcClaimModal() {
       if (bk) {
         setActiveBooking(bk);
         setUpcomingFutureBooking(null);
-        let basePrice = bk.total_price || 0;
-        let serviceName = bk.items_summary?.[0]?.name || 'Temujanji Servis';
-        setSelectedServices([{ id: 'booking', name: serviceName, price: basePrice, isBooking: true, qty: 1 }]);
+
+        // Load every booked line into the cart (not just the first one) so the
+        // cashier sees the full appointment; extras are appended on top.
+        let bookedItems: any = bk.items_summary;
+        if (typeof bookedItems === 'string') {
+          try { bookedItems = JSON.parse(bookedItems); } catch (e) { bookedItems = []; }
+        }
+        if (!Array.isArray(bookedItems)) bookedItems = [];
+
+        const bookingLines = bookedItems
+          .filter((it: any) => it && (it.name || it.title))
+          .map((it: any, index: number) => ({
+            id: `booking_${index}`,
+            service_id: it.service_id || it.id || '',
+            name: it.name || it.title || 'Service',
+            price: parseFloat(it.price) || 0,
+            qty: Math.max(1, parseInt(it.qty, 10) || 1),
+            item_type: it.item_type || 'service',
+            duration_minutes: Number(it.duration_minutes) || 0,
+            commission_type: it.commission_type || 'none',
+            commission_rate: Number(it.commission_rate) || 0,
+            isBooking: true,
+          }));
+
+        if (bookingLines.length === 0) {
+          bookingLines.push({
+            id: 'booking',
+            service_id: '',
+            name: 'Temujanji Servis',
+            price: parseFloat(bk.total_price) || 0,
+            qty: 1,
+            item_type: 'service',
+            duration_minutes: 0,
+            commission_type: 'none',
+            commission_rate: 0,
+            isBooking: true,
+          } as any);
+        }
+
+        setSelectedServices(bookingLines as any);
       } else {
         setActiveBooking(null);
         setSelectedServices([]);
@@ -823,6 +861,22 @@ export default function NfcClaimModal() {
           payment_reference: paymentReference.trim(),
           branch_name: user?.branch_name || '',
           branch_id: user?.branch || '',
+          // A booking checkout hands the cart to the booking engine, which owns
+          // the single transaction, card update, commission and receipt.
+          booking_id: activeBooking?.id || '',
+          items: activeBooking
+            ? selectedServices.map((item: any) => ({
+                id: item.service_id || item.id,
+                service_id: item.service_id || item.id,
+                name: item.name,
+                price: parseFloat(item.price) || 0,
+                qty: parseInt(item.qty, 10) || 1,
+                item_type: item.item_type || 'service',
+                duration_minutes: item.duration_minutes || 0,
+                commission_type: item.commission_type || 'none',
+                commission_rate: item.commission_rate || 0,
+              }))
+            : undefined,
         },
       });
 
@@ -841,34 +895,27 @@ export default function NfcClaimModal() {
         subtotal: subtotalAmount,
       });
 
-      // If customer had an active booking, mark completed
-      if (activeBooking?.id) {
+      // A booking checkout is completed by the server (the endpoint moves the
+      // booking to completed, which fires the booking engine and writes the
+      // receipt). Only a walk-in sale needs a receipt from the client — and
+      // marking the booking here again used to create a SECOND transaction.
+      if (!activeBooking?.id) {
         try {
-          await pb.collection('service_bookings').update(activeBooking.id, {
-            status: 'completed'
-          });
-        } catch (bErr) {
-          console.warn('Booking reconciliation note:', bErr);
-        }
-      }
+          const receiptPayload: any = {
+            merchant: merchantId,
+            customer_phone: claim.customer_phone,
+            receipt_number: `REC-${Date.now().toString().slice(-6)}`,
+            total_amount: bill,
+            payment_method: paymentMethod || 'nfc_counter',
+            payment_reference: paymentReference.trim(),
+            stamps_earned: stamps,
+            line_items: selectedServices.length > 0 ? selectedServices : [{ name: locale === 'en' ? 'Service Payment' : 'Pembayaran Servis', price: subtotalAmount || bill }]
+          };
 
-      // ALWAYS create a digital receipt
-      try {
-        const receiptPayload: any = {
-          merchant: merchantId,
-          customer_phone: claim.customer_phone,
-          receipt_number: `REC-${Date.now().toString().slice(-6)}`,
-          total_amount: bill,
-          payment_method: paymentMethod || 'nfc_counter',
-          payment_reference: paymentReference.trim(),
-          stamps_earned: stamps,
-          line_items: selectedServices.length > 0 ? selectedServices : [{ name: locale === 'en' ? 'Service Payment' : 'Pembayaran Servis', price: subtotalAmount || bill }]
-        };
-        if (activeBooking?.id) receiptPayload.booking = activeBooking.id;
-        
-        await pb.collection('digital_receipts').create(receiptPayload);
-      } catch (bErr) {
-        console.warn('Receipt creation note:', bErr);
+          await pb.collection('digital_receipts').create(receiptPayload);
+        } catch (bErr) {
+          console.warn('Receipt creation note:', bErr);
+        }
       }
 
       // Show sleek in-modal success view
@@ -1527,6 +1574,22 @@ export default function NfcClaimModal() {
                       </View>
                       {activeBooking ? <TouchableOpacity accessibilityRole="button" onPress={handleToggleBookingStatus} style={styles.compactStatus}><Text style={styles.compactMuted}>{activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'In-service' : 'Booked'}</Text></TouchableOpacity> : <View style={styles.compactStatus}><Text style={styles.compactMuted}>Walk-in</Text></View>}
                     </View>
+                    {activeBooking ? (
+                      <View style={styles.compactLine}>
+                        <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                        <Text style={[styles.compactMuted, { flex: 1 }]} numberOfLines={1}>
+                          {[activeBooking.booking_date, activeBooking.start_time, activeBooking.expand?.staff?.name].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                    ) : upcomingFutureBooking ? (
+                      <View style={styles.compactLine}>
+                        <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                        <Text style={[styles.compactMuted, { flex: 1 }]} numberOfLines={1}>
+                          {(locale === 'ms' ? 'Tempahan seterusnya ' : 'Next booking ')}
+                          {[upcomingFutureBooking.booking_date, upcomingFutureBooking.start_time].filter(Boolean).join(' ')}
+                        </Text>
+                      </View>
+                    ) : null}
                     <View>
                       <View style={styles.compactLine}>
                         <Text style={styles.compactLabel}>{locale === 'ms' ? 'Jumlah bil' : 'Bill amount'}</Text>
@@ -1538,10 +1601,23 @@ export default function NfcClaimModal() {
                           <TextInput accessibilityLabel={locale === 'ms' ? 'Jumlah bil' : 'Bill amount'} style={styles.compactAmountText} value={customBillInput} onChangeText={text => setCustomBillInput(text.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#94A3B8" />
                         </View>
                         <View style={styles.compactPresets}>{['10', '20', '30', '50'].map(amount => <TouchableOpacity key={amount} accessibilityRole="button" accessibilityState={{ selected: customBillInput === amount }} style={[styles.compactPreset, customBillInput === amount && { backgroundColor: '#0F172A', borderColor: '#0F172A' }]} onPress={() => setCustomBillInput(amount)}><Text style={[styles.compactLabel, customBillInput === amount && { color: '#FFFFFF' }]}>RM{amount}</Text></TouchableOpacity>)}</View>
-                      </> : <TouchableOpacity accessibilityRole="button" style={styles.compactOrderSummary} onPress={() => setIsCatalogPickerOpen(true)}>
-                        <View style={{ flex: 1 }}><Text style={styles.compactLabel}>{selectedServices.reduce((sum, item) => sum + (item.qty || 1), 0)} {locale === 'ms' ? 'item' : 'items'}</Text><Text style={styles.compactMuted} numberOfLines={1}>{selectedServices.map(item => item.name).join(', ')}</Text></View>
-                        <Text style={styles.compactCurrency}>RM{subtotalAmount.toFixed(2)}</Text>
-                      </TouchableOpacity>}
+                      </> : (
+                        <View style={{ gap: 6 }}>
+                          {selectedServices.map((item: any, index: number) => (
+                            <View key={`${item.id}-${index}`} style={styles.compactLine}>
+                              <Text style={[styles.compactLabel, { flex: 1 }]} numberOfLines={1}>
+                                {(parseInt(item.qty, 10) || 1) > 1 ? `${item.qty} × ` : ''}{item.name}
+                              </Text>
+                              <Text style={styles.compactLabel}>
+                                RM{(((parseFloat(item.price) || 0)) * (parseInt(item.qty, 10) || 1)).toFixed(2)}
+                              </Text>
+                            </View>
+                          ))}
+                          <TouchableOpacity accessibilityRole="button" style={styles.compactLine} onPress={() => setIsCatalogPickerOpen(true)}>
+                            <Text style={styles.compactLink}>+ {locale === 'ms' ? 'Tambah item' : 'Add item'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                     <View style={styles.compactVoucherLine}>
                       <TouchableOpacity accessibilityRole="button" style={[styles.compactLine, { flex: 1, gap: 8, minHeight: 48 }]} onPress={() => setIsVouchersExpanded(true)}>

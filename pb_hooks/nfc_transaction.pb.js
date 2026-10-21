@@ -121,6 +121,192 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
     const programId = program.id;
     const goal = parseInt(program.get("stamp_goal")) || 10;
 
+    // Voucher redemption is shared by the walk-in path and the booking checkout.
+    const applyVoucher = () => {
+      // `voucher_id` present (even empty) is authoritative: the cashier can
+      // deliberately remove the customer's pre-selected voucher. Older clients
+      // omit the key, so fall back to the voucher stored on the claim.
+      const hasVoucherField = Object.prototype.hasOwnProperty.call(body, "voucher_id");
+      const voucherId = hasVoucherField
+        ? String(body.voucher_id || "").trim()
+        : (claim.getString("voucher") || "").trim();
+      const outcome = { id: voucherId, code: "", error: "" };
+      if (!voucherId) return outcome;
+
+      try {
+        let vRec = null;
+        try {
+          vRec = $app.findRecordById("vouchers", voucherId);
+        } catch (e) {
+          const byCode = $app.findRecordsByFilter("vouchers", `code = '${voucherId}'`, "-created", 1, 0);
+          if (byCode.length > 0) vRec = byCode[0];
+        }
+
+        if (!vRec) {
+          outcome.error = "not_found";
+          return outcome;
+        }
+
+        const vStatus = vRec.getString("status");
+        const vExpires = vRec.getString("expires_at");
+
+        if (vStatus !== "active") {
+          outcome.error = vStatus || "invalid";
+        } else if (vExpires && new Date(vExpires.replace(" ", "T")).getTime() <= Date.now()) {
+          outcome.error = "expired";
+        } else if (customer && vRec.getString("customer") !== customer.id) {
+          outcome.error = "wrong_customer";
+        } else {
+          // Resolve the voucher's merchant before burning it here.
+          let vMerchant = "";
+          const rewardId = vRec.getString("reward");
+          const campaignId = vRec.getString("campaign");
+          try {
+            if (rewardId) vMerchant = $app.findRecordById("rewards", rewardId).getString("merchant") || "";
+          } catch (rwErr) {}
+          if (!vMerchant && campaignId) {
+            try {
+              vMerchant = $app.findRecordById("campaigns", campaignId).getString("merchant") || "";
+            } catch (cpErr) {}
+          }
+          if (!vMerchant) {
+            try {
+              const rawMeta = vRec.getString("metadata");
+              if (rawMeta && rawMeta !== "null") {
+                const meta = JSON.parse(rawMeta);
+                if (meta && typeof meta === "object") vMerchant = meta.merchant_id || "";
+              }
+            } catch (metaErr) {}
+          }
+          if (!vMerchant || vMerchant !== merchantId) {
+            outcome.error = "wrong_merchant";
+          }
+        }
+
+        if (outcome.error) {
+          console.log(`[NFC COMPLETE] Voucher ${voucherId} not applied: ${outcome.error}`);
+        } else {
+          const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+          vRec.set("status", "used");
+          vRec.set("used_at", nowIso);
+          $app.save(vRec);
+          outcome.code = vRec.getString("code");
+          console.log("[NFC COMPLETE] Voucher marked as used:", outcome.code || voucherId);
+        }
+      } catch (vErr) {
+        outcome.error = "error";
+        console.log("[NFC COMPLETE] Voucher redemption note:", vErr.message || vErr);
+      }
+
+      return outcome;
+    };
+
+    // A checkout started from a booking carries its id so the booking engine
+    // owns the single transaction (stamps, commission and receipt).
+    const bookingId = String(body.booking_id || "").trim();
+    let activeBooking = null;
+    if (bookingId) {
+      try {
+        activeBooking = $app.findRecordById("service_bookings", bookingId);
+      } catch (bErr) {
+        return e.json(404, { code: "BOOKING_NOT_FOUND", message: "Booking not found." });
+      }
+      if (activeBooking.getString("merchant") !== merchantId) {
+        return e.json(403, { code: "BOOKING_FORBIDDEN", message: "That booking belongs to another store." });
+      }
+      const bookingDigits = (activeBooking.getString("customer_phone") || "").replace(/[^\d]/g, "");
+      if (bookingDigits && cleanPhone.replace(/[^\d]/g, "") && bookingDigits !== cleanPhone.replace(/[^\d]/g, "")) {
+        return e.json(400, { code: "BOOKING_PHONE_MISMATCH", message: "This booking belongs to a different phone number." });
+      }
+      const bookingStatus = activeBooking.getString("status");
+      if (bookingStatus === "completed" || bookingStatus === "cancelled" || bookingStatus === "no_show") {
+        return e.json(400, { code: "BOOKING_NOT_ACTIVE", message: "This booking is already " + bookingStatus + "." });
+      }
+    }
+
+    // Booking checkout: merge the POS cart into the booking and let
+    // booking_helper.processCompletedBooking write the transaction.
+    if (customer && activeBooking) {
+      const voucherOutcome = applyVoucher();
+
+      const mergedItems = [];
+      if (Array.isArray(body.items)) {
+        body.items.forEach((rawItem) => {
+          if (!rawItem) return;
+          const itemName = String(rawItem.name || "").trim();
+          if (!itemName) return;
+          const entry = {
+            id: String(rawItem.id || rawItem.service_id || ""),
+            service_id: String(rawItem.service_id || rawItem.id || ""),
+            name: itemName,
+            price: Number(rawItem.price) || 0,
+            qty: Math.max(1, parseInt(rawItem.qty, 10) || 1),
+            item_type: String(rawItem.item_type || "service"),
+            duration_minutes: Number(rawItem.duration_minutes) || 0,
+            commission_type: String(rawItem.commission_type || "none"),
+            commission_rate: Number(rawItem.commission_rate) || 0,
+          };
+          mergedItems.push(entry);
+        });
+      }
+
+      let bookingMeta = {};
+      try {
+        const rawBookingMeta = activeBooking.getString("metadata");
+        bookingMeta = rawBookingMeta && rawBookingMeta !== "null" ? JSON.parse(rawBookingMeta) : {};
+      } catch (metaParseErr) {
+        bookingMeta = {};
+      }
+      if (!bookingMeta || typeof bookingMeta !== "object" || Array.isArray(bookingMeta)) bookingMeta = {};
+      bookingMeta.pos_claim_id = claimId;
+      bookingMeta.pos_stamps = actualStamps;
+      bookingMeta.voucher_id = voucherOutcome.id || "";
+      bookingMeta.voucher_code = voucherOutcome.code || "";
+      bookingMeta.voucher_error = voucherOutcome.error || "";
+      bookingMeta.subtotal = body.subtotal !== undefined ? parseFloat(body.subtotal) || 0 : billAmount;
+      bookingMeta.discount_amount = body.discount_amount !== undefined ? parseFloat(body.discount_amount) || 0 : 0;
+
+      if (mergedItems.length > 0) {
+        activeBooking.set("items_summary", JSON.stringify(mergedItems));
+      }
+      activeBooking.set("total_price", billAmount);
+      activeBooking.set("metadata", JSON.stringify(bookingMeta));
+
+      try {
+        const chosenStaffId = String(body.staff_id || "").trim();
+        if (chosenStaffId) {
+          const staffRec = $app.findRecordById("merchant_staff", chosenStaffId);
+          if (staffRec && staffRec.getString("merchant") === merchantId) {
+            activeBooking.set("staff", staffRec.id);
+          }
+        }
+      } catch (staffErr) {}
+
+      activeBooking.set("status", "completed");
+      // Fires booking_system.pb.js -> processCompletedBooking: one transaction.
+      $app.save(activeBooking);
+
+      claim.set("status", "completed");
+      claim.set("bill_amount", billAmount);
+      claim.set("stamp_amount", actualStamps);
+      claim.set("handled_by", authRecord.id);
+      claim.set("staff_name", (authRecord.getString("name") || "").trim() || "Staff");
+      if (customer) claim.set("customer", customer.id);
+      claim.set("completed_at", new Date().toISOString().replace('T', ' ').substring(0, 19));
+      $app.save(claim);
+
+      console.log(`[NFC COMPLETE] Booking ${activeBooking.id} checked out via POS (claim ${claimId}) for RM${billAmount}, ${actualStamps} stamp(s)`);
+
+      return e.json(200, {
+        success: true,
+        message: "Booking completed",
+        booking_id: activeBooking.id,
+        completed_via: "pos",
+        voucher_error: voucherOutcome.error || "",
+        voucher_code: voucherOutcome.code || "",
+      });
+    }
+
     // 3. Find or create loyalty card & add stamps
     let card = null;
     if (customer) {
@@ -155,81 +341,10 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
       const branchName = (body.branch_name || authRecord.getString("branch_name") || claim.getString("branch_name") || "All Branches (HQ)").trim();
       const branchId = (body.branch_id || authRecord.getString("branch") || claim.getString("branch") || "").trim();
-      // `voucher_id` present (even empty) is authoritative: the cashier can
-      // deliberately remove the customer's pre-selected voucher. Older clients
-      // omit the key, so fall back to the voucher stored on the claim.
-      const hasVoucherField = Object.prototype.hasOwnProperty.call(body, "voucher_id");
-      const voucherId = hasVoucherField
-        ? String(body.voucher_id || "").trim()
-        : (claim.getString("voucher") || "").trim();
-      let redeemedVoucherCode = "";
-      let voucherError = "";
-
-      if (voucherId) {
-        try {
-          let vRec = null;
-          try {
-            vRec = $app.findRecordById("vouchers", voucherId);
-          } catch (e) {
-            const byCode = $app.findRecordsByFilter("vouchers", `code = '${voucherId}'`, "-created", 1, 0);
-            if (byCode.length > 0) vRec = byCode[0];
-          }
-
-          if (!vRec) {
-            voucherError = "not_found";
-          } else {
-            const vStatus = vRec.getString("status");
-            const vExpires = vRec.getString("expires_at");
-
-            if (vStatus !== "active") {
-              voucherError = vStatus || "invalid";
-            } else if (vExpires && new Date(vExpires.replace(" ", "T")).getTime() <= Date.now()) {
-              voucherError = "expired";
-            } else if (customer && vRec.getString("customer") !== customer.id) {
-              voucherError = "wrong_customer";
-            } else {
-              // Resolve the voucher's merchant before burning it here.
-              let vMerchant = "";
-              const rewardId = vRec.getString("reward");
-              const campaignId = vRec.getString("campaign");
-              try {
-                if (rewardId) vMerchant = $app.findRecordById("rewards", rewardId).getString("merchant") || "";
-              } catch (rwErr) {}
-              if (!vMerchant && campaignId) {
-                try {
-                  vMerchant = $app.findRecordById("campaigns", campaignId).getString("merchant") || "";
-                } catch (cpErr) {}
-              }
-              if (!vMerchant) {
-                try {
-                  const rawMeta = vRec.getString("metadata");
-                  if (rawMeta && rawMeta !== "null") {
-                    const meta = JSON.parse(rawMeta);
-                    if (meta && typeof meta === "object") vMerchant = meta.merchant_id || "";
-                  }
-                } catch (metaErr) {}
-              }
-              if (!vMerchant || vMerchant !== merchantId) {
-                voucherError = "wrong_merchant";
-              }
-            }
-
-            if (voucherError) {
-              console.log(`[NFC COMPLETE] Voucher ${voucherId} not applied: ${voucherError}`);
-            } else {
-              const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
-              vRec.set("status", "used");
-              vRec.set("used_at", nowIso);
-              $app.save(vRec);
-              redeemedVoucherCode = vRec.getString("code");
-              console.log("[NFC COMPLETE] Voucher marked as used:", redeemedVoucherCode || voucherId);
-            }
-          }
-        } catch (vErr) {
-          voucherError = "error";
-          console.log("[NFC COMPLETE] Voucher redemption note:", vErr.message || vErr);
-        }
-      }
+      const voucherOutcome = applyVoucher();
+      const voucherId = voucherOutcome.id;
+      const redeemedVoucherCode = voucherOutcome.code;
+      const voucherError = voucherOutcome.error;
 
       try {
         function resolveBranchId(mid, candidate) {

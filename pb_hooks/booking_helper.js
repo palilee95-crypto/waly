@@ -251,6 +251,20 @@ function processCompletedBooking(rec) {
     }
   }
 
+  // A POS checkout chooses its own stamp count; /api/risev/nfc/complete stores
+  // it on the booking before completing it.
+  try {
+    var rawBookingMeta = (typeof rec.getString === "function") ? rec.getString("metadata") : "";
+    if (rawBookingMeta && rawBookingMeta !== "null") {
+      var parsedBookingMeta = JSON.parse(rawBookingMeta);
+      var posStamps = parsedBookingMeta && parsedBookingMeta.pos_stamps;
+      if (posStamps !== undefined && posStamps !== null && String(posStamps) !== "") {
+        stampsToAward = Math.max(0, parseInt(String(posStamps), 10) || 0);
+        if (program && program.get("enable_stamps") === false) stampsToAward = 0;
+      }
+    }
+  } catch (posMetaErr) {}
+
   // 4. Resolve items summary
   var itemsSummary = [];
   try {

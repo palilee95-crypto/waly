@@ -833,6 +833,34 @@ export default function CustomerBookingPwaScreen() {
     }
   }, [user, activeRole, queryName, queryPhone]);
 
+  // Returning customers: resolve the name from the phone so nobody retypes it.
+  // The lookup is scoped to this store — it only answers for customers that
+  // already have a card or a booking here.
+  useEffect(() => {
+    const digits = customerPhone.replace(/[^\d]/g, '');
+    const merchantId = merchant?.id;
+    if (!merchantId || digits.length < 9 || customerName.trim()) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await pb.send<{ exists: boolean; name?: string }>('/api/risev/booking/customer-lookup', {
+          method: 'GET',
+          query: { merchant: merchantId, phone: digits },
+          requestKey: null,
+        });
+        const resolved = res && res.exists ? String(res.name || '').trim() : '';
+        if (!cancelled && resolved) {
+          setCustomerName(resolved);
+          AsyncStorage.setItem('risev_cust_name', resolved).catch(() => {});
+        }
+      } catch (err) {}
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [customerPhone, customerName, merchant?.id]);
+
   useEffect(() => {
     if (queryRef === 'nfc_walkin') {
       setCurrentStep(1);
@@ -1142,13 +1170,40 @@ export default function CustomerBookingPwaScreen() {
         }
       }
 
-      // Fetch staff (live active staff only)
+      // Fetch staff (live active staff only). The public route resolves the
+      // owner's avatar from the users collection, which the PWA cannot read.
       try {
-        const stRes = await pb.collection('merchant_staff').getList(1, 20, {
-          filter: `merchant = "${mRecord.id}" && is_active = true`,
-          sort: 'sort_order,created'
-        });
-        const activeStaff = (stRes.items || []).filter((s: any) => s.is_active !== false && s.attendance_status !== 'on_leave');
+        let activeStaff: any[] = [];
+        let usedPublicRoute = false;
+        try {
+          const pubRes = await pb.send<{ staff: any[] }>('/api/risev/staff/public', {
+            method: 'GET',
+            query: { merchant: mRecord.id },
+            requestKey: null,
+          });
+          if (pubRes && Array.isArray(pubRes.staff)) {
+            usedPublicRoute = true;
+            activeStaff = pubRes.staff.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              role_title: s.role_title,
+              user: s.user_id || '',
+              is_active: true,
+              avatar: '',
+              avatar_url: s.avatar_url ? `${pb.baseUrl}${s.avatar_url}` : '',
+            }));
+          }
+        } catch (pubErr) {
+          usedPublicRoute = false;
+        }
+
+        if (!usedPublicRoute) {
+          const stRes = await pb.collection('merchant_staff').getList(1, 20, {
+            filter: `merchant = "${mRecord.id}" && is_active = true`,
+            sort: 'sort_order,created'
+          });
+          activeStaff = (stRes.items || []).filter((s: any) => s.is_active !== false && s.attendance_status !== 'on_leave');
+        }
 
         // Attach real rating aggregates (derived from completed bookings).
         let staffRatings: Record<string, { rating_avg: number; rating_count: number }> = {};
@@ -2661,9 +2716,9 @@ export default function CustomerBookingPwaScreen() {
                   {/* Individual Real Staff Cards (only renders if merchant has staff) */}
                   {staffList.map((st) => {
                     const isSelected = selectedStaff?.id === st.id;
-                    const avatarUri = st.avatar
-                      ? pb.files.getURL(st, st.avatar)
-                      : ((st as any).photo || null);
+                    const avatarUri = (st as any).avatar_url
+                      || (st.avatar ? pb.files.getURL(st, st.avatar) : null)
+                      || ((st as any).photo || null);
 
                     return (
                       <TouchableOpacity
@@ -2873,6 +2928,11 @@ export default function CustomerBookingPwaScreen() {
                   onChangeText={setCustomerName}
                 />
               </View>
+              {customerName.trim() ? (
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.45)', marginTop: 6 }}>
+                  Saved from your last visit — edit it if anything changed.
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.inputFieldGroup}>
