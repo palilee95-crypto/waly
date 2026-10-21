@@ -44,6 +44,18 @@ export type ManageActivity = {
   branchName: string;
 };
 
+/** The loyalty card design the customer sees (loyalty_programs). */
+export type ManageCardDesign = {
+  programId: string;
+  programName: string;
+  cardColor: string;
+  fontColor: string;
+  cardIcon: string;
+  cardBackgroundBack: string;
+  spendPerPoint: number;
+  milestones: number[];
+};
+
 export type ManageCustomerDetail = {
   profile: {
     id: string;
@@ -72,9 +84,16 @@ export type ManageCustomerDetail = {
     enableStamps: boolean;
     enablePoints: boolean;
   };
+  card: ManageCardDesign | null;
+  merchantName: string;
   vouchers: ManageVoucher[];
   activity: ManageActivity[];
 };
+
+export function programCardImageUrl(programId?: string | null, file?: string | null): string {
+  if (!programId || !file) return '';
+  return `${pb.baseUrl}/api/files/loyalty_programs/${programId}/${encodeURIComponent(file)}`;
+}
 
 export type ManageCustomersPage = {
   items: ManageCustomerRow[];

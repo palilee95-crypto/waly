@@ -8,6 +8,16 @@ import { FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
  * flip animation. Keep the two in sync when the NFC card changes.
  */
 
+/** White or near-black, whichever stays readable on the merchant's card colour. */
+export function inkOn(background: string) {
+  const hex = String(background || '').replace('#', '');
+  if (hex.length < 6) return '#FFFFFF';
+  const r = parseInt(hex.slice(0, 2), 16) || 0;
+  const g = parseInt(hex.slice(2, 4), 16) || 0;
+  const b = parseInt(hex.slice(4, 6), 16) || 0;
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 160 ? '#0F172A' : '#FFFFFF';
+}
+
 const STAMP_ICONS = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
   { id: 'star', family: 'FontAwesome', name: 'star' },

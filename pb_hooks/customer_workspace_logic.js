@@ -1541,7 +1541,12 @@ function buildManageCustomerDetail($app, ctx, customerId) {
       "COALESCE(c.points_balance, 0) as points, COALESCE(c.completions, 0) as completions, " +
       "COALESCE(c.opt_in_marketing, 1) as opt_in, COALESCE(p.name, '') as program_name, " +
       "COALESCE(p.stamp_goal, 10) as goal, COALESCE(p.enable_stamps, 1) as enable_stamps, " +
-      "COALESCE(p.enable_points, 0) as enable_points " +
+      "COALESCE(p.enable_points, 0) as enable_points, " +
+      // Card design, so the merchant sees the same card as the customer.
+      "COALESCE(p.id, '') as program_id, COALESCE(p.card_color, '') as card_color, " +
+      "COALESCE(p.font_color, '') as font_color, COALESCE(p.card_icon, '') as card_icon, " +
+      "COALESCE(p.card_background_back, '') as card_background_back, " +
+      "COALESCE(p.spend_per_point, 1) as spend_per_point, COALESCE(p.sub_rewards, '') as sub_rewards " +
       "FROM loyalty_cards c JOIN users u ON u.id = c.customer " +
       "LEFT JOIN loyalty_programs p ON p.id = c.program " +
       "WHERE c.merchant = {:mid} AND c.customer = {:cid} " +
@@ -1551,6 +1556,8 @@ function buildManageCustomerDetail($app, ctx, customerId) {
       id: "", name: "", phone: "", avatar: "", tier: "", birthday: "", joined: "",
       card_id: "", stamps: 0, points: 0, completions: 0, opt_in: 1,
       program_name: "", goal: 10, enable_stamps: 1, enable_points: 0,
+      program_id: "", card_color: "", font_color: "", card_icon: "",
+      card_background_back: "", spend_per_point: 1, sub_rewards: "",
     }
   )[0];
   if (!cardRow) return null;
@@ -1594,6 +1601,27 @@ function buildManageCustomerDetail($app, ctx, customerId) {
   const spendCents = Math.round((Number(metrics.spend) || 0) * 100);
   const lastSeen = parsePbDate(metrics.last_seen);
 
+  // Milestone stamps come from the program's sub_rewards JSON.
+  let milestones = [];
+  try {
+    const rawSubs = cardRow.sub_rewards;
+    const parsedSubs = typeof rawSubs === "string"
+      ? (rawSubs && rawSubs !== "null" ? JSON.parse(rawSubs) : [])
+      : rawSubs;
+    if (Array.isArray(parsedSubs)) {
+      milestones = parsedSubs
+        .map(function (entry) { return Number(entry && entry.at_stamp); })
+        .filter(function (stamp) { return isFinite(stamp) && stamp > 0; });
+    }
+  } catch (subErr) {
+    milestones = [];
+  }
+
+  let merchantName = "";
+  try {
+    merchantName = $app.findRecordById("merchants", ctx.merchantId).getString("name") || "";
+  } catch (merchantErr) {}
+
   return {
     profile: {
       id: cardRow.id,
@@ -1622,6 +1650,17 @@ function buildManageCustomerDetail($app, ctx, customerId) {
       enableStamps: Number(cardRow.enable_stamps) !== 0,
       enablePoints: Number(cardRow.enable_points) !== 0,
     },
+    card: cardRow.program_id ? {
+      programId: cardRow.program_id,
+      programName: cardRow.program_name || "",
+      cardColor: cardRow.card_color || "",
+      fontColor: cardRow.font_color || "",
+      cardIcon: cardRow.card_icon || "",
+      cardBackgroundBack: cardRow.card_background_back || "",
+      spendPerPoint: Number(cardRow.spend_per_point) || 1,
+      milestones: milestones,
+    } : null,
+    merchantName: merchantName,
     vouchers: vouchers.map(function (v) {
       return {
         id: v.id,

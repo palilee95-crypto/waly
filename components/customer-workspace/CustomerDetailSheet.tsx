@@ -19,17 +19,7 @@ import {
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
-import LoyaltyCardBack from '@/components/LoyaltyCardBack';
-
-/** White or near-black, whichever stays readable on the merchant's card colour. */
-function inkOn(background: string) {
-  const hex = String(background || '').replace('#', '');
-  if (hex.length < 6) return '#FFFFFF';
-  const r = parseInt(hex.slice(0, 2), 16) || 0;
-  const g = parseInt(hex.slice(2, 4), 16) || 0;
-  const b = parseInt(hex.slice(4, 6), 16) || 0;
-  return (r * 299 + g * 587 + b * 114) / 1000 >= 160 ? '#0F172A' : '#FFFFFF';
-}
+import LoyaltyCardBack, { inkOn } from '@/components/LoyaltyCardBack';
 
 const TYPE_LABEL: Record<string, string> = {
   earn: 'Stamp earned',
