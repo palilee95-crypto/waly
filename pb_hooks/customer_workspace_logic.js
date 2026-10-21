@@ -1578,7 +1578,11 @@ function buildManageCustomerDetail($app, ctx, customerId) {
   const activity = rows(
     $app,
     "SELECT t.id as id, t.type as type, CAST(COALESCE(t.bill_amount, 0) AS TEXT) as bill, " +
-      "COALESCE(t.stamps, 0) as stamps, COALESCE(t.points, 0) as points, t.created as created, " +
+      // transactions.stamps cannot go below 0, so a stamp deduction keeps its
+      // signed amount in metadata.stamp_delta and stores 0 in the column.
+      "CASE WHEN t.type = 'adjust' AND json_valid(t.metadata) " +
+      "THEN COALESCE(json_extract(t.metadata, '$.stamp_delta'), COALESCE(t.stamps, 0)) " +
+      "ELSE COALESCE(t.stamps, 0) END as stamps, COALESCE(t.points, 0) as points, t.created as created, " +
       "COALESCE(s.name, '') as staff_name, COALESCE(b.name, '') as branch_name " +
       "FROM transactions t LEFT JOIN users s ON s.id = t.staff LEFT JOIN branches b ON b.id = t.branch " +
       "WHERE t.merchant = {:mid} AND t.customer = {:cid} ORDER BY t.created DESC LIMIT 50",

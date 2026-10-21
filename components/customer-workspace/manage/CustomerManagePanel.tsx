@@ -298,6 +298,15 @@ export default function CustomerManagePanel({ customerId, visitDate, visitsOnDat
   const signal = detailSignal(detail);
   const hasPhone = !!whatsappNumber(profile.phone);
 
+  const isStampAction = action === 'stamps';
+  const adjustUnit = isStampAction ? 'stamps' : 'points';
+  const adjustCurrent = isStampAction ? loyalty.stamps : loyalty.points;
+  const adjustAmount = Number(delta);
+  const adjustIsNumber = delta.trim() !== '' && Number.isInteger(adjustAmount);
+  const adjustNext = adjustIsNumber ? adjustCurrent + adjustAmount : null;
+  const adjustBelowZero = adjustNext !== null && adjustNext < 0;
+  const adjustCanSubmit = adjustIsNumber && adjustAmount !== 0 && !adjustBelowZero && !!reason.trim() && !saving;
+
   return (
     <>
     <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -501,32 +510,53 @@ export default function CustomerManagePanel({ customerId, visitDate, visitsOnDat
 
       {action === 'stamps' || action === 'points' ? (
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {action === 'stamps' ? 'Adjust stamps' : 'Adjust points'}
-          </Text>
-          <Text style={styles.formHint}>
-            Current: {action === 'stamps' ? `${loyalty.stamps} stamps` : `${loyalty.points} points`}
-          </Text>
-          <View style={styles.stepperRow}>
-            {[-5, -1, 1, 5].map((amount) => (
-              <TouchableOpacity
-                key={amount}
-                style={styles.stepperChip}
-                onPress={() => setDelta(String(amount))}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.stepperText}>{amount > 0 ? `+${amount}` : amount}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.formHead}>
+            <Text style={styles.formTitle}>
+              {isStampAction ? 'Adjust stamps' : 'Adjust points'}
+            </Text>
+            <View style={styles.balanceChip}>
+              <Ionicons name={isStampAction ? 'ribbon-outline' : 'sparkles-outline'} size={iconSizes.micro} color={colors.accent[700]} />
+              <Text style={styles.balanceChipText}>
+                {isStampAction ? `${loyalty.stamps} / ${loyalty.stampGoal}` : `${loyalty.points} pts`}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.presetRow}>
+            {[-5, -1, 1, 5].map((amount) => {
+              const selected = delta.trim() === String(amount);
+              return (
+                <TouchableOpacity
+                  key={amount}
+                  style={[styles.presetChip, selected && styles.presetChipActive]}
+                  onPress={() => setDelta(String(amount))}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${amount > 0 ? 'Add' : 'Remove'} ${Math.abs(amount)} ${adjustUnit}`}
+                >
+                  <Text style={[styles.presetChipText, selected && styles.presetChipTextActive]}>
+                    {amount > 0 ? `+${amount}` : `−${Math.abs(amount)}`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.inputLabel}>Custom amount</Text>
+          <View style={styles.fieldWrap}>
             <TextInput
               value={delta}
               onChangeText={setDelta}
-              style={styles.deltaInput}
+              style={styles.fieldInput}
               keyboardType="numeric"
               placeholder="0"
               placeholderTextColor={colors.accent[400]}
+              accessibilityLabel={`Amount of ${adjustUnit} to adjust`}
             />
+            <Text style={styles.fieldSuffix}>{adjustUnit}</Text>
           </View>
+
           <Text style={styles.inputLabel}>Reason</Text>
           <TextInput
             value={reason}
@@ -534,12 +564,41 @@ export default function CustomerManagePanel({ customerId, visitDate, visitsOnDat
             style={styles.input}
             placeholder="Why is this adjustment needed?"
             placeholderTextColor={colors.accent[400]}
+            maxLength={300}
+            accessibilityLabel="Reason for this adjustment"
           />
+          <Text style={styles.helperText}>Saved to the customer's activity record.</Text>
+
+          <View style={styles.previewRow}>
+            <Ionicons
+              name={adjustBelowZero ? 'alert-circle-outline' : 'arrow-forward'}
+              size={iconSizes.micro}
+              color={adjustBelowZero ? colors.error.dark : colors.accent[400]}
+            />
+            <Text style={styles.previewLabel}>New balance</Text>
+            <Text style={[styles.previewValue, adjustBelowZero && styles.previewValueBad]}>
+              {!adjustIsNumber
+                ? 'Enter a whole number'
+                : adjustAmount === 0
+                  ? `${adjustCurrent} ${adjustUnit} — no change`
+                  : adjustBelowZero
+                    ? `Can't go below 0`
+                    : isStampAction
+                      ? `${adjustNext} of ${loyalty.stampGoal} stamps`
+                      : `${adjustNext} ${adjustUnit}`}
+            </Text>
+          </View>
+
           <View style={styles.formActions}>
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => setAction(null)} activeOpacity={0.8}>
               <Text style={styles.secondaryBtnText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.primaryBtn, saving && styles.disabled]} onPress={saveAdjust} disabled={saving} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, !adjustCanSubmit && styles.disabled]}
+              onPress={saveAdjust}
+              disabled={!adjustCanSubmit}
+              activeOpacity={0.85}
+            >
               <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Apply adjustment'}</Text>
             </TouchableOpacity>
           </View>
@@ -633,7 +692,7 @@ function ActionButton({ icon, label, onPress, danger }: { icon: keyof typeof Ion
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  body: { gap: spacing[3], paddingBottom: spacing[8] },
+  body: { gap: spacing[3], paddingBottom: 120 },
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[10], gap: spacing[2] },
   errorText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: colors.accent[500], textAlign: 'center' },
 
@@ -699,14 +758,26 @@ const styles = StyleSheet.create({
   actionBtnTextDanger: { color: colors.error.dark },
 
   formCard: { backgroundColor: colors.white, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.accent[100], padding: spacing[4], gap: spacing[2], ...shadows.sm },
-  formTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, color: colors.black },
+  formHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  formTitle: { flex: 1, minWidth: 0, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, color: colors.black },
   formHint: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: colors.accent[500] },
+  balanceChip: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingHorizontal: spacing[2.5], paddingVertical: 4, borderRadius: radii.full, backgroundColor: colors.accent[50], borderWidth: 1, borderColor: colors.accent[100] },
+  balanceChipText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11.5, color: colors.accent[700] },
   inputLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10.5, color: colors.accent[500], marginTop: spacing[1] },
   input: { height: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.accent[100], backgroundColor: colors.accent[50], paddingHorizontal: spacing[3], fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, color: colors.black },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  stepperChip: { minWidth: 46, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radii.md, backgroundColor: colors.accent[50], borderWidth: 1, borderColor: colors.accent[100] },
-  stepperText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: colors.black },
-  deltaInput: { width: 76, height: 40, borderRadius: radii.md, borderWidth: 1, borderColor: colors.accent[100], paddingHorizontal: spacing[2], fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: colors.black },
+  helperText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: colors.accent[400] },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[1] },
+  presetChip: { minWidth: 58, minHeight: 40, paddingHorizontal: spacing[4], alignItems: 'center', justifyContent: 'center', borderRadius: radii.full, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.accent[200] },
+  presetChipActive: { backgroundColor: colors.black, borderColor: colors.black },
+  presetChipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.black },
+  presetChipTextActive: { color: colors.white },
+  fieldWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], height: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.accent[100], backgroundColor: colors.accent[50], paddingHorizontal: spacing[3] },
+  fieldInput: { flex: 1, minWidth: 0, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: colors.black, paddingVertical: 0 },
+  fieldSuffix: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: colors.accent[500] },
+  previewRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing[1.5], marginTop: spacing[1] },
+  previewLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: colors.accent[500] },
+  previewValue: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11.5, color: colors.black },
+  previewValueBad: { color: colors.error.dark },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing[2], marginTop: spacing[1] },
   primaryBtn: { minHeight: 42, paddingHorizontal: spacing[4], borderRadius: radii.md, backgroundColor: colors.primary[400], alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 12.5, color: colors.black },
