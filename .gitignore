@@ -7,7 +7,9 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+# expo-env.d.ts is committed on purpose: it loads `expo/types`, which carries the
+# web style augmentations. Without it in CI, `tsc` reports false errors on
+# react-native-web styles (position: 'sticky', Image style unions).
 .hermes/
 
 # Native
