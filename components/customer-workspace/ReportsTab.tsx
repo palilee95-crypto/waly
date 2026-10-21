@@ -14,6 +14,7 @@ import {
 import CustomerSnapshotCard from './CustomerSnapshotCard';
 import SalesReport from './SalesReport';
 import LoyaltyReport from './LoyaltyReport';
+import ReviewsReport from './ReviewsReport';
 
 export type ReportId = 'customers' | 'bookings' | 'sales' | 'loyalty' | 'reviews';
 
@@ -436,8 +437,6 @@ function OtherReport({
   onOpenLedger: (focus?: LedgerFocus) => void;
   onOpenBookings: (filter?: { status?: string; date?: string }) => void;
 }) {
-  const { feedback, reviews } = snapshot;
-
   if (report === 'bookings') {
     return <BookingsReport snapshot={snapshot} periodLabel={periodLabel} onOpenBookings={onOpenBookings} />;
   }
@@ -450,56 +449,7 @@ function OtherReport({
     return <LoyaltyReport snapshot={snapshot} periodLabel={periodLabel} onOpenAudience={onOpenAudience} onOpenDirectory={onOpenDirectory} />;
   }
 
-  // reviews
-  const maxStars = Math.max(1, ...reviews.distribution.map((d) => d.count));
-  return (
-    <View style={styles.body}>
-      <View style={styles.kpiGrid}>
-        <Kpi label="Responses" value={formatCount(feedback.responses)} sub={periodLabel} />
-        <Kpi
-          label="Average rating"
-          value={feedback.avgRating === null ? 'No data' : feedback.avgRating.toFixed(1)}
-          sub={`Out of 5 stars`}
-        />
-      </View>
-
-      <Card>
-        <Text style={styles.cardTitle}>Rating breakdown</Text>
-        {feedback.responses === 0 ? (
-          <Text style={styles.empty}>No feedback in this period.</Text>
-        ) : (
-          reviews.distribution.map((d) => (
-            <View key={d.stars} style={styles.starRow}>
-              <Text style={styles.starLabel}>{d.stars}★</Text>
-              <View style={styles.freqTrack}>
-                <View style={[styles.freqFill, { width: `${(d.count / maxStars) * 100}%` }]} />
-              </View>
-              <Text style={styles.freqCount}>{d.count}</Text>
-            </View>
-          ))
-        )}
-      </Card>
-
-      <Section title="Recent feedback">
-        {reviews.recent.length === 0 ? (
-          <Text style={styles.empty}>No feedback in this period.</Text>
-        ) : (
-          reviews.recent.map((r, i) => (
-            <View key={`${r.createdAt}-${i}`} style={styles.reviewRow}>
-              <View style={styles.reviewHead}>
-                <Text style={styles.rankName} numberOfLines={1}>
-                  {r.name}
-                </Text>
-                <Text style={styles.stars}>{'★'.repeat(r.stars)}</Text>
-              </View>
-              {r.feedback ? <Text style={styles.reviewText}>{r.feedback}</Text> : null}
-              <Text style={styles.rankMeta}>{formatShortDateFromIso(r.createdAt)}</Text>
-            </View>
-          ))
-        )}
-      </Section>
-    </View>
-  );
+  return <ReviewsReport snapshot={snapshot} periodLabel={periodLabel} />;
 }
 
 // ── Small pieces ─────────────────────────────────────────────────────────────
@@ -585,18 +535,6 @@ function hourLabel(hour: number) {
   if (hour === 0) return '12am';
   if (hour === 12) return '12pm';
   return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
-}
-
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <View style={styles.kpi}>
-      <Text style={styles.kpiLabel}>{label}</Text>
-      <Text style={styles.kpiValue} numberOfLines={1}>
-        {value}
-      </Text>
-      {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
-    </View>
-  );
 }
 
 function Card({ children }: { children: ReactNode }) {
@@ -802,31 +740,6 @@ const styles = StyleSheet.create({
   bookingScheduleHintText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10.5, color: '#746241' },
   bookingServiceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EEF1F5' },
   bookingServiceRank: { width: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11, color: '#A4AFBE' },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 0 },
-  kpi: {
-    flexGrow: 1,
-    flexBasis: '47%',
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ECEFF3',
-    padding: 15,
-  },
-  kpiLabel: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    color: '#94A3B8',
-  },
-  kpiValue: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 21,
-    color: colors.black,
-    marginTop: 3,
-  },
-  kpiSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: '#64748B', marginTop: 3 },
-
   card: {
     backgroundColor: colors.white,
     borderRadius: 22,
@@ -875,30 +788,6 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, color: '#64748B' },
-
-  freqRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  freqLabel: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 11,
-    color: '#475569',
-    width: 76,
-  },
-  freqTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: '#F1F5F9', overflow: 'hidden' },
-  freqFill: { height: 8, borderRadius: 4, backgroundColor: colors.black },
-  freqCount: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    color: colors.black,
-    width: 26,
-    textAlign: 'right',
-  },
-  starRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  starLabel: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    color: '#B45309',
-    width: 26,
-  },
 
   section: { marginBottom: 0 },
   sectionHead: {
@@ -965,16 +854,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: '#94A3B8',
     paddingVertical: 12,
-  },
-  reviewRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  reviewHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  stars: { color: '#F59E0B', fontSize: 11 },
-  reviewText: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: '#475569',
-    marginTop: 3,
   },
 });
 

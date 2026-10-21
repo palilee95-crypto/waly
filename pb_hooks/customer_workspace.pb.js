@@ -2,6 +2,7 @@
 //
 //   GET /api/risev/merchant/customer-workspace?branch=<id|all>&from=YYYY-MM-DD&to=YYYY-MM-DD
 //   GET /api/risev/merchant/customer-workspace/audience?card=return|rewards|rebook|birthday|all|top|inactive&page=1&perPage=20
+//   GET /api/risev/merchant/customer-workspace/reviews?from=YYYY-MM-DD&to=YYYY-MM-DD&stars=1..5|low&sort=newest|lowest&comments=1&page=1&perPage=20
 //
 // Read-only: no writes, no messaging. JSVM rules honoured here:
 //   * every helper lives INSIDE the handler (file-level functions are not visible);
@@ -326,5 +327,62 @@ routerAdd("GET", "/api/risev/merchant/customer-workspace/transactions", (e) => {
   } catch (err) {
     console.log("[CUSTOMER WORKSPACE] Ledger failed:", err && err.message ? err.message : err);
     return e.json(500, { code: "LEDGER_FAILED", message: "Could not load transactions." });
+  }
+});
+
+// Feedback has no branch relation, so this route always returns merchant-wide
+// records for the selected period. The UI labels that scope explicitly.
+routerAdd("GET", "/api/risev/merchant/customer-workspace/reviews", (e) => {
+  const logic = require(`${__hooks}/customer_workspace_logic.js`);
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { code: "AUTH_REQUIRED", message: "Sign in to view customer feedback." });
+  }
+
+  let merchantId = "";
+  try { merchantId = authRecord.getString("merchant_id") || ""; } catch (err) {}
+  if (!merchantId) {
+    try {
+      const owned = $app.findRecordsByFilter("merchants", "owner = '" + authRecord.id + "'", "", 1, 0);
+      if (owned && owned.length > 0) merchantId = owned[0].id;
+    } catch (err) {}
+  }
+  if (!merchantId) {
+    return e.json(403, { code: "MERCHANT_REQUIRED", message: "No merchant profile is linked to this account." });
+  }
+  try {
+    $app.findRecordById("merchants", merchantId);
+  } catch (err) {
+    return e.json(403, { code: "MERCHANT_REQUIRED", message: "Merchant profile not found." });
+  }
+
+  const query = (e.requestInfo() && e.requestInfo().query) || {};
+  const fromDate = String(query.from || "");
+  const toDate = String(query.to || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate) || toDate <= fromDate) {
+    return e.json(400, { code: "INVALID_PERIOD", message: "Choose a valid feedback period." });
+  }
+  const stars = String(query.stars || "");
+  if (stars && stars !== "low" && !/^[1-5]$/.test(stars)) {
+    return e.json(400, { code: "INVALID_RATING", message: "Choose one to five stars, or low ratings." });
+  }
+  const sort = String(query.sort || "newest");
+  if (sort !== "newest" && sort !== "lowest") {
+    return e.json(400, { code: "INVALID_SORT", message: "Choose newest or lowest rated." });
+  }
+  const comments = String(query.comments || "0");
+  if (comments !== "0" && comments !== "1") {
+    return e.json(400, { code: "INVALID_COMMENTS", message: "Comments filter must be 0 or 1." });
+  }
+
+  try {
+    return e.json(200, logic.buildReviews($app, {
+      merchantId: merchantId,
+      fromUtc: logic.localDateToUtcStart(fromDate),
+      toUtc: logic.localDateToUtcStart(toDate),
+    }, { stars: stars, sort: sort, commentsOnly: comments === "1", page: query.page, perPage: query.perPage }));
+  } catch (err) {
+    console.log("[CUSTOMER WORKSPACE] Feedback failed:", err && err.message ? err.message : err);
+    return e.json(500, { code: "FEEDBACK_FAILED", message: "Could not load customer feedback." });
   }
 });

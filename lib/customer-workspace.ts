@@ -23,6 +23,27 @@ export type AttentionItem = {
 };
 
 export type StampBucket = { date: string; label: string; detail: string; stamps: number };
+export type ReviewRow = { id: string; name: string; stars: number; feedback: string; createdAt: string };
+export type ReviewsPage = { page: number; perPage: number; total: number; items: ReviewRow[] };
+export type ReviewFilter = number | 'low' | null;
+export type ReviewSort = 'newest' | 'lowest';
+export type ReviewSeriesPoint = { key: string; label: string; detail: string; count: number; avgRating: number | null };
+export type ReviewImprovementStatus = 'open' | 'in_progress' | 'done';
+export type ReviewImprovementCategory = 'service' | 'product' | 'wait' | 'staff' | 'other';
+export type ReviewImprovementTask = {
+  id: string;
+  reviewId: string;
+  title: string;
+  category: ReviewImprovementCategory;
+  status: ReviewImprovementStatus;
+  ownerName: string;
+  dueDate: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+  review: Omit<ReviewRow, 'id'> | null;
+};
+export type ReviewImprovementList = { items: ReviewImprovementTask[]; counts: Record<ReviewImprovementStatus, number>; limit: number; truncated: boolean; allPeriods: boolean };
 
 export type WorkspaceSnapshot = {
   asOf: string;
@@ -135,7 +156,9 @@ export type WorkspaceSnapshot = {
   };
   reviews: {
     distribution: { stars: number; count: number }[];
-    recent: { name: string; stars: number; feedback: string; createdAt: string }[];
+    recent: ReviewRow[];
+    series: ReviewSeriesPoint[];
+    granularity: 'hour' | 'day' | 'week' | 'month';
   };
 };
 
@@ -264,6 +287,55 @@ export async function fetchTransactions(params: {
   });
 }
 
+/** Merchant-wide feedback; store_feedbacks has no branch field. */
+export async function fetchReviews(params: {
+  from: string;
+  to: string;
+  stars?: ReviewFilter;
+  sort?: ReviewSort;
+  commentsOnly?: boolean;
+  page?: number;
+  perPage?: number;
+}): Promise<ReviewsPage> {
+  const qs = new URLSearchParams({
+    from: params.from,
+    to: params.to,
+    page: String(params.page ?? 1),
+    perPage: String(params.perPage ?? 20),
+  });
+  if (params.stars) qs.set('stars', String(params.stars));
+  if (params.sort) qs.set('sort', params.sort);
+  if (params.commentsOnly) qs.set('comments', '1');
+  return pb.send<ReviewsPage>(`/api/risev/merchant/customer-workspace/reviews?${qs.toString()}`, {
+    method: 'GET',
+    requestKey: null,
+  });
+}
+
+/** Improvement tasks are separate from immutable customer feedback. */
+export async function fetchReviewImprovements(): Promise<ReviewImprovementList> {
+  return pb.send<ReviewImprovementList>('/api/risev/merchant/review-improvements', { method: 'GET', requestKey: null });
+}
+
+export async function createReviewImprovement(input: {
+  reviewId: string;
+  title: string;
+  category: ReviewImprovementCategory;
+  ownerName: string;
+  dueDate: string;
+  note: string;
+}): Promise<{ item: ReviewImprovementTask }> {
+  return pb.send<{ item: ReviewImprovementTask }>('/api/risev/merchant/review-improvements', {
+    method: 'POST', body: input, requestKey: null,
+  });
+}
+
+export async function updateReviewImprovementStatus(id: string, status: ReviewImprovementStatus): Promise<{ item: ReviewImprovementTask }> {
+  return pb.send<{ item: ReviewImprovementTask }>('/api/risev/merchant/review-improvements/status', {
+    method: 'POST', body: { id, status }, requestKey: null,
+  });
+}
+
 export type FetchWorkspaceParams = {
   branchId?: string;
   periodId?: string;
@@ -325,7 +397,9 @@ function normalizeSnapshot(raw: WorkspaceSnapshot): WorkspaceSnapshot {
     },
     reviews: {
       distribution: raw.reviews?.distribution ?? [],
-      recent: raw.reviews?.recent ?? [],
+      recent: (raw.reviews?.recent ?? []).map((row, index) => ({ ...row, id: row.id || `${row.createdAt}-${index}` })),
+      series: raw.reviews?.series ?? [],
+      granularity: raw.reviews?.granularity ?? 'day',
     },
   };
 }
