@@ -1,6 +1,11 @@
 # API PocketBase Reverse Proxy
+#
+# IMPORTANT: proxy by CONTAINER name, not by compose service name. Two compose
+# projects (prod + /opt/risev-staging) share risev_risev-network; when both had a
+# service called "pocketbase", Docker DNS round-robined Caddy between the two
+# containers and roughly half of production traffic hit staging.
 {$DOMAIN_API} {
-    reverse_proxy pocketbase:8090 {
+    reverse_proxy risev-pocketbase:8090 {
         header_up X-Real-IP {header.CF-Connecting-IP}
     }
 
