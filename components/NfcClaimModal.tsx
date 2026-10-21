@@ -22,6 +22,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import FullPosCheckout from './FullPosCheckout';
 import ManualPosCustomerStep from './ManualPosCustomerStep';
+import ThermalReceiptScreen from './ThermalReceiptScreen';
+import { PaidReceipt } from '@/lib/paidReceipt';
 import { normalizeManualPosPhone } from '@/lib/manualPosPhone';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
@@ -172,6 +174,8 @@ export default function NfcClaimModal() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [isSuccess, setIsSuccess] = useState(false);
+  const [paidReceipt, setPaidReceipt] = useState<PaidReceipt | null>(null);
+  const [showPaidReceipt, setShowPaidReceipt] = useState(false);
   const [bannerNow, setBannerNow] = useState(Date.now());
   useEffect(() => {
     if (!claim || isVisible || isSuccess || claim.status !== 'pending') return;
@@ -887,6 +891,8 @@ export default function NfcClaimModal() {
         success: boolean;
         voucher_error?: string;
         voucher_code?: string;
+        receipt_id?: string;
+        receipt_error?: string;
       }>('/api/risev/nfc/complete', {
         method: 'POST',
         body: {
@@ -903,8 +909,7 @@ export default function NfcClaimModal() {
           // A booking checkout hands the cart to the booking engine, which owns
           // the single transaction, card update, commission and receipt.
           booking_id: activeBooking?.id || '',
-          items: activeBooking
-            ? selectedServices.map((item: any) => ({
+          items: selectedServices.map((item: any) => ({
                 id: item.service_id || item.id,
                 service_id: item.service_id || item.id,
                 name: item.name,
@@ -914,8 +919,7 @@ export default function NfcClaimModal() {
                 duration_minutes: item.duration_minutes || 0,
                 commission_type: item.commission_type || 'none',
                 commission_rate: item.commission_rate || 0,
-              }))
-            : undefined,
+              })),
         },
       });
 
@@ -934,27 +938,22 @@ export default function NfcClaimModal() {
         subtotal: subtotalAmount,
       });
 
-      // A booking checkout is completed by the server (the endpoint moves the
-      // booking to completed, which fires the booking engine and writes the
-      // receipt). Only a walk-in sale needs a receipt from the client — and
-      // marking the booking here again used to create a SECOND transaction.
-      if (!activeBooking?.id) {
+      // Both booking and walk-in receipts are now created by the completion
+      // endpoint from the same transaction snapshot. Never fabricate one here.
+      if (completeRes.receipt_id) {
         try {
-          const receiptPayload: any = {
-            merchant: merchantId,
-            customer_phone: claim.customer_phone,
-            receipt_number: `REC-${Date.now().toString().slice(-6)}`,
-            total_amount: bill,
-            payment_method: paymentMethod || 'nfc_counter',
-            payment_reference: paymentReference.trim(),
-            stamps_earned: stamps,
-            line_items: selectedServices.length > 0 ? selectedServices : [{ name: locale === 'en' ? 'Service Payment' : 'Pembayaran Servis', price: subtotalAmount || bill }]
-          };
-
-          await pb.collection('digital_receipts').create(receiptPayload);
-        } catch (bErr) {
-          console.warn('Receipt creation note:', bErr);
+          const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(completeRes.receipt_id, { expand: 'merchant', requestKey: null });
+          if (saved.payment_status === 'paid') {
+            setPaidReceipt(saved);
+            setShowPaidReceipt(true);
+            setIsVisible(false);
+          }
+        } catch (receiptErr) {
+          console.warn('Paid receipt could not be loaded:', receiptErr);
+          setErrorMsg('Payment was recorded, but the receipt could not be loaded. Open transaction history to try again.');
         }
+      } else if (bill > 0) {
+        setErrorMsg(completeRes.receipt_error || 'Payment was recorded, but the receipt is not ready. Please try again.');
       }
 
       // Show sleek in-modal success view
@@ -971,6 +970,21 @@ export default function NfcClaimModal() {
     }
   };
 
+  const retryPaidReceipt = async () => {
+    if (!claim?.id || isLoading) return;
+    setIsLoading(true);
+    try {
+      const result = await pb.send<{ receipt_id?: string; receipt_error?: string }>('/api/risev/nfc/complete', {
+        method: 'POST', body: { claim_id: claim.id }, requestKey: null,
+      });
+      if (!result.receipt_id) throw new Error(result.receipt_error || 'Receipt is not available yet. Please try again shortly.');
+      const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(result.receipt_id, { expand: 'merchant', requestKey: null });
+      if (saved.payment_status !== 'paid') throw new Error('Paid receipt is not available yet.');
+      setPaidReceipt(saved); setShowPaidReceipt(true); setIsVisible(false); setErrorMsg(null);
+    } catch (error: any) { setErrorMsg(error?.message || 'Could not load the receipt. Please try again.'); }
+    finally { setIsLoading(false); }
+  };
+
   const handleClose = () => {
     setIsVisible(false);
     setClaim(null);
@@ -979,6 +993,8 @@ export default function NfcClaimModal() {
     setPosPhone('');
     setPosCustomerError('');
     setIsSuccess(false);
+    setShowPaidReceipt(false);
+    setPaidReceipt(null);
     setErrorMsg(null);
     setBillAmount('20');
     setCustomBillInput('20');
@@ -1045,6 +1061,7 @@ export default function NfcClaimModal() {
 
   return (
     <>
+      <ThermalReceiptScreen visible={showPaidReceipt} receipt={paidReceipt} mode="merchant" animate onClose={handleClose} />
       {/* Floating Minimized Pending Capsule (visible when minimized so cashier can re-open anytime) */}
       {!isVisible && !isSuccess && claim.status === 'pending' && (
         <View style={styles.floatingContainer} pointerEvents="box-none">
@@ -1091,10 +1108,12 @@ export default function NfcClaimModal() {
               <View style={styles.successIconBg}>
                 <Ionicons name="checkmark-circle" size={42} color="#10B981" />
               </View>
-              <Text style={styles.successTitle}>Stamps Issued Successfully!</Text>
+              <Text style={styles.successTitle}>{netTotalAmount > 0 ? 'Payment recorded' : 'Stamps issued!'}</Text>
               <Text style={styles.successSubtitle}>
-                {stampAmount} stamp(s) credited to <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{getCleanCustomerName(claim.customer_name)}</Text>
+                {netTotalAmount > 0 ? `Payment of RM${netTotalAmount.toFixed(2)} recorded for ` : `${stampAmount} stamp(s) credited to `}<Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{getCleanCustomerName(claim.customer_name)}</Text>
               </Text>
+              {!!errorMsg && <Text style={{ textAlign: 'center', color: '#B45309', marginTop: 12, fontSize: 12 }}>{errorMsg}</Text>}
+              {!!errorMsg && netTotalAmount > 0 && <TouchableOpacity style={styles.doneBtn} onPress={retryPaidReceipt} disabled={isLoading}><Text style={styles.doneBtnText}>{isLoading ? 'Checking…' : 'Try receipt again'}</Text></TouchableOpacity>}
 
               <View style={styles.summaryBox}>
                 <View style={styles.summaryRow}>
@@ -1109,7 +1128,7 @@ export default function NfcClaimModal() {
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Bill Amount</Text>
-                  <Text style={styles.summaryValue}>RM {parseFloat(billAmount || '0').toFixed(2)}</Text>
+                  <Text style={styles.summaryValue}>RM {netTotalAmount.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
@@ -1559,7 +1578,7 @@ export default function NfcClaimModal() {
                       <View style={styles.payDisclaimerRow}>
                         <Ionicons name="information-circle-outline" size={13} color="#86868B" />
                         <Text style={styles.payDisclaimerText}>
-                          Loyalty points/stamps will be awarded after payment is confirmed.
+                          Confirm only after payment is received. Rewards follow confirmation.
                         </Text>
                       </View>
                     </View>

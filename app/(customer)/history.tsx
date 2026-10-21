@@ -69,7 +69,18 @@ export default function StampHistoryScreen() {
     }
   };
 
-  const handleOpenReceipt = (item: TransactionItem) => {
+  const handleOpenReceipt = async (item: TransactionItem) => {
+    if (Number(item.bill_amount) > 0) {
+      try {
+        const match = await pb.send<{ receipt_id?: string }>('/api/risev/customer/transaction-receipt', {
+          method: 'GET', params: { transaction_id: item.id }, requestKey: null,
+        });
+        if (match.receipt_id) {
+          router.push({ pathname: '/b/receipt/[id]', params: { id: match.receipt_id } });
+          return;
+        }
+      } catch (error) { /* Older transactions may have only a loyalty receipt. */ }
+    }
     let branchName = 'Main Counter';
     if (item.metadata) {
       try {

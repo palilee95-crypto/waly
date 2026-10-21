@@ -1,0 +1,136 @@
+// Paid receipt recovery/creation for NFC claims.
+//
+// This lives in a required module because PocketBase JSVM handlers do not see
+// file-level functions from their .pb.js file. The helper uses the global
+// $app, exactly like booking_helper.js.
+function ensureNfcPaidReceipt(claim, transaction, checkout) {
+  const claimId = claim.id;
+  const merchantId = claim.getString("merchant");
+  const matches = $app.findRecordsByFilter("digital_receipts", "claim = '" + claimId + "'", "-created", 1, 0);
+  if (matches.length) return matches[0].id;
+
+  let txn = transaction || null;
+  let sourceOverride = checkout || null;
+  if (!txn) {
+    const bookings = $app.findRecordsByFilter(
+      "service_bookings",
+      "merchant = '" + merchantId + "' && metadata ~ '\"pos_claim_id\":\"" + claimId + "\"'",
+      "-created",
+      10,
+      0
+    );
+    const booking = bookings.find(function (item) {
+      try {
+        return JSON.parse(item.getString("metadata") || "{}").pos_claim_id === claimId && item.getString("status") === "completed";
+      } catch (err) {
+        return false;
+      }
+    });
+    if (booking) {
+      const bookedReceipts = $app.findRecordsByFilter("digital_receipts", "booking = '" + booking.id + "'", "-created", 1, 0);
+      if (bookedReceipts.length) {
+        const receipt = bookedReceipts[0];
+        receipt.set("claim", claimId);
+        receipt.set("payment_status", "paid");
+        $app.save(receipt);
+        return receipt.id;
+      }
+      const bookingLedger = $app.findRecordsByFilter(
+        "transactions",
+        "merchant = '" + merchantId + "' && metadata ~ '\"booking_id\":\"" + booking.id + "\"'",
+        "-created",
+        10,
+        0
+      );
+      txn = bookingLedger.find(function (item) {
+        try {
+          return JSON.parse(item.getString("metadata") || "{}").booking_id === booking.id;
+        } catch (err) {
+          return false;
+        }
+      }) || null;
+      const bookingMeta = JSON.parse(booking.getString("metadata") || "{}");
+      let bookingItems = [];
+      try {
+        bookingItems = JSON.parse(booking.getString("items_summary") || "[]");
+      } catch (err) {}
+      sourceOverride = Object.assign({}, bookingMeta, { items: bookingItems });
+    }
+  }
+
+  if (!txn) {
+    const ledger = $app.findRecordsByFilter(
+      "transactions",
+      "merchant = '" + merchantId + "' && metadata ~ '\"claim_id\":\"" + claimId + "\"'",
+      "-created",
+      10,
+      0
+    );
+    txn = ledger.find(function (item) {
+      try {
+        const meta = JSON.parse(item.getString("metadata") || "{}");
+        return meta.claim_id === claimId && meta.source === "nfc_claim";
+      } catch (err) {
+        return false;
+      }
+    }) || null;
+  }
+  if (!txn) throw new Error("The paid transaction for this claim was not found.");
+
+  const amount = Number(claim.get("bill_amount")) || Number(txn.get("bill_amount")) || 0;
+  if (amount <= 0) return "";
+
+  let meta = {};
+  try {
+    meta = JSON.parse(txn.getString("metadata") || "{}");
+  } catch (err) {}
+  const source = sourceOverride || meta;
+  const rawItems = Array.isArray(source.items)
+    ? source.items
+    : (Array.isArray(meta.items_summary) ? meta.items_summary : []);
+  const items = rawItems.slice(0, 100).map(function (item) {
+    return {
+      name: String(item.name || "Item").slice(0, 120),
+      qty: Math.max(1, Math.min(999, parseInt(item.qty, 10) || 1)),
+      price: Math.max(0, Number(item.price) || 0),
+    };
+  }).filter(function (item) {
+    return item.name;
+  });
+  if (!items.length) {
+    items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount });
+  }
+  const subtotal = Math.max(
+    0,
+    Number(source.subtotal) ||
+      items.reduce(function (sum, item) {
+        return sum + item.price * item.qty;
+      }, 0)
+  );
+  const discount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+
+  const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
+  receipt.set("merchant", merchantId);
+  receipt.set("claim", claimId);
+  receipt.set("transaction", txn.id);
+  receipt.set("customer", txn.getString("customer") || claim.getString("customer"));
+  receipt.set("customer_phone", claim.getString("customer_phone"));
+  receipt.set("customer_name", claim.getString("customer_name") || "Customer");
+  receipt.set("staff_name", meta.staff_name || claim.getString("staff_name") || "");
+  receipt.set("branch_name", meta.branch_name || claim.getString("branch_name") || "");
+  receipt.set("receipt_number", "RV-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + txn.id.slice(-6).toUpperCase());
+  receipt.set("line_items", items);
+  receipt.set("subtotal", subtotal);
+  receipt.set("discount_amount", discount);
+  receipt.set("total_amount", amount);
+  receipt.set("payment_method", String(source.payment_method || "Counter"));
+  receipt.set("payment_reference", String(source.payment_reference || "").slice(0, 120));
+  receipt.set("payment_status", "paid");
+  receipt.set("stamps_earned", Number(txn.get("stamps")) || 0);
+  $app.save(receipt);
+  return receipt.id;
+}
+
+module.exports = {
+  ensureNfcPaidReceipt: ensureNfcPaidReceipt,
+};

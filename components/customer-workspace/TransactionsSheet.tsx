@@ -14,6 +14,9 @@ import { colors, radii } from '@/theme';
 import { LedgerRow, LedgerType, type LedgerFocus, fetchTransactions, formatLedgerImpact, formatShortDateFromIso } from '@/lib/customer-workspace';
 import { collectLedger, buildLedgerCsv, shareCsv } from '@/lib/customer-csv';
 import CustomerDetailSheet from './CustomerDetailSheet';
+import { pb } from '@/lib/pocketbase';
+import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
+import { PaidReceipt } from '@/lib/paidReceipt';
 
 const PAGE_SIZE = 25;
 
@@ -73,7 +76,24 @@ export default function TransactionsSheet({
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<LedgerRow | null>(null);
+  const [paidReceipt, setPaidReceipt] = useState<PaidReceipt | null>(null);
+  const [receiptBusyId, setReceiptBusyId] = useState('');
+  const [receiptError, setReceiptError] = useState('');
   const requestId = useRef(0);
+
+  const openPaidReceipt = async (transactionId: string) => {
+    if (receiptBusyId) return;
+    setReceiptBusyId(transactionId); setReceiptError('');
+    try {
+      const result = await pb.collection('digital_receipts').getList<PaidReceipt>(1, 1, {
+        filter: `transaction = "${transactionId}"`, sort: '-created', expand: 'merchant', requestKey: null,
+      });
+      const receipt = result.items[0];
+      if (!receipt || receipt.payment_status !== 'paid') throw new Error('No paid receipt is available for this transaction.');
+      setPaidReceipt(receipt);
+    } catch (error: any) { setReceiptError(error?.message || 'Could not load receipt.'); }
+    finally { setReceiptBusyId(''); }
+  };
 
   // Debounce the search box so typing does not fire a request per keystroke.
   useEffect(() => {
@@ -247,11 +267,15 @@ export default function TransactionsSheet({
                       </Text>
                     </View>
                     <Text style={styles.rowMeta} numberOfLines={1}>{detail}</Text>
+                    {row.billCents > 0 && <TouchableOpacity onPress={(event) => { event.stopPropagation(); openPaidReceipt(row.id); }} accessibilityRole="button" accessibilityLabel={`View receipt for ${row.customerName}`} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#FFF3B5' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#111' }}>{receiptBusyId === row.id ? 'Loading…' : 'Receipt'}</Text>
+                    </TouchableOpacity>}
                   </View>
                 </TouchableOpacity>
               );
             })}
 
+            {!!receiptError && <Text style={styles.errorText}>{receiptError}</Text>}
             {loading ? (
               <View style={styles.center}>
                 <ActivityIndicator color={colors.black} />
@@ -291,6 +315,7 @@ export default function TransactionsSheet({
               loadPage(1);
             }}
           />
+          <ThermalReceiptScreen visible={!!paidReceipt} receipt={paidReceipt} mode="merchant" onClose={() => setPaidReceipt(null)} />
         </View>
       </View>
     </Modal>

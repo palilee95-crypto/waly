@@ -514,6 +514,7 @@ function processCompletedBooking(rec) {
     console.log("[BOOKING COMPLETE] Transaction created " + newTx.id + " for customer " + customer.id + ": RM" + totalPrice + ", +" + stampsToAward + " stamps");
   } catch (txErr) {
     console.log("[BOOKING TRANSACTION ERROR]", txErr.message || txErr);
+    newTx = null;
   }
 
   // 8. Update customer loyalty card stamps (triggers stamp_complete.pb.js)
@@ -542,6 +543,12 @@ function processCompletedBooking(rec) {
 
   // 10. Generate digital receipt
   try {
+    if (!newTx || totalPrice <= 0) return newTx;
+    var receiptMeta = {};
+    try {
+      var receiptMetaRaw = rec.getString ? rec.getString("metadata") : "";
+      receiptMeta = receiptMetaRaw ? JSON.parse(receiptMetaRaw) : {};
+    } catch (metaErr) { receiptMeta = {}; }
     var dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     var receiptCode = "REC-" + dateStr + "-" + $security.randomString(4).toUpperCase();
 
@@ -551,12 +558,30 @@ function processCompletedBooking(rec) {
       digitalReceipt.set("id", $security.randomString(15).toLowerCase());
       digitalReceipt.set("merchant", merchantId);
       digitalReceipt.set("booking", bookingId);
+      if (receiptMeta.pos_claim_id) digitalReceipt.set("claim", receiptMeta.pos_claim_id);
+      digitalReceipt.set("transaction", newTx.id);
       digitalReceipt.set("customer", customer.id);
       digitalReceipt.set("customer_phone", customer.getString("phone") || customerPhone);
+      digitalReceipt.set("customer_name", customerName);
+      digitalReceipt.set("staff_name", staffName || "");
+      var receiptBranchName = "";
+      if (branchId) {
+        try {
+          var receiptBranch = $app.findRecordById("branches", branchId);
+          if (receiptBranch.getString("merchant") === merchantId) {
+            receiptBranchName = receiptBranch.getString("name") || receiptBranch.getString("branch_name") || "";
+          }
+        } catch (branchErr) {}
+      }
+      digitalReceipt.set("branch_name", receiptBranchName);
       digitalReceipt.set("receipt_number", receiptCode);
       digitalReceipt.set("line_items", itemsSummary || []);
+      digitalReceipt.set("subtotal", Number(receiptMeta.subtotal) || totalPrice);
+      digitalReceipt.set("discount_amount", Number(receiptMeta.discount_amount) || 0);
       digitalReceipt.set("total_amount", totalPrice);
-      digitalReceipt.set("payment_method", "Store Counter");
+      digitalReceipt.set("payment_method", receiptMeta.payment_method || "Store Counter");
+      digitalReceipt.set("payment_reference", receiptMeta.payment_reference || "");
+      digitalReceipt.set("payment_status", receiptMeta.pos_claim_id ? "paid" : "recorded");
       digitalReceipt.set("stamps_earned", stampsToAward);
       $app.save(digitalReceipt);
       console.log("[BOOKING COMPLETE] Digital receipt generated: " + receiptCode);

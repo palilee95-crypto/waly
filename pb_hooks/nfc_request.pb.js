@@ -456,6 +456,54 @@ routerAdd("GET", "/api/risev/nfc/claim-status", (e) => {
   }
 });
 
+// Resolve only the paid receipt tied to this customer's exact NFC claim. Guest
+// sessions present the phone used for that claim; signed-in customers may use
+// their own account instead. Never search by newest merchant/phone receipt.
+routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
+  try {
+    const query = e.requestInfo().query || {};
+    const claimId = String(query.claim_id || "").trim();
+    if (!/^[a-z0-9]{15}$/.test(claimId)) return e.json(400, { message: "Invalid claim" });
+    const claim = $app.findRecordById("nfc_claims", claimId);
+    if (claim.getString("status") !== "completed") return e.json(200, { receipt_id: "", paid_sale: false });
+    const digits = (value) => {
+      let result = String(value || "").replace(/[^\d]/g, "");
+      if (result.indexOf("0") === 0) result = "6" + result;
+      return result;
+    };
+    const requestedPhone = digits(query.phone);
+    const claimPhone = digits(claim.getString("customer_phone"));
+    const accountMatches = !!(e.auth && claim.getString("customer") && e.auth.id === claim.getString("customer"));
+    if (!accountMatches && (!requestedPhone || requestedPhone !== claimPhone)) {
+      return e.json(403, { message: "This receipt belongs to another customer" });
+    }
+    const receipts = $app.findRecordsByFilter("digital_receipts", "claim = '" + claimId + "'", "-created", 1, 0);
+    const receipt = receipts.length ? receipts[0] : null;
+    if (!receipt || receipt.getString("payment_status") !== "paid" || Number(receipt.get("total_amount")) <= 0) {
+      return e.json(200, { receipt_id: "", paid_sale: Number(claim.get("bill_amount")) > 0 });
+    }
+    return e.json(200, { receipt_id: receipt.id, paid_sale: true });
+  } catch (err) {
+    return e.json(404, { message: "Receipt not found" });
+  }
+});
+
+// Customer history resolves a receipt through its ledger transaction only for
+// the signed-in owner of that transaction.
+routerAdd("GET", "/api/risev/customer/transaction-receipt", (e) => {
+  try {
+    if (!e.auth) return e.json(401, { message: "Sign in to view transaction receipts" });
+    const query = e.requestInfo().query || {};
+    const transactionId = String(query.transaction_id || "").trim();
+    if (!/^[a-z0-9]{15}$/.test(transactionId)) return e.json(400, { message: "Invalid transaction" });
+    const transaction = $app.findRecordById("transactions", transactionId);
+    if (transaction.getString("customer") !== e.auth.id) return e.json(403, { message: "This transaction belongs to another customer" });
+    const receipts = $app.findRecordsByFilter("digital_receipts", "transaction = '" + transactionId + "'", "-created", 1, 0);
+    const receipt = receipts.length ? receipts[0] : null;
+    return e.json(200, { receipt_id: receipt && receipt.getString("payment_status") === "paid" ? receipt.id : "" });
+  } catch (err) { return e.json(404, { message: "Transaction not found" }); }
+});
+
 // Endpoint to check customer's active vouchers for this merchant before claiming
 routerAdd("POST", "/api/risev/nfc/customer-vouchers", (e) => {
   try {

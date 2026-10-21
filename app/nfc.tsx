@@ -32,6 +32,7 @@ import { getRewardVisualUrl } from '@/lib/rewardVisuals';
 import { getVoucherSpineTheme } from '@/theme';
 import * as Clipboard from 'expo-clipboard';
 import BranchFormModal, { StaffOption } from '@/components/BranchFormModal';
+import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -745,6 +746,8 @@ export default function NfcLandingScreen() {
   // Digital Receipt state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [receiptExpected, setReceiptExpected] = useState(false);
+  const [receiptRetry, setReceiptRetry] = useState(0);
 
   // Loyalty Mode
   const isPointsOnly = program?.enable_stamps === false && program?.enable_points === true;
@@ -1063,16 +1066,6 @@ export default function NfcLandingScreen() {
     if (isApproved && step === 'sent') {
       setShowBack(true);
 
-      const activeClaimId = claimIdRef.current || claimId;
-      if (activeClaimId) {
-        pb.collection('digital_receipts').getList(1, 1, {
-          filter: `customer_phone = "${phoneInput || sessionPhone}" && merchant = "${merchant?.id}"`,
-          sort: '-created'
-        }).then(res => {
-          if (res.items.length > 0) setReceiptData(res.items[0]);
-        }).catch(() => {});
-      }
-
       Animated.sequence([
         Animated.delay(800), // Delay to let flip and stamp ink finish
         Animated.parallel([
@@ -1142,6 +1135,32 @@ export default function NfcLandingScreen() {
       if (reviewTimer) clearTimeout(reviewTimer);
     };
   }, [isApproved, step, merchant?.id, unlockedReward, showRewardModal]);
+
+  useEffect(() => {
+    if (!isApproved || step !== 'sent') { setReceiptData(null); setReceiptExpected(false); return; }
+    const activeClaimId = claimIdRef.current || claimId;
+    const phone = phoneInput || sessionPhone;
+    if (!activeClaimId || !phone) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const load = async () => {
+      try {
+        const match = await pb.send<{ receipt_id?: string; paid_sale?: boolean }>('/api/risev/nfc/receipt', {
+          method: 'GET', params: { claim_id: activeClaimId, phone }, requestKey: null,
+        });
+        if (!cancelled && match.paid_sale) setReceiptExpected(true);
+        if (match.receipt_id) {
+          const saved = await pb.collection('digital_receipts').getOne(match.receipt_id, { expand: 'merchant', requestKey: null });
+          if (!cancelled && saved.payment_status === 'paid') { setReceiptData(saved); return; }
+        }
+      } catch (error) { /* The purchase may not have produced a paid receipt. */ }
+      if (!cancelled && ++attempts < 6) timer = setTimeout(load, 1500);
+    };
+    setReceiptData(null);
+    load();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [isApproved, step, claimId, phoneInput, sessionPhone, receiptRetry]);
 
   const handleSelectStar = async (star: number) => {
     setReviewRating(star);
@@ -4078,15 +4097,29 @@ export default function NfcLandingScreen() {
                       style={styles.receiptBanner}
                       onPress={() => setShowReceiptModal(true)}
                       activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="View or download receipt"
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                        <Text style={styles.receiptBannerText}>Payment of RM {parseFloat(receiptData.total_amount || 0).toFixed(2)} Successful</Text>
+                        <Ionicons name="receipt-outline" size={17} color="#111111" />
+                        <Text style={styles.receiptBannerText}>View / Download Receipt</Text>
                       </View>
-                      <View style={styles.receiptBannerBtn}>
-                        <Ionicons name="receipt-outline" size={14} color="#0F172A" />
-                        <Text style={styles.receiptBannerBtnText}>Receipt</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                  {!receiptData && receiptExpected && (
+                    <TouchableOpacity
+                      style={styles.receiptBanner}
+                      onPress={() => setReceiptRetry((current) => current + 1)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Check for your receipt again"
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="receipt-outline" size={17} color="#111111" />
+                        <Text style={styles.receiptBannerText}>Receipt preparing · Tap to retry</Text>
                       </View>
+                      <Ionicons name="refresh" size={16} color="#64748B" />
                     </TouchableOpacity>
                   )}
 
@@ -4912,68 +4945,12 @@ export default function NfcLandingScreen() {
         </View>
       </Modal>
 
-      {/* Digital Receipt Modal (Bottom Sheet Style) */}
-      {receiptData && (
-        <Modal
-          visible={showReceiptModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowReceiptModal(false)}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '80%' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                  {isEn ? 'Digital Receipt' : 'Resit Digital'}
-                </Text>
-                <TouchableOpacity onPress={() => setShowReceiptModal(false)}>
-                  <Ionicons name="close-circle" size={28} color="#94A3B8" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                    <Ionicons name="storefront" size={32} color="#0F172A" />
-                  </View>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', textAlign: 'center' }}>{merchant?.name}</Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
-                    {isEn ? 'Receipt #:' : 'Resit #:'} {receiptData.receipt_number || receiptData.id}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>
-                    {new Date(receiptData.created).toLocaleString(isEn ? 'en-MY' : 'ms-MY')}
-                  </Text>
-                </View>
-
-                <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, marginBottom: 16 }}>
-                  {receiptData.line_items && Array.isArray(receiptData.line_items) ? (
-                    receiptData.line_items.map((item: any, idx: number) => (
-                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>{item.name}</Text>
-                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>RM {parseFloat(item.price || 0).toFixed(2)}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#1E293B' }}>
-                        {isEn ? 'Service Payment' : 'Pembayaran Servis'}
-                      </Text>
-                      <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
-                    {isEn ? 'Total Amount' : 'Jumlah Total'}
-                  </Text>
-                  <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>RM {parseFloat(receiptData.total_amount || 0).toFixed(2)}</Text>
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
+      <ThermalReceiptScreen
+        visible={showReceiptModal}
+        receipt={receiptData}
+        mode="customer"
+        onClose={() => setShowReceiptModal(false)}
+      />
 
       {/* 🎁 MILESTONE & CARD COMPLETION REWARD CELEBRATION SLIDE-UP MODAL */}
       <Modal
@@ -7073,10 +7050,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4E8EE',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     width: '100%',
     maxWidth: 360,
   },

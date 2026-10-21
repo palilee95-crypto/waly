@@ -3,6 +3,7 @@
 
 routerAdd("POST", "/api/risev/nfc/complete", (e) => {
   try {
+    const receiptHelper = require(`${__hooks}/paid_receipt_helper.js`);
     const authRecord = e.auth;
     if (!authRecord) {
       return e.json(401, { message: "Unauthorized merchant authentication required" });
@@ -25,10 +26,6 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       return e.json(404, { message: "NFC claim record not found" });
     }
 
-    if (claim.getString("status") === "completed") {
-      return e.json(400, { message: "NFC claim has already been completed" });
-    }
-
     const merchantId = claim.getString("merchant");
     const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
     let isOwner = false;
@@ -44,6 +41,21 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
 
     if (!isOwner && authMerchantId !== merchantId && !isSuperuser) {
       return e.json(403, { message: "Forbidden. You are not authorized to confirm claims for this store." });
+    }
+
+    if (claim.getString("status") === "completed") {
+      let priorReceiptId = "";
+      let receiptError = "";
+      try {
+        if (Number(claim.get("bill_amount")) > 0) priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+      } catch (err) {
+        receiptError = "Receipt recovery failed. Please contact support with this claim ID.";
+        console.log("[NFC COMPLETE] Receipt recovery failed for", claim.id, err.message || err);
+      }
+      return e.json(200, { success: true, already_completed: true, receipt_id: priorReceiptId, receipt_error: receiptError });
+    }
+    if (claim.getString("status") !== "pending") {
+      return e.json(409, { message: "This claim is no longer pending." });
     }
 
     if (billAmount < 0) {
@@ -228,6 +240,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
     // booking_helper.processCompletedBooking write the transaction.
     if (customer && activeBooking) {
       const voucherOutcome = applyVoucher();
+      if (voucherOutcome.error && Number(body.discount_amount) > 0) {
+        return e.json(400, { code: "VOUCHER_NOT_APPLIED", message: "Voucher could not be applied: " + voucherOutcome.error });
+      }
 
       const mergedItems = [];
       if (Array.isArray(body.items)) {
@@ -265,6 +280,8 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       bookingMeta.voucher_error = voucherOutcome.error || "";
       bookingMeta.subtotal = body.subtotal !== undefined ? parseFloat(body.subtotal) || 0 : billAmount;
       bookingMeta.discount_amount = body.discount_amount !== undefined ? parseFloat(body.discount_amount) || 0 : 0;
+      bookingMeta.payment_method = String(body.payment_method || "cash");
+      bookingMeta.payment_reference = String(body.payment_reference || "").slice(0, 120);
 
       if (mergedItems.length > 0) {
         activeBooking.set("items_summary", JSON.stringify(mergedItems));
@@ -295,6 +312,17 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       claim.set("completed_at", new Date().toISOString().replace('T', ' ').substring(0, 19));
       $app.save(claim);
 
+      let bookingReceiptId = "";
+      let bookingReceiptError = "";
+      try {
+        const bookingReceipts = $app.findRecordsByFilter("digital_receipts", "booking = '" + activeBooking.id + "'", "-created", 1, 0);
+        bookingReceiptId = bookingReceipts.length ? bookingReceipts[0].id : "";
+        if (!bookingReceiptId && billAmount > 0) bookingReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+      } catch (receiptLookupErr) {
+        bookingReceiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
+        console.log("[NFC COMPLETE] Booking receipt recovery failed:", receiptLookupErr.message || receiptLookupErr);
+      }
+
       console.log(`[NFC COMPLETE] Booking ${activeBooking.id} checked out via POS (claim ${claimId}) for RM${billAmount}, ${actualStamps} stamp(s)`);
 
       return e.json(200, {
@@ -302,9 +330,16 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         message: "Booking completed",
         booking_id: activeBooking.id,
         completed_via: "pos",
+        receipt_id: bookingReceiptId,
+        receipt_error: bookingReceiptError,
         voucher_error: voucherOutcome.error || "",
         voucher_code: voucherOutcome.code || "",
       });
+    }
+
+    const voucherOutcome = applyVoucher();
+    if (voucherOutcome.error && Number(body.discount_amount) > 0) {
+      return e.json(400, { code: "VOUCHER_NOT_APPLIED", message: "Voucher could not be applied: " + voucherOutcome.error });
     }
 
     // 3. Find or create loyalty card & add stamps
@@ -341,11 +376,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       const staffName = (authRecord.getString("name") || "").trim() || (authRecord.getString("phone") ? "Staff (" + authRecord.getString("phone").slice(-4) + ")" : "Staff");
       const branchName = (body.branch_name || authRecord.getString("branch_name") || claim.getString("branch_name") || "All Branches (HQ)").trim();
       const branchId = (body.branch_id || authRecord.getString("branch") || claim.getString("branch") || "").trim();
-      const voucherOutcome = applyVoucher();
       const voucherId = voucherOutcome.id;
       const redeemedVoucherCode = voucherOutcome.code;
       const voucherError = voucherOutcome.error;
 
+      let transactionId = "";
       try {
         function resolveBranchId(mid, candidate) {
           if (!candidate) return "";
@@ -379,11 +414,30 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
           voucher_error: voucherError || "",
           subtotal: body.subtotal ? parseFloat(body.subtotal) : billAmount,
           discount_amount: body.discount_amount ? parseFloat(body.discount_amount) : 0,
+          payment_method: String(body.payment_method || "cash"),
+          payment_reference: String(body.payment_reference || "").slice(0, 120),
+          items: Array.isArray(body.items) ? body.items.slice(0, 100).map((item) => ({ name: String(item.name || "Item").slice(0, 120), qty: Math.max(1, parseInt(item.qty, 10) || 1), price: Math.max(0, Number(item.price) || 0) })) : [],
         };
         txn.set("metadata", JSON.stringify(txnMeta));
         $app.save(txn);
+        transactionId = txn.id;
       } catch (txnErr) {
         console.log("[NFC COMPLETE] Transaction error:", txnErr.message || txnErr);
+      }
+
+      // The paid receipt is a server-owned snapshot of this exact POS claim.
+      // A stamp-only approval (zero bill) remains a loyalty event, not a sale.
+      let receiptId = "";
+      let receiptError = "";
+      if (billAmount > 0 && transactionId) {
+        try {
+          receiptId = receiptHelper.ensureNfcPaidReceipt(claim, $app.findRecordById("transactions", transactionId), body);
+        } catch (receiptErr) {
+          console.log("[NFC COMPLETE] Paid receipt error:", receiptErr.message || receiptErr);
+          receiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
+        }
+      } else if (billAmount > 0) {
+        receiptError = "Payment was recorded, but its transaction was not saved. Contact support with this claim ID.";
       }
 
       // 5. Update nfc_claim record to completed
@@ -405,7 +459,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         totalStamps: totalStamps,
         goal: goal,
         voucher_error: voucherError || "",
-        voucher_code: redeemedVoucherCode || ""
+        voucher_code: redeemedVoucherCode || "",
+        receipt_id: receiptId,
+        receipt_error: receiptError
       });
     }
 

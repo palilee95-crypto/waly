@@ -2,6 +2,12 @@
 
 This file records repository changes for developers who pull the project from GitHub. Entries are append-only and summarize behavior, implementation areas, validation, and operational notes.
 
+## 2026-10-21 — Paid receipt rollout pending
+
+- The customer NFC and merchant POS receipt UI depends on `pb_migrations/1793000004_shared_paid_receipts.js` and the updated `pb_hooks/nfc_transaction.pb.js`, `pb_hooks/nfc_request.pb.js`, and `pb_hooks/booking_helper.js`. The local web app points at `api.risev.app`, so a frontend-only update cannot make receipts appear there.
+- Deploy the migration and hooks to the PocketBase VPS, restart PocketBase so the migration applies, then verify that `/api/risev/nfc/complete` returns a non-empty `receipt_id` for a paid test claim. Confirm the same receipt appears in the merchant modal and customer NFC screen. Existing completed walk-in claims can be repaired by the merchant's **Try receipt again** action; it reads the original ledger transaction and does not issue another stamp or sale.
+- This workspace did not run the migration or deploy the backend. Cloudflare returned 403 (error 1010) to a read-only API probe from this environment, so production behavior was not verified here.
+
 **Last documented commit:** `169cf37` (`feat: add manual POS and catalog inventory support`)
 
 ## 2026-10-19 — NFC, quota, infrastructure, POS, and inventory updates
