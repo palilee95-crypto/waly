@@ -32,6 +32,8 @@ type Props = {
   onAdd: (item: any) => void;
   onBack: () => void;
   onPay: () => void;
+  onChangeCustomer?: () => void;
+  customerRequired?: boolean;
   total: number;
   subtotal: number;
   discount: number;
@@ -65,6 +67,8 @@ export default function FullPosCheckout({
   onAdd,
   onBack,
   onPay,
+  onChangeCustomer,
+  customerRequired = false,
   total,
   subtotal,
   discount,
@@ -150,9 +154,10 @@ export default function FullPosCheckout({
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.headerTitle}>{ms ? 'POS Penuh' : 'Full POS'}</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {[name, phone].filter(Boolean).join(' · ')}
+            {phone ? [name, phone].filter(Boolean).join(' · ') : (ms ? 'Tambah pelanggan semasa checkout' : 'Add customer at checkout')}
           </Text>
         </View>
+        {onChangeCustomer ? <TouchableOpacity onPress={onChangeCustomer} style={styles.changeCustomer} accessibilityRole="button" accessibilityLabel={ms ? 'Tukar pelanggan' : 'Change customer'}><Text style={styles.changeCustomerText}>{ms ? 'Tukar' : 'Change'}</Text></TouchableOpacity> : null}
         <View style={styles.headerBadge}>
           <Ionicons name="cart-outline" size={13} color="#050505" />
           <Text style={styles.headerBadgeText}>{items.reduce((sum, item) => sum + (item.qty || 1), 0)}</Text>
@@ -289,7 +294,7 @@ export default function FullPosCheckout({
         </View>
 
         <View style={styles.optionCard}>
-          <TouchableOpacity style={styles.optionRow} onPress={() => setShowVouchers((v) => !v)} activeOpacity={0.75}>
+          <TouchableOpacity style={[styles.optionRow, customerRequired && !phone && styles.optionUnavailable]} onPress={() => setShowVouchers((v) => !v)} disabled={customerRequired && !phone} activeOpacity={0.75} accessibilityRole="button" accessibilityState={{ disabled: customerRequired && !phone }}>
             <View style={styles.optionIcon}>
               <Ionicons name="ticket-outline" size={17} color="#B45309" />
             </View>
@@ -298,7 +303,7 @@ export default function FullPosCheckout({
               <Text style={styles.optionValue} numberOfLines={1}>
                 {voucher
                   ? (voucher.expand?.reward?.name || parseVoucherMeta(voucher).snapshot_title || voucher.code)
-                  : `${vouchers.length} ${ms ? 'tersedia' : 'available'}`}
+                  : customerRequired && !phone ? (ms ? 'Tambah pelanggan semasa checkout' : 'Add customer at checkout') : `${vouchers.length} ${ms ? 'tersedia' : 'available'}`}
               </Text>
             </View>
             {voucher ? (
@@ -390,7 +395,7 @@ export default function FullPosCheckout({
           activeOpacity={0.85}
         >
           <Ionicons name="card-outline" size={18} color="#050505" />
-          <Text style={styles.payButtonText}>{ms ? 'Bayar' : 'Pay'} · {money(total)}</Text>
+          <Text style={styles.payButtonText}>{customerRequired && !phone ? (ms ? 'Checkout' : 'Checkout') : (ms ? 'Teruskan pembayaran' : 'Continue to payment')} · {money(total)}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -404,6 +409,8 @@ const styles = StyleSheet.create({
   headerBackText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
   headerTitle: { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505', letterSpacing: -0.3 },
   headerSubtitle: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 },
+  changeCustomer: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
+  changeCustomerText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#475569' },
   headerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFCC00', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
   headerBadgeText: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' },
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
@@ -441,6 +448,7 @@ const styles = StyleSheet.create({
   removeBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   optionCard: { marginTop: 14, backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1, borderColor: '#EEF0F3', paddingHorizontal: 10, paddingVertical: 8 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6 },
+  optionUnavailable: { opacity: 0.6 },
   optionIcon: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
   optionLabel: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
   optionValue: { fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 1 },

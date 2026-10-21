@@ -87,6 +87,9 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     if (digits.indexOf("0") === 0) digits = "6" + digits;
     if (digits.indexOf("60") !== 0 && digits.length >= 9) digits = "60" + digits;
     const cleanPhone = "+" + digits;
+    if (isManualPos && !/^601\d{8,9}$/.test(digits)) {
+      return e.json(400, { code: "POS_PHONE_INVALID", message: "Enter a valid Malaysian mobile number before checkout." });
+    }
 
     // Check if customer user record already exists
     let customerUser = null;
@@ -202,12 +205,14 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     // Generate random 6-character uppercase session code
     const sessionCode = $security.randomString(6).toUpperCase();
 
-    // Check for any existing draft/pending claim from this phone & merchant
+    // Customer NFC requests may reuse their own pending claim. Manual POS
+    // checkouts always get a fresh claim so they cannot overwrite an NFC
+    // request (or a different sale for the same customer).
     let claim = null;
-    try {
+    if (!isManualPos) try {
       const existingClaims = $app.findRecordsByFilter(
         "nfc_claims",
-        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && (status = 'draft' || status = 'pending')`,
+        `merchant = '${merchantId}' && customer_phone = '${cleanPhone}' && manual_pos = false && (status = 'draft' || status = 'pending')`,
         "-created",
         1,
         0

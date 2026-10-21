@@ -15,8 +15,8 @@ export function normalizeManualPosPhone(raw: string): string {
     normalized = '60' + normalized;
   }
 
-  // Malaysian numbers are 9-10 digits after the country code (11-12 total).
-  if (normalized.length < 11 || normalized.length > 12) return '';
+  // POS checkout requires a Malaysian mobile number: 601 followed by 8–9 digits.
+  if (!/^601\d{8,9}$/.test(normalized)) return '';
 
   return '+' + normalized;
 }

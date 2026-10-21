@@ -21,6 +21,7 @@ import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import FullPosCheckout from './FullPosCheckout';
+import ManualPosCustomerStep from './ManualPosCustomerStep';
 import { normalizeManualPosPhone } from '@/lib/manualPosPhone';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
@@ -190,12 +191,62 @@ export default function NfcClaimModal() {
   const [isCatalogPickerOpen, setIsCatalogPickerOpen] = useState(false);
   const [fullPosOpen, setFullPosOpen] = useState(false);
   const [paymentFromPos, setPaymentFromPos] = useState(false);
+  const [posCustomerStep, setPosCustomerStep] = useState(false);
+  const [posPhone, setPosPhone] = useState('');
+  const [posCustomerBusy, setPosCustomerBusy] = useState(false);
+  const posCustomerBusyRef = React.useRef(false);
+  const [posCustomerError, setPosCustomerError] = useState('');
   const openFullPos = () => {
     if (selectedServices.length === 0 && Number(customBillInput) > 0) {
       setSelectedServices([{ id: 'quick_custom_amount', name: locale === 'ms' ? 'Jumlah manual' : 'Custom amount', price: Number(customBillInput), qty: 1, item_type: 'custom' }]);
     }
     setCustomBillInput('0');
     setFullPosOpen(true);
+  };
+
+  const attachManualPosCustomer = async () => {
+    if (!claim?.manual_pos || !merchantId || posCustomerBusyRef.current) return;
+    const phone = normalizeManualPosPhone(posPhone);
+    if (!phone) {
+      setPosCustomerError(locale === 'ms' ? 'Masukkan nombor telefon Malaysia yang sah.' : 'Enter a valid Malaysian mobile number.');
+      return;
+    }
+    if (phone === normalizeManualPosPhone(claim.customer_phone || '') && claim.id) {
+      setPosCustomerStep(false);
+      setFullPosOpen(true);
+      return;
+    }
+    posCustomerBusyRef.current = true;
+    setPosCustomerBusy(true);
+    setPosCustomerError('');
+    let createdId = '';
+    try {
+      const response = await pb.send<{ success: boolean; claim_id?: string }>('/api/risev/nfc/request', {
+        method: 'POST',
+        body: { merchant_id: merchantId, phone, branch_id: user?.branch || '', branch_name: user?.branch_name || '', manual_pos: true },
+      });
+      if (!response.success || !response.claim_id) throw new Error('Could not prepare this sale.');
+      createdId = response.claim_id;
+      const nextClaim = await pb.collection('nfc_claims').getOne(createdId, { requestKey: null });
+      if (nextClaim.merchant !== merchantId || nextClaim.status !== 'pending' || nextClaim.manual_pos !== true || normalizeManualPosPhone(nextClaim.customer_phone) !== phone) {
+        throw new Error('Customer details could not be verified. Please try again.');
+      }
+      const oldClaimId = claim._local_pos_draft ? '' : claim.id;
+      setClaim(nextClaim);
+      setAppliedVoucher(null);
+      setCustomerVouchers([]);
+      setPosCustomerStep(false);
+      setFullPosOpen(true);
+      if (oldClaimId && oldClaimId !== nextClaim.id) {
+        pb.collection('nfc_claims').update(oldClaimId, { status: 'cancelled' }).catch(() => {});
+      }
+    } catch (err: any) {
+      if (createdId) pb.collection('nfc_claims').update(createdId, { status: 'cancelled' }).catch(() => {});
+      setPosCustomerError(String(err?.data?.message || err?.message || (locale === 'ms' ? 'Tidak dapat meneruskan. Cuba lagi.' : 'Could not continue. Please try again.')));
+    } finally {
+      posCustomerBusyRef.current = false;
+      setPosCustomerBusy(false);
+    }
   };
   const [pickerSearchQuery, setPickerSearchQuery] = useState('');
   const [pickerCategory, setPickerCategory] = useState('all');
@@ -371,6 +422,7 @@ export default function NfcClaimModal() {
       const todayStr = new Date().toISOString().split('T')[0];
       let bk: any = null;
 
+      if (!claim.manual_pos) {
       try {
         // 1. Query TODAY's active booking (booked, arrived, in_service)
         const bRes = await pb.collection('service_bookings').getList(1, 1, {
@@ -417,6 +469,12 @@ export default function NfcClaimModal() {
         } catch (fErr) {
           setUpcomingFutureBooking(null);
         }
+      }
+      } else {
+        // A manual POS cart has already been built. Attaching a customer must
+        // never replace its items with a booking or clear it.
+        setActiveBooking(null);
+        setUpcomingFutureBooking(null);
       }
 
       // Fetch active merchant services (up-to-date catalog)
@@ -640,10 +698,15 @@ export default function NfcClaimModal() {
         setClaim(targetClaim);
         if (targetClaim.manual_pos) {
           setFullPosOpen(true);
+          setPosCustomerStep(false);
+          setPosPhone(targetClaim.customer_phone || '');
+          setPosCustomerError('');
           setCheckoutStep('review');
           setCustomBillInput('0');
           setSelectedServices([]);
           setAppliedVoucher(null);
+          setCustomerVouchers([]);
+          setPaymentFromPos(false);
         }
         setIsVouchersExpanded(false);
         if (targetClaim.bill_amount) setBillAmount(String(targetClaim.bill_amount));
@@ -826,6 +889,9 @@ export default function NfcClaimModal() {
     setIsVisible(false);
     setClaim(null);
     setFullPosOpen(false);
+    setPosCustomerStep(false);
+    setPosPhone('');
+    setPosCustomerError('');
     setIsSuccess(false);
     setErrorMsg(null);
     setBillAmount('20');
@@ -838,6 +904,13 @@ export default function NfcClaimModal() {
     setPaymentMethod('qr');
     setPaymentReference('');
     setIsCatalogPickerOpen(false);
+  };
+
+  const closeManualPos = () => {
+    if (claim?.manual_pos && !claim._local_pos_draft && claim.id && !isSuccess) {
+      pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' }).catch(() => {});
+    }
+    handleClose();
   };
 
   const handleMinimize = () => {
@@ -924,8 +997,8 @@ export default function NfcClaimModal() {
           onRequestClose={handleMinimize}
         >
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
-      <View style={[styles.overlay, fullPosOpen && { padding: 0 }] }>
-        <View style={[styles.modalCard, isProPlan && checkoutStep === 'review' && !isCatalogPickerOpen && !isSuccess && { maxHeight: '96%', paddingTop: 12, paddingBottom: 12 }, fullPosOpen && { flex: 1, maxWidth: '100%', maxHeight: '100%', borderRadius: 0, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 0 }] }>
+      <View style={[styles.overlay, (fullPosOpen || posCustomerStep) && { padding: 0 }] }>
+        <View style={[styles.modalCard, isProPlan && checkoutStep === 'review' && !isCatalogPickerOpen && !isSuccess && { maxHeight: '96%', paddingTop: 12, paddingBottom: 12 }, (fullPosOpen || posCustomerStep) && { flex: 1, maxWidth: '100%', maxHeight: '100%', borderRadius: 0, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 0 }] }>
           {isSuccess ? (
             // ── In-Modal Success Confirmation Screen ──────────────
             <View style={styles.successWrap}>
@@ -1009,12 +1082,28 @@ export default function NfcClaimModal() {
                 return matchesSearch && matchesCategory;
               });
 
+              if (posCustomerStep) {
+                return <ManualPosCustomerStep
+                  locale={locale}
+                  phone={posPhone}
+                  onPhoneChange={(value) => { setPosPhone(value); setPosCustomerError(''); }}
+                  onBack={() => { setPosCustomerStep(false); setFullPosOpen(true); }}
+                  onContinue={attachManualPosCustomer}
+                  busy={posCustomerBusy}
+                  error={posCustomerError}
+                  total={netTotalAmount}
+                  itemCount={selectedServices.reduce((sum, item) => sum + (item.qty || 1), 0)}
+                />;
+              }
               if (fullPosOpen) {
                 return <FullPosCheckout
-                  name={getCleanCustomerName(claim.customer_name)} phone={claim.customer_phone} locale={locale}
+                  name={claim.customer_phone ? getCleanCustomerName(claim.customer_name) : ''} phone={claim.customer_phone} locale={locale}
                   catalog={quickAddons} items={selectedServices} setItems={setSelectedServices}
                   imageFor={item => getItemImageUrl(item, quickAddons)} onAdd={handleAddItem}
-                  onBack={() => setFullPosOpen(false)} onPay={() => { if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) { Alert.alert(locale === 'ms' ? 'Nombor telefon diperlukan' : 'Customer phone required'); return; } setPaymentFromPos(true); setFullPosOpen(false); setCheckoutStep('payment'); }}
+                  onBack={() => claim.manual_pos ? closeManualPos() : setFullPosOpen(false)}
+                  onChangeCustomer={claim.manual_pos && claim.customer_phone ? () => { setPosPhone(claim.customer_phone); setPosCustomerError(''); setPosCustomerStep(true); setFullPosOpen(false); } : undefined}
+                  onPay={() => { if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) { setPosPhone(''); setPosCustomerError(''); setPosCustomerStep(true); setFullPosOpen(false); return; } setPaymentFromPos(true); setFullPosOpen(false); setCheckoutStep('payment'); }}
+                  customerRequired={!!claim.manual_pos}
                   total={netTotalAmount} subtotal={subtotalAmount} discount={discountAmount}
                   vouchers={customerVouchers} voucher={appliedVoucher} onVoucher={setAppliedVoucher}
                   stamps={stampAmount} onStamps={setStampAmount} points={Math.floor(netTotalAmount / spendPerPoint)}
