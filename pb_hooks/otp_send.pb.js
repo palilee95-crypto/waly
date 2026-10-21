@@ -186,6 +186,13 @@ routerAdd("POST", "/api/risev/register", (e) => {
 routerAdd("POST", "/api/risev/login", (e) => {
   // Cloudflare Turnstile Verification Helper (scoped locally for Goja JSVM)
   function verifyTurnstileToken(token, clientIp, expectedAction) {
+    // Staging runs behind the same public hostnames but is not customer-facing.
+    // A developer whose browser blocks challenges.cloudflare.com would otherwise
+    // be unable to log in there at all. Production never sets this flag.
+    if (String($os.getenv("TURNSTILE_DISABLED") || "").trim() === "1") {
+      console.log("[Turnstile] Skipped — TURNSTILE_DISABLED=1 (staging only)");
+      return true;
+    }
     if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
       return false;
     }
