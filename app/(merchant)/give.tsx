@@ -13,6 +13,7 @@ import {
   Alert,
   AppState,
   AppStateStatus,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ import { cachedFetch } from '@/lib/data-cache';
 import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
 import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
+import { parsePassScan } from '@/lib/bookingPass';
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
@@ -273,10 +275,56 @@ export default function GiveStampsScreen() {
     executeRedemption(voucherCode);
   };
 
+  // A customer appointment pass QR opens that booking in the POS.
+  const openScannedBookingPass = async (bookingId: string) => {
+    try {
+      const res = await pb.send<{ booking: any }>('/api/risev/merchant/booking-pass', {
+        method: 'POST',
+        body: { booking_id: bookingId },
+        requestKey: null,
+      });
+      const booking = res?.booking;
+      if (!booking) throw new Error('Booking not found.');
+      DeviceEventEmitter.emit('OPEN_NFC_CLAIM', {
+        id: '',
+        merchant: booking.merchant_id,
+        status: 'pending',
+        manual_pos: true,
+        _local_pos_draft: true,
+        customer_name: booking.customer_name || '',
+        customer_phone: booking.customer_phone || '',
+        booking_id: booking.id,
+        created: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      const code = err?.response?.code || '';
+      const message = code === 'BOOKING_FORBIDDEN'
+        ? 'That appointment belongs to another store.'
+        : code === 'BOOKING_NOT_ACTIVE'
+        ? 'That appointment is already closed.'
+        : code === 'BOOKING_NOT_FOUND'
+        ? 'Booking not found.'
+        : err?.message || 'Could not load that appointment pass.';
+      Alert.alert('Appointment Pass', message);
+    } finally {
+      setTimeout(() => { isProcessingScan.current = false; }, 800);
+    }
+  };
+
   // 3. Camera Scan Handler (Auto-executes redemption upon QR detection)
   const handleBarCodeScanned = (event: any) => {
     const raw = event?.data || event?.nativeEvent?.data || (typeof event === 'string' ? event : '');
     if (!raw || isRedeemingVoucher || isProcessingScan.current) return;
+
+    // A booking pass is resolved server-side (auth + merchant ownership); a
+    // voucher or loyalty QR falls through to the redemption path below.
+    const scannedPass = parsePassScan(raw);
+    if (scannedPass) {
+      isProcessingScan.current = true;
+      setIsCameraActive(false);
+      openScannedBookingPass(scannedPass.bookingId);
+      return;
+    }
 
     isProcessingScan.current = true;
     setIsCameraActive(false);

@@ -460,6 +460,11 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
       }
     }
 
+    const auth = e.auth;
+    if (!auth) {
+      return e.json(401, { code: "AUTH_REQUIRED", message: "Sign in to update a booking." });
+    }
+
     const bookingId = data.booking_id || data.id;
     const newStatus = data.status;
 
@@ -472,9 +477,40 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
       return e.json(404, { error: "Booking not found" });
     }
 
+    // The id alone is never proof: the caller must own or staff the merchant.
+    const merchantId = booking.getString("merchant");
+    const isSuperuser = auth.isSuperuser === true ||
+      (auth.collection && auth.collection().name === "_superusers");
+    let isOwner = false;
+    if (merchantId) {
+      try {
+        isOwner = $app.findRecordById("merchants", merchantId).getString("owner") === auth.id;
+      } catch (mErr) {}
+    }
+    const authMerchantId = typeof auth.getString === "function" ? auth.getString("merchant_id") : "";
+    if (!isSuperuser && !isOwner && authMerchantId !== merchantId) {
+      return e.json(403, { code: "BOOKING_FORBIDDEN", message: "That booking belongs to another store." });
+    }
+
+    const allowedStatuses = ["booked", "arrived", "in_service", "completed", "cancelled", "no_show"];
+    if (allowedStatuses.indexOf(newStatus) === -1) {
+      return e.json(400, { code: "BOOKING_STATUS_INVALID", message: "Unknown booking status." });
+    }
+
     const oldStatus = booking.getString("status");
-    booking.set("status", newStatus);
-    $app.save(booking);
+    // Reopening a finished booking is allowed, but it cannot skip straight to
+    // completed — the visit has to be in progress first.
+    if (newStatus === "completed" && (oldStatus === "no_show" || oldStatus === "cancelled")) {
+      return e.json(409, {
+        code: "BOOKING_TRANSITION_INVALID",
+        message: "Reopen the booking before completing it."
+      });
+    }
+
+    if (oldStatus !== newStatus) {
+      booking.set("status", newStatus);
+      $app.save(booking);
+    }
 
     if (oldStatus !== "completed" && newStatus === "completed") {
       try {

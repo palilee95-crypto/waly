@@ -768,15 +768,28 @@ export default function CustomerDashboard() {
     if (!upcomingBooking?.id) return;
     try {
       setMarkingArrivedLoading(true);
-      await pb.collection('service_bookings').update(upcomingBooking.id, {
-        status: 'arrived'
+      // Customers no longer write the booking record directly: the server
+      // validates ownership, status and the same-day window.
+      const res = await pb.send<any>('/api/risev/booking/check-in', {
+        method: 'POST',
+        body: { booking_id: upcomingBooking.id },
+        requestKey: null,
       });
       setHasMarkedArrived(true);
       setUpcomingBooking((prev: any) => prev ? { ...prev, status: 'arrived' } : null);
-      Alert.alert('Arrival Confirmed! 📍', 'The store counter has been notified of your arrival.');
+      Alert.alert(
+        res?.already ? 'Already Checked In 📍' : 'Arrival Confirmed! 📍',
+        'The store counter has been notified of your arrival.'
+      );
     } catch (err: any) {
       console.warn('Arrival update err:', err);
-      Alert.alert('Notice', 'Could not update arrival status right now. Please inform the store staff at the counter.');
+      const code = err?.response?.code || '';
+      const message = code === 'BOOKING_NOT_TODAY'
+        ? 'You can only check in on the day of your appointment.'
+        : code === 'BOOKING_NOT_ACTIVE'
+        ? 'This booking can no longer be checked in.'
+        : 'Could not update arrival status right now. Please inform the store staff at the counter.';
+      Alert.alert('Notice', message);
     } finally {
       setMarkingArrivedLoading(false);
     }

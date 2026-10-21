@@ -853,15 +853,12 @@ export default function BookingsScreen() {
     setUpdatingId(bookingId);
     try {
       if (!bookingId.startsWith('mock-')) {
-        try {
-          await pb.collection('service_bookings').update(bookingId, { status: newStatus });
-        } catch (upErr) {
-          // Fall back to server-side endpoint with full privileges
-          await pb.send('/api/risev/merchant/booking-status', {
-            method: 'POST',
-            body: { booking_id: bookingId, status: newStatus }
-          });
-        }
+        // Customers lost direct write access to service_bookings; the merchant
+        // endpoint enforces ownership and the status transition.
+        await pb.send('/api/risev/merchant/booking-status', {
+          method: 'POST',
+          body: { booking_id: bookingId, status: newStatus }
+        });
       }
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
       if (newStatus === 'completed') {

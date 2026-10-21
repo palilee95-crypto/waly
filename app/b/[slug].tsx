@@ -14,6 +14,7 @@ import {
   Modal,
   Linking,
   Animated,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
+import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -304,7 +307,7 @@ function parseStoreOperatingHours(hoursData: any, fallbackStr?: string): Operati
 }
 
 export default function CustomerBookingPwaScreen() {
-  const { slug, phone: queryPhone, name: queryName, ref: queryRef } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string }>();
+  const { slug, phone: queryPhone, name: queryName, ref: queryRef, pass: queryPass } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string; pass?: string }>();
   const router = useRouter();
   const { locale } = useLanguage();
 
@@ -429,6 +432,13 @@ export default function CustomerBookingPwaScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Appointment pass sheet (QR + check-in). Only a signed-in customer can see
+  // the pass; guests are routed through the login redirect.
+  const [showPassSheet, setShowPassSheet] = useState(false);
+  const [passLoading, setPassLoading] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
+  const [checkingIn, setCheckingIn] = useState(false);
 
   // Web Push Customer Appointment Reminders state
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
@@ -782,6 +792,132 @@ export default function CustomerBookingPwaScreen() {
     };
   };
 
+  // The appointment pass is customer-only. A merchant session (or a signed-out
+  // device) must never unlock it: that confusion is what leaked the merchant's
+  // identity into walk-ins earlier.
+  const isCustomerSession = (): boolean => {
+    if (!(pb.authStore as any)?.isValid) return false;
+    const model: any = (pb.authStore as any)?.record || (pb.authStore as any)?.model || null;
+    if (!model) return false;
+    if (activeRole === 'merchant') return false;
+    const role = String((user as any)?.role || model?.role || '');
+    return activeRole === 'customer' || role === 'customer' || role === 'both';
+  };
+
+  const passBooking = createdBooking || existingBooking;
+  const passBookingId = String(passBooking?.id || '');
+  const passIsDemo = !passBookingId || passBookingId.startsWith('BK-');
+
+  const openPassFor = (booking: any) => {
+    if (!booking) return;
+    setCreatedBooking(booking);
+    const isoDate = String(booking.booking_date || '').split('T')[0];
+    if (isoDate) {
+      setSelectedIsoDate(isoDate);
+      setSelectedDate(formatUpcomingDate(isoDate));
+    }
+    if (booking.start_time) setSelectedTime(booking.start_time);
+    setHasArrived(booking.status === 'arrived' || booking.status === 'in_service');
+    setCurrentStep(4);
+  };
+
+  const passServiceText = (() => {
+    const raw = passBooking?.items_summary;
+    let items: any[] = [];
+    if (Array.isArray(raw)) items = raw;
+    else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) items = parsed;
+      } catch (e) {
+        items = [];
+      }
+    }
+    const names = items.map((item: any) => item?.name || item?.title).filter(Boolean);
+    if (names.length > 0) return names.join(', ');
+    return passBooking?.service_name || selectedServices.map((s: any) => s.name).join(', ') || 'Appointment';
+  })();
+
+  const goToLoginForPass = () => {
+    if (!passBookingId) return;
+    const redirect = `/b/${slug}?pass=${passBookingId}`;
+    const phone = String(passBooking?.customer_phone || customerPhone || '').trim();
+    router.push({
+      pathname: '/login',
+      params: {
+        redirect_to: redirect,
+        ...(phone ? { prefill_phone: phone } : {}),
+        ...(customerName ? { prefill_name: customerName } : {}),
+      },
+    } as any);
+  };
+
+  const openPassSheet = () => {
+    setPassError(null);
+    if (passIsDemo) {
+      showToast('Demo booking — there is no live pass to check in.');
+      return;
+    }
+    if (!isCustomerSession()) {
+      goToLoginForPass();
+      return;
+    }
+    setShowPassSheet(true);
+  };
+
+  const sharePass = async () => {
+    if (passIsDemo) return;
+    const url = buildPassUrl(String(slug), passBookingId);
+    try {
+      await Clipboard.setStringAsync(url);
+    } catch (e) {}
+    if (Platform.OS === 'web') {
+      showToast('Pass link copied');
+      return;
+    }
+    try {
+      await Share.share({ message: `Your ${merchant?.store_name || 'Risev'} appointment pass:\n${url}` });
+    } catch (e) {}
+  };
+
+  const handleCheckIn = async () => {
+    if (passIsDemo || checkingIn) return;
+    if (!isCustomerSession()) {
+      goToLoginForPass();
+      return;
+    }
+    setCheckingIn(true);
+    setPassError(null);
+    try {
+      const res = await pb.send<any>('/api/risev/booking/check-in', {
+        method: 'POST',
+        body: { booking_id: passBookingId },
+        requestKey: null,
+      });
+      setHasArrived(true);
+      setCreatedBooking((prev: any) => (prev ? { ...prev, status: 'arrived' } : { id: passBookingId, status: 'arrived' }));
+      setExistingBooking((prev: any) => (prev ? { ...prev, status: 'arrived' } : prev));
+      // The sheet already shows the new state; the toast would cover its header.
+      if (!showPassSheet) {
+        showToast(res?.already ? 'Already checked in 📍' : 'Arrival confirmed — the counter has been notified 📍');
+      }
+    } catch (err: any) {
+      const code = err?.response?.code || err?.data?.code || '';
+      const messages: Record<string, string> = {
+        AUTH_REQUIRED: 'Log in to check in.',
+        PASS_FORBIDDEN: 'This pass belongs to a different customer.',
+        BOOKING_NOT_TODAY: 'You can only check in on the day of your appointment.',
+        BOOKING_NOT_ACTIVE: 'This booking can no longer be checked in.',
+        BOOKING_NOT_FOUND: 'Booking not found.',
+      };
+      const message = messages[code] || err?.response?.message || err?.message || 'Could not check in right now.';
+      setPassError(message);
+      if (!showPassSheet) showToast(message);
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
   // The Vouchers sheet used to render two invented vouchers, so merchants saw
   // "Store Promo Voucher" cards they never created. Load this customer's real active
   // vouchers for this store instead; the sheet shows an empty state when there are none.
@@ -866,6 +1002,62 @@ export default function CustomerBookingPwaScreen() {
       setCurrentStep(1);
     }
   }, [queryRef]);
+
+  // A pass link (QR or shared link) restores the pass for the signed-in
+  // customer. Guests are sent to login first and come back to this URL.
+  const passRedirectRef = useRef(false);
+  useEffect(() => {
+    const passId = typeof queryPass === 'string' ? queryPass.trim() : '';
+    if (!passId || passId.startsWith('BK-')) return;
+
+    if (!isCustomerSession()) {
+      if (!passRedirectRef.current) {
+        passRedirectRef.current = true;
+        router.replace({
+          pathname: '/login',
+          params: { redirect_to: `/b/${slug}?pass=${passId}` },
+        } as any);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setPassLoading(true);
+      try {
+        const res = await pb.send<any>('/api/risev/booking/pass', {
+          method: 'GET',
+          query: { booking_id: passId },
+          requestKey: null,
+        });
+        if (cancelled || !res?.booking) return;
+        const payload = res.booking;
+        const items = Array.isArray(payload.items_summary) ? payload.items_summary : [];
+        openPassFor({
+          ...payload,
+          service_name: items.map((item: any) => item?.name || item?.title).filter(Boolean).join(', '),
+        });
+        setShowPassSheet(true);
+      } catch (err: any) {
+        if (!cancelled) {
+          const code = err?.response?.code || '';
+          const message = code === 'PASS_FORBIDDEN'
+            ? 'This pass belongs to a different customer.'
+            : code === 'AUTH_REQUIRED'
+            ? 'Log in to view your pass.'
+            : 'Could not load this pass.';
+          setPassError(message);
+          showToast(message);
+        }
+      } finally {
+        if (!cancelled) setPassLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryPass, user?.id, activeRole, slug]);
 
   const loadCachedCustomerInfo = async () => {
     try {
@@ -1530,15 +1722,18 @@ export default function CustomerBookingPwaScreen() {
   };
 
   const handleArrived = async () => {
-    setHasArrived(true);
-    showToast('Arrival notification sent to counter! 📍');
-    if (createdBooking?.id && !createdBooking.id.startsWith('BK-')) {
-      try {
-        await pb.collection('service_bookings').update(createdBooking.id, {
-          status: 'arrived'
-        });
-      } catch (e) {}
+    if (hasArrived) return;
+    if (!isCustomerSession()) {
+      // The public page cannot write the booking, so sign-in is the only way in.
+      goToLoginForPass();
+      return;
     }
+    if (createdBooking?.id && !createdBooking.id.startsWith('BK-')) {
+      await handleCheckIn();
+      return;
+    }
+    setHasArrived(true);
+    showToast('Arrival confirmed 📍');
   };
 
   if (loading) {
@@ -1955,8 +2150,7 @@ export default function CustomerBookingPwaScreen() {
                   } else if (isCompleted) {
                     handleOpenReviewModal();
                   } else {
-                    setCreatedBooking(existingBooking);
-                    setCurrentStep(4);
+                    openPassFor(existingBooking);
                   }
                 };
 
@@ -3055,7 +3249,7 @@ export default function CustomerBookingPwaScreen() {
                   shadowOpacity: 0.04,
                   shadowRadius: 6,
                 }}
-                onPress={() => showToast('Share or Save Pass')}
+                onPress={sharePass}
                 activeOpacity={0.8}
               >
                 <Ionicons name="ellipsis-horizontal" size={20} color="#000000" />
@@ -3319,11 +3513,11 @@ export default function CustomerBookingPwaScreen() {
                   gap: 8,
                 }}
                 activeOpacity={0.85}
-                onPress={() => showToast('Pass Checked In Successfully!')}
+                onPress={openPassSheet}
               >
-                <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
+                <Ionicons name={isCustomerSession() ? 'qr-code-outline' : 'lock-closed-outline'} size={18} color="#FFFFFF" />
                 <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', flex: 1, textAlign: 'center' }}>
-                  View Pass & Check In
+                  {isCustomerSession() ? 'View Pass & Check In' : 'Log in to view your pass'}
                 </Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </TouchableOpacity>
@@ -3419,7 +3613,8 @@ export default function CustomerBookingPwaScreen() {
             </View>
             </View>
 
-            {/* 5. Arrival Check-In Action Section (Anchored to Bottom) */}
+            {/* 5. Arrival Check-In Action Section (Anchored to Bottom, customer-only) */}
+            {isCustomerSession() && (
             <View style={{ marginTop: 'auto', paddingTop: 16 }}>
               <TouchableOpacity
                 onPress={handleArrived}
@@ -3473,6 +3668,7 @@ export default function CustomerBookingPwaScreen() {
                 Tap the button above as soon as you step inside the store.
               </Text>
             </View>
+            )}
           </View>
         )}
 
@@ -3946,6 +4142,193 @@ export default function CustomerBookingPwaScreen() {
             >
               <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Vouchers</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🎫 Appointment Pass Sheet (QR + same-day check-in) */}
+      <Modal
+        visible={showPassSheet}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPassSheet(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
+          <View style={[styles.loyaltyCardModalContent, {
+            backgroundColor: '#FFFFFF',
+            maxHeight: '92%',
+            boxShadow: 'none',
+            shadowColor: 'transparent',
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
+          }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <View style={[styles.modalHeaderIconBadge, { backgroundColor: '#FFCC00' }]}>
+                  <Ionicons name="qr-code-outline" size={18} color="#111111" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.loyaltyModalTitle, { color: '#111111' }]}>Appointment Pass</Text>
+                  <Text style={[styles.loyaltyModalSub, { color: '#64748B' }]} numberOfLines={1}>
+                    {merchant?.store_name || passBooking?.merchant_name || 'Your appointment'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.modalCloseBtn, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9' }]}
+                  onPress={() => setShowPassSheet(false)}
+                >
+                  <Ionicons name="close" size={18} color="#111111" />
+                </TouchableOpacity>
+              </View>
+
+              {/* QR */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                paddingVertical: 18,
+                alignItems: 'center',
+              }}>
+                {passIsDemo ? (
+                  <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="qr-code-outline" size={64} color="#CBD5E1" />
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 8 }}>
+                      Demo booking — no live pass
+                    </Text>
+                  </View>
+                ) : (
+                  <Image
+                    source={{
+                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(buildPassUrl(String(slug), passBookingId))}`,
+                    }}
+                    style={{ width: 200, height: 200 }}
+                    resizeMode="contain"
+                  />
+                )}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 10,
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}>
+                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 1 }}>
+                    PASS
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 1.2 }}>
+                    #{shortPassRef(passBookingId)}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 8 }}>
+                  Show this at the counter
+                </Text>
+              </View>
+
+              {/* Details */}
+              <View style={{ marginTop: 14, gap: 10 }}>
+                {[
+                  { icon: 'cut-outline', label: 'SERVICE', value: passServiceText },
+                  {
+                    icon: 'calendar-outline',
+                    label: 'SLOT',
+                    value: `${formatUpcomingDate(passBooking?.booking_date)} @ ${passBooking?.start_time || '—'}`,
+                  },
+                  {
+                    icon: 'location-outline',
+                    label: 'LOCATION',
+                    value: passBooking?.branch_name || selectedBranch?.name || merchant?.store_name || '—',
+                  },
+                  { icon: 'person-outline', label: 'PROVIDER', value: passBooking?.staff_name || 'Any Available' },
+                  { icon: 'cash-outline', label: 'TOTAL', value: `RM${Number(passBooking?.total_price || 0).toFixed(2)}` },
+                ].map((row) => (
+                  <View key={row.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={row.icon as any} size={15} color="#111111" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.6 }}>
+                        {row.label}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', marginTop: 1 }}>
+                        {row.value}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Status */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                marginTop: 16,
+                backgroundColor: hasArrived ? '#DCFCE7' : '#FEF9C3',
+                borderRadius: 999,
+                paddingVertical: 8,
+              }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: hasArrived ? '#16A34A' : '#EAB308' }} />
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 0.6 }}>
+                  {hasArrived ? 'CHECKED IN' : 'CONFIRMED'}
+                </Text>
+              </View>
+
+              {/* Primary action */}
+              <TouchableOpacity
+                onPress={handleCheckIn}
+                disabled={hasArrived || checkingIn || passLoading}
+                activeOpacity={0.85}
+                style={{
+                  marginTop: 12,
+                  backgroundColor: hasArrived ? '#16A34A' : '#000000',
+                  borderRadius: 16,
+                  paddingVertical: 15,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: checkingIn ? 0.7 : 1,
+                }}
+              >
+                {checkingIn ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name={hasArrived ? 'checkmark-circle' : 'navigate'} size={18} color="#FFFFFF" />
+                )}
+                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
+                  {hasArrived ? 'Arrival confirmed' : checkingIn ? 'Checking in…' : "I'm here — Check in"}
+                </Text>
+              </TouchableOpacity>
+
+              {passError ? (
+                <Text style={{
+                  marginTop: 10,
+                  fontSize: 12,
+                  fontFamily: 'PlusJakartaSans_600SemiBold',
+                  color: '#B91C1C',
+                  textAlign: 'center',
+                }}>
+                  {passError}
+                </Text>
+              ) : null}
+
+              <TouchableOpacity
+                onPress={sharePass}
+                activeOpacity={0.8}
+                style={{ marginTop: 10, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <Ionicons name="share-outline" size={16} color="#111111" />
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' }}>Save / Share pass</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>

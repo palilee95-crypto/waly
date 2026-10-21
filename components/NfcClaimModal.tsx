@@ -115,6 +115,48 @@ const getItemImageUrl = (item: any, availableAddons: any[] = []): string | null 
   return null;
 };
 
+// Turn a booking's items_summary into POS cart lines. Used by both the
+// phone-lookup flow and a booking pass scanned at the counter.
+const buildBookingCartLines = (booking: any): any[] => {
+  let bookedItems: any = booking?.items_summary;
+  if (typeof bookedItems === 'string') {
+    try { bookedItems = JSON.parse(bookedItems); } catch (e) { bookedItems = []; }
+  }
+  if (!Array.isArray(bookedItems)) bookedItems = [];
+
+  const lines = bookedItems
+    .filter((it: any) => it && (it.name || it.title))
+    .map((it: any, index: number) => ({
+      id: `booking_${index}`,
+      service_id: it.service_id || it.id || '',
+      name: it.name || it.title || 'Service',
+      price: parseFloat(it.price) || 0,
+      qty: Math.max(1, parseInt(it.qty, 10) || 1),
+      item_type: it.item_type || 'service',
+      duration_minutes: Number(it.duration_minutes) || 0,
+      commission_type: it.commission_type || 'none',
+      commission_rate: Number(it.commission_rate) || 0,
+      isBooking: true,
+    }));
+
+  if (lines.length === 0) {
+    lines.push({
+      id: 'booking',
+      service_id: '',
+      name: 'Temujanji Servis',
+      price: parseFloat(booking?.total_price) || 0,
+      qty: 1,
+      item_type: 'service',
+      duration_minutes: 0,
+      commission_type: 'none',
+      commission_rate: 0,
+      isBooking: true,
+    } as any);
+  }
+
+  return lines;
+};
+
 export default function NfcClaimModal() {
   const { user } = useAuth();
   const { locale } = useLanguage();
@@ -122,6 +164,9 @@ export default function NfcClaimModal() {
 
   const [claim, setClaim] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
+  // A booking pass scanned at the counter. Kept in its own state because the
+  // real nfc_claim record created afterwards does not carry the booking id.
+  const [scannedBookingId, setScannedBookingId] = useState('');
   const [billAmount, setBillAmount] = useState('10');
   const [stampAmount, setStampAmount] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
@@ -403,8 +448,12 @@ export default function NfcClaimModal() {
     if (!activeBooking) return;
     const nextStatus = (activeBooking.status === 'booked') ? 'in_service' : 'booked';
     try {
-      await pb.collection('service_bookings').update(activeBooking.id, {
-        status: nextStatus
+      // Customers lost direct write access to service_bookings; the merchant
+      // endpoint enforces ownership and the status transition.
+      await pb.send('/api/risev/merchant/booking-status', {
+        method: 'POST',
+        body: { booking_id: activeBooking.id, status: nextStatus },
+        requestKey: null,
       });
       setActiveBooking((prev: any) => ({ ...prev, status: nextStatus }));
     } catch (err) {
@@ -422,7 +471,19 @@ export default function NfcClaimModal() {
       const todayStr = new Date().toISOString().split('T')[0];
       let bk: any = null;
 
-      if (!claim.manual_pos) {
+      if (scannedBookingId) {
+        // The cashier scanned this customer's pass: load exactly that booking.
+        try {
+          const passRes = await pb.send<{ booking: any }>('/api/risev/merchant/booking-pass', {
+            method: 'POST',
+            body: { booking_id: scannedBookingId },
+            requestKey: null,
+          });
+          bk = passRes?.booking || null;
+        } catch (passErr) {
+          console.warn('Booking pass lookup failed:', passErr);
+        }
+      } else if (!claim.manual_pos) {
       try {
         // 1. Query TODAY's active booking (booked, arrived, in_service)
         const bRes = await pb.collection('service_bookings').getList(1, 1, {
@@ -449,46 +510,9 @@ export default function NfcClaimModal() {
       if (bk) {
         setActiveBooking(bk);
         setUpcomingFutureBooking(null);
-
         // Load every booked line into the cart (not just the first one) so the
         // cashier sees the full appointment; extras are appended on top.
-        let bookedItems: any = bk.items_summary;
-        if (typeof bookedItems === 'string') {
-          try { bookedItems = JSON.parse(bookedItems); } catch (e) { bookedItems = []; }
-        }
-        if (!Array.isArray(bookedItems)) bookedItems = [];
-
-        const bookingLines = bookedItems
-          .filter((it: any) => it && (it.name || it.title))
-          .map((it: any, index: number) => ({
-            id: `booking_${index}`,
-            service_id: it.service_id || it.id || '',
-            name: it.name || it.title || 'Service',
-            price: parseFloat(it.price) || 0,
-            qty: Math.max(1, parseInt(it.qty, 10) || 1),
-            item_type: it.item_type || 'service',
-            duration_minutes: Number(it.duration_minutes) || 0,
-            commission_type: it.commission_type || 'none',
-            commission_rate: Number(it.commission_rate) || 0,
-            isBooking: true,
-          }));
-
-        if (bookingLines.length === 0) {
-          bookingLines.push({
-            id: 'booking',
-            service_id: '',
-            name: 'Temujanji Servis',
-            price: parseFloat(bk.total_price) || 0,
-            qty: 1,
-            item_type: 'service',
-            duration_minutes: 0,
-            commission_type: 'none',
-            commission_rate: 0,
-            isBooking: true,
-          } as any);
-        }
-
-        setSelectedServices(bookingLines as any);
+        setSelectedServices(buildBookingCartLines(bk) as any);
       } else {
         setActiveBooking(null);
         setSelectedServices([]);
@@ -616,7 +640,7 @@ export default function NfcClaimModal() {
         setCustomerVouchers([]);
       }
     })();
-  }, [claim?.id, claim?.customer_phone, claim?.customer_name, claim?.voucher, claim?.voucher_id, merchantId]);
+  }, [claim?.id, claim?.customer_phone, claim?.customer_name, claim?.voucher, claim?.voucher_id, merchantId, scannedBookingId]);
 
   const activeClaimRef = React.useRef<any>(null);
   activeClaimRef.current = claim;
@@ -734,6 +758,7 @@ export default function NfcClaimModal() {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
       if (targetClaim && targetClaim.status === 'pending') {
         setClaim(targetClaim);
+        setScannedBookingId(String(targetClaim.booking_id || ''));
         if (targetClaim.manual_pos) {
           setFullPosOpen(true);
           setPosCustomerStep(false);
@@ -758,6 +783,7 @@ export default function NfcClaimModal() {
       } else {
         // If claim is already completed or cancelled, clear state and do not open
         setClaim(null);
+        setScannedBookingId('');
         setIsVisible(false);
         setErrorMsg(null);
       }
@@ -766,6 +792,19 @@ export default function NfcClaimModal() {
       sub.remove();
     };
   }, []);
+
+  // A scanned booking pass opens the POS straight on the appointment: attach the
+  // customer (creating the real nfc_claim) without asking the cashier to retype
+  // the phone that came from the pass.
+  const autoAttachBookingRef = React.useRef('');
+  useEffect(() => {
+    if (!isVisible || !claim?.manual_pos || !scannedBookingId) return;
+    if (claim.id) return;
+    if (!normalizeManualPosPhone(posPhone)) return;
+    if (autoAttachBookingRef.current === scannedBookingId) return;
+    autoAttachBookingRef.current = scannedBookingId;
+    attachManualPosCustomer();
+  }, [isVisible, claim?.id, claim?.manual_pos, scannedBookingId, posPhone]);
 
   const handleConfirmClassic = async () => {
     if (!claim) return;
