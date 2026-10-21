@@ -25,6 +25,12 @@ services:
       - ./pb_migrations:/pb/pb_migrations
     environment:
       - PUSH_DISABLED=1
+      # Turnstile is skipped on staging: a browser that blocks
+      # challenges.cloudflare.com hands over a token Cloudflare rejects, so the
+      # team could never sign in there. Production never sets this flag.
+      - TURNSTILE_DISABLED=1
+      # Same widget/secret as production, so real tokens would verify too.
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET}
     networks:
       - risev
 
