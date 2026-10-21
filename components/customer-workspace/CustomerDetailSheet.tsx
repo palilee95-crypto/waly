@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Linking } from 'react-native';
 import { colors, radii } from '@/theme';
 import {
@@ -20,26 +19,7 @@ import {
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
-
-// Mirrors the stamp icon set the customer card uses, so the merchant sees the
-// same stamp as the customer does.
-const STAMP_ICONS = [
-  { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
-  { id: 'star', family: 'FontAwesome', name: 'star' },
-  { id: 'heart', family: 'Ionicons', name: 'heart' },
-  { id: 'coffee', family: 'MaterialIcons', name: 'local-cafe' },
-  { id: 'cake', family: 'MaterialIcons', name: 'cake' },
-  { id: 'restaurant', family: 'Ionicons', name: 'restaurant' },
-  { id: 'bag', family: 'Ionicons', name: 'bag-handle' },
-  { id: 'sparkles', family: 'Ionicons', name: 'sparkles' },
-] as const;
-
-function StampGlyph({ iconId, size, color }: { iconId: string; size: number; color: string }) {
-  const icon = STAMP_ICONS.find((entry) => entry.id === iconId) || STAMP_ICONS[3];
-  if (icon.family === 'FontAwesome') return <FontAwesome name={icon.name as any} size={size} color={color} />;
-  if (icon.family === 'MaterialIcons') return <MaterialIcons name={icon.name as any} size={size} color={color} />;
-  return <Ionicons name={icon.name as any} size={size} color={color} />;
-}
+import LoyaltyCardBack from '@/components/LoyaltyCardBack';
 
 /** White or near-black, whichever stays readable on the merchant's card colour. */
 function inkOn(background: string) {
@@ -198,61 +178,24 @@ export default function CustomerDetailSheet({
               {(() => {
                 const design = detail.card;
                 const surface = design?.cardColor || colors.black;
-                const ink = design?.fontColor || inkOn(surface);
-                const stampFill = design?.stampColor || colors.primary[400];
-                const glyph = design?.cardIcon || 'coffee';
                 const showStamps = !design || design.enableStamps;
-                const merchantLabel = detail.merchantName || 'This store';
 
                 return (
-                  <View style={[styles.card, { backgroundColor: surface }]}>
-                    {design?.cardBackground ? (
-                      <View style={styles.cardClip}>
-                        <Image source={{ uri: design.cardBackground }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                      </View>
-                    ) : null}
-
-                    <View style={styles.cardTop}>
-                      <View style={styles.cardLogoBox}>
-                        {detail.merchantLogo ? (
-                          <Image source={{ uri: detail.merchantLogo }} style={styles.cardLogo} resizeMode="contain" />
-                        ) : (
-                          <Text style={styles.cardLogoFallback}>{merchantLabel.slice(0, 1).toUpperCase()}</Text>
-                        )}
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[styles.cardName, { color: ink }]} numberOfLines={1}>{merchantLabel}</Text>
-                        <Text style={[styles.cardProgram, { color: ink }]} numberOfLines={1}>
-                          {design?.programName || 'Loyalty card'}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[styles.cardCount, { color: ink }]}>
-                          {showStamps ? `${detail.stamps}/${stampGoal}` : detail.points.toLocaleString('en-MY')}
-                        </Text>
-                        <Text style={[styles.cardCountLabel, { color: ink }]}>
-                          {showStamps ? 'STAMPS' : 'POINTS'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {showStamps ? (
-                      <View style={styles.stampGrid}>
-                        {Array.from({ length: stampGoal }, (_, index) => index + 1).map((slot) =>
-                          slot <= detail.stamps ? (
-                            <View key={slot} style={[styles.stampSlot, { backgroundColor: stampFill }]}>
-                              <StampGlyph iconId={glyph} size={15} color="#FFFFFF" />
-                            </View>
-                          ) : (
-                            <View key={slot} style={[styles.stampSlot, styles.stampSlotEmpty, { borderColor: ink }]}>
-                              <StampGlyph iconId={glyph} size={13} color={ink} />
-                            </View>
-                          )
-                        )}
-                      </View>
-                    ) : null}
-
-                    <Text style={[styles.cardHint, { color: ink }]}>
+                  <View style={styles.cardBlock}>
+                    <LoyaltyCardBack
+                      merchantName={detail.merchantName || 'This store'}
+                      cardColor={surface}
+                      fontColor={design?.fontColor || inkOn(surface)}
+                      cardIcon={design?.cardIcon || 'coffee'}
+                      backgroundImage={design?.cardBackgroundBack || ''}
+                      stamps={detail.stamps}
+                      goal={stampGoal}
+                      points={detail.points}
+                      enableStamps={showStamps}
+                      spendPerPoint={design?.spendPerPoint}
+                      milestones={design?.milestones}
+                    />
+                    <Text style={styles.cardHint}>
                       {!showStamps
                         ? 'Points only — stamps are switched off for this card.'
                         : stampsLeft === 0
@@ -410,35 +353,8 @@ const styles = StyleSheet.create({
   actionMenuText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.error.dark },
   center: { paddingVertical: 32, alignItems: 'center' },
   errorText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, color: '#B91C1C' },
-  card: {
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  cardClip: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 22, overflow: 'hidden' },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardLogoBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 5,
-  },
-  cardLogo: { width: '100%', height: '100%', borderRadius: 7 },
-  cardLogoFallback: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17, color: colors.black },
-  cardName: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15 },
-  cardProgram: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10.5, opacity: 0.7, marginTop: 2 },
-  cardCount: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17 },
-  cardCountLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8.5, letterSpacing: 0.7, opacity: 0.7, marginTop: 2 },
-  stampGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 16 },
-  stampSlot: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  stampSlotEmpty: { borderWidth: 1.5, borderStyle: 'dashed', opacity: 0.35 },
-  cardHint: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, opacity: 0.85, marginTop: 14 },
+  cardBlock: { marginBottom: 10, gap: 8 },
+  cardHint: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#64748B', paddingHorizontal: 2 },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',

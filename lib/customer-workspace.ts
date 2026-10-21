@@ -490,6 +490,9 @@ export type CustomerCardDesign = {
   fontColor: string;
   cardIcon: string;
   cardBackground: string;
+  cardBackgroundBack: string;
+  spendPerPoint: number;
+  milestones: number[];
   enableStamps: boolean;
   enablePoints: boolean;
 };
@@ -557,6 +560,21 @@ export async function fetchCustomerDetail(
   const program: any = card?.expand?.program || null;
   const merchantRecord: any = merchant || null;
 
+  // sub_rewards is a JSON field: an array when the SDK parsed it, a string when it did not.
+  const subRewards = (() => {
+    const raw = program?.sub_rewards;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  })();
+
   return {
     id: customerId,
     name: fallback.name || expanded?.name || 'Customer',
@@ -587,6 +605,13 @@ export async function fetchCustomerDetail(
           cardBackground: program.card_background
             ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background}`
             : '',
+          cardBackgroundBack: program.card_background_back
+            ? `${pb.baseUrl}/api/files/loyalty_programs/${program.id}/${program.card_background_back}`
+            : '',
+          spendPerPoint: Number(program.spend_per_point) || 1,
+          milestones: subRewards
+            .map((entry: any) => Number(entry?.at_stamp))
+            .filter((stamp: number) => Number.isFinite(stamp) && stamp > 0),
           enableStamps: program.enable_stamps !== false,
           enablePoints: program.enable_points === true,
         }
