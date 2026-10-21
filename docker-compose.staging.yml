@@ -28,9 +28,12 @@ services:
       # Turnstile is skipped on staging: a browser that blocks
       # challenges.cloudflare.com hands over a token Cloudflare rejects, so the
       # team could never sign in there. Production never sets this flag.
+      #
+      # No TURNSTILE_SECRET here on purpose — the bypass returns before the
+      # secret is read, so injecting the production secret would only widen the
+      # blast radius. If staging ever needs real verification, give it its own
+      # widget + secret and turn this flag off.
       - TURNSTILE_DISABLED=1
-      # Same widget/secret as production, so real tokens would verify too.
-      - TURNSTILE_SECRET=${TURNSTILE_SECRET}
     networks:
       - risev
 
