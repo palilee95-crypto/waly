@@ -492,7 +492,7 @@ function buildSnapshot($app, ctx) {
     "SELECT strftime('%Y-%m-%d', t.created, '+8 hours') as day, " +
       "CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps FROM transactions t " +
       "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
-      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY day",
+      " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.type <> 'adjust' GROUP BY day",
     base,
     { day: "", stamps: "" }
   );
@@ -505,7 +505,7 @@ function buildSnapshot($app, ctx) {
       "SELECT CAST(strftime('%H', t.created, '+8 hours') AS INTEGER) as hour, " +
         "CAST(COALESCE(SUM(t.stamps), 0) AS TEXT) as stamps FROM transactions t " +
         "WHERE t.merchant = {:mid}" + branchClause(ctx, "t.branch") +
-        " AND t.created >= {:fromUtc} AND t.created < {:toUtc} GROUP BY hour",
+        " AND t.created >= {:fromUtc} AND t.created < {:toUtc} AND t.type <> 'adjust' GROUP BY hour",
       base,
       { hour: 0, stamps: "" }
     );
@@ -875,15 +875,88 @@ function buildSnapshot($app, ctx) {
     return { stars: stars, count: hit ? Number(hit.cnt) || 0 : 0 };
   });
 
+  // Ratings follow the same selected period and adaptive bucket size as Visit
+  // Trend. Sum/count are rolled up together so a day with one rating does not
+  // weigh as much as a day with many ratings.
+  const reviewDayRows = rows(
+    $app,
+    "SELECT strftime('%Y-%m-%d', created, '+8 hours') as day, COUNT(*) as cnt, " +
+      "CAST(COALESCE(SUM(rating), 0) AS TEXT) as total FROM store_feedbacks " +
+      "WHERE merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc} GROUP BY day",
+    feedbackBase,
+    { day: "", cnt: 0, total: "" }
+  );
+  const reviewDayMap = {};
+  reviewDayRows.forEach(function (row) {
+    reviewDayMap[row.day] = { count: Number(row.cnt) || 0, total: Number(row.total) || 0 };
+  });
+  const reviewSeries = [];
+  const addReviewPoint = function (key, label, detail, count, total) {
+    reviewSeries.push({
+      key: key,
+      label: label,
+      detail: detail,
+      count: count,
+      avgRating: count > 0 ? Math.round((total / count) * 10) / 10 : null,
+    });
+  };
+  if (insightUnit === "hour") {
+    const hourlyReviews = rows(
+      $app,
+      "SELECT CAST(strftime('%H', created, '+8 hours') AS INTEGER) as hour, COUNT(*) as cnt, " +
+        "CAST(COALESCE(SUM(rating), 0) AS TEXT) as total FROM store_feedbacks " +
+        "WHERE merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc} GROUP BY hour",
+      feedbackBase,
+      { hour: 0, cnt: 0, total: "" }
+    );
+    const hourMap = {};
+    hourlyReviews.forEach(function (row) {
+      hourMap[Number(row.hour)] = { count: Number(row.cnt) || 0, total: Number(row.total) || 0 };
+    });
+    for (let hour = 0; hour < 24; hour++) {
+      const item = hourMap[hour] || { count: 0, total: 0 };
+      addReviewPoint(ctx.fromDate + "T" + pad2(hour), (hour % 12 || 12) + (hour < 12 ? "a" : "p"),
+        ctx.fromDate + " · " + pad2(hour) + ":00–" + pad2(hour) + ":59", item.count, item.total);
+    }
+  } else if (insightUnit === "day") {
+    dailyBuckets.forEach(function (bucket) {
+      const item = reviewDayMap[bucket.date] || { count: 0, total: 0 };
+      addReviewPoint(bucket.date, bucket.date.slice(5), bucket.date, item.count, item.total);
+    });
+  } else {
+    const groupedReviews = {};
+    dailyBuckets.forEach(function (bucket) {
+      let key = bucket.date.slice(0, 7) + "-01";
+      if (insightUnit === "week") {
+        const weekday = new Date(bucket.date + "T00:00:00Z").getUTCDay();
+        key = addDays(bucket.date, -((weekday + 6) % 7));
+      }
+      if (!groupedReviews[key]) groupedReviews[key] = { count: 0, total: 0, first: bucket.date, last: bucket.date };
+      const item = reviewDayMap[bucket.date] || { count: 0, total: 0 };
+      groupedReviews[key].count += item.count;
+      groupedReviews[key].total += item.total;
+      groupedReviews[key].last = bucket.date;
+    });
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    Object.keys(groupedReviews).sort().forEach(function (key) {
+      const item = groupedReviews[key];
+      const isWeek = insightUnit === "week";
+      addReviewPoint(key,
+        isWeek ? item.first.slice(5) + "–" + item.last.slice(8) : monthNames[Number(key.slice(5, 7)) - 1],
+        isWeek ? item.first + " – " + item.last : key.slice(0, 7), item.count, item.total);
+    });
+  }
+
   const recentReviews = rows(
     $app,
-    "SELECT IFNULL(customer_name, '') as name, rating as stars, IFNULL(feedback, '') as feedback, created as created " +
+    "SELECT id as id, IFNULL(customer_name, '') as name, rating as stars, IFNULL(feedback, '') as feedback, created as created " +
       "FROM store_feedbacks WHERE merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc} " +
       "ORDER BY created DESC LIMIT 5",
     feedbackBase,
-    { name: "", stars: 0, feedback: "", created: "" }
+    { id: "", name: "", stars: 0, feedback: "", created: "" }
   ).map(function (r) {
     return {
+      id: r.id,
       name: r.name || "Customer",
       stars: Number(r.stars) || 0,
       feedback: r.feedback || "",
@@ -971,8 +1044,41 @@ function buildSnapshot($app, ctx) {
     reviews: {
       distribution: distribution,
       recent: recentReviews,
+      series: reviewSeries,
+      granularity: insightUnit,
     },
   };
+}
+
+/** Merchant-wide feedback: the collection has no branch field. */
+function buildReviews($app, ctx, opts) {
+  const requestedLimit = Number(opts.perPage);
+  const requestedPage = Number(opts.page);
+  const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(50, requestedLimit) : 20;
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(100000, requestedPage) : 1;
+  const params = { mid: ctx.merchantId, fromUtc: ctx.fromUtc, toUtc: ctx.toUtc };
+  let ratingClause = "";
+  if (opts.stars === "low") {
+    ratingClause = " AND rating BETWEEN 1 AND 3";
+  } else if (opts.stars) {
+    params.stars = Number(opts.stars);
+    ratingClause = " AND rating = {:stars}";
+  }
+  const commentsClause = opts.commentsOnly ? " AND TRIM(COALESCE(feedback, '')) <> ''" : "";
+  const where = "merchant = {:mid} AND created >= {:fromUtc} AND created < {:toUtc}" + ratingClause + commentsClause;
+  const orderBy = opts.sort === "lowest" ? "rating ASC, created DESC, id DESC" : "created DESC, id DESC";
+  const total = Number(scalar($app, "SELECT COUNT(*) as v FROM store_feedbacks WHERE " + where, params, "v")) || 0;
+  const items = rows(
+    $app,
+    "SELECT id as id, IFNULL(customer_name, '') as name, rating as stars, " +
+      "IFNULL(feedback, '') as feedback, created as created FROM store_feedbacks WHERE " + where +
+      " ORDER BY " + orderBy + " LIMIT {:limit} OFFSET {:offset}",
+    Object.assign({}, params, { limit: limit, offset: (page - 1) * limit }),
+    { id: "", name: "", stars: 0, feedback: "", created: "" }
+  ).map(function (r) {
+    return { id: r.id, name: r.name || "Customer", stars: Number(r.stars) || 0, feedback: r.feedback || "", createdAt: r.created };
+  });
+  return { page: page, perPage: limit, total: total, items: items };
 }
 
 /**
@@ -1284,10 +1390,255 @@ function buildAudience($app, ctx, card, page, perPage) {
   throw new Error("UNKNOWN_CARD");
 }
 
+/**
+ * Full customer directory for Manage Customers.
+ * Options: q, sort=last_visit|name|visits|spend, filter=all|at_risk|near_reward|new,
+ * page, perPage. Merchant-wide unless ctx.branchId is set.
+ */
+function buildManageCustomers($app, ctx, options) {
+  const opts = options || {};
+  const limit = Math.max(1, Math.min(50, Number(opts.perPage) || 25));
+  const page = Math.max(1, Number(opts.page) || 1);
+  const offset = (page - 1) * limit;
+  const q = String(opts.q || "").trim();
+  const sort = ["last_visit", "name", "visits", "spend"].indexOf(String(opts.sort || "")) >= 0
+    ? String(opts.sort)
+    : "last_visit";
+  const filter = ["all", "at_risk", "near_reward", "new"].indexOf(String(opts.filter || "")) >= 0
+    ? String(opts.filter)
+    : "all";
+
+  const returnDays = Number(ctx.returnDays) > 0 ? Number(ctx.returnDays) : DEFAULT_RETURN_DAYS;
+  const cutoff = new Date(Date.now() - returnDays * DAY_MS).toISOString().replace("T", " ").slice(0, 19);
+  const nowUtc = utcNowString();
+  const params = Object.assign({}, bindBase(ctx), {
+    mid: ctx.merchantId,
+    now: nowUtc,
+    cutoff: cutoff,
+    limit: limit,
+    offset: offset,
+  });
+
+  const innerWhere = ["c.merchant = {:mid}"];
+  if (q) {
+    params.q = "%" + q + "%";
+    const digits = q.replace(/[^\d]/g, "");
+    if (digits) {
+      params.qphone = "%" + (digits.charAt(0) === "0" ? "6" + digits : digits) + "%";
+      innerWhere.push("(u.name LIKE {:q} OR u.phone LIKE {:q} OR u.phone LIKE {:qphone})");
+    } else {
+      innerWhere.push("u.name LIKE {:q}");
+    }
+  }
+  if (ctx.branchId) {
+    innerWhere.push(
+      "u.id IN (SELECT DISTINCT t2.customer FROM transactions t2 WHERE t2.merchant = {:mid}" +
+        branchClause(ctx, "t2.branch") +
+        " AND t2.type <> 'adjust')"
+    );
+  }
+
+  const innerSql =
+    "SELECT u.id as id, u.name as name, u.phone as phone, u.avatar as avatar, " +
+    "COALESCE(u.tier, 'bronze') as tier, u.birthday as birthday, COALESCE(u.created, '') as joined, " +
+    "IFNULL(MAX(t.created), '') as last_seen, IFNULL(MIN(t.created), '') as first_seen, " +
+    "COUNT(t.id) as visits, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend, " +
+    "MAX(COALESCE(c.stamps_collected, 0)) as stamps, MAX(COALESCE(p.stamp_goal, 10)) as goal, " +
+    "MAX(COALESCE(c.points_balance, 0)) as points, MAX(COALESCE(c.opt_in_marketing, 1)) as opt_in, " +
+    "(SELECT COUNT(*) FROM vouchers v JOIN rewards r ON r.id = v.reward " +
+    " WHERE v.customer = u.id AND r.merchant = {:mid} AND v.status = 'active' " +
+    " AND (v.expires_at IS NULL OR v.expires_at > {:now})) as active_vouchers " +
+    "FROM loyalty_cards c JOIN users u ON u.id = c.customer " +
+    "LEFT JOIN loyalty_programs p ON p.id = c.program " +
+    "LEFT JOIN transactions t ON t.customer = c.customer AND t.merchant = c.merchant AND t.type <> 'adjust'" +
+    branchClause(ctx, "t.branch") +
+    " WHERE " + innerWhere.join(" AND ") + " GROUP BY u.id";
+
+  const outerWhere = [];
+  if (filter === "at_risk") outerWhere.push("x.last_seen <> '' AND x.last_seen < {:cutoff}");
+  if (filter === "near_reward") outerWhere.push("x.goal > 0 AND (x.goal - x.stamps) BETWEEN 1 AND 2");
+  if (filter === "new") outerWhere.push("x.first_seen <> '' AND x.first_seen >= {:cutoff}");
+  const outerClause = outerWhere.length > 0 ? " WHERE " + outerWhere.join(" AND ") : "";
+
+  const orderBy =
+    sort === "name"
+      ? "x.name COLLATE NOCASE ASC"
+      : sort === "visits"
+        ? "x.visits DESC, x.name ASC"
+        : sort === "spend"
+          ? "CAST(x.spend AS REAL) DESC, x.name ASC"
+          : "x.last_seen DESC, x.name ASC";
+
+  const countParams = Object.assign({}, params);
+  delete countParams.limit;
+  delete countParams.offset;
+
+  const countRow = rows(
+    $app,
+    "SELECT COUNT(*) as n FROM (" + innerSql + ") x" + outerClause,
+    countParams,
+    { n: 0 }
+  )[0];
+
+  const items = rows(
+    $app,
+    "SELECT x.* FROM (" + innerSql + ") x" + outerClause +
+      " ORDER BY " + orderBy + " LIMIT {:limit} OFFSET {:offset}",
+    params,
+    {
+      id: "", name: "", phone: "", avatar: "", tier: "", birthday: "", joined: "",
+      last_seen: "", first_seen: "", visits: 0, spend: "", stamps: 0, goal: 10,
+      points: 0, opt_in: 1, active_vouchers: 0,
+    }
+  ).map(function (r) {
+    const seen = parsePbDate(r.last_seen);
+    return {
+      id: r.id,
+      name: r.name || "Customer",
+      phone: r.phone || "",
+      avatar: r.avatar || "",
+      visits: Number(r.visits) || 0,
+      lastVisit: r.last_seen || null,
+      daysIdle: seen === null ? null : Math.floor((Date.now() - seen) / DAY_MS),
+      spendCents: Math.round((Number(r.spend) || 0) * 100),
+      stamps: Number(r.stamps) || 0,
+      stampGoal: Number(r.goal) || 10,
+      points: Number(r.points) || 0,
+      activeVouchers: Number(r.active_vouchers) || 0,
+      tier: r.tier || "bronze",
+      optInMarketing: Number(r.opt_in) !== 0,
+      joinedAt: r.joined || "",
+    };
+  });
+
+  return {
+    items: items,
+    total: Number(countRow && countRow.n) || 0,
+    page: page,
+    perPage: limit,
+  };
+}
+
+/** One customer's full management record. Returns null when not owned by the merchant. */
+function buildManageCustomerDetail($app, ctx, customerId) {
+  const params = Object.assign({}, bindBase(ctx), { mid: ctx.merchantId, cid: customerId });
+  const cardRow = rows(
+    $app,
+    "SELECT u.id as id, u.name as name, u.phone as phone, u.avatar as avatar, " +
+      "COALESCE(u.tier, 'bronze') as tier, u.birthday as birthday, COALESCE(u.created, '') as joined, " +
+      "c.id as card_id, COALESCE(c.stamps_collected, 0) as stamps, " +
+      "COALESCE(c.points_balance, 0) as points, COALESCE(c.completions, 0) as completions, " +
+      "COALESCE(c.opt_in_marketing, 1) as opt_in, COALESCE(p.name, '') as program_name, " +
+      "COALESCE(p.stamp_goal, 10) as goal, COALESCE(p.enable_stamps, 1) as enable_stamps, " +
+      "COALESCE(p.enable_points, 0) as enable_points " +
+      "FROM loyalty_cards c JOIN users u ON u.id = c.customer " +
+      "LEFT JOIN loyalty_programs p ON p.id = c.program " +
+      "WHERE c.merchant = {:mid} AND c.customer = {:cid} " +
+      "ORDER BY c.created DESC LIMIT 1",
+    params,
+    {
+      id: "", name: "", phone: "", avatar: "", tier: "", birthday: "", joined: "",
+      card_id: "", stamps: 0, points: 0, completions: 0, opt_in: 1,
+      program_name: "", goal: 10, enable_stamps: 1, enable_points: 0,
+    }
+  )[0];
+  if (!cardRow) return null;
+
+  const metrics = rows(
+    $app,
+    "SELECT COUNT(t.id) as visits, CAST(COALESCE(SUM(t.bill_amount), 0) AS TEXT) as spend, " +
+      "IFNULL(MAX(t.created), '') as last_seen " +
+      "FROM transactions t WHERE t.merchant = {:mid} AND t.customer = {:cid} AND t.type <> 'adjust'" +
+      branchClause(ctx, "t.branch"),
+    params,
+    { visits: 0, spend: "", last_seen: "" }
+  )[0] || { visits: 0, spend: "", last_seen: "" };
+
+  const vouchers = rows(
+    $app,
+    "SELECT v.id as id, v.code as code, v.status as status, v.expires_at as expires_at, " +
+      "v.created as created, COALESCE(r.name, 'Reward') as reward_name " +
+      "FROM vouchers v JOIN rewards r ON r.id = v.reward " +
+      "WHERE v.customer = {:cid} AND r.merchant = {:mid} ORDER BY v.created DESC LIMIT 100",
+    { cid: customerId, mid: ctx.merchantId },
+    { id: "", code: "", status: "", expires_at: "", created: "", reward_name: "" }
+  );
+
+  const activity = rows(
+    $app,
+    "SELECT t.id as id, t.type as type, CAST(COALESCE(t.bill_amount, 0) AS TEXT) as bill, " +
+      "COALESCE(t.stamps, 0) as stamps, COALESCE(t.points, 0) as points, t.created as created, " +
+      "COALESCE(s.name, '') as staff_name, COALESCE(b.name, '') as branch_name " +
+      "FROM transactions t LEFT JOIN users s ON s.id = t.staff LEFT JOIN branches b ON b.id = t.branch " +
+      "WHERE t.merchant = {:mid} AND t.customer = {:cid} ORDER BY t.created DESC LIMIT 50",
+    { mid: ctx.merchantId, cid: customerId },
+    { id: "", type: "", bill: "", stamps: 0, points: 0, created: "", staff_name: "", branch_name: "" }
+  );
+
+  const visits = Number(metrics.visits) || 0;
+  const spendCents = Math.round((Number(metrics.spend) || 0) * 100);
+  const lastSeen = parsePbDate(metrics.last_seen);
+
+  return {
+    profile: {
+      id: cardRow.id,
+      name: cardRow.name || "Customer",
+      phone: cardRow.phone || "",
+      avatar: cardRow.avatar || "",
+      tier: cardRow.tier || "bronze",
+      joinedAt: cardRow.joined || "",
+      birthday: cardRow.birthday || null,
+      optInMarketing: Number(cardRow.opt_in) !== 0,
+    },
+    metrics: {
+      visits: visits,
+      spendCents: spendCents,
+      avgSpendCents: visits > 0 ? Math.round(spendCents / visits) : null,
+      lastVisit: metrics.last_seen || null,
+      daysIdle: lastSeen === null ? null : Math.floor((Date.now() - lastSeen) / DAY_MS),
+    },
+    loyalty: {
+      cardId: cardRow.card_id,
+      programName: cardRow.program_name || "",
+      stamps: Number(cardRow.stamps) || 0,
+      stampGoal: Number(cardRow.goal) || 10,
+      completions: Number(cardRow.completions) || 0,
+      points: Number(cardRow.points) || 0,
+      enableStamps: Number(cardRow.enable_stamps) !== 0,
+      enablePoints: Number(cardRow.enable_points) !== 0,
+    },
+    vouchers: vouchers.map(function (v) {
+      return {
+        id: v.id,
+        code: v.code,
+        status: v.status,
+        rewardName: v.reward_name,
+        expiresAt: v.expires_at || null,
+        createdAt: v.created,
+      };
+    }),
+    activity: activity.map(function (a) {
+      return {
+        id: a.id,
+        type: a.type,
+        billCents: Math.round((Number(a.bill) || 0) * 100),
+        stamps: Number(a.stamps) || 0,
+        points: Number(a.points) || 0,
+        createdAt: a.created,
+        staffName: a.staff_name || "",
+        branchName: a.branch_name || "",
+      };
+    }),
+  };
+}
+
 module.exports = {
   buildSnapshot: buildSnapshot,
   buildTransactions: buildTransactions,
+  buildReviews: buildReviews,
   buildAudience: buildAudience,
+  buildManageCustomers: buildManageCustomers,
+  buildManageCustomerDetail: buildManageCustomerDetail,
   localDate: localDate,
   localDateToUtcStart: localDateToUtcStart,
   addDays: addDays,

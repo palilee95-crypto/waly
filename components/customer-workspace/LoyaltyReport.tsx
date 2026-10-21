@@ -64,9 +64,9 @@ export default function LoyaltyReport({ snapshot, periodLabel, onOpenAudience, o
           onPress={() => readyCount > 0 ? onOpenAudience('rewards') : onOpenDirectory()}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={readyCount > 0 ? 'View reward-ready customers' : 'View all customers'}
+          accessibilityLabel={readyCount > 0 ? 'View reward-ready customers' : 'Manage customers'}
         >
-          <Text style={styles.heroActionText}>{readyCount > 0 ? 'View reward-ready customers' : 'View customers'}</Text>
+          <Text style={styles.heroActionText}>{readyCount > 0 ? 'View reward-ready customers' : 'Manage customers'}</Text>
           <Ionicons name="arrow-forward" size={17} color={colors.white} />
         </TouchableOpacity>
         {readyCount > loyalty.nearReward ? (

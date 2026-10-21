@@ -18,6 +18,18 @@ routerAdd("POST", "/api/risev/merchant/customer/update", (e) => {
       return e.json(400, { message: "No merchant profile associated with logged in account." });
     }
 
+    const helper = require(`${__hooks}/customer_manage_helper.js`);
+    let merchant = null;
+    try {
+      merchant = $app.findRecordById("merchants", merchantId);
+    } catch (mErr) {}
+    if (!merchant) {
+      return e.json(404, { message: "Merchant record not found." });
+    }
+    if (!helper.canManageCustomers($app, authRecord, merchant)) {
+      return e.json(403, { message: "You do not have permission to manage customers." });
+    }
+
     const body = e.requestInfo().body || {};
     const customerId = (body.customer_id || body.id || "").trim();
     const newName = (body.name || "").trim();
@@ -25,6 +37,10 @@ routerAdd("POST", "/api/risev/merchant/customer/update", (e) => {
 
     if (!customerId) {
       return e.json(400, { message: "Customer ID is required." });
+    }
+
+    if (!helper.customerBelongsToMerchant($app, merchantId, customerId)) {
+      return e.json(403, { message: "Customer does not belong to this store." });
     }
 
     if (!newName) {

@@ -27,7 +27,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
 
   const currentRoute = state.routes[state.index]?.name;
   // Hide tab bar on sub-screens like subscription paywall, nfc-marketplace, profile onboarding, edit-profile, branches, staff, or rewards
-  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace' || currentRoute === 'profile-onboarding' || currentRoute === 'edit-profile' || currentRoute === 'branches' || currentRoute === 'staff' || currentRoute === 'rewards') {
+  if (currentRoute === 'subscription' || currentRoute === 'nfc-marketplace' || currentRoute === 'profile-onboarding' || currentRoute === 'edit-profile' || currentRoute === 'branches' || currentRoute === 'staff' || currentRoute === 'rewards' || currentRoute === 'manage-customers' || currentRoute === 'customer-detail') {
     return null;
   }
 
@@ -956,7 +956,7 @@ export default function MerchantLayout() {
     );
   }
 
-  const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding') || pathname.includes('edit-profile') || pathname.includes('branches') || pathname.includes('staff');
+  const isFullScreenRoute = pathname.includes('subscription') || pathname.includes('nfc-marketplace') || pathname.includes('profile-onboarding') || pathname.includes('edit-profile') || pathname.includes('branches') || pathname.includes('staff') || pathname.includes('manage-customers') || pathname.includes('customer-detail');
   const compactSupportFab = pathname.includes('customers');
 
   return (
@@ -986,12 +986,14 @@ export default function MerchantLayout() {
         <Tabs.Screen name="onboarding-setup" options={{ href: null }} />
         <Tabs.Screen name="whatsapp-integration" options={{ href: null }} />
         <Tabs.Screen name="bookings" options={{ href: null }} />
+        <Tabs.Screen name="manage-customers" options={{ href: null }} />
+        <Tabs.Screen name="customer-detail" options={{ href: null }} />
       </Tabs>
       <NfcClaimModal />
       <ManualPosLauncher />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && (
+      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && !pathname.includes('manage-customers') && !pathname.includes('customer-detail') && (
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"

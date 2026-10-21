@@ -61,7 +61,7 @@ export default function CustomerWorkspaceScreen() {
 
   // The old standalone activity screen is gone — the directory and audiences live
   // in the workspace's own sheet.
-  const openDirectory = () => setAudienceCard('all');
+  const openDirectory = () => router.push('/(merchant)/manage-customers' as any);
   const goAnalytics = () => router.push('/(merchant)/analytics' as any);
 
   // Share your store: the existing join link, no messaging involved.

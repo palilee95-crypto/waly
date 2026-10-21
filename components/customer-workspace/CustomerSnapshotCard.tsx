@@ -118,9 +118,9 @@ export default function CustomerSnapshotCard({
           onPress={onOpenDirectory}
           activeOpacity={0.75}
           accessibilityRole="button"
-          accessibilityLabel="View all customers"
+          accessibilityLabel="Manage customers"
         >
-          <Text style={styles.directoryText}>View all customers</Text>
+          <Text style={styles.directoryText}>Manage customers</Text>
           <Ionicons name="arrow-forward" size={iconSizes.sm} color={colors.black} />
         </TouchableOpacity>
       ) : null}
