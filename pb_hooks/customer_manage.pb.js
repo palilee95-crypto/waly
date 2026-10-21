@@ -143,13 +143,14 @@ routerAdd("POST", "/api/risev/merchant/customer/stamps-adjust", (e) => {
       tx.set("merchant", merchant.id);
       tx.set("loyalty_card", card.id);
       tx.set("type", "adjust");
-      tx.set("stamps", delta);
+      tx.set("stamps", delta > 0 ? delta : 0);
       tx.set("points", 0);
       tx.set("bill_amount", 0);
       tx.set("metadata", JSON.stringify({
         reason: reason,
         previous: previous,
         next: next,
+        stamp_delta: delta,
         staff_id: e.auth.id,
         source: "manage_customers",
       }));
