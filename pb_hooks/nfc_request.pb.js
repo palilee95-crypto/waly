@@ -466,9 +466,14 @@ routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
     if (!/^[a-z0-9]{15}$/.test(claimId)) return e.json(400, { message: "Invalid claim" });
     const claim = $app.findRecordById("nfc_claims", claimId);
     if (claim.getString("status") !== "completed") return e.json(200, { receipt_id: "", paid_sale: false });
+    // Same canonical form the claim was created with: a customer may type
+    // "+60…", "0…" or just the subscriber number ("126140423"), and all three
+    // must match the stored phone.
     const digits = (value) => {
       let result = String(value || "").replace(/[^\d]/g, "");
+      if (!result) return "";
       if (result.indexOf("0") === 0) result = "6" + result;
+      if (result.indexOf("60") !== 0 && result.length >= 9) result = "60" + result;
       return result;
     };
     const requestedPhone = digits(query.phone);
