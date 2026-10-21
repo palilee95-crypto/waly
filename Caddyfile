@@ -4,6 +4,15 @@
         header_up X-Real-IP {header.CF-Connecting-IP}
     }
 
+    log {
+        # Bounded: 10 MB per file, 5 files, ~50 MB max.
+        output file /data/logs/access.log {
+            roll_size 10MiB
+            roll_keep 5
+        }
+        format json
+    }
+
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
@@ -17,6 +26,14 @@
 {$DOMAIN_API_STAGING} {
     reverse_proxy risev-pocketbase-staging:8090 {
         header_up X-Real-IP {header.CF-Connecting-IP}
+    }
+
+    log {
+        output file /data/logs/access.log {
+            roll_size 10MiB
+            roll_keep 5
+        }
+        format json
     }
 
     header {
