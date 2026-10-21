@@ -45,23 +45,39 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 Invoke-Remote "mkdir -p $remoteDir/pb_hooks $remoteDir/pb_migrations"
 Invoke-Remote "tar czf /root/risev-$Env-backup-$stamp.tgz -C $remoteDir pb_hooks pb_migrations 2>/dev/null || true"
 
-foreach ($dir in @('pb_hooks', 'pb_migrations')) {
-    $files = Get-ChildItem -Path (Join-Path $repo $dir) -File | Where-Object { $_.Extension -in '.js', '.json' }
-    if ($files.Count -eq 0) { throw "No files found in $dir" }
-    Write-Host "  $dir : $($files.Count) file(s)"
-    foreach ($file in $files) {
-        if ($DryRun) {
-            Write-Host "[dry-run] scp $($file.Name) -> ${sshTarget}:$remoteDir/$dir/"
-            continue
+# PocketBase watches pb_hooks and restarts on every changed file, so copying a
+# whole directory into a running container means dozens of restarts. Stop it
+# first, copy, then start once (which also applies any new migrations).
+if ($Restart -and -not $DryRun) {
+    Write-Host "  stopping $container"
+    Invoke-Remote "docker stop $container >/dev/null 2>&1 || true"
+}
+
+try {
+    foreach ($dir in @('pb_hooks', 'pb_migrations')) {
+        $files = Get-ChildItem -Path (Join-Path $repo $dir) -File | Where-Object { $_.Extension -in '.js', '.json' }
+        if ($files.Count -eq 0) { throw "No files found in $dir" }
+        Write-Host "  $dir : $($files.Count) file(s)"
+        foreach ($file in $files) {
+            if ($DryRun) {
+                Write-Host "[dry-run] scp $($file.Name) -> ${sshTarget}:$remoteDir/$dir/"
+                continue
+            }
+            & scp -q -i $IdentityFile -o BatchMode=yes -o StrictHostKeyChecking=accept-new $file.FullName "${sshTarget}:$remoteDir/$dir/"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to copy $($file.Name)" }
         }
-        & scp -q -i $IdentityFile -o BatchMode=yes -o StrictHostKeyChecking=accept-new $file.FullName "${sshTarget}:$remoteDir/$dir/"
-        if ($LASTEXITCODE -ne 0) { throw "Failed to copy $($file.Name)" }
+    }
+} finally {
+    if ($Restart -and -not $DryRun) {
+        Write-Host "  starting $container"
+        Invoke-Remote "docker start $container >/dev/null"
     }
 }
 
-if ($Restart) {
-    Invoke-Remote "cd $remoteDir && docker compose restart pocketbase"
-    Invoke-Remote "docker logs --since 90s $container 2>&1 | grep -E '\[MIGRATION\]|ERROR|Server started' | tail -20"
+if ($Restart -and -not $DryRun) {
+    Start-Sleep -Seconds 6
+    Invoke-Remote "docker logs --since 60s $container 2>&1 | grep -E '\[MIGRATION|ERROR|Server started' | tail -20"
+    Invoke-Remote "docker exec $container wget -qO- http://127.0.0.1:8090/api/health || echo 'health check failed'"
 } else {
     Write-Host 'Files copied. PocketBase hot-reloads hooks; pass -Restart to apply migrations and restart.'
 }
