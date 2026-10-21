@@ -295,7 +295,7 @@ export default function CustomerProfile() {
   };
 
   const handleWhatsAppSupport = () => {
-    Linking.openURL('https://wa.me/601153300472').catch(() => {
+    Linking.openURL('https://wa.me/60104648598').catch(() => {
       Alert.alert('Error', 'Unable to open WhatsApp.');
     });
   };

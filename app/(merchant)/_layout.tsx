@@ -859,7 +859,7 @@ export default function MerchantLayout() {
             style={styles.onboardingInput}
             value={storePhone}
             onChangeText={setStorePhone}
-            placeholder="e.g. +601153300472"
+            placeholder="e.g. 0123456789"
             placeholderTextColor="#9CA3AF"
             keyboardType="phone-pad"
             {...Platform.select({
