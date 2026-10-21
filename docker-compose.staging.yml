@@ -1,0 +1,34 @@
+# Staging PocketBase stack (lives at /opt/risev-staging on the VPS).
+#
+#   cd /opt/risev-staging && docker compose up -d
+#
+# Deliberately has NO SMTP, ChipIn or VAPID credentials and sets PUSH_DISABLED=1:
+# staging runs on a copy of production data and must never message or charge a
+# real customer.
+#
+# IMPORTANT: the service is called `pocketbase-staging`, not `pocketbase`. Both
+# stacks share risev_risev-network, so a duplicate service name makes Docker DNS
+# round-robin between them — that is exactly how production traffic once leaked
+# into staging. Caddy proxies by container name (risev-pocketbase-staging).
+services:
+  pocketbase-staging:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: risev-pocketbase-staging
+    restart: unless-stopped
+    working_dir: /pb
+    mem_limit: 512m
+    cpus: 1.0
+    command: serve --http=0.0.0.0:8090 --dir=/pb/pb_data --hooksDir=/pb/pb_hooks --migrationsDir=/pb/pb_migrations
+    volumes:
+      - ./pb_data:/pb/pb_data
+      - ./pb_hooks:/pb/pb_hooks
+      - ./pb_migrations:/pb/pb_migrations
+    environment:
+      - PUSH_DISABLED=1
+    networks:
+      - risev
+
+networks:
+  risev:
+    external: true
+    name: risev_risev-network
