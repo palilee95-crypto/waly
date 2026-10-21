@@ -10,6 +10,14 @@ function dispatchToPushService(subRecords, payload) {
     return { successCount: 0, failedCount: 0, total: 0 };
   }
 
+  // Staging runs on a copy of production data. A push from there would reach a
+  // real customer's device, so the staging container sets PUSH_DISABLED=1.
+  const pushDisabled = String($os.getenv("PUSH_DISABLED") || "").trim();
+  if (pushDisabled === "1" || pushDisabled.toLowerCase() === "true") {
+    console.log("[PUSH DISABLED] Skipping push dispatch for " + subRecords.length + " subscription(s)");
+    return { successCount: 0, failedCount: 0, total: 0 };
+  }
+
   const subscriptions = subRecords.map(function(s) {
     return {
       id: s.id,

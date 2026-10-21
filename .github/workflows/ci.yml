@@ -1,0 +1,52 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # PocketBase hooks/migrations run in the JSVM, so they cannot be executed
+      # here — but a syntax error takes the backend down on restart, and this
+      # catches it before a deploy.
+      - name: PocketBase hook syntax
+        shell: bash
+        run: |
+          set -e
+          failed=0
+          for f in pb_hooks/*.js pb_migrations/*.js; do
+            [ -e "$f" ] || continue
+            if ! node --check "$f"; then
+              echo "::error file=$f::Syntax error"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Web + PWA export
+        run: npm run build:web
+        env:
+          EXPO_PUBLIC_APP_ENV: staging
+          EXPO_PUBLIC_PB_URL: https://staging-api.risev.app
+          EXPO_PUBLIC_REQUIRE_PB_URL: '1'

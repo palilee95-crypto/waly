@@ -1,6 +1,8 @@
 # API PocketBase Reverse Proxy
 {$DOMAIN_API} {
-    reverse_proxy pocketbase:8090
+    reverse_proxy pocketbase:8090 {
+        header_up X-Real-IP {header.CF-Connecting-IP}
+    }
 
     header {
         X-Content-Type-Options nosniff
@@ -9,4 +11,17 @@
     }
 }
 
+# Staging API — same rules, disposable database (/opt/risev-staging).
+# Caddy reads DOMAIN_API_STAGING at start; after changing it run
+# `docker compose up -d caddy`.
+{$DOMAIN_API_STAGING} {
+    reverse_proxy risev-pocketbase-staging:8090 {
+        header_up X-Real-IP {header.CF-Connecting-IP}
+    }
 
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+}

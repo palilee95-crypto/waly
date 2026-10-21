@@ -16,6 +16,9 @@ services:
       - caddy_config:/config
     environment:
       - DOMAIN_API=${DOMAIN_API}
+      # Staging API host (served by the risev-pocketbase-staging container).
+      # Caddy reads env at start, so a change here needs `docker compose up -d caddy`.
+      - DOMAIN_API_STAGING=${DOMAIN_API_STAGING}
     depends_on:
       - pocketbase
     networks:
