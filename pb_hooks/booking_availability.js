@@ -45,29 +45,30 @@ function durationMinutes(booking) {
   return total > 0 ? total : 30;
 }
 
-// The first active booking that overlaps the requested window for this staff
-// member, or null. Overlap, not equality: a 90-minute service blocks the slots
-// its duration covers.
+// The turnaround booking creation reserves after every appointment. Conflict
+// windows use it on both sides: an existing visit occupies its service time
+// plus this buffer, and callers pass the requested slot's buffered end.
+var TURNAROUND_MINUTES = 10;
+
+// The first active booking whose buffered window overlaps the requested
+// buffered window for this staff member. A `null` result means the query ran
+// and found no overlap; a failed query throws, so callers cannot mistake an
+// unverified slot for a free one.
 function findStaffConflict(merchantId, staffId, date, startMinutes, endMinutes, excludeId) {
   if (!staffId) return null;
-  var records = [];
-  try {
-    records = $app.findRecordsByFilter(
-      "service_bookings",
-      "merchant = '" + merchantId + "' && staff = '" + staffId + "' && booking_date ~ '" + date + "' && (status = 'booked' || status = 'arrived' || status = 'in_service')",
-      "start_time",
-      200,
-      0
-    );
-  } catch (err) {
-    return null;
-  }
+  var records = $app.findRecordsByFilter(
+    "service_bookings",
+    "merchant = '" + merchantId + "' && staff = '" + staffId + "' && booking_date ~ '" + date + "' && (status = 'booked' || status = 'arrived' || status = 'in_service')",
+    "start_time",
+    200,
+    0
+  );
   for (var i = 0; i < records.length; i++) {
     var rec = records[i];
     if (excludeId && rec.id === excludeId) continue;
     var otherStart = toMinutes(rec.getString("start_time"));
     if (!otherStart) continue;
-    var otherEnd = otherStart + durationMinutes(rec);
+    var otherEnd = otherStart + durationMinutes(rec) + TURNAROUND_MINUTES;
     if (startMinutes < otherEnd && otherStart < endMinutes) return rec;
   }
   return null;

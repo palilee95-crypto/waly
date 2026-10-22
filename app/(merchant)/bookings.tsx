@@ -960,6 +960,8 @@ export default function BookingsScreen() {
         BOOKING_SLOT_PAST: 'That slot is in the past.',
         BOOKING_NOT_ACTIVE: 'This booking can no longer be moved.',
         BOOKING_STAFF_INVALID: 'That provider is not available for this store.',
+        BOOKING_STAFF_UNAVAILABLE: 'That provider is inactive or on leave. Choose another provider.',
+        BOOKING_AVAILABILITY_UNAVAILABLE: 'Could not verify provider availability. Please try again.',
         BOOKING_TIME_INVALID: 'Choose a valid time slot.',
         BOOKING_DATE_INVALID: 'Choose a valid date.',
       };

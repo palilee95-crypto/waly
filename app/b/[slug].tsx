@@ -394,7 +394,10 @@ export default function CustomerBookingPwaScreen() {
   const [lookupStatus, setLookupStatus] = useState<'idle' | 'checking' | 'known' | 'unknown'>('idle');
   const [resolvedName, setResolvedName] = useState('');
   const [nameOverride, setNameOverride] = useState(false);
-  const resolvedNameRef = useRef('');
+  // Digits of the phone the current name belongs to — whether it came from a
+  // session, a URL, the cache, a lookup or was typed. A name is dropped as soon
+  // as the phone changes to a different number.
+  const nameOwnerPhoneRef = useRef('');
   const [profileTab, setProfileTab] = useState<'Services' | 'Reviews' | 'About'>('Services');
 
   // Post-booking state
@@ -1002,7 +1005,7 @@ export default function CustomerBookingPwaScreen() {
         if (cancelled) return;
         const resolved = res && res.exists ? String(res.name || '').trim() : '';
         if (resolved) {
-          resolvedNameRef.current = resolved;
+          nameOwnerPhoneRef.current = digits;
           setResolvedName(resolved);
           setLookupStatus('known');
           setCustomerName((prev) => (prev.trim() ? prev : resolved));
@@ -1108,10 +1111,12 @@ export default function CustomerBookingPwaScreen() {
       if (qName) {
         setCustomerName(qName);
         setNameOverride(true);
+        nameOwnerPhoneRef.current = phone.replace(/[^\d]/g, '');
         return;
       }
       if (session.name) {
         setCustomerName(session.name);
+        nameOwnerPhoneRef.current = phone.replace(/[^\d]/g, '');
         return;
       }
 
@@ -1122,7 +1127,7 @@ export default function CustomerBookingPwaScreen() {
         const digits = phone.replace(/[^\d]/g, '');
         if (cached?.name && digits && String(cached.phone || '') === digits) {
           setCustomerName(String(cached.name));
-          resolvedNameRef.current = String(cached.name);
+          nameOwnerPhoneRef.current = digits;
           setResolvedName(String(cached.name));
           setLookupStatus('known');
         }
@@ -3180,11 +3185,16 @@ export default function CustomerBookingPwaScreen() {
                   value={customerPhone}
                   onChangeText={(text) => {
                     setCustomerPhone(text);
-                    // A name resolved for the previous number does not belong to
-                    // this one; a name the customer typed themselves stays.
-                    setCustomerName((prev) => (resolvedNameRef.current && prev === resolvedNameRef.current ? '' : prev));
-                    resolvedNameRef.current = '';
-                    setResolvedName('');
+                    const nextDigits = text.replace(/[^\d]/g, '');
+                    // Drop a name that belongs to the previous number (session,
+                    // URL, cached, lookup or typed). A different number is a
+                    // different person until the lookup says otherwise.
+                    if (nameOwnerPhoneRef.current && nameOwnerPhoneRef.current !== nextDigits) {
+                      setCustomerName('');
+                      setNameOverride(false);
+                      nameOwnerPhoneRef.current = '';
+                      setResolvedName('');
+                    }
                   }}
                   autoFocus
                 />
@@ -3238,7 +3248,11 @@ export default function CustomerBookingPwaScreen() {
                     placeholder={locale === 'ms' ? 'Masukkan nama penuh anda' : 'Enter your full name'}
                     placeholderTextColor={themeStyles.textMutedColor}
                     value={customerName}
-                    onChangeText={setCustomerName}
+                    onChangeText={(text) => {
+                      setCustomerName(text);
+                      // A typed name belongs to the number on screen now.
+                      nameOwnerPhoneRef.current = customerPhone.replace(/[^\d]/g, '');
+                    }}
                   />
                 </View>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.45)', marginTop: 6 }}>

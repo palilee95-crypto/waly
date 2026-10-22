@@ -622,19 +622,59 @@ routerAdd("POST", "/api/risev/merchant/booking-reschedule", (e) => {
     const staffId = String(data.staff_id !== undefined && data.staff_id !== null
       ? data.staff_id
       : booking.getString("staff")).trim();
+    // Same provider checks booking creation applies. They run for the retained
+    // provider too, because the assignment is moving to a new slot.
     if (staffId) {
-      let staffOk = false;
+      let staffRecord = null;
       try {
-        staffOk = $app.findRecordById("merchant_staff", staffId).getString("merchant") === merchantId;
-      } catch (staffErr) {}
-      if (!staffOk) {
+        staffRecord = $app.findRecordById("merchant_staff", staffId);
+      } catch (staffErr) {
+        staffRecord = null;
+      }
+      if (!staffRecord || staffRecord.getString("merchant") !== merchantId) {
         return e.json(400, { code: "BOOKING_STAFF_INVALID", message: "That provider is not available for this store." });
+      }
+
+      let unavailableName = "";
+      if (staffRecord.get("is_active") === false || staffRecord.getString("attendance_status") === "on_leave") {
+        unavailableName = staffRecord.getString("name") || "This provider";
+      } else {
+        const staffUserId = staffRecord.getString("user");
+        if (staffUserId) {
+          try {
+            const staffUser = $app.findRecordById("users", staffUserId);
+            if (staffUser.getString("attendance_status") === "on_leave") {
+              unavailableName = staffUser.getString("name") || unavailableName;
+            }
+          } catch (staffUserErr) {}
+        }
+      }
+      if (unavailableName) {
+        return e.json(409, {
+          code: "BOOKING_STAFF_UNAVAILABLE",
+          message: unavailableName + " is inactive or on leave. Choose another provider.",
+        });
       }
     }
 
+    // `end_time` is the service end; the conflict window adds the same
+    // turnaround booking creation reserves (booking_system onRecordCreate).
+    const TURNAROUND_MINUTES = 10;
     const duration = availability.durationMinutes(booking);
-    const endMinutes = startMinutes + Math.max(15, duration);
-    const conflict = availability.findStaffConflict(merchantId, staffId, bookingDate, startMinutes, endMinutes, bookingId);
+    const serviceEndMinutes = startMinutes + duration;
+    const slotEndMinutes = serviceEndMinutes + TURNAROUND_MINUTES;
+
+    let conflict = null;
+    try {
+      conflict = availability.findStaffConflict(merchantId, staffId, bookingDate, startMinutes, slotEndMinutes, bookingId);
+    } catch (availabilityErr) {
+      // Never treat an unverified slot as free.
+      console.log("[BOOKING RESCHEDULE] availability query failed:", availabilityErr.message || availabilityErr);
+      return e.json(500, {
+        code: "BOOKING_AVAILABILITY_UNAVAILABLE",
+        message: "Could not verify provider availability. Please try again.",
+      });
+    }
     if (conflict) {
       return e.json(409, {
         code: "BOOKING_SLOT_TAKEN",
@@ -665,7 +705,7 @@ routerAdd("POST", "/api/risev/merchant/booking-reschedule", (e) => {
 
     booking.set("booking_date", bookingDate);
     booking.set("start_time", startTime);
-    booking.set("end_time", availability.formatMinutes(endMinutes));
+    booking.set("end_time", availability.formatMinutes(serviceEndMinutes));
     booking.set("staff", staffId || null);
     existingMeta.change_log = changeLog;
     booking.set("metadata", existingMeta);
