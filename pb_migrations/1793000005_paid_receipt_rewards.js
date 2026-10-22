@@ -24,7 +24,11 @@ migrate((app) => {
       console.log("[MIGRATION 1793000005] Added reward progress columns to digital_receipts");
     }
   } catch (err) {
+    // Do not swallow: the receipt writers below depend on these columns, and a
+    // silent skip would make every reward snapshot vanish (unknown fields are
+    // dropped without an error). Failing here is loud and fixable.
     console.log("[MIGRATION 1793000005 ERROR]", err.message || err);
+    throw err;
   }
 }, (app) => {
   try {

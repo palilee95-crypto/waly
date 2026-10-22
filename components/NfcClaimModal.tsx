@@ -860,6 +860,10 @@ export default function NfcClaimModal() {
         handleClose();
         return;
       }
+      // Release the "this claim is being completed" latch: left set, it makes the
+      // poll and the SSE handler ignore the next customer's claim until this one
+      // is closed.
+      localCompletionRef.current = false;
       setErrorMsg(err?.message || 'Failed to issue stamps.');
     } finally {
       setIsLoading(false);
@@ -997,6 +1001,10 @@ export default function NfcClaimModal() {
         handleClose();
         return;
       }
+      // Release the "this claim is being completed" latch: left set, it makes the
+      // poll and the SSE handler ignore the next customer's claim until this one
+      // is closed.
+      localCompletionRef.current = false;
       setErrorMsg(err?.message || 'Failed to issue stamps.');
     } finally {
       setIsLoading(false);
@@ -1048,6 +1056,9 @@ export default function NfcClaimModal() {
   };
 
   const handleMinimize = () => {
+    // Minimizing means the cashier is not completing this claim right now, so the
+    // completion latch must be released or the next claim is ignored.
+    localCompletionRef.current = false;
     // If the active claim is already completed or cancelled, dismiss it completely instead of keeping banner
     if (!claim || claim.status !== 'pending') {
       handleClose();

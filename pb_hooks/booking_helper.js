@@ -587,6 +587,23 @@ function processCompletedBooking(rec) {
       digitalReceipt.set("payment_reference", receiptMeta.payment_reference || "");
       digitalReceipt.set("payment_status", receiptMeta.pos_claim_id ? "paid" : "recorded");
       digitalReceipt.set("stamps_earned", stampsToAward);
+      // Reward snapshot, same shape as paid_receipt_helper: without it the receipt
+      // screen falls back to the card's live balance, which drifts after every
+      // later visit. A card that completed during this booking was reset to 0, so
+      // the receipt shows the balance the visit actually reached (goal).
+      try {
+        if (loyaltyCard) {
+          var receiptGoal = Math.max(1, Number(program && program.get && program.get("stamp_goal")) || 10);
+          var liveBalance = Math.max(0, Number(loyaltyCard.get("stamps_collected")) || 0);
+          var completedCard = stampsToAward > 0 && liveBalance < stampsToAward;
+          digitalReceipt.set("stamp_goal", receiptGoal);
+          digitalReceipt.set("stamps_before", completedCard
+            ? Math.max(0, receiptGoal - stampsToAward)
+            : Math.max(0, liveBalance - stampsToAward));
+          digitalReceipt.set("stamps_balance", completedCard ? receiptGoal : liveBalance);
+          digitalReceipt.set("reward_name", String((program && program.getString && program.getString("reward_name")) || "").slice(0, 120));
+        }
+      } catch (snapshotErr) {}
       $app.save(digitalReceipt);
       console.log("[BOOKING COMPLETE] Digital receipt generated: " + receiptCode);
     }

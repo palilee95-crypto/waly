@@ -337,3 +337,100 @@ onRecordUpdate((e) => {
 
   return e.next();
 }, 'vouchers');
+
+// -------------------------------------------------------------
+// 2. Merchant / staff voucher PREVIEW (read-only)
+// -------------------------------------------------------------
+// The vouchers collection is not readable by staff, so the counter previously
+// fell back to a code-only review with no reward or customer. This route performs
+// the same auth and ownership checks as redeem, then returns only what the review
+// sheet shows.
+routerAdd("GET", "/api/risev/merchant/vouchers/preview", (e) => {
+  try {
+    const authRecord = e.auth;
+    if (!authRecord) {
+      return e.json(401, { success: false, message: "Unauthorized. Merchant login required." });
+    }
+    const authRole = authRecord.getString("role");
+    if (authRole !== "merchant" && authRole !== "both") {
+      return e.json(403, { success: false, message: "Forbidden. Merchant or staff access required." });
+    }
+
+    let merchantId = authRecord.getString("merchant_id");
+    if (!merchantId) {
+      try {
+        const owned = $app.findRecordsByFilter("merchants", `owner = "${authRecord.id}"`, "-created", 1, 0);
+        if (owned.length > 0) merchantId = owned[0].id;
+      } catch (ownedErr) {}
+    }
+    if (!merchantId) {
+      return e.json(400, { success: false, message: "Account is not associated with any merchant store." });
+    }
+
+    const query = (e.requestInfo() && e.requestInfo().query) || {};
+    let rawCode = String(query.code || "").trim();
+    if (rawCode.includes("?code=")) rawCode = rawCode.split("?code=")[1].split("&")[0];
+    else if (rawCode.includes("/")) rawCode = rawCode.substring(rawCode.lastIndexOf("/") + 1);
+    const cleanCode = rawCode.trim().toUpperCase();
+
+    // A scanned payload is never interpolated into a filter.
+    if (!/^[A-Z0-9-]{4,32}$/.test(cleanCode)) {
+      return e.json(400, { success: false, message: "That does not look like a voucher code." });
+    }
+
+    const vouchers = $app.findRecordsByFilter("vouchers", `code = "${cleanCode}"`, "-created", 1, 0);
+    if (!vouchers || vouchers.length === 0) {
+      return e.json(404, { success: false, message: "Voucher code not found." });
+    }
+    const voucher = vouchers[0];
+
+    // Ownership: voucher.merchant, else its reward's merchant, else metadata.
+    let voucherMerchantId = voucher.getString("merchant");
+    let rewardName = voucher.getString("title") || "";
+    const rewardId = voucher.getString("reward");
+    if (rewardId) {
+      try {
+        const reward = $app.findRecordById("rewards", rewardId);
+        if (!voucherMerchantId) voucherMerchantId = reward.getString("merchant");
+        rewardName = reward.getString("title") || reward.getString("name") || rewardName;
+      } catch (rewardErr) {}
+    }
+    if (!voucherMerchantId) {
+      try {
+        const rawMeta = voucher.getString("metadata");
+        const parsedMeta = rawMeta && rawMeta !== "null" ? JSON.parse(rawMeta) : null;
+        if (parsedMeta && parsedMeta.merchant_id) voucherMerchantId = parsedMeta.merchant_id;
+      } catch (metaErr) {}
+    }
+    if (voucherMerchantId && voucherMerchantId !== merchantId) {
+      return e.json(403, { success: false, message: "That voucher belongs to another store." });
+    }
+
+    let customerName = voucher.getString("customer_name") || "";
+    const customerId = voucher.getString("customer");
+    if (customerId) {
+      try {
+        customerName = $app.findRecordById("users", customerId).getString("name") || customerName;
+      } catch (custErr) {}
+    }
+
+    return e.json(200, {
+      success: true,
+      voucher: {
+        id: voucher.id,
+        code: voucher.getString("code"),
+        status: voucher.getString("status"),
+        expires_at: voucher.getString("expires_at"),
+        title: rewardName,
+        customer_name: customerName,
+        expand: {
+          reward: { name: rewardName },
+          customer: { name: customerName }
+        }
+      }
+    });
+  } catch (err) {
+    console.log("[VOUCHER PREVIEW ERROR]", err.message || err);
+    return e.json(500, { success: false, message: "Could not load that voucher." });
+  }
+});

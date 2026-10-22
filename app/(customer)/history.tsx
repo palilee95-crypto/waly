@@ -80,24 +80,24 @@ export default function StampHistoryScreen() {
     const bill = Number(item.bill_amount) || 0;
     const hasVoucher = Boolean(meta.voucher_id || meta.voucher_code || Number(meta.discount_amount) > 0);
     if (bill > 0 || hasVoucher) {
+      // Prefer the server-owned receipt, but never block the loyalty receipt that
+      // the fallback below builds: manual sales write a "recorded" row that this
+      // route only reports once it is paid, and older transactions have no row at
+      // all. A failed lookup must not turn into a dead-end error.
       try {
         const match = await pb.send<{ receipt_id?: string }>('/api/risev/customer/transaction-receipt', {
           method: 'GET', params: { transaction_id: item.id }, requestKey: null,
         });
-        if (match.receipt_id) {
+        if (match?.receipt_id) {
           router.push({ pathname: '/b/receipt/[id]', params: { id: match.receipt_id } });
           return;
         }
       } catch (error) {
-        setReceiptError('Could not load this transaction’s receipt. Please try again.');
-        return;
+        console.warn('Receipt lookup failed, using the loyalty receipt instead:', error);
       }
-      setReceiptError('A recorded receipt is not available for this transaction yet.');
-      return;
     }
     const card = item.expand?.loyalty_card;
     const program = card?.expand?.program;
-    const cardBalance = Number(card?.stamps_collected);
     const items = Array.isArray(meta.items) && meta.items.length
       ? meta.items.map((line: any) => ({
           name: String(line.name || 'Item'),
@@ -127,9 +127,16 @@ export default function StampHistoryScreen() {
       payment_method: bill > 0 ? String(meta.payment_method || 'cash') : hasVoucher ? 'Voucher' : 'Loyalty',
       payment_status: bill > 0 || hasVoucher ? 'paid' : 'issued',
       stamps_earned: item.stamps || 0,
-      stamps_balance: Number.isFinite(cardBalance) ? Math.max(0, cardBalance) : (item.stamps || 0),
+      // Never show the card's CURRENT balance for an old visit: it has moved on
+      // (or been reset) since. Use a recorded snapshot when the ledger carries
+      // one, otherwise show only what this visit earned.
+      stamps_balance: (() => {
+        const snapshot = Number(meta.stamps_balance ?? meta.stamps_after);
+        if (Number.isFinite(snapshot) && snapshot >= 0) return snapshot;
+        return Math.max(0, Number(item.stamps) || 0);
+      })(),
       stamp_goal: Math.max(1, Number(program?.stamp_goal) || 10),
-      reward_name: program?.name || '',
+      reward_name: (program as any)?.reward_name || program?.name || '',
       expand: { merchant: item.expand?.merchant },
     };
     setSelectedReceipt(receipt);

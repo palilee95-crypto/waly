@@ -216,7 +216,15 @@ export default function GiveStampsScreen() {
   // responses from a previous phone number out of the form.
   useEffect(() => {
     const rawDigits = phoneInput.replace(/\D/g, '');
-    const complete = rawDigits.length >= 9 && (!rawDigits.startsWith('11') || rawDigits.length === 10);
+    // Mirror the server's canonical form: 0… and bare numbers both become 60…,
+    // then the subscriber must start with 1. Without this, a 9–10 digit number
+    // like "234567890" triggers a lookup the backend answers with 400, leaving a
+    // Retry button that can never succeed.
+    let canonical = rawDigits;
+    if (canonical.startsWith('0')) canonical = '6' + canonical;
+    if (!canonical.startsWith('60')) canonical = '60' + canonical;
+    const subscriber = canonical.slice(2);
+    const complete = /^1\d{8,9}$/.test(subscriber) && (!subscriber.startsWith('11') || subscriber.length === 10);
     if (!complete) {
       setExistingCustomer(null);
       setCustomerLookup('idle');
@@ -329,15 +337,19 @@ export default function GiveStampsScreen() {
     setVoucherError('');
     setPendingVoucher({ code: clean, loading: true });
     try {
-      const voucher = await pb.collection('vouchers').getFirstListItem(`code = '${clean}'`, {
-        expand: 'reward,customer',
-        requestKey: null,
-      });
-      setPendingVoucher({ code: clean, voucher });
-    } catch (lookupErr) {
-      // The server remains authoritative on redemption; still let the cashier
-      // review the code when the read-only lookup is restricted.
+      // Server-side preview: staff cannot read the vouchers collection, and a
+      // scanned payload must never be interpolated into a client filter.
+      const res = await pb.send<{ success: boolean; voucher?: any; message?: string }>(
+        '/api/risev/merchant/vouchers/preview',
+        { method: 'GET', params: { code: clean }, requestKey: null }
+      );
+      setPendingVoucher({ code: clean, voucher: res?.voucher });
+    } catch (lookupErr: any) {
+      // Redemption stays authoritative on the server; surface why the details are
+      // missing instead of silently showing a code-only review.
       setPendingVoucher({ code: clean });
+      const message = lookupErr?.response?.message || lookupErr?.message;
+      if (message) setVoucherError(String(message));
     }
   };
 
@@ -1205,7 +1217,7 @@ export default function GiveStampsScreen() {
             <TouchableOpacity
               style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
               onPress={() => pendingVoucher && executeRedemption(pendingVoucher.code)}
-              disabled={isRedeemingVoucher}
+              disabled={isRedeemingVoucher || !!pendingVoucher?.loading}
               activeOpacity={0.85}
             >
               {isRedeemingVoucher ? (
