@@ -1147,13 +1147,25 @@ export default function NfcLandingScreen() {
     let attempts = 0;
     const load = async () => {
       try {
-        const match = await pb.send<{ receipt_id?: string; paid_sale?: boolean }>('/api/risev/nfc/receipt', {
+        const match = await pb.send<{ receipt_id?: string; share_token?: string; paid_sale?: boolean }>('/api/risev/nfc/receipt', {
           method: 'GET', params: { claim_id: activeClaimId, phone }, requestKey: null,
         });
         if (!cancelled && match.paid_sale) setReceiptExpected(true);
-        if (match.receipt_id) {
-          const saved = await pb.collection('digital_receipts').getOne(match.receipt_id, { expand: 'merchant', requestKey: null });
-          if (!cancelled && saved.payment_status === 'paid') { setReceiptData(saved); return; }
+        // Guests cannot read the collection any more: the token route returns the
+        // receipt's own fields, without the customer's phone or account ids.
+        if (match.share_token) {
+          const res = await pb.send<{ receipt?: any }>('/api/risev/receipt/public', {
+            method: 'GET', params: { token: match.share_token }, requestKey: null,
+          });
+          const saved = res?.receipt;
+          if (!cancelled && saved && saved.payment_status === 'paid') {
+            setReceiptData({
+              ...saved,
+              id: match.receipt_id || match.share_token,
+              expand: { merchant: { name: saved.merchant_name || '' } },
+            });
+            return;
+          }
         }
       } catch (error) { /* The purchase may not have produced a paid receipt. */ }
       if (!cancelled && ++attempts < 6) timer = setTimeout(load, 1500);

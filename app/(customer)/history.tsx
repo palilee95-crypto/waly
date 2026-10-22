@@ -85,11 +85,12 @@ export default function StampHistoryScreen() {
       // route only reports once it is paid, and older transactions have no row at
       // all. A failed lookup must not turn into a dead-end error.
       try {
-        const match = await pb.send<{ receipt_id?: string }>('/api/risev/customer/transaction-receipt', {
+        const match = await pb.send<{ receipt_id?: string; share_token?: string }>('/api/risev/customer/transaction-receipt', {
           method: 'GET', params: { transaction_id: item.id }, requestKey: null,
         });
-        if (match?.receipt_id) {
-          router.push({ pathname: '/b/receipt/[id]', params: { id: match.receipt_id } });
+        // The public page reads by share token; the record id is no longer public.
+        if (match?.share_token) {
+          router.push({ pathname: '/b/receipt/[id]', params: { id: match.share_token } });
           return;
         }
       } catch (error) {

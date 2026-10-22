@@ -304,6 +304,7 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
         receipt.set("payment_method", "Manual entry");
         receipt.set("payment_status", "recorded");
         receipt.set("stamps_earned", actualStampsToAward);
+        receipt.set("share_token", $security.randomString(24));
         receipt.set("stamps_before", currentStamps);
         receipt.set("stamps_balance", totalStamps);
         receipt.set("stamp_goal", goal);

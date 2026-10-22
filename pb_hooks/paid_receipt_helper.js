@@ -135,6 +135,8 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   receipt.set("payment_reference", String(source.payment_reference || "").slice(0, 120));
   receipt.set("payment_status", "paid");
   receipt.set("stamps_earned", Number(txn.get("stamps")) || 0);
+  // Public receipt links carry this token instead of the record id.
+  receipt.set("share_token", $security.randomString(24));
   try {
     const cardId = txn.getString("loyalty_card");
     if (cardId) {

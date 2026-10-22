@@ -25,6 +25,8 @@ export type PaidReceipt = {
   stamps_balance?: number;
   stamp_goal?: number;
   reward_name?: string;
+  // Unguessable token behind the public receipt link (the record id is private).
+  share_token?: string;
   expand?: { merchant?: { name?: string; store_name?: string; logo?: string; collectionName?: string; id?: string } };
 };
 

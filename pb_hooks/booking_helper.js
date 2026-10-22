@@ -587,6 +587,7 @@ function processCompletedBooking(rec) {
       digitalReceipt.set("payment_reference", receiptMeta.payment_reference || "");
       digitalReceipt.set("payment_status", receiptMeta.pos_claim_id ? "paid" : "recorded");
       digitalReceipt.set("stamps_earned", stampsToAward);
+      digitalReceipt.set("share_token", $security.randomString(24));
       // Reward snapshot, same shape as paid_receipt_helper: without it the receipt
       // screen falls back to the card's live balance, which drifts after every
       // later visit. A card that completed during this booking was reset to 0, so
