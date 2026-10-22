@@ -60,14 +60,20 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
     // so the screen falls back to the card instead of rendering "0/10".
     const goal = numberOrZero("stamp_goal");
 
+    // The ledger relation is internal. The shared slip only needs a short,
+    // stable reference for its "Transaction" row, computed the same way the
+    // merchant slip derives it from the record.
+    const transactionRef = String(receipt.getString("transaction") || "")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .slice(-8)
+      .toUpperCase();
+
     return e.json(200, {
       receipt: {
         receipt_number: receipt.getString("receipt_number"),
         created: receipt.getString("created"),
-        // The merchant slip prints the ledger reference and the payment
-        // reference; the shared slip must carry the same rows or the two PDFs
-        // stop matching. Both belong to the sale the token already unlocks.
-        transaction: receipt.getString("transaction"),
+        // A display reference, never the raw transaction id.
+        transaction_reference: transactionRef,
         merchant_name: merchantName,
         // A logo is public branding (the Explore page shows it), and the receipt
         // PDF draws it, so the id and file name travel with the payload.

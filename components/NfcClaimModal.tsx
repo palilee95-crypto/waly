@@ -232,6 +232,9 @@ export default function NfcClaimModal() {
   // Which claim the applied/placeholder voucher belongs to. A new claim must
   // start with no voucher, even if the last one resolved to a real record.
   const appliedVoucherClaimRef = React.useRef<string>('');
+  // The cashier explicitly removed this claim's voucher. Honour that even when
+  // the claim's own lookup is still in flight and resolves afterwards.
+  const voucherDeselectedRef = React.useRef(false);
   const [isVouchersExpanded, setIsVouchersExpanded] = useState<boolean>(false);
   const [customBillInput, setCustomBillInput] = useState<string>('20');
   const [subtotalAmount, setSubtotalAmount] = useState<number>(20);
@@ -285,6 +288,7 @@ export default function NfcClaimModal() {
       }
       const oldClaimId = claim._local_pos_draft ? '' : claim.id;
       setClaim(nextClaim);
+      voucherDeselectedRef.current = false;
       setAppliedVoucher(null);
       setCustomerVouchers([]);
       setPosCustomerStep(false);
@@ -490,6 +494,7 @@ export default function NfcClaimModal() {
     // *current* selection).
     if (appliedVoucherClaimRef.current !== effectClaimId) {
       appliedVoucherClaimRef.current = effectClaimId;
+      voucherDeselectedRef.current = false;
       setAppliedVoucher(null);
     }
 
@@ -519,7 +524,7 @@ export default function NfcClaimModal() {
     // Every asynchronous write goes through here: a lookup that resolves after
     // the active claim changed must not repaint the modal with the old voucher.
     const applyVoucherForClaim = (next: any) => {
-      if (!active) return;
+      if (!active || voucherDeselectedRef.current) return;
       setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : next));
     };
 
@@ -857,6 +862,7 @@ export default function NfcClaimModal() {
           setCheckoutStep('review');
           setCustomBillInput('0');
           setSelectedServices([]);
+          voucherDeselectedRef.current = false;
           setAppliedVoucher(null);
           setCustomerVouchers([]);
           setPaymentFromPos(false);
@@ -1141,6 +1147,7 @@ export default function NfcClaimModal() {
     setErrorMsg(null);
     setBillAmount('20');
     setCustomBillInput('20');
+    voucherDeselectedRef.current = false;
     setAppliedVoucher(null);
     setStampAmount('1');
     setSelectedServices([]);
@@ -1757,7 +1764,7 @@ export default function NfcClaimModal() {
                         try { meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {}); } catch {}
                         const selected = appliedVoucher?.id === v.id;
                         const issue = getVoucherIssue(v);
-                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }, issue && { opacity: 0.6 }]} onPress={() => { if (issue) { Alert.alert(locale === 'ms' ? 'Baucar tidak sah' : 'Voucher unavailable', issue); return; } setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
+                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }, issue && { opacity: 0.6 }]} onPress={() => { if (issue) { Alert.alert(locale === 'ms' ? 'Baucar tidak sah' : 'Voucher unavailable', issue); return; } voucherDeselectedRef.current = selected; setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.compactLabel}>{meta.snapshot_title || v.expand?.reward?.name || v.code}</Text>
                             <Text style={styles.compactMuted}>{v.code}</Text>
@@ -1845,7 +1852,7 @@ export default function NfcClaimModal() {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color="#64748B" />
                       </TouchableOpacity>
-                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => setAppliedVoucher(null)}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
+                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => { voucherDeselectedRef.current = true; setAppliedVoucher(null); }}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
                     </View>
                     <View style={styles.compactLine}>
                       <Text style={styles.compactLabel}>{locale === 'ms' ? 'Cop diberikan' : 'Stamps to give'}</Text>

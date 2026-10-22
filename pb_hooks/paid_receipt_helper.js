@@ -130,6 +130,10 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
     if (!voucherTitle) voucherTitle = "Voucher redemption";
   }
 
+  // The declared discount is what the client says the voucher took off. Only a
+  // voucher that actually applied may also derive it from subtotal − total.
+  const declaredDiscount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+
   const items = rawItems.slice(0, 100).map(function (item) {
     return {
       name: String(item.name || "Item").slice(0, 120),
@@ -140,10 +144,13 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
     return item.name;
   });
   if (!items.length) {
-    if (voucherApplied) {
+    // A voucher that covers the whole bill stands in for the sale; a partial
+    // voucher still leaves a counter payment for the balance, with the voucher
+    // shown separately as the discount.
+    if (voucherApplied && amount <= 0) {
       items.push({ name: voucherTitle, qty: 1, price: voucherValue });
     } else {
-      items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount });
+      items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount + declaredDiscount });
     }
   }
   const subtotal = Math.max(
@@ -153,11 +160,12 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
         return sum + item.price * item.qty;
       }, 0)
   );
-  // The discount is what the voucher took off. Deriving it from subtotal − total
-  // as a floor keeps a fully covered slip internally consistent: a RM20 reward
-  // on a RM20 bill reads subtotal RM20.00, discount −RM20.00, total RM0.00.
-  const declaredDiscount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
-  const discount = Math.max(declaredDiscount, Math.min(subtotal, Math.max(0, subtotal - amount)));
+  // Deriving subtotal − total as a floor keeps a fully covered slip internally
+  // consistent (RM20 item − RM20 voucher = RM0.00), but only when a voucher was
+  // applied — otherwise it would print a "Voucher discount" with no voucher.
+  const discount = voucherApplied
+    ? Math.max(declaredDiscount, Math.min(subtotal, Math.max(0, subtotal - amount)))
+    : declaredDiscount;
 
   const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
   receipt.set("merchant", merchantId);
