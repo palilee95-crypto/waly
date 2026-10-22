@@ -27,6 +27,8 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
+import { ALL_TIME_SLOTS, isSlotInPast } from '@/lib/bookingSlots';
+import { openBookingCheckout } from '@/lib/openBookingCheckout';
 import * as ImagePicker from 'expo-image-picker';
 import BookingAccessModal from './_components/BookingAccessModal';
 
@@ -168,6 +170,14 @@ export default function BookingsScreen() {
 
   // No-Show Confirmation Modal State
   const [noShowTargetBooking, setNoShowTargetBooking] = useState<BookingItem | null>(null);
+
+  // Reschedule (date / time / staff) sheet state
+  const [rescheduleTarget, setRescheduleTarget] = useState<BookingItem | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleStaffId, setRescheduleStaffId] = useState('');
+  const [rescheduleBusy, setRescheduleBusy] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState('');
 
   // Services State
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -870,7 +880,11 @@ export default function BookingsScreen() {
       }
     } catch (e: any) {
       console.warn('Status update error:', e);
-      Alert.alert('Error', e?.message || 'Failed to update appointment status.');
+      const code = e?.response?.code || e?.data?.code || '';
+      const message = code === 'BOOKING_NOT_TODAY'
+        ? 'This appointment can only be marked arrived on its scheduled day.'
+        : (e?.message || 'Failed to update appointment status.');
+      Alert.alert('Error', message);
     } finally {
       setUpdatingId(null);
     }
@@ -895,6 +909,100 @@ export default function BookingsScreen() {
   const handleMarkNoShow = (b: BookingItem) => {
     setNoShowTargetBooking(b);
   };
+
+  // Move an appointment to another slot. The server owns past-slot validation
+  // and the provider conflict check; this only collects the choice.
+  const handleOpenReschedule = (b: BookingItem) => {
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    setRescheduleTarget(b);
+    setRescheduleDate(b.booking_date || todayIso);
+    setRescheduleTime(b.start_time || '');
+    setRescheduleStaffId('');
+    setRescheduleError('');
+  };
+
+  const handleSaveReschedule = async () => {
+    if (!rescheduleTarget || rescheduleBusy) return;
+    if (!rescheduleDate || !rescheduleTime) {
+      setRescheduleError('Choose a date and time.');
+      return;
+    }
+    setRescheduleBusy(true);
+    setRescheduleError('');
+    try {
+      const res = await pb.send<{ booking: any }>('/api/risev/merchant/booking-reschedule', {
+        method: 'POST',
+        body: {
+          booking_id: rescheduleTarget.id,
+          booking_date: rescheduleDate,
+          start_time: rescheduleTime,
+          ...(rescheduleStaffId ? { staff_id: rescheduleStaffId } : {}),
+        },
+        requestKey: null,
+      });
+      const updated = res?.booking;
+      setBookings(prev => prev.map(b => b.id === rescheduleTarget.id
+        ? {
+            ...b,
+            booking_date: updated?.booking_date || rescheduleDate,
+            start_time: updated?.start_time || rescheduleTime,
+            end_time: updated?.end_time || b.end_time,
+            staff_name: updated?.staff_name || b.staff_name,
+          }
+        : b));
+      setRescheduleTarget(null);
+      Alert.alert('Appointment moved', 'The customer sees the new slot on their pass.');
+    } catch (err: any) {
+      const code = err?.response?.code || err?.data?.code || '';
+      const messages: Record<string, string> = {
+        BOOKING_SLOT_TAKEN: 'That provider already has an appointment at this time.',
+        BOOKING_SLOT_PAST: 'That slot is in the past.',
+        BOOKING_NOT_ACTIVE: 'This booking can no longer be moved.',
+        BOOKING_STAFF_INVALID: 'That provider is not available for this store.',
+        BOOKING_STAFF_UNAVAILABLE: 'That provider is inactive or on leave. Choose another provider.',
+        BOOKING_AVAILABILITY_UNAVAILABLE: 'Could not verify provider availability. Please try again.',
+        BOOKING_TIME_INVALID: 'Choose a valid time slot.',
+        BOOKING_DATE_INVALID: 'Choose a valid date.',
+      };
+      setRescheduleError(messages[code] || err?.message || 'Could not move this appointment.');
+    } finally {
+      setRescheduleBusy(false);
+    }
+  };
+
+  // Complete Booking no longer closes the sale on its own: it opens Quick POS
+  // with the booking prefilled, and the booking engine completes it when the
+  // checkout is confirmed.
+  const handleCompleteBooking = async (b: BookingItem) => {
+    setUpdatingId(b.id);
+    try {
+      await openBookingCheckout(b.id);
+    } catch (err: any) {
+      const code = err?.response?.code || '';
+      const message = code === 'BOOKING_NOT_ACTIVE'
+        ? 'This booking has already been closed.'
+        : 'Could not open the checkout for this booking.';
+      Alert.alert('Checkout unavailable', message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const rescheduleDates = useMemo(() => {
+    const list: Array<{ iso: string; day: string; num: string }> = [];
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      list.push({
+        iso: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        num: String(d.getDate()),
+      });
+    }
+    return list;
+  }, []);
 
   const handleCustomerWhatsApp = (b: BookingItem) => {
     let rawPhone = (b.customer_phone || '').replace(/[^0-9]/g, '');
@@ -1970,7 +2078,7 @@ export default function BookingsScreen() {
                           {b.status === 'arrived' && (
                             <TouchableOpacity
                               style={styles.btnPrimaryAction}
-                              onPress={() => handleUpdateStatus(b.id, 'completed')}
+                              onPress={() => handleCompleteBooking(b)}
                               disabled={updatingId === b.id}
                               activeOpacity={0.85}
                             >
@@ -1978,8 +2086,8 @@ export default function BookingsScreen() {
                                 <ActivityIndicator size="small" color="#000" />
                               ) : (
                                 <>
-                                  <Ionicons name="checkmark" size={16} color="#000" />
-                                  <Text style={styles.btnPrimaryActionText}>Complete & Stamp</Text>
+                                  <Ionicons name="checkmark-done" size={16} color="#000" />
+                                  <Text style={styles.btnPrimaryActionText}>Complete Booking</Text>
                                 </>
                               )}
                             </TouchableOpacity>
@@ -1987,21 +2095,28 @@ export default function BookingsScreen() {
 
                           {b.status === 'booked' && (
                             <>
-                              <TouchableOpacity
-                                style={styles.btnPrimaryAction}
-                                onPress={() => handleUpdateStatus(b.id, 'arrived')}
-                                disabled={updatingId === b.id}
-                                activeOpacity={0.85}
-                              >
-                                {updatingId === b.id ? (
-                                  <ActivityIndicator size="small" color="#000" />
-                                ) : (
-                                  <>
-                                    <Ionicons name="location" size={16} color="#000" />
-                                    <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
-                                  </>
-                                )}
-                              </TouchableOpacity>
+                              {b.booking_date === localToday ? (
+                                <TouchableOpacity
+                                  style={styles.btnPrimaryAction}
+                                  onPress={() => handleUpdateStatus(b.id, 'arrived')}
+                                  disabled={updatingId === b.id}
+                                  activeOpacity={0.85}
+                                >
+                                  {updatingId === b.id ? (
+                                    <ActivityIndicator size="small" color="#000" />
+                                  ) : (
+                                    <>
+                                      <Ionicons name="location" size={16} color="#000" />
+                                      <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
+                                    </>
+                                  )}
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={[styles.btnSecondaryAction, { flex: 1 }]}>
+                                  <Ionicons name="calendar-outline" size={15} color="#64748B" />
+                                  <Text style={[styles.btnSecondaryActionText, { color: '#64748B' }]}>Arrives {b.booking_date}</Text>
+                                </View>
+                              )}
 
                               <TouchableOpacity
                                 style={styles.btnDangerAction}
@@ -2046,6 +2161,17 @@ export default function BookingsScreen() {
                             >
                               <Ionicons name="logo-whatsapp" size={16} color="#000" />
                               <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
+                            </TouchableOpacity>
+                          )}
+
+                          {['booked', 'arrived', 'in_service'].includes(b.status) && (
+                            <TouchableOpacity
+                              style={styles.btnSecondaryAction}
+                              onPress={() => handleOpenReschedule(b)}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="calendar-outline" size={16} color="#000" />
+                              <Text style={styles.btnSecondaryActionText}>Edit</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -3736,6 +3862,151 @@ export default function BookingsScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Reschedule Modal (date / time / staff) */}
+      <Modal visible={!!rescheduleTarget} animationType="slide" transparent onRequestClose={() => setRescheduleTarget(null)}>
+        <View style={styles.calendarModalOverlay}>
+          <View style={[styles.calendarModalContainer, { maxHeight: '90%' }]}>
+            <View style={styles.calendarModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.calendarModalTitle}>Reschedule appointment</Text>
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                  {rescheduleTarget?.customer_name || 'Customer'} · {rescheduleTarget?.service_name || 'Appointment'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setRescheduleTarget(null)} style={styles.btnCloseModal}>
+                <Ionicons name="close" size={20} color="#050505" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginBottom: 8 }}>DATE</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                {rescheduleDates.map(dt => {
+                  const selected = rescheduleDate === dt.iso;
+                  return (
+                    <TouchableOpacity
+                      key={dt.iso}
+                      onPress={() => setRescheduleDate(dt.iso)}
+                      activeOpacity={0.85}
+                      style={{
+                        width: 58,
+                        borderRadius: 16,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        backgroundColor: selected ? '#000000' : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: selected ? '#000000' : '#E2E8F0',
+                      }}
+                    >
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#64748B' }}>{dt.day}</Text>
+                      <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: selected ? '#FFFFFF' : '#111111', marginTop: 2 }}>{dt.num}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>TIME</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {ALL_TIME_SLOTS.map(slot => {
+                  const past = isSlotInPast(slot, rescheduleDate);
+                  const selected = rescheduleTime === slot;
+                  return (
+                    <TouchableOpacity
+                      key={slot}
+                      disabled={past}
+                      onPress={() => setRescheduleTime(slot)}
+                      activeOpacity={0.85}
+                      style={{
+                        width: '31.5%',
+                        borderRadius: 12,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        backgroundColor: selected ? '#000000' : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: selected ? '#000000' : '#E2E8F0',
+                        opacity: past ? 0.35 : 1,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#111111' }}>{slot}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {staffList.some((s: any) => s.merchant_staff_id) && (
+                <>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>PROVIDER</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setRescheduleStaffId('')}
+                      activeOpacity={0.85}
+                      style={{
+                        borderRadius: 999,
+                        paddingHorizontal: 14,
+                        paddingVertical: 9,
+                        backgroundColor: rescheduleStaffId ? '#F8FAFC' : '#000000',
+                        borderWidth: 1,
+                        borderColor: rescheduleStaffId ? '#E2E8F0' : '#000000',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: rescheduleStaffId ? '#111111' : '#FFFFFF' }}>Keep current</Text>
+                    </TouchableOpacity>
+                    {staffList.filter((s: any) => s.merchant_staff_id).map((s: any) => {
+                      const selected = rescheduleStaffId === s.merchant_staff_id;
+                      return (
+                        <TouchableOpacity
+                          key={s.merchant_staff_id}
+                          onPress={() => setRescheduleStaffId(s.merchant_staff_id)}
+                          activeOpacity={0.85}
+                          style={{
+                            borderRadius: 999,
+                            paddingHorizontal: 14,
+                            paddingVertical: 9,
+                            backgroundColor: selected ? '#000000' : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: selected ? '#000000' : '#E2E8F0',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#111111' }} numberOfLines={1}>
+                            {s.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {!!rescheduleError && (
+                <Text style={{ color: '#B91C1C', fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 14 }}>
+                  {rescheduleError}
+                </Text>
+              )}
+
+              <TouchableOpacity
+                onPress={handleSaveReschedule}
+                disabled={rescheduleBusy}
+                activeOpacity={0.85}
+                style={{
+                  marginTop: 20,
+                  backgroundColor: '#000000',
+                  borderRadius: 16,
+                  paddingVertical: 15,
+                  alignItems: 'center',
+                  opacity: rescheduleBusy ? 0.6 : 1,
+                }}
+              >
+                {rescheduleBusy ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Save new slot</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* View Calendar Modal */}
       <Modal visible={showCalendarModal} animationType="slide" transparent={true}>
         <View style={styles.calendarModalOverlay}>
@@ -3980,30 +4251,30 @@ export default function BookingsScreen() {
 
                       {/* Merchant Action Row under each card */}
                       <View style={styles.calCardActionRow}>
-                        {b.status !== 'completed' && b.status !== 'no_show' && (
-                          <>
-                            <TouchableOpacity
-                              style={styles.btnCalActionComplete}
-                              onPress={() => handleUpdateStatus(b.id, 'completed')}
-                              disabled={updatingId === b.id}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.btnCalActionCompleteText}>
-                                {updatingId === b.id ? 'Updating...' : '✓ Complete & Stamp'}
-                              </Text>
-                            </TouchableOpacity>
+                        {b.status === 'arrived' && (
+                          <TouchableOpacity
+                            style={styles.btnCalActionComplete}
+                            onPress={() => handleCompleteBooking(b)}
+                            disabled={updatingId === b.id}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.btnCalActionCompleteText}>
+                              {updatingId === b.id ? 'Opening checkout…' : '✓ Complete Booking'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
 
-                            <TouchableOpacity
-                              style={styles.btnCalActionNoShow}
-                              onPress={() => handleMarkNoShow(b)}
-                              disabled={updatingId === b.id}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.btnCalActionNoShowText}>
-                                ✕ Mark No Show
-                              </Text>
-                            </TouchableOpacity>
-                          </>
+                        {b.status === 'booked' && (
+                          <TouchableOpacity
+                            style={styles.btnCalActionNoShow}
+                            onPress={() => handleMarkNoShow(b)}
+                            disabled={updatingId === b.id}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.btnCalActionNoShowText}>
+                              ✕ Mark No Show
+                            </Text>
+                          </TouchableOpacity>
                         )}
 
                         {b.status === 'no_show' && (

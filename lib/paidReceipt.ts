@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { pb } from '@/lib/pocketbase';
+import { jpegPdfBlob } from '@/lib/pdfFromCanvas';
 
 export type PaidReceipt = {
   id: string;
@@ -496,31 +497,8 @@ function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
 
 function browserPdf(receipt: PaidReceipt): Blob {
   const canvas = browserReceiptCanvas(receipt);
-  const width = canvas.width;
-  const height = canvas.height;
-  const encoded = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
-  const binary = atob(encoded);
-  const jpg = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  const offsets: number[] = [0];
-  const push = (data: string | Uint8Array) => { const chunk = typeof data === 'string' ? encoder.encode(data) : data; chunks.push(chunk); bytes += chunk.length; };
-  const object = (id: number, content: string | Uint8Array, suffix = '') => { offsets[id] = bytes; push(`${id} 0 obj\n`); push(content); push(`${suffix}\nendobj\n`); };
-  push('%PDF-1.4\n');
-  object(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  object(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
   // Same 80 mm slip the print path uses, so both files share one shape.
-  const pageWidth = Math.round((80 / 25.4) * 72);
-  const pageHeight = Math.round((height / width) * pageWidth);
-  object(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
-  offsets[4] = bytes; push(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); push(jpg); push('\nendstream\nendobj\n');
-  const stream = `q ${pageWidth} 0 0 ${pageHeight} 0 0 cm /Im0 Do Q`;
-  object(5, `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-  const xref = bytes; push('xref\n0 6\n0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i++) push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
-  return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
+  return jpegPdfBlob(canvas, Math.round((80 / 25.4) * 72));
 }
 
 const PRINT_STYLE_ID = 'risev-receipt-print-style';

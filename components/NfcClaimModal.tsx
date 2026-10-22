@@ -24,6 +24,7 @@ import FullPosCheckout from './FullPosCheckout';
 import ManualPosCustomerStep from './ManualPosCustomerStep';
 import ThermalReceiptScreen from './ThermalReceiptScreen';
 import { PaidReceipt } from '@/lib/paidReceipt';
+import { shortPassRef } from '@/lib/bookingPass';
 import { normalizeManualPosPhone } from '@/lib/manualPosPhone';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
@@ -278,7 +279,7 @@ export default function NfcClaimModal() {
     try {
       const response = await pb.send<{ success: boolean; claim_id?: string }>('/api/risev/nfc/request', {
         method: 'POST',
-        body: { merchant_id: merchantId, phone, branch_id: user?.branch || '', branch_name: user?.branch_name || '', manual_pos: true },
+        body: { merchant_id: merchantId, phone, branch_id: user?.branch || '', branch_name: user?.branch_name || '', manual_pos: true, ...(scannedBookingId ? { booking_id: scannedBookingId } : {}) },
       });
       if (!response.success || !response.claim_id) throw new Error('Could not prepare this sale.');
       createdId = response.claim_id;
@@ -298,6 +299,8 @@ export default function NfcClaimModal() {
       }
     } catch (err: any) {
       if (createdId) pb.collection('nfc_claims').update(createdId, { status: 'cancelled' }).catch(() => {});
+      // Let the next opening retry the attachment for this booking.
+      autoAttachBookingRef.current = '';
       setPosCustomerError(String(err?.data?.message || err?.message || (locale === 'ms' ? 'Tidak dapat meneruskan. Cuba lagi.' : 'Could not continue. Please try again.')));
     } finally {
       posCustomerBusyRef.current = false;
@@ -852,6 +855,8 @@ export default function NfcClaimModal() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
       if (targetClaim && targetClaim.status === 'pending') {
+        // A fresh opening is a fresh attachment attempt for this booking.
+        autoAttachBookingRef.current = '';
         setClaim(targetClaim);
         setScannedBookingId(String(targetClaim.booking_id || ''));
         if (targetClaim.manual_pos) {
@@ -929,9 +934,26 @@ export default function NfcClaimModal() {
 
       setIsSuccess(true);
     } catch (err: any) {
-      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+      const errorMessage = String(err?.message || '');
+      const errorCode = err?.response?.code || err?.data?.code || '';
+      if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        handleClose();
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
+        try {
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
+          if (shown) {
+            localCompletionRef.current = false;
+            return;
+          }
+        } catch (receiptErr) {}
+        localCompletionRef.current = false;
+        setErrorMsg(locale === 'ms' ? 'Tempahan ini sudah selesai.' : 'This appointment was already completed.');
         return;
       }
       // Release the "this claim is being completed" latch: left set, it makes the
@@ -1105,9 +1127,26 @@ export default function NfcClaimModal() {
       // Show sleek in-modal success view
       setIsSuccess(true);
     } catch (err: any) {
-      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+      const errorMessage = String(err?.message || '');
+      const errorCode = err?.response?.code || err?.data?.code || '';
+      if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        handleClose();
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
+        try {
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
+          if (shown) {
+            localCompletionRef.current = false;
+            return;
+          }
+        } catch (receiptErr) {}
+        localCompletionRef.current = false;
+        setErrorMsg(locale === 'ms' ? 'Tempahan ini sudah selesai.' : 'This appointment was already completed.');
         return;
       }
       // Release the "this claim is being completed" latch: left set, it makes the
@@ -1135,6 +1174,7 @@ export default function NfcClaimModal() {
 
   const handleClose = () => {
     localCompletionRef.current = false;
+    autoAttachBookingRef.current = '';
     setIsVisible(false);
     setClaim(null);
     setFullPosOpen(false);
@@ -1800,7 +1840,7 @@ export default function NfcClaimModal() {
                       <View style={styles.compactLine}>
                         <Ionicons name="calendar-outline" size={14} color="#64748B" />
                         <Text style={[styles.compactMuted, { flex: 1 }]} numberOfLines={1}>
-                          {[activeBooking.booking_date, activeBooking.start_time, activeBooking.expand?.staff?.name].filter(Boolean).join(' · ')}
+                          {[activeBooking.id ? `#${shortPassRef(activeBooking.id)}` : '', activeBooking.booking_date, activeBooking.start_time, activeBooking.expand?.staff?.name].filter(Boolean).join(' · ')}
                         </Text>
                       </View>
                     ) : upcomingFutureBooking ? (
