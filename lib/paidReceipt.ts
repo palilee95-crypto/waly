@@ -165,7 +165,35 @@ function browserPdf(receipt: PaidReceipt): Blob {
 }
 
 const PRINT_STYLE_ID = 'risev-receipt-print-style';
-const PRINT_SHEET_ID = 'risev-receipt-print-sheet';
+const PRINT_SHEET_CLASS = 'risev-print-sheet';
+const PRINT_ACTIVE_CLASS = 'risev-print-sheet-active';
+const PRINT_SLIP_MM = 80;
+
+type PrintSheet = { sheet: HTMLDivElement; image: HTMLImageElement; slipHeightMm: number };
+// Receipt screens can stack (a receipt modal over the receipt page), so sheets
+// live in mount order: only the top one — the one in front — is printable, and
+// the one underneath takes over when it closes.
+const printSheets: PrintSheet[] = [];
+let printStyle: HTMLStyleElement | null = null;
+
+function syncPrintSheets(): void {
+  const top = printSheets[printSheets.length - 1];
+  printSheets.forEach((entry) => {
+    entry.sheet.classList.toggle(PRINT_ACTIVE_CLASS, entry === top);
+  });
+  if (!top) {
+    printStyle?.remove();
+    printStyle = null;
+    return;
+  }
+  if (!printStyle || !printStyle.isConnected) {
+    printStyle = document.createElement('style');
+    printStyle.id = PRINT_STYLE_ID;
+    document.head.appendChild(printStyle);
+  }
+  // The page height belongs to the active slip, so it is rebuilt per top sheet.
+  printStyle.textContent = `.${PRINT_SHEET_CLASS}{display:none}@media print{@page{size:${PRINT_SLIP_MM}mm ${top.slipHeightMm}mm;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}body>*:not(.${PRINT_ACTIVE_CLASS}){display:none!important}.${PRINT_ACTIVE_CLASS}{display:block!important;width:${PRINT_SLIP_MM}mm;margin:0}.${PRINT_ACTIVE_CLASS} img{display:block;width:${PRINT_SLIP_MM}mm;height:${top.slipHeightMm}mm}}`;
+}
 
 // Browsers print the page, not the receipt — iOS Share → Print → Save to PDF
 // captured the animated screen (logo, barcode, action bar and all). Mounting
@@ -174,21 +202,23 @@ const PRINT_SHEET_ID = 'risev-receipt-print-sheet';
 export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return () => {};
   const logoUrl = receiptLogoUrl(receipt);
-  const slipWidthMm = 80;
   const paint = (canvas: HTMLCanvasElement) => canvas.toDataURL('image/jpeg', 0.92);
   const first = browserReceiptCanvas(receipt);
-  const slipHeightMm = Math.round(slipWidthMm * (first.height / first.width) * 10) / 10;
-  const style = document.createElement('style');
-  style.id = PRINT_STYLE_ID;
-  style.textContent = `@media print{@page{size:${slipWidthMm}mm ${slipHeightMm}mm;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}body>*:not(#${PRINT_SHEET_ID}){display:none!important}#${PRINT_SHEET_ID}{display:block!important;width:${slipWidthMm}mm;margin:0}#${PRINT_SHEET_ID} img{display:block;width:${slipWidthMm}mm;height:${slipHeightMm}mm}}#${PRINT_SHEET_ID}{display:none}`;
   const sheet = document.createElement('div');
-  sheet.id = PRINT_SHEET_ID;
+  sheet.className = PRINT_SHEET_CLASS;
   const image = document.createElement('img');
   image.alt = `Receipt ${receipt.receipt_number || ''}`.trim();
   image.src = paint(first);
   sheet.appendChild(image);
-  document.head.appendChild(style);
   document.body.appendChild(sheet);
+
+  const entry: PrintSheet = {
+    sheet,
+    image,
+    slipHeightMm: Math.round(PRINT_SLIP_MM * (first.height / first.width) * 10) / 10,
+  };
+  printSheets.push(entry);
+  syncPrintSheets();
 
   // The first draw carries the brand tile when the logo is still in flight;
   // repaint once it lands so print never keeps the fallback. A disposed sheet
@@ -201,7 +231,13 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
     });
   }
 
-  return () => { disposed = true; sheet.remove(); style.remove(); };
+  return () => {
+    disposed = true;
+    sheet.remove();
+    const index = printSheets.indexOf(entry);
+    if (index >= 0) printSheets.splice(index, 1);
+    syncPrintSheets();
+  };
 }
 
 export async function savePaidReceiptPdf(receipt: PaidReceipt): Promise<void> {
