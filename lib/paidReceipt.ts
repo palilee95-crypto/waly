@@ -37,6 +37,7 @@ export const receiptDate = (receipt: PaidReceipt) => new Date(String(receipt.cre
 export const receiptLines = (receipt: PaidReceipt) => Array.isArray(receipt.line_items) ? receipt.line_items : [];
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (match) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match));
 const browserLogos = new Map<string, HTMLImageElement>();
+const logoLoads = new Map<string, Promise<HTMLImageElement | null>>();
 
 function receiptLogoUrl(receipt: PaidReceipt): string {
   const merchant = receipt.expand?.merchant;
@@ -45,14 +46,26 @@ function receiptLogoUrl(receipt: PaidReceipt): string {
     : '';
 }
 
-export function preloadPaidReceiptLogo(receipt: PaidReceipt): void {
-  if (Platform.OS !== 'web' || typeof Image === 'undefined') return;
+// Resolves when the logo is available (or definitively not): the receipt falls
+// back to the brand tile while loading, and anything that drew that fallback
+// needs a signal to redraw.
+export function preloadPaidReceiptLogo(receipt: PaidReceipt): Promise<HTMLImageElement | null> {
+  if (Platform.OS !== 'web' || typeof Image === 'undefined') return Promise.resolve(null);
   const url = receiptLogoUrl(receipt);
-  if (!url || browserLogos.has(url)) return;
-  const image = new Image();
-  image.crossOrigin = 'anonymous';
-  image.onload = () => browserLogos.set(url, image);
-  image.src = url;
+  if (!url) return Promise.resolve(null);
+  const cached = browserLogos.get(url);
+  if (cached) return Promise.resolve(cached);
+  const inFlight = logoLoads.get(url);
+  if (inFlight) return inFlight;
+  const load = new Promise<HTMLImageElement | null>((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => { browserLogos.set(url, image); resolve(image); };
+    image.onerror = () => resolve(null);
+    image.src = url;
+  }).finally(() => logoLoads.delete(url));
+  logoLoads.set(url, load);
+  return load;
 }
 
 function receiptHtml(receipt: PaidReceipt): string {
@@ -70,7 +83,7 @@ function receiptHtml(receipt: PaidReceipt): string {
 
 // Browser PDF is drawn from receipt data, never captured from the animation.
 // A JPEG-backed single-page PDF is supported by iOS and Android browsers.
-function browserPdf(receipt: PaidReceipt): Blob {
+function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
   const isPaid = receipt.payment_status === 'paid';
   const rewardGoal = Math.max(1, Number(receipt.stamp_goal) || 10);
   const rewardBalance = Number(receipt.stamps_balance);
@@ -121,6 +134,13 @@ function browserPdf(receipt: PaidReceipt): Blob {
   label('Thank you for visiting!', Math.min(height - 70, y + 20), false, 20, 'center');
   label('Powered by risev', Math.min(height - 34, y + 55), true, 18, 'center', '#555');
 
+  return canvas;
+}
+
+function browserPdf(receipt: PaidReceipt): Blob {
+  const canvas = browserReceiptCanvas(receipt);
+  const width = canvas.width;
+  const height = canvas.height;
   const encoded = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
   const binary = atob(encoded);
   const jpg = Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -144,8 +164,85 @@ function browserPdf(receipt: PaidReceipt): Blob {
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
 }
 
+const PRINT_STYLE_ID = 'risev-receipt-print-style';
+const PRINT_SHEET_CLASS = 'risev-print-sheet';
+const PRINT_ACTIVE_CLASS = 'risev-print-sheet-active';
+const PRINT_SLIP_MM = 80;
+
+type PrintSheet = { sheet: HTMLDivElement; image: HTMLImageElement; slipHeightMm: number };
+// Receipt screens can stack (a receipt modal over the receipt page), so sheets
+// live in mount order: only the top one — the one in front — is printable, and
+// the one underneath takes over when it closes.
+const printSheets: PrintSheet[] = [];
+let printStyle: HTMLStyleElement | null = null;
+
+function syncPrintSheets(): void {
+  const top = printSheets[printSheets.length - 1];
+  printSheets.forEach((entry) => {
+    entry.sheet.classList.toggle(PRINT_ACTIVE_CLASS, entry === top);
+  });
+  if (!top) {
+    printStyle?.remove();
+    printStyle = null;
+    return;
+  }
+  if (!printStyle || !printStyle.isConnected) {
+    printStyle = document.createElement('style');
+    printStyle.id = PRINT_STYLE_ID;
+    document.head.appendChild(printStyle);
+  }
+  // The page height belongs to the active slip, so it is rebuilt per top sheet.
+  printStyle.textContent = `.${PRINT_SHEET_CLASS}{display:none}@media print{@page{size:${PRINT_SLIP_MM}mm ${top.slipHeightMm}mm;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}body>*:not(.${PRINT_ACTIVE_CLASS}){display:none!important}.${PRINT_ACTIVE_CLASS}{display:block!important;width:${PRINT_SLIP_MM}mm;margin:0}.${PRINT_ACTIVE_CLASS} img{display:block;width:${PRINT_SLIP_MM}mm;height:${top.slipHeightMm}mm}}`;
+}
+
+// Browsers print the page, not the receipt — iOS Share → Print → Save to PDF
+// captured the animated screen (logo, barcode, action bar and all). Mounting
+// the same image the downloaded PDF carries, visible only under @media print,
+// makes every print path produce the designed receipt.
+export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return () => {};
+  const logoUrl = receiptLogoUrl(receipt);
+  const paint = (canvas: HTMLCanvasElement) => canvas.toDataURL('image/jpeg', 0.92);
+  const first = browserReceiptCanvas(receipt);
+  const sheet = document.createElement('div');
+  sheet.className = PRINT_SHEET_CLASS;
+  const image = document.createElement('img');
+  image.alt = `Receipt ${receipt.receipt_number || ''}`.trim();
+  image.src = paint(first);
+  sheet.appendChild(image);
+  document.body.appendChild(sheet);
+
+  const entry: PrintSheet = {
+    sheet,
+    image,
+    slipHeightMm: Math.round(PRINT_SLIP_MM * (first.height / first.width) * 10) / 10,
+  };
+  printSheets.push(entry);
+  syncPrintSheets();
+
+  // The first draw carries the brand tile when the logo is still in flight;
+  // repaint once it lands so print never keeps the fallback. A disposed sheet
+  // must stay dead, so the callback checks before touching it.
+  let disposed = false;
+  if (logoUrl && !browserLogos.get(logoUrl)) {
+    void preloadPaidReceiptLogo(receipt).then((logo) => {
+      if (!logo || disposed || !sheet.isConnected) return;
+      image.src = paint(browserReceiptCanvas(receipt));
+    });
+  }
+
+  return () => {
+    disposed = true;
+    sheet.remove();
+    const index = printSheets.indexOf(entry);
+    if (index >= 0) printSheets.splice(index, 1);
+    syncPrintSheets();
+  };
+}
+
 export async function savePaidReceiptPdf(receipt: PaidReceipt): Promise<void> {
   if (Platform.OS === 'web') {
+    await preloadPaidReceiptLogo(receipt);
     const blob = browserPdf(receipt);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = `${receipt.receipt_number || 'risev-receipt'}.pdf`;
@@ -160,6 +257,7 @@ export async function sharePaidReceiptPdf(receipt: PaidReceipt): Promise<'shared
   if (Platform.OS === 'web') {
     const shareNav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
     if (typeof File !== 'undefined' && shareNav.share && shareNav.canShare) {
+      await preloadPaidReceiptLogo(receipt);
       const blob = browserPdf(receipt);
       const file = new File([blob], `${receipt.receipt_number || 'risev-receipt'}.pdf`, { type: 'application/pdf' });
       if (shareNav.canShare({ files: [file] })) {
