@@ -148,7 +148,14 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
         goal = Math.max(1, Number(program.get("stamp_goal")) || 10);
         rewardName = String(program.getString("name") || "").slice(0, 120);
       } catch (programErr) {}
-      receipt.set("stamps_before", Math.max(0, balance - earnedStamps));
+      // A card that just completed its goal is reset before this snapshot runs,
+      // so balance - earned would report "0 before, 0 after" for a 9/10 -> 10/10
+      // visit. When the balance is below what was just earned, the visit finished
+      // the card: the pre-visit balance was goal - earned.
+      const stampsBefore = balance >= earnedStamps
+        ? balance - earnedStamps
+        : Math.max(0, goal - earnedStamps);
+      receipt.set("stamps_before", Math.max(0, stampsBefore));
       receipt.set("stamps_balance", balance);
       receipt.set("stamp_goal", goal);
       receipt.set("reward_name", rewardName);

@@ -27,7 +27,12 @@ export default function DigitalReceiptScreen() {
     pb.collection('digital_receipts').getOne<PaidReceipt>(id, { expand: 'merchant', requestKey: null })
       .then((record) => {
         if (!mounted) return;
-        if (record.payment_status !== 'paid' && record.payment_status !== 'recorded') {
+        // `paid` receipts can legitimately be RM0.00 (a voucher covered the bill).
+        // `recorded` is a manual entry, and this page is public: only treat it as
+        // a receipt when money actually changed hands.
+        const isPaidSale = record.payment_status === 'paid';
+        const isRecordedSale = record.payment_status === 'recorded' && Number(record.total_amount) > 0;
+        if (!isPaidSale && !isRecordedSale) {
           setError('A receipt is not available for this transaction.');
         } else setReceipt(record);
       })

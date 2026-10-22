@@ -1,4 +1,4 @@
-// pb_hooks/manual_give.pb.js
+﻿// pb_hooks/manual_give.pb.js
 // Endpoint for merchant to manually issue stamps to a customer by phone number
 
 routerAdd("GET", "/api/risev/merchant/give-customer", (e) => {
@@ -30,13 +30,28 @@ routerAdd("GET", "/api/risev/merchant/give-customer", (e) => {
     if (!users.length) return e.json(200, { found: false, requiresName: true });
 
     const customer = users[0];
-    const name = customer.getString("name").trim();
+
+    // A phone number alone must not reveal who it belongs to: only surface the
+    // name once this customer already has a relationship with THIS merchant.
+    // Otherwise any merchant could resolve arbitrary numbers into names.
+    let knownHere = false;
+    try {
+      knownHere = $app.findRecordsByFilter("loyalty_cards", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0
+        || $app.findRecordsByFilter("transactions", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0
+        || $app.findRecordsByFilter("service_bookings", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0;
+    } catch (histErr) {
+      knownHere = false;
+    }
+
+    const name = knownHere ? customer.getString("name").trim() : "";
     const requiresName = !name || /^Customer(?:[ _]|$)/i.test(name);
     let stamps = 0;
     let points = 0;
     try {
-      let programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}' && is_active = true`, "-created", 1, 0);
-      if (!programs.length) programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "-created", 1, 0);
+      // Same program resolution as the NFC/POS path (nfc_transaction.pb.js):
+      // oldest program, regardless of is_active. Manual and NFC stamps must land
+      // on the same card, otherwise a customer sees two balances.
+      let programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
       if (programs.length) {
         const cards = $app.findRecordsByFilter(
           "loyalty_cards",
@@ -141,9 +156,10 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       }
     }
 
-    // 2. Find or auto-create merchant's loyalty program
-    let programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}' && is_active = true`, "-created", 1, 0);
-    if (!programs.length) programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "-created", 1, 0);
+    // 2. Find or auto-create merchant's loyalty program.
+    // Oldest program, matching nfc_transaction.pb.js â€” the two entry points must
+    // resolve the same card or stamps split across two programs.
+    const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
     let program = programs.length > 0 ? programs[0] : null;
     if (!program) {
       const progCol = $app.findCollectionByNameOrId("loyalty_programs");
@@ -261,35 +277,42 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       if (merchRec) merchantStoreName = merchRec.getString("name");
     } catch (mErr) {}
 
-    // Snapshot this manual entry as a recorded receipt. The cashier has not
+    // Snapshot a manual SALE as a recorded receipt. The cashier has not
     // confirmed a payment here, so it must never be labelled PAID like POS.
     // A receipt failure must not invite a retry that would issue stamps twice.
+    //
+    // Only when money changed hands: digital_receipts.viewRule is public so that
+    // shared receipt links open without a login, which means every receipt is
+    // readable by id. A zero-bill stamp issue is a loyalty event, not a sale, and
+    // must not publish the customer's name and phone.
     let receiptId = "";
-    try {
-      const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
-      receipt.set("merchant", merchantId);
-      receipt.set("transaction", txn.id);
-      receipt.set("customer", customer.id);
-      receipt.set("customer_phone", cleanPhone);
-      receipt.set("customer_name", resolvedCustomerName);
-      receipt.set("staff_name", authRecord.getString("name") || "Merchant");
-      receipt.set("branch_name", branchName);
-      receipt.set("receipt_number", "RV-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + txn.id.slice(-6).toUpperCase());
-      receipt.set("line_items", [{ name: billAmount > 0 ? "Manual sale entry" : "Loyalty stamp issue", qty: 1, price: billAmount }]);
-      receipt.set("subtotal", billAmount);
-      receipt.set("discount_amount", 0);
-      receipt.set("total_amount", billAmount);
-      receipt.set("payment_method", "Manual entry");
-      receipt.set("payment_status", "recorded");
-      receipt.set("stamps_earned", actualStampsToAward);
-      receipt.set("stamps_before", currentStamps);
-      receipt.set("stamps_balance", totalStamps);
-      receipt.set("stamp_goal", goal);
-      receipt.set("reward_name", nextRewardName || program.getString("reward_name") || "");
-      $app.save(receipt);
-      receiptId = receipt.id;
-    } catch (receiptErr) {
-      console.log("[MANUAL GIVE] Transaction saved but receipt unavailable:", receiptErr.message || receiptErr);
+    if (billAmount > 0) {
+      try {
+        const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
+        receipt.set("merchant", merchantId);
+        receipt.set("transaction", txn.id);
+        receipt.set("customer", customer.id);
+        receipt.set("customer_phone", cleanPhone);
+        receipt.set("customer_name", resolvedCustomerName);
+        receipt.set("staff_name", authRecord.getString("name") || "Merchant");
+        receipt.set("branch_name", branchName);
+        receipt.set("receipt_number", "RV-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + txn.id.slice(-6).toUpperCase());
+        receipt.set("line_items", [{ name: "Manual sale entry", qty: 1, price: billAmount }]);
+        receipt.set("subtotal", billAmount);
+        receipt.set("discount_amount", 0);
+        receipt.set("total_amount", billAmount);
+        receipt.set("payment_method", "Manual entry");
+        receipt.set("payment_status", "recorded");
+        receipt.set("stamps_earned", actualStampsToAward);
+        receipt.set("stamps_before", currentStamps);
+        receipt.set("stamps_balance", totalStamps);
+        receipt.set("stamp_goal", goal);
+        receipt.set("reward_name", nextRewardName || program.getString("reward_name") || "");
+        $app.save(receipt);
+        receiptId = receipt.id;
+      } catch (receiptErr) {
+        console.log("[MANUAL GIVE] Transaction saved but receipt unavailable:", receiptErr.message || receiptErr);
+      }
     }
 
     let pointsBalance = 0;
