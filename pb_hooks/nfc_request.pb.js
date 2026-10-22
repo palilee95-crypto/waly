@@ -29,6 +29,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
 
     // POS is a paid-plan feature and must be initiated by the merchant or its
     // staff. The customer flow below stays public; only manual_pos is gated.
+    let bookingBypass = false;
+    let checkoutBookingId = "";
     if (isManualPos) {
       const auth = e.auth;
       if (!auth) {
@@ -59,8 +61,7 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       // A booking checkout is already covered by the booking add-on, so a manual
       // POS sale that carries a valid booking id is allowed on any plan. Without
       // a valid booking id the POS plan gate below still applies.
-      let bookingBypass = false;
-      const checkoutBookingId = String(body.booking_id || "").trim();
+      checkoutBookingId = String(body.booking_id || "").trim();
       if (checkoutBookingId) {
         try {
           const digitsOf = (value) => String(value || "").replace(/[^\d]/g, "");
@@ -228,6 +229,34 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     // checkouts always get a fresh claim so they cannot overwrite an NFC
     // request (or a different sale for the same customer).
     let claim = null;
+
+    // A booking-exempt manual claim is reused for the same booking, so one
+    // booking cannot open several exemption claims.
+    if (isManualPos && bookingBypass && checkoutBookingId) {
+      try {
+        const existingBypass = $app.findRecordsByFilter(
+          "nfc_claims",
+          `merchant = '${merchantId}' && booking = '${checkoutBookingId}' && status = 'pending'`,
+          "-created",
+          1,
+          0
+        );
+        if (existingBypass.length > 0) {
+          claim = existingBypass[0];
+          claim.set("customer_name", name);
+          claim.set("customer_phone", cleanPhone);
+          claim.set("session_code", sessionCode);
+          claim.set("status", "pending");
+          if (branchId) claim.set("branch", branchId);
+          if (branchName) claim.set("branch_name", branchName);
+          $app.save(claim);
+          console.log(`[NFC REQUEST] Reused booking claim ${claim.id} for booking ${checkoutBookingId}`);
+        }
+      } catch (bypassErr) {
+        claim = null;
+      }
+    }
+
     if (!isManualPos) try {
       const existingClaims = $app.findRecordsByFilter(
         "nfc_claims",
@@ -271,6 +300,13 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
       try { claim.set("manual_pos", isManualPos); } catch (vErr) {}
+      // Bind an exempt claim to the booking that justified it. /nfc/complete
+      // requires this booking id back before it will settle the sale.
+      if (bookingBypass && checkoutBookingId) {
+        try { claim.set("booking", checkoutBookingId); } catch (bookErr) {
+          console.log("[NFC REQUEST] Could not bind booking to claim:", bookErr.message || bookErr);
+        }
+      }
       if (appliedVoucherId) {
         try { claim.set("voucher", appliedVoucherId); } catch (vErr) {}
         try { claim.set("voucher_title", voucherTitle); } catch (vErr) {}

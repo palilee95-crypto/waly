@@ -299,6 +299,8 @@ export default function NfcClaimModal() {
       }
     } catch (err: any) {
       if (createdId) pb.collection('nfc_claims').update(createdId, { status: 'cancelled' }).catch(() => {});
+      // Let the next opening retry the attachment for this booking.
+      autoAttachBookingRef.current = '';
       setPosCustomerError(String(err?.data?.message || err?.message || (locale === 'ms' ? 'Tidak dapat meneruskan. Cuba lagi.' : 'Could not continue. Please try again.')));
     } finally {
       posCustomerBusyRef.current = false;
@@ -853,6 +855,8 @@ export default function NfcClaimModal() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
       if (targetClaim && targetClaim.status === 'pending') {
+        // A fresh opening is a fresh attachment attempt for this booking.
+        autoAttachBookingRef.current = '';
         setClaim(targetClaim);
         setScannedBookingId(String(targetClaim.booking_id || ''));
         if (targetClaim.manual_pos) {
@@ -934,10 +938,15 @@ export default function NfcClaimModal() {
       const errorCode = err?.response?.code || err?.data?.code || '';
       if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        // The appointment may already have been settled by another checkout.
-        // Show its receipt instead of starting a second sale.
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
         try {
-          const shown = await loadPaidReceipt();
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
           if (shown) {
             localCompletionRef.current = false;
             return;
@@ -1122,10 +1131,15 @@ export default function NfcClaimModal() {
       const errorCode = err?.response?.code || err?.data?.code || '';
       if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        // The appointment may already have been settled by another checkout.
-        // Show its receipt instead of starting a second sale.
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
         try {
-          const shown = await loadPaidReceipt();
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
           if (shown) {
             localCompletionRef.current = false;
             return;
@@ -1160,6 +1174,7 @@ export default function NfcClaimModal() {
 
   const handleClose = () => {
     localCompletionRef.current = false;
+    autoAttachBookingRef.current = '';
     setIsVisible(false);
     setClaim(null);
     setFullPosOpen(false);

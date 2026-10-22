@@ -599,7 +599,7 @@ routerAdd("POST", "/api/risev/merchant/booking-reschedule", (e) => {
 
     const bookingDate = String(data.booking_date || booking.getString("booking_date")).trim();
     const startTime = String(data.start_time || booking.getString("start_time")).trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
+    if (!availability.isValidIsoDate(bookingDate)) {
       return e.json(400, { code: "BOOKING_DATE_INVALID", message: "Choose a valid date." });
     }
     const startMinutes = availability.toMinutes(startTime);

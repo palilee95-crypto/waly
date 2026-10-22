@@ -24,7 +24,7 @@ import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import { ALL_TIME_SLOTS, getPeriodForSlot, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
-import { AppointmentPassData, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import { AppointmentPassData, passStatusLabel, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -820,7 +820,7 @@ export default function CustomerBookingPwaScreen() {
     bookingId: passBookingId,
     shortRef: passBookingId ? shortPassRef(passBookingId) : '',
     status: bookingStatus === 'booked' && hasArrived ? 'arrived' : bookingStatus,
-    merchantName: merchant?.store_name || merchant?.name || 'Risev merchant',
+    merchantName: merchant?.store_name || merchant?.name || passBooking?.merchant_name || 'Risev merchant',
     merchantLogoUrl: merchant?.logo_url || null,
     passUrl: passUrlForBooking,
     qrUrl: passUrlForBooking
@@ -836,11 +836,26 @@ export default function CustomerBookingPwaScreen() {
     customerPhone: String(passBooking?.customer_phone || customerPhone || ''),
   };
   const passStatus = passData.status;
-  const passStatusLabel = passStatus === 'completed'
-    ? 'COMPLETED'
-    : (passStatus === 'arrived' || passStatus === 'in_service')
-      ? 'CHECKED IN'
-      : 'CONFIRMED';
+  // One label for the sheet and the PDF; inactive passes get a red pill and no
+  // check-in action.
+  const passStatusText = passStatusLabel(passStatus);
+  const passInactive = ['completed', 'cancelled', 'no_show'].includes(passStatus);
+  const passPillStyle = passStatusText === 'CONFIRMED'
+    ? { bg: '#FEF9C3', dot: '#EAB308', text: '#111111' }
+    : (passStatus === 'cancelled' || passStatus === 'no_show')
+      ? { bg: '#FEE2E2', dot: '#DC2626', text: '#B91C1C' }
+      : { bg: '#DCFCE7', dot: '#16A34A', text: '#15803D' };
+  const passActionLabel = passStatus === 'completed'
+    ? 'Appointment completed'
+    : passStatus === 'cancelled'
+      ? 'Appointment cancelled'
+      : passStatus === 'no_show'
+        ? 'Marked as no show'
+        : hasArrived
+          ? 'Arrival confirmed'
+          : checkingIn
+            ? 'Checking in…'
+            : "I'm here — Check in";
 
   const goToLoginForPass = () => {
     if (!passBookingId) return;
@@ -893,7 +908,7 @@ export default function CustomerBookingPwaScreen() {
   };
 
   const handleCheckIn = async () => {
-    if (passIsDemo || checkingIn) return;
+    if (passIsDemo || checkingIn || passInactive) return;
     if (!isCustomerSession()) {
       goToLoginForPass();
       return;
@@ -967,11 +982,14 @@ export default function CustomerBookingPwaScreen() {
     const qName = (typeof queryName === 'string' ? queryName : '').trim();
     const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
     const session = customerSessionIdentity();
+    const namePhone = (qPhone || session.phone).replace(/[^\d]/g, '');
 
     if (qName) {
       setCustomerName(qName);
+      nameOwnerPhoneRef.current = namePhone;
     } else if (session.name) {
       setCustomerName(session.name);
+      nameOwnerPhoneRef.current = namePhone;
     }
 
     if (qPhone) {
@@ -1122,7 +1140,24 @@ export default function CustomerBookingPwaScreen() {
 
       try {
         const raw = await AsyncStorage.getItem('risev_cust_identity');
-        if (!raw) return;
+        if (!raw) {
+          // Migrate the pre-identity cache: trust the remembered name only when
+          // it was stored for this same number, then keep the pair under the
+          // new key so later phone edits can still invalidate it.
+          const legacyName = await AsyncStorage.getItem('risev_cust_name');
+          const legacyPhone = (await AsyncStorage.getItem('risev_cust_phone')) || phone;
+          const digits = phone.replace(/[^\d]/g, '');
+          const legacyDigits = String(legacyPhone || '').replace(/[^\d]/g, '');
+          if (legacyName && digits && legacyDigits === digits) {
+            setCustomerName(legacyName);
+            nameOwnerPhoneRef.current = digits;
+            setResolvedName(legacyName);
+            setLookupStatus('known');
+            await AsyncStorage.setItem('risev_cust_identity', JSON.stringify({ name: legacyName, phone: digits }));
+            await AsyncStorage.removeItem('risev_cust_name');
+          }
+          return;
+        }
         const cached = JSON.parse(raw);
         const digits = phone.replace(/[^\d]/g, '');
         if (cached?.name && digits && String(cached.phone || '') === digits) {
@@ -4394,24 +4429,24 @@ export default function CustomerBookingPwaScreen() {
                 justifyContent: 'center',
                 gap: 6,
                 marginTop: 16,
-                backgroundColor: passStatusLabel === 'CONFIRMED' ? '#FEF9C3' : '#DCFCE7',
+                backgroundColor: passPillStyle.bg,
                 borderRadius: 999,
                 paddingVertical: 8,
               }}>
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: passStatusLabel === 'CONFIRMED' ? '#EAB308' : '#16A34A' }} />
-                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 0.6 }}>
-                  {passStatusLabel}
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: passPillStyle.dot }} />
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: passPillStyle.text, letterSpacing: 0.6 }}>
+                  {passStatusText}
                 </Text>
               </View>
 
               {/* Primary action */}
               <TouchableOpacity
                 onPress={handleCheckIn}
-                disabled={hasArrived || checkingIn || passLoading}
+                disabled={hasArrived || checkingIn || passLoading || passInactive}
                 activeOpacity={0.85}
                 style={{
                   marginTop: 12,
-                  backgroundColor: hasArrived ? '#16A34A' : '#000000',
+                  backgroundColor: passInactive ? '#E2E8F0' : hasArrived ? '#16A34A' : '#000000',
                   borderRadius: 16,
                   paddingVertical: 15,
                   flexDirection: 'row',
@@ -4424,10 +4459,10 @@ export default function CustomerBookingPwaScreen() {
                 {checkingIn ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Ionicons name={hasArrived ? 'checkmark-circle' : 'navigate'} size={18} color="#FFFFFF" />
+                  <Ionicons name={passInactive ? 'close-circle-outline' : hasArrived ? 'checkmark-circle' : 'navigate'} size={18} color={passInactive ? '#64748B' : '#FFFFFF'} />
                 )}
-                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  {hasArrived ? 'Arrival confirmed' : checkingIn ? 'Checking in…' : "I'm here — Check in"}
+                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: passInactive ? '#64748B' : '#FFFFFF' }}>
+                  {passActionLabel}
                 </Text>
               </TouchableOpacity>
 

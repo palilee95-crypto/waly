@@ -26,6 +26,24 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       return e.json(404, { message: "NFC claim record not found" });
     }
 
+    // A claim created through the booking-scoped plan bypass stays bound to
+    // that booking: it cannot be settled as an ordinary manual sale.
+    let claimBookingId = "";
+    try {
+      claimBookingId = claim.getString("booking") || "";
+    } catch (claimBookingErr) {
+      claimBookingId = "";
+    }
+    if (claimBookingId) {
+      const suppliedBookingId = String(body.booking_id || "").trim();
+      if (!suppliedBookingId || suppliedBookingId !== claimBookingId) {
+        return e.json(403, {
+          code: "POS_PLAN_REQUIRED",
+          message: "This sale is tied to a booking. Complete it through the booking checkout.",
+        });
+      }
+    }
+
     const merchantId = claim.getString("merchant");
     const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
     let isOwner = false;
@@ -240,7 +258,24 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
       const bookingStatus = activeBooking.getString("status");
       if (bookingStatus === "completed" || bookingStatus === "cancelled" || bookingStatus === "no_show") {
-        return e.json(400, { code: "BOOKING_NOT_ACTIVE", message: "This booking is already " + bookingStatus + "." });
+        // The booking was settled by another checkout. Return its receipt so the
+        // counter can show it instead of starting a second sale.
+        let settledReceiptId = "";
+        try {
+          const settledReceipts = $app.findRecordsByFilter(
+            "digital_receipts",
+            "booking = '" + activeBooking.id + "'",
+            "-created",
+            1,
+            0
+          );
+          if (settledReceipts.length > 0) settledReceiptId = settledReceipts[0].id;
+        } catch (settledErr) {}
+        return e.json(400, {
+          code: "BOOKING_NOT_ACTIVE",
+          message: "This booking is already " + bookingStatus + ".",
+          receipt_id: settledReceiptId,
+        });
       }
     }
 

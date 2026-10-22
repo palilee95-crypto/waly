@@ -4251,30 +4251,30 @@ export default function BookingsScreen() {
 
                       {/* Merchant Action Row under each card */}
                       <View style={styles.calCardActionRow}>
-                        {b.status !== 'completed' && b.status !== 'no_show' && (
-                          <>
-                            <TouchableOpacity
-                              style={styles.btnCalActionComplete}
-                              onPress={() => handleUpdateStatus(b.id, 'completed')}
-                              disabled={updatingId === b.id}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.btnCalActionCompleteText}>
-                                {updatingId === b.id ? 'Updating...' : '✓ Complete & Stamp'}
-                              </Text>
-                            </TouchableOpacity>
+                        {b.status === 'arrived' && (
+                          <TouchableOpacity
+                            style={styles.btnCalActionComplete}
+                            onPress={() => handleCompleteBooking(b)}
+                            disabled={updatingId === b.id}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.btnCalActionCompleteText}>
+                              {updatingId === b.id ? 'Opening checkout…' : '✓ Complete Booking'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
 
-                            <TouchableOpacity
-                              style={styles.btnCalActionNoShow}
-                              onPress={() => handleMarkNoShow(b)}
-                              disabled={updatingId === b.id}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.btnCalActionNoShowText}>
-                                ✕ Mark No Show
-                              </Text>
-                            </TouchableOpacity>
-                          </>
+                        {b.status === 'booked' && (
+                          <TouchableOpacity
+                            style={styles.btnCalActionNoShow}
+                            onPress={() => handleMarkNoShow(b)}
+                            disabled={updatingId === b.id}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.btnCalActionNoShowText}>
+                              ✕ Mark No Show
+                            </Text>
+                          </TouchableOpacity>
                         )}
 
                         {b.status === 'no_show' && (

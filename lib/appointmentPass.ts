@@ -37,7 +37,7 @@ const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match
 ));
 
-const passStatusLabel = (status: string) => {
+export const passStatusLabel = (status: string) => {
   if (status === 'completed') return 'COMPLETED';
   if (status === 'arrived' || status === 'in_service') return 'CHECKED IN';
   if (status === 'cancelled' || status === 'no_show') return status.toUpperCase().replace('_', ' ');

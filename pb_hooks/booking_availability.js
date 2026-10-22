@@ -3,20 +3,33 @@
 // A required module, not file scope: PocketBase JSVM handlers cannot see
 // file-level declarations (see AGENTS.md).
 
-// "03:00 PM" -> 900 minutes. Returns 0 for an unparseable value.
+// "03:00 PM" -> 900 minutes. Returns 0 for anything that is not a well-formed
+// 12-hour slot with real hour/minute ranges, so callers can treat 0 as invalid.
 function toMinutes(slot) {
-  var value = String(slot || "").trim();
-  if (!value) return 0;
-  var parts = value.split(/\s+/);
-  var timePart = parts[0] || "";
-  var modifier = (parts[1] || "").toUpperCase();
-  var hm = timePart.split(":");
-  var hours = parseInt(hm[0], 10);
-  var minutes = parseInt(hm[1], 10) || 0;
-  if (isNaN(hours)) return 0;
+  var match = /^([0-9]{1,2}):([0-9]{2})\s*(AM|PM)$/i.exec(String(slot || "").trim());
+  if (!match) return 0;
+  var hours = parseInt(match[1], 10);
+  var minutes = parseInt(match[2], 10);
+  if (isNaN(hours) || isNaN(minutes)) return 0;
+  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return 0;
+  var modifier = match[3].toUpperCase();
   if (modifier === "PM" && hours < 12) hours += 12;
   if (modifier === "AM" && hours === 12) hours = 0;
   return hours * 60 + minutes;
+}
+
+// A real calendar day in "YYYY-MM-DD" form (rejects 2026-99-99 and friends).
+function isValidIsoDate(value) {
+  var string = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(string)) return false;
+  var parts = string.split("-");
+  var year = parseInt(parts[0], 10);
+  var month = parseInt(parts[1], 10);
+  var day = parseInt(parts[2], 10);
+  var date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
 }
 
 function formatMinutes(total) {
@@ -76,6 +89,7 @@ function findStaffConflict(merchantId, staffId, date, startMinutes, endMinutes, 
 
 module.exports = {
   toMinutes: toMinutes,
+  isValidIsoDate: isValidIsoDate,
   formatMinutes: formatMinutes,
   durationMinutes: durationMinutes,
   findStaffConflict: findStaffConflict,
