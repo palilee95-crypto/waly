@@ -351,11 +351,10 @@ routerAdd("GET", "/api/risev/merchant/vouchers/preview", (e) => {
     if (!authRecord) {
       return e.json(401, { success: false, message: "Unauthorized. Merchant login required." });
     }
-    const authRole = authRecord.getString("role");
-    if (authRole !== "merchant" && authRole !== "both") {
-      return e.json(403, { success: false, message: "Forbidden. Merchant or staff access required." });
-    }
-
+    // Merchant scope comes from the account, from a store it owns, or from its
+    // staff row. users.role is not authoritative here: staff are linked through
+    // merchant_staff (and the redeem route accepts them the same way), so gating
+    // on a role name is what kept staff out of the preview.
     let merchantId = authRecord.getString("merchant_id");
     if (!merchantId) {
       try {
@@ -364,7 +363,15 @@ routerAdd("GET", "/api/risev/merchant/vouchers/preview", (e) => {
       } catch (ownedErr) {}
     }
     if (!merchantId) {
-      return e.json(400, { success: false, message: "Account is not associated with any merchant store." });
+      try {
+        const staffRows = $app.findRecordsByFilter("merchant_staff", `user = "${authRecord.id}"`, "-created", 1, 0);
+        if (staffRows.length > 0 && staffRows[0].getBool("is_active") !== false) {
+          merchantId = staffRows[0].getString("merchant");
+        }
+      } catch (staffErr) {}
+    }
+    if (!merchantId) {
+      return e.json(403, { success: false, message: "This account is not linked to a store." });
     }
 
     const query = (e.requestInfo() && e.requestInfo().query) || {};

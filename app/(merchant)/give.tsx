@@ -601,6 +601,10 @@ export default function GiveStampsScreen() {
     : isPointsOnly ? (previewPoints > 0 ? `+${previewPoints} points` : 'Points from sale')
     : `${stampsValue} stamp${stampsValue === 1 ? '' : 's'}`;
   const pendingVoucherRecord = pendingVoucher?.voucher;
+  // Details must be loaded before the cashier can confirm: the preview is the
+  // only place the reward and customer are shown, and a code-only sheet would be
+  // confirmation without knowing what is being redeemed.
+  const voucherReviewReady = !!pendingVoucherRecord && !pendingVoucher?.loading;
   const pendingRewardName = pendingVoucherRecord?.expand?.reward?.name || pendingVoucherRecord?.title || 'Reward voucher';
   const pendingCustomerName = pendingVoucherRecord?.expand?.customer?.name || pendingVoucherRecord?.customer_name || 'Customer';
   const pendingExpiry = pendingVoucherRecord?.expires_at
@@ -1215,9 +1219,9 @@ export default function GiveStampsScreen() {
             ) : null}
             {voucherError ? <Text style={styles.reviewError}>{voucherError}</Text> : null}
             <TouchableOpacity
-              style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
-              onPress={() => pendingVoucher && executeRedemption(pendingVoucher.code)}
-              disabled={isRedeemingVoucher || !!pendingVoucher?.loading}
+              style={[styles.primaryBtn, (isRedeemingVoucher || !voucherReviewReady) && styles.primaryBtnDisabled]}
+              onPress={() => pendingVoucher && voucherReviewReady && executeRedemption(pendingVoucher.code)}
+              disabled={isRedeemingVoucher || !voucherReviewReady}
               activeOpacity={0.85}
             >
               {isRedeemingVoucher ? (
